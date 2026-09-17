@@ -314,7 +314,8 @@ test_archive_tag_holds_the_network() {
     local args="${STUB_DIR}/archive.args"
     run_build "$args" \
         --service mina-archive --version 3.1.0 --network mainnet \
-        --docker-registry testreg --deb-codename noble --deb-build-flags none
+        --docker-registry testreg --deb-codename noble --deb-build-flags none \
+        --deb-profile mainnet
 
     assert_option_value "target" "$args" "--target" "mina-archive"
     assert_has_line "ubuntu base image" "$args" "image=ubuntu:noble"
@@ -326,7 +327,7 @@ test_rosetta_tag_holds_the_network() {
     local args="${STUB_DIR}/rosetta.args"
     run_build "$args" \
         --service mina-rosetta --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags none
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet
 
     assert_option_value "target" "$args" "--target" "mina-rosetta"
     assert_has_line "readable tag" "$args" "testreg/mina-rosetta:3.1.0-devnet"
@@ -353,7 +354,8 @@ test_hardfork_targets() {
 
     run_build "$args" \
         --service mina-daemon-auto-hardfork --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags none --deb-legacy-version 2.0.0
+        --docker-registry testreg --deb-build-flags none --deb-legacy-version 2.0.0 \
+        --deb-profile devnet
     assert_option_value "auto hardfork target" "$args" "--target" \
         "mina-daemon-auto-hardfork"
     assert_has_line "the legacy version reaches the build" "$args" \
@@ -370,10 +372,14 @@ test_configured_service_uses_docker_tag_for_the_output() {
     local args="${STUB_DIR}/configured.args"
     run_build "$args" \
         --service mina-daemon-configured --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags none
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet
 
     assert_has_line "dockerfile" "$args" "dockerfiles/Dockerfile-install-config"
     assert_has_line "the version names the base image" "$args" "version=3.1.0"
+    # The base is the profiled image (<version>-devnet-generic): the generic
+    # image has no profile, and the node has no default one.
+    assert_has_line "the base image is the profiled image" "$args" \
+        "generic_base_segment=-devnet"
     assert_has_line "output tag" "$args" \
         "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet"
 }
@@ -382,7 +388,7 @@ test_profiled_service_uses_its_own_dockerfile() {
     local args="${STUB_DIR}/profiled.args"
     run_build "$args" \
         --service mina-daemon-profiled --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags none
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet
 
     assert_has_line "dockerfile" "$args" "dockerfiles/Dockerfile-install-profile"
     assert_has_line "output tag" "$args" \
@@ -422,7 +428,7 @@ test_profiled_instrumented_suffix() {
     local args="${STUB_DIR}/profiled-instrumented.args"
     run_build "$args" \
         --service mina-daemon-profiled --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags instrumented
+        --docker-registry testreg --deb-build-flags instrumented --deb-profile devnet
 
     assert_has_line "readable tag" "$args" \
         "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet-generic-instrumented"
@@ -437,6 +443,9 @@ test_rosetta_configured_keeps_the_rosetta_name() {
         --docker-registry testreg --deb-build-flags none
 
     assert_has_line "dockerfile" "$args" "dockerfiles/Dockerfile-install-config"
+    # Rosetta's generic image is per-network and already has a profile.
+    assert_has_line "the base image is the per-network generic image" "$args" \
+        "generic_base_segment=-devnet"
     assert_has_line "output tag" "$args" \
         "testreg/mina-rosetta:3.0.0-test-branch-abcdefg-bullseye-devnet"
 }
@@ -483,7 +492,8 @@ test_arm64_gets_a_platform_suffix() {
     local args="${STUB_DIR}/arm.args"
     run_build "$args" \
         --service mina-archive --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags none --platform linux/arm64
+        --docker-registry testreg --deb-build-flags none --platform linux/arm64 \
+        --deb-profile devnet
 
     assert_has_line "platform" "$args" "linux/arm64"
     assert_has_line "the tag has the platform suffix" "$args" \
@@ -521,9 +531,19 @@ test_missing_input_stops_the_build() {
     if [[ "$LAST_EXIT" -eq 0 ]]; then log_fail "an unknown codename must stop the build"; else log_pass; fi
 
     run_build "$args" --service mina-daemon-auto-hardfork --version 3.1.0 \
-        --network devnet --docker-registry testreg
+        --network devnet --docker-registry testreg --deb-profile devnet
     if [[ "$LAST_EXIT" -eq 0 ]]; then
         log_fail "the auto hardfork build must stop without --deb-legacy-version"
+    else
+        log_pass
+    fi
+
+    # The profile picks the base image and the profile packages; a default
+    # would build a working-looking image for the wrong network.
+    run_build "$args" --service mina-daemon-configured --version 3.1.0 \
+        --network mainnet --docker-registry testreg --deb-build-flags none
+    if [[ "$LAST_EXIT" -eq 0 ]]; then
+        log_fail "a configured build must stop without --deb-profile"
     else
         log_pass
     fi
