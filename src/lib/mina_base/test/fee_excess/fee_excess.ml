@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 open Mina_base
 open Snark_params.Tick
@@ -57,19 +57,19 @@ let combine_checked_unchecked_consistent () =
 let combine_succeed_with_0_middle () =
   Quickcheck.test
     (let open Quickcheck in
-    let open Generator.Let_syntax in
-    let%bind fe = gen in
-    (* The tokens before and after should be distinct.
+     let open Generator.Let_syntax in
+     let%bind fe = gen in
+     (* The tokens before and after should be distinct.
        Especially in this scenario, we may get an overflow error
        otherwise. *)
-    let%map tid, excess =
-      gen_single
-        ~token_id:
-          (Generator.filter Token_id.gen
-             ~f:(Fn.compose not (Token_id.equal fe.fee_token_l)) )
-        ()
-    in
-    (fe, tid, excess))
+     let%map tid, excess =
+       gen_single
+         ~token_id:
+           (Generator.filter Token_id.gen
+              ~f:(Fn.compose not (Token_id.equal fe.fee_token_l)) )
+         ()
+     in
+     (fe, tid, excess) )
     ~f:(fun (fe1, tid, excess) ->
       let fe2 =
         if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
@@ -77,8 +77,8 @@ let combine_succeed_with_0_middle () =
           match
             of_one_or_two
               (`Two
-                ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-                , (tid, excess) ) )
+                 ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
+                 , (tid, excess) ) )
           with
           | Ok fe2 ->
               fe2

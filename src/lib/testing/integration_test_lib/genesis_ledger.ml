@@ -45,14 +45,14 @@ let create (config : Test_config.Test_account.t list) =
   let add_accounts accounts_and_keypairs =
     List.map accounts_and_keypairs
       ~f:(fun
-           ( { Test_config.Test_account.balance
-             ; account_name
-             ; timing
-             ; permissions
-             ; zkapp
-             }
-           , (pk, sk) )
-         ->
+          ( { Test_config.Test_account.balance
+            ; account_name
+            ; timing
+            ; permissions
+            ; zkapp
+            }
+          , (pk, sk) )
+        ->
         let timing = runtime_timing_of_timing timing in
         let default = Runtime_config.Accounts.Single.default in
         let account =

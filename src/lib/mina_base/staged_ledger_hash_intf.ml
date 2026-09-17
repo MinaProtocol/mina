@@ -1,5 +1,5 @@
 module type Full = sig
-  open Core_kernel
+  open Core
   open Snark_params.Tick
 
   type t [@@deriving sexp, equal, compare, hash, yojson]

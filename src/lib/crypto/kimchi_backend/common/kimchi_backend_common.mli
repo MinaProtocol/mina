@@ -10,7 +10,7 @@ module Plonk_constraint_system : sig
   type ('f, 'rust_gates) t =
     ('f, 'rust_gates) Kimchi_pasta_snarky_backend.Plonk_constraint_system.t
 
-  val get_public_input_size : ('a, 'b) t -> int Core_kernel.Set_once.t
+  val get_public_input_size : ('a, 'b) t -> int Core.Set_once.t
 
   (** Return the size of all the fixed lookup tables concatenated, without the
       built-in XOR and RangeCheck tables *)

@@ -86,7 +86,7 @@ let health_check ~port ?(retries = 30) ?(delay = 1.0) () =
         Deferred.unit
     | Error _ ->
         if remaining > 0 then
-          let%bind () = after (Time.Span.of_sec delay) in
+          let%bind () = after (Time_float.Span.of_sec delay) in
           go (remaining - 1)
         else failwith "Mock server health check timed out"
   in

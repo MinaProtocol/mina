@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
@@ -15,7 +15,7 @@ let fits_in_bits_as_prover (word : Circuit.Field.t) (length : int) =
   assert (
     Bignum_bigint.(
       field_to_bignum_bigint (cvar_field_to_field_as_prover word)
-      < pow (of_int 2) (of_int length)) )
+      < pow (of_int 2) (of_int length) ) )
 
 (** Side of rotation. *)
 type rot_mode = Left | Right
@@ -184,7 +184,7 @@ let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
           Field.Constant.(
             ( curr_field - field0 - (field1 * two_pow_len)
             - (field2 * two_pow_2len) - (field3 * two_pow_3len) )
-            / two_pow_4len) )
+            / two_pow_4len ) )
     in
     next_var
   in

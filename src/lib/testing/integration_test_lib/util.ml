@@ -50,7 +50,7 @@ let check_cmd_output ~prog ~args output =
   | Error (`Signal signal) ->
       let%map () = print_output () in
       Or_error.errorf "command exited prematurely due to signal %d"
-        (Signal.to_system_int signal)
+        (Signal_unix.to_system_int signal)
 
 let run_cmd_or_error_timeout ~timeout_seconds dir prog args =
   [%log' spam (Logger.create ())]
@@ -61,7 +61,7 @@ let run_cmd_or_error_timeout ~timeout_seconds dir prog args =
   let%bind res =
     match%map
       Timeout.await ()
-        ~timeout_duration:(Time.Span.create ~sec:timeout_seconds ())
+        ~timeout_duration:(Time_float.Span.create ~sec:timeout_seconds ())
         (Process.collect_output_and_wait process)
     with
     | `Ok output ->

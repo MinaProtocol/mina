@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 let different_version = Mina_numbers.Txn_version.(succ current)

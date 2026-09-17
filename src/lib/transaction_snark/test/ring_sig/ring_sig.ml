@@ -136,9 +136,11 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
           ( if debug_mode then
-            Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
-            |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
-            |> printf "vk:\n%s\n\n" )
+              Binable.to_string
+                (module Side_loaded_verification_key.Stable.V2)
+                vk
+              |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
+              |> printf "vk:\n%s\n\n" )
           |> fun () ->
           let Mina_transaction_logic.For_tests.Transaction_spec.
                 { sender = sender, sender_nonce
@@ -317,27 +319,27 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               }
           in
           ( if debug_mode then
-            (* print fee payer *)
-            Account_update.Fee_payer.to_yojson fee_payer
-            |> Yojson.Safe.pretty_to_string
-            |> printf "fee_payer:\n%s\n\n"
-            |> fun () ->
-            (* print other_account_update data *)
-            Zkapp_command.Call_forest.iteri zkapp_command.account_updates
-              ~f:(fun idx (p : Account_update.t) ->
-                Account_update.Body.to_yojson p.body
-                |> Yojson.Safe.pretty_to_string
-                |> printf "other_account_update #%d body:\n%s\n\n" idx )
-            |> fun () ->
-            (* print other_account_update proof *)
-            Pickles.Side_loaded.Proof.Stable.V2.sexp_of_t pi
-            |> Sexp.to_string |> Base64.encode_exn
-            |> printf "other_account_update_proof:\n%s\n\n"
-            |> fun () ->
-            (* print protocol_state *)
-            Zkapp_precondition.Protocol_state.to_yojson protocol_state
-            |> Yojson.Safe.pretty_to_string
-            |> printf "protocol_state:\n%s\n\n" )
+              (* print fee payer *)
+              Account_update.Fee_payer.to_yojson fee_payer
+              |> Yojson.Safe.pretty_to_string
+              |> printf "fee_payer:\n%s\n\n"
+              |> fun () ->
+              (* print other_account_update data *)
+              Zkapp_command.Call_forest.iteri zkapp_command.account_updates
+                ~f:(fun idx (p : Account_update.t) ->
+                  Account_update.Body.to_yojson p.body
+                  |> Yojson.Safe.pretty_to_string
+                  |> printf "other_account_update #%d body:\n%s\n\n" idx )
+              |> fun () ->
+              (* print other_account_update proof *)
+              Pickles.Side_loaded.Proof.Stable.V3.sexp_of_t pi
+              |> Sexp.to_string |> Base64.encode_exn
+              |> printf "other_account_update_proof:\n%s\n\n"
+              |> fun () ->
+              (* print protocol_state *)
+              Zkapp_precondition.Protocol_state.to_yojson protocol_state
+              |> Yojson.Safe.pretty_to_string
+              |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) ) ;

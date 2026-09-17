@@ -5,7 +5,7 @@
     Subject:    Test slot reduction vesting parameter update equations.
  *)
 
-open Core_kernel
+open Core
 open Currency
 open Mina_base
 open Mina_numbers
@@ -40,14 +40,14 @@ let gen_vesting_timing_with ~(spec : vesting_spec) =
   in
   let%bind vesting_end =
     Global_slot_since_genesis.(
-      gen_incl (of_uint32 spec.vesting_end_min) (of_uint32 spec.vesting_end_max))
+      gen_incl (of_uint32 spec.vesting_end_min) (of_uint32 spec.vesting_end_max) )
   in
   let%bind cliff_time =
     Global_slot_since_genesis.(gen_incl (of_int 1) vesting_end)
   in
   let%bind initial_minimum_balance =
     Balance.(
-      gen_incl spec.initial_minimum_balance_min spec.initial_minimum_balance_max)
+      gen_incl spec.initial_minimum_balance_min spec.initial_minimum_balance_max )
   in
   Account.gen_vesting_details ~cliff_time ~vesting_end ~vesting_period
     initial_minimum_balance
@@ -116,14 +116,14 @@ let gen_slot_during_vesting ~(timing : Account.Timing.as_record) =
   let at_most_cliff =
     let half_period_before_cliff =
       Global_slot_since_genesis.(
-        sub timing.cliff_time half_period |> Option.value ~default:zero)
+        sub timing.cliff_time half_period |> Option.value ~default:zero )
     in
     (half_period_before_cliff, timing.cliff_time)
   in
   let right_before_cliff =
     let slot_right_before_cliff =
       Global_slot_since_genesis.(
-        sub timing.cliff_time Global_slot_span.one |> Option.value ~default:zero)
+        sub timing.cliff_time Global_slot_span.one |> Option.value ~default:zero )
     in
     (slot_right_before_cliff, slot_right_before_cliff)
   in
@@ -137,12 +137,12 @@ let gen_slot_during_vesting ~(timing : Account.Timing.as_record) =
         let slot_right_after_cliff =
           add timing.cliff_time Global_slot_span.one
         in
-        (slot_right_after_cliff, slot_right_after_cliff))
+        (slot_right_after_cliff, slot_right_after_cliff) )
   in
   let at_least_cliff =
     let just_before_end =
       Global_slot_since_genesis.(
-        sub vesting_end Global_slot_span.one |> Option.value ~default:zero)
+        sub vesting_end Global_slot_span.one |> Option.value ~default:zero )
     in
     (timing.cliff_time, just_before_end)
   in
@@ -156,11 +156,11 @@ let gen_slot_during_vesting ~(timing : Account.Timing.as_record) =
     ; (1.0, at_least_cliff)
     ]
     |> List.filter_map ~f:(fun (weight, (low, high)) ->
-           if
-             Global_slot_since_genesis.(compare low high) <= 0
-             && Global_slot_since_genesis.(compare high vesting_end) < 0
-           then Some (weight, Global_slot_since_genesis.(gen_incl low high))
-           else None )
+        if
+          Global_slot_since_genesis.(compare low high) <= 0
+          && Global_slot_since_genesis.(compare high vesting_end) < 0
+        then Some (weight, Global_slot_since_genesis.(gen_incl low high))
+        else None )
   in
   Quickcheck.Generator.weighted_union intervals
 
@@ -214,7 +214,7 @@ let gen_any_at_hardfork =
     according to [Account_timing.Slot_reduction_update.is_actively_vesting] *)
 let is_actively_vesting ~global_slot (t : Account.Timing.as_record) =
   Account_timing.Slot_reduction_update.(
-    t |> of_record |> is_actively_vesting ~global_slot)
+    t |> of_record |> is_actively_vesting ~global_slot )
 
 (** Test that the generator for not-actively-vesting accounts produces accounts
     that aren't considered actively vesting *)
@@ -240,11 +240,11 @@ let record_conversion_roundtrip () =
       let timing = Account_timing.Slot_reduction_update.of_record timing in
       assert (
         Account_timing.Slot_reduction_update.(
-          equal timing (of_record @@ to_record timing)) ) )
+          equal timing (of_record @@ to_record timing) ) ) )
 
 let half_max_global_slot =
   Global_slot_since_genesis.(
-    max_value |> to_uint32 |> UInt32.(Fn.flip div (of_int 2)) |> of_uint32)
+    max_value |> to_uint32 |> UInt32.(Fn.flip div (of_int 2)) |> of_uint32 )
 
 let slot_at_most_half_max global_slot =
   Global_slot_since_genesis.compare global_slot half_max_global_slot <= 0
@@ -265,8 +265,7 @@ let unadjusted_vesting_ends_as_expected () =
          balance is zero at vesting_end *)
       [%test_pred: Balance.t * Balance.t]
         (fun (unlocked, new_balance) ->
-          (not Balance.(equal unlocked zero))
-          && Balance.(equal new_balance zero) )
+          (not Balance.(equal unlocked zero)) && Balance.(equal new_balance zero) )
         ( funds_unlocked_at_slot ~global_slot:vesting_end timing
         , min_balance_at_slot ~global_slot:vesting_end timing ) )
 
@@ -279,10 +278,10 @@ let fast_vesting_ends_as_expected () =
   Quickcheck.test
     ( gen_vesting_or_cliff_at_hardfork
     |> Quickcheck.Generator.filter_map ~f:(fun (timing, hardfork_slot) ->
-           let vesting_end = final_vesting_slot timing in
-           if slot_at_most_half_max vesting_end then
-             Some (timing, hardfork_slot, vesting_end)
-           else None ) )
+        let vesting_end = final_vesting_slot timing in
+        if slot_at_most_half_max vesting_end then
+          Some (timing, hardfork_slot, vesting_end)
+        else None ) )
     ~f:(fun (timing, hardfork_slot, vesting_end) ->
       let pre_hardfork_vesting_span =
         Global_slot_since_genesis.(diff vesting_end hardfork_slot)
@@ -341,49 +340,48 @@ let minimum_balance_unchanged_at_hardfork () =
 let no_even_vesting_discrepancies () =
   Quickcheck.test
     (let open Quickcheck.Generator.Let_syntax in
-    (* Need to make sure that the hardfork doesn't occur in the last half of the
+     (* Need to make sure that the hardfork doesn't occur in the last half of the
        global slots, otherwise no test cases will exist! *)
-    let%bind timing, hardfork_slot, vesting_end =
-      gen_vesting_or_cliff_at_hardfork
-      |> Quickcheck.Generator.filter_map ~f:(fun (timing, hardfork_slot) ->
-             let vesting_end = final_vesting_slot timing in
-             if slot_at_most_half_max vesting_end then
-               Some (timing, hardfork_slot, vesting_end)
-             else None )
-    in
-    (* Our test slot can't be exactly hardfork_slot, for the reasons described
+     let%bind timing, hardfork_slot, vesting_end =
+       gen_vesting_or_cliff_at_hardfork
+       |> Quickcheck.Generator.filter_map ~f:(fun (timing, hardfork_slot) ->
+           let vesting_end = final_vesting_slot timing in
+           if slot_at_most_half_max vesting_end then
+             Some (timing, hardfork_slot, vesting_end)
+           else None )
+     in
+     (* Our test slot can't be exactly hardfork_slot, for the reasons described
        in the doc comment. *)
-    let min_pre_hardfork_test_slot =
-      Global_slot_since_genesis.succ hardfork_slot
-    in
-    (* Our test slot on the no-hardfork timeline also can't be more than half
+     let min_pre_hardfork_test_slot =
+       Global_slot_since_genesis.succ hardfork_slot
+     in
+     (* Our test slot on the no-hardfork timeline also can't be more than half
        the max slot, as these slots cease to exist in the with-hardfork
        timeline. *)
-    let max_pre_hardfork_test_slot =
-      Global_slot_since_genesis.(
-        min half_max_global_slot
-          (if equal vesting_end max_value then max_value else succ vesting_end))
-    in
-    let%map pre_hardfork_test_slot =
-      Global_slot_since_genesis.(
-        gen_incl min_pre_hardfork_test_slot max_pre_hardfork_test_slot)
-    in
-    (* The with-hardfork timeline test slot is twice the distance from the
+     let max_pre_hardfork_test_slot =
+       Global_slot_since_genesis.(
+         min half_max_global_slot
+           (if equal vesting_end max_value then max_value else succ vesting_end) )
+     in
+     let%map pre_hardfork_test_slot =
+       Global_slot_since_genesis.(
+         gen_incl min_pre_hardfork_test_slot max_pre_hardfork_test_slot )
+     in
+     (* The with-hardfork timeline test slot is twice the distance from the
        hardfork_slot compared to the without-hardfork timeline *)
-    let post_hardfork_test_slot_span =
-      Global_slot_since_genesis.(diff pre_hardfork_test_slot hardfork_slot)
-      |> Option.value_exn |> Global_slot_span.to_uint32
-      |> UInt32.(mul (of_int 2))
-      |> Global_slot_span.of_uint32
-    in
-    let post_hardfork_test_slot =
-      Global_slot_since_genesis.(add hardfork_slot post_hardfork_test_slot_span)
-    in
-    (timing, hardfork_slot, pre_hardfork_test_slot, post_hardfork_test_slot))
-    ~f:(fun ( timing
-            , hardfork_slot
-            , pre_hardfork_test_slot
-            , post_hardfork_test_slot ) ->
+     let post_hardfork_test_slot_span =
+       Global_slot_since_genesis.(diff pre_hardfork_test_slot hardfork_slot)
+       |> Option.value_exn |> Global_slot_span.to_uint32
+       |> UInt32.(mul (of_int 2))
+       |> Global_slot_span.of_uint32
+     in
+     let post_hardfork_test_slot =
+       Global_slot_since_genesis.(add hardfork_slot post_hardfork_test_slot_span)
+     in
+     (timing, hardfork_slot, pre_hardfork_test_slot, post_hardfork_test_slot) )
+    ~f:(fun
+        (timing, hardfork_slot, pre_hardfork_test_slot, post_hardfork_test_slot)
+      ->
       [%test_eq: Balance.t]
         (funds_unlocked_at_slot ~global_slot:pre_hardfork_test_slot timing)
         (funds_unlocked_at_slot ~global_slot:post_hardfork_test_slot
@@ -399,51 +397,52 @@ let no_even_vesting_discrepancies () =
 let no_odd_vesting_discrepancies () =
   Quickcheck.test
     (let open Quickcheck.Generator.Let_syntax in
-    let%bind timing, hardfork_slot, vesting_end =
-      gen_vesting_or_cliff_at_hardfork
-      |> Quickcheck.Generator.filter_map ~f:(fun (timing, hardfork_slot) ->
-             let vesting_end = final_vesting_slot timing in
-             (* Our guarantees only hold for accounts that do not take a long
+     let%bind timing, hardfork_slot, vesting_end =
+       gen_vesting_or_cliff_at_hardfork
+       |> Quickcheck.Generator.filter_map ~f:(fun (timing, hardfork_slot) ->
+           let vesting_end = final_vesting_slot timing in
+           (* Our guarantees only hold for accounts that do not take a long
                 time to vest - the property that adjusted accounts only vest at
                 even spans does actually fail for certain very long
                 schedules. *)
-             if not @@ slot_at_most_half_max vesting_end then None
-             else if
-               (* Also need to make sure that this account is actively vesting
+           if not @@ slot_at_most_half_max vesting_end then None
+           else if
+             (* Also need to make sure that this account is actively vesting
                   for at least one odd-span slot, otherwise no test cases
                   exist *)
-               Global_slot_span.(
-                 compare
-                   ( Global_slot_since_genesis.diff vesting_end hardfork_slot
-                   |> Option.value_exn )
-                   one)
-               >= 0
-             then Some (timing, hardfork_slot, vesting_end)
-             else None )
-    in
-    let total_vesting_slots =
-      Global_slot_since_genesis.(diff vesting_end hardfork_slot)
-      |> Option.value_exn |> Global_slot_span.to_uint32
-    in
-    let max_post_hardfork_span =
-      UInt32.(
-        if compare total_vesting_slots (div max_int (of_int 2)) > 0 then max_int
-        else mul total_vesting_slots (of_int 2))
-      |> Global_slot_span.of_uint32
-    in
-    let%map post_hardfork_span =
-      Global_slot_span.(gen_incl one max_post_hardfork_span)
-      |> Quickcheck.Generator.filter ~f:(fun span ->
-             let span_uint32 = Global_slot_span.to_uint32 span in
-             UInt32.(equal Infix.(span_uint32 mod of_int 2) one) )
-    in
-    let test_slot =
-      Global_slot_since_genesis.(add hardfork_slot post_hardfork_span)
-    in
-    ( timing
-    , Account_timing.slot_reduction_update ~hardfork_slot timing
-    , test_slot
-    , hardfork_slot ))
+             Global_slot_span.(
+               compare
+                 ( Global_slot_since_genesis.diff vesting_end hardfork_slot
+                 |> Option.value_exn )
+                 one )
+             >= 0
+           then Some (timing, hardfork_slot, vesting_end)
+           else None )
+     in
+     let total_vesting_slots =
+       Global_slot_since_genesis.(diff vesting_end hardfork_slot)
+       |> Option.value_exn |> Global_slot_span.to_uint32
+     in
+     let max_post_hardfork_span =
+       UInt32.(
+         if compare total_vesting_slots (div max_int (of_int 2)) > 0 then
+           max_int
+         else mul total_vesting_slots (of_int 2) )
+       |> Global_slot_span.of_uint32
+     in
+     let%map post_hardfork_span =
+       Global_slot_span.(gen_incl one max_post_hardfork_span)
+       |> Quickcheck.Generator.filter ~f:(fun span ->
+           let span_uint32 = Global_slot_span.to_uint32 span in
+           UInt32.(equal Infix.(span_uint32 mod of_int 2) one) )
+     in
+     let test_slot =
+       Global_slot_since_genesis.(add hardfork_slot post_hardfork_span)
+     in
+     ( timing
+     , Account_timing.slot_reduction_update ~hardfork_slot timing
+     , test_slot
+     , hardfork_slot ) )
     ~sexp_of:(fun (timing, adjusted_timing, test_slot, hardfork_slot) ->
       [%sexp_of:
         Account_timing.Slot_reduction_update.t
@@ -451,8 +450,7 @@ let no_odd_vesting_discrepancies () =
         * Global_slot_since_genesis.t
         * Global_slot_since_genesis.t]
         Account_timing.Slot_reduction_update.
-          (of_record timing, of_record adjusted_timing, test_slot, hardfork_slot)
-      )
+          (of_record timing, of_record adjusted_timing, test_slot, hardfork_slot) )
     ~f:(fun (_timing, adjusted_timing, test_slot, _hardfork_slot) ->
       [%test_eq: Balance.t] Balance.zero
         (funds_unlocked_at_slot ~global_slot:test_slot adjusted_timing) )

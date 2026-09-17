@@ -8,7 +8,7 @@
  *)
 
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Frontier_base
 
@@ -66,7 +66,7 @@ val check :
             | `Transition of State_hash.t
             | `Arcs of State_hash.t
             | `Protocol_states_for_root_scan_state ]
-         | `Raised of Core_kernel.Error.t ] ] )
+         | `Raised of Core.Error.t ] ] )
      Result.t
 
 val initialize : t -> root_data:Root_data.Limited.t -> unit

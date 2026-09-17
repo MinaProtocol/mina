@@ -1,6 +1,6 @@
 (** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
 
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 open Signature_lib

@@ -24,7 +24,7 @@ let dummy_constraints () =
     ignore
       ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
           (Kimchi_backend_common.Scalar_challenge.create x)
-        : Field.t * Field.t ))
+        : Field.t * Field.t ) )
 
 let tag, _, p, Pickles.Provers.[ step ] =
   Pickles.compile_promise () ~public_input:(Input Field.typ)

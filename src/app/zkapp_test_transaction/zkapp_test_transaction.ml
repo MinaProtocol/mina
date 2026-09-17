@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Cli_lib.Arg_type
@@ -51,7 +51,7 @@ module Flags = struct
         Param.flag "--debug" Param.no_arg
           ~doc:"Debug mode, generates transaction snark"
       in
-      (keyfile, fee, nonce, memo, debug))
+      (keyfile, fee, nonce, memo, debug) )
 end
 
 let create_zkapp_account =
@@ -92,7 +92,7 @@ let create_zkapp_account =
        if Currency.Amount.(equal amount zero) then
          failwith "Receiver amount must be greater than 0" ;
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
+         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ) )
 
 let upgrade_zkapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -132,10 +132,10 @@ let upgrade_zkapp =
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
@@ -143,7 +143,7 @@ let upgrade_zkapp =
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~verification_key ~zkapp_uri ~auth ~constraint_constants
-         ~genesis_constants ))
+         ~genesis_constants ) )
 
 let transfer_funds_one_receiver =
   let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
@@ -184,13 +184,13 @@ let transfer_funds_one_receiver =
          failwithf "Fee must at least be %s"
            (Currency.Fee.to_mina_string Flags.min_fee)
            () ;
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
-         ~constraint_constants ))
+         ~constraint_constants ) )
 
 let transfer_funds =
   let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
@@ -269,13 +269,13 @@ let transfer_funds =
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receivers ~genesis_constants
-         ~constraint_constants ))
+         ~constraint_constants ) )
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
@@ -352,10 +352,9 @@ let update_state =
            Param.(optional_with_default 1 int)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
@@ -364,13 +363,14 @@ let update_state =
           (rather than beside the genesis-constants block) so this mesa-only
           addition does not adjoin the lines develop rewrote to
           Genesis_constants.profiled (), which would make the branch fail the
-          "merges cleanly into develop" lint. *)
+          "merges cleanly into develop" lint now that the develop port (#19138)
+          has landed. *)
        let max_state_fields = Mina_base.Zkapp_state.max_size_int in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~num_events ~num_actions ~event_elements_per
          ~action_elements_per ~repeat_arrays ~num_state_fields
          ~num_account_updates ~max_state_fields ~genesis_constants
-         ~constraint_constants ))
+         ~constraint_constants ) )
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
@@ -409,12 +409,12 @@ let update_zkapp_uri =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+
+       let (module G) = Genesis_constants.profiled () in
+       let genesis_constants = G.genesis_constants in
+       let constraint_constants = G.constraint_constants in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth ~genesis_constants ~constraint_constants ))
+         ~zkapp_uri ~auth ~genesis_constants ~constraint_constants ) )
 
 let update_action_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -442,28 +442,28 @@ let update_action_state =
            Param.(
              required
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        and action_state1 =
          Param.flag "--sequence-state1"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        and action_state2 =
          Param.flag "--sequence-state2"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        and action_state3 =
          Param.flag "--sequence-state3"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let action_state =
@@ -471,16 +471,16 @@ let update_action_state =
            ~f:(fun s -> if List.is_empty s then None else Some (Array.of_list s))
            [ action_state0; action_state1; action_state2; action_state3 ]
        in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+
+       let (module G) = Genesis_constants.profiled () in
+       let genesis_constants = G.genesis_constants in
+       let constraint_constants = G.constraint_constants in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~action_state ~genesis_constants ~constraint_constants ))
+         ~action_state ~genesis_constants ~constraint_constants ) )
 
 let update_token_symbol =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
@@ -515,16 +515,16 @@ let update_token_symbol =
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth ~genesis_constants ~constraint_constants ))
+         ~token_symbol ~auth ~genesis_constants ~constraint_constants ) )
 
 let update_permissions =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -615,17 +615,17 @@ let update_permissions =
            }
        in
        let snapp_update = { Account_update.Update.dummy with permissions } in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~genesis_constants ~constraint_constants ~snapp_update
-         ~current_auth:(Util.auth_of_string current_auth) ))
+         ~current_auth:(Util.auth_of_string current_auth) ) )
 
 let update_timings =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -687,17 +687,17 @@ let update_timings =
              : Account_update.Update.Timing_info.value )
        in
        let snapp_update = { Account_update.Update.dummy with timing } in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
+       let genesis_constants = G.genesis_constants in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~snapp_update ~genesis_constants ~constraint_constants
-         ~current_auth:(Util.auth_of_string current_auth) ))
+         ~current_auth:(Util.auth_of_string current_auth) ) )
 
 let test_zkapp_with_genesis_ledger =
   Command.(
@@ -722,7 +722,7 @@ let test_zkapp_with_genesis_ledger =
              "PATH path to a configuration file consisting the genesis ledger"
            Param.(required string)
        in
-       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ) )
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)
@@ -739,6 +739,6 @@ let txn_commands =
   ]
 
 let () =
-  Command.run
+  Command_unix.run
     (Command.group ~summary:"ZkApp test transaction"
        ~preserve_subcommand_order:() txn_commands )

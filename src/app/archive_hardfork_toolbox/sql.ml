@@ -47,67 +47,43 @@ module Block_info = struct
       Ok { id; height; state_hash; protocol_version }
     in
     Caqti_type.(
-      custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
+      custom ~encode ~decode (t4 int int64 string Protocol_version.typ) )
 end
 
-(* Walks the parent chain from the block whose state hash is $1 back to genesis.
-   Used by the callers that start from a state hash (is-in-best-chain,
-   confirmations, no-commands-after). *)
+let chain_of_query_templated ~start_condition ~join_condition =
+  {%string|
+    WITH RECURSIVE chain AS (
+        SELECT
+            b.id AS id,
+            b.parent_id AS parent_id,
+            b.state_hash AS state_hash,
+            b.height AS height,
+            b.global_slot_since_genesis AS global_slot_since_genesis,
+            b.protocol_version_id AS protocol_version_id
+        FROM blocks b
+        WHERE %{start_condition}
+
+        UNION ALL
+
+        SELECT
+            p.id,
+            p.parent_id,
+            p.state_hash,
+            p.height,
+            p.global_slot_since_genesis,
+            p.protocol_version_id
+        FROM blocks p
+        JOIN chain c ON p.id = c.parent_id AND %{join_condition} AND c.parent_id IS NOT NULL
+    )
+  |}
+
 let chain_of_query =
-  {sql|
-    WITH RECURSIVE chain AS (
-        SELECT
-            b.id AS id,
-            b.parent_id AS parent_id,
-            b.state_hash AS state_hash,
-            b.height AS height,
-            b.global_slot_since_genesis AS global_slot_since_genesis,
-            b.protocol_version_id AS protocol_version_id
-        FROM blocks b
-        WHERE b.state_hash = $1
+  chain_of_query_templated ~start_condition:"b.state_hash = $1"
+    ~join_condition:"TRUE"
 
-        UNION ALL
-
-        SELECT
-            p.id,
-            p.parent_id,
-            p.state_hash,
-            p.height,
-            p.global_slot_since_genesis,
-            p.protocol_version_id
-        FROM blocks p
-        JOIN chain c ON p.id = c.parent_id AND c.parent_id IS NOT NULL
-    )
-  |sql}
-
-(* Walks the parent chain from the block with id $1 down to (and including) the
-   block with id $2. Used by blocks_between_both_inclusive. *)
 let chain_of_query_until_inclusive =
-  {sql|
-    WITH RECURSIVE chain AS (
-        SELECT
-            b.id AS id,
-            b.parent_id AS parent_id,
-            b.state_hash AS state_hash,
-            b.height AS height,
-            b.global_slot_since_genesis AS global_slot_since_genesis,
-            b.protocol_version_id AS protocol_version_id
-        FROM blocks b
-        WHERE b.id = $1
-
-        UNION ALL
-
-        SELECT
-            p.id,
-            p.parent_id,
-            p.state_hash,
-            p.height,
-            p.global_slot_since_genesis,
-            p.protocol_version_id
-        FROM blocks p
-        JOIN chain c ON p.id = c.parent_id AND c.id <> $2 AND c.parent_id IS NOT NULL
-    )
-  |sql}
+  chain_of_query_templated ~start_condition:"b.id = $1"
+    ~join_condition:"c.id <> $2"
 
 let latest_state_hash (module Conn : CONNECTION) =
   let query =
@@ -223,7 +199,7 @@ module Fork_context = struct
     in
     Caqti_type.(
       custom ~encode ~decode
-        (t2 (t3 string int64 int64) (t3 string (option string) (option int64))))
+        (t2 (t3 string int64 int64) (t3 string (option string) (option int64))) )
 end
 
 (* The first hard-fork block (global_slot_since_hard_fork = 0) strictly above the
@@ -257,7 +233,7 @@ let blocks_to_orphan (module Conn : CONNECTION) ~canonical_block_ids
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->* t3 int64 string string)
+      ->* t3 int64 string string )
       {%string|
         SELECT height, state_hash, chain_status::text
         FROM blocks
@@ -294,7 +270,7 @@ let conversion_summary_counts (module Conn : CONNECTION) ~canonical_block_ids
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->! t4 int int int int)
+      ->! t4 int int int int )
       {%string|
         SELECT
           COUNT(*) FILTER (WHERE id = ANY($2::int[]))::int,
@@ -344,7 +320,7 @@ let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->. Caqti_type.unit)
+      ->. Caqti_type.unit )
       {%string|
         UPDATE blocks
         SET chain_status = CASE
@@ -410,29 +386,21 @@ let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
     Caqti_type.(t2 string int ->! int)
       {%string|
         %{chain_of_query}
-        SELECT COUNT(*) FROM chain 
-        WHERE global_slot_since_genesis >= $2;
+        SELECT COUNT(*) FROM chain
+        WHERE global_slot_since_genesis > $2;
       |}
   in
   Conn.find query (latest_state_hash, fork_slot)
 
 let number_of_commands_since_block_query block_commands_table =
-  Caqti_type.(t2 string int ->! t4 string int int int)
+  Caqti_type.(t2 string int ->! int)
     {%string|
       %{chain_of_query}
-      SELECT 
-          state_hash,
-          height,
-          global_slot_since_genesis,
-          COUNT(bc.block_id) AS command_count
+      SELECT COUNT(bc.block_id)::int AS command_count
       FROM chain
-      LEFT JOIN %{block_commands_table} bc 
+      LEFT JOIN %{block_commands_table} bc
           ON chain.id = bc.block_id
-      WHERE global_slot_since_genesis >= $2
-      GROUP BY 
-          state_hash,
-          height,
-          global_slot_since_genesis;
+      WHERE chain.global_slot_since_genesis > $2;
     |}
 
 let number_of_user_commands_since_block (module Conn : CONNECTION)

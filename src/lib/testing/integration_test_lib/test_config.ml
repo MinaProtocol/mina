@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Container_images = struct
   type t =
@@ -60,8 +60,9 @@ type constants =
 [@@deriving to_yojson]
 
 let default_constants =
+  let (module G) = Genesis_constants.profiled () in
   let protocol =
-    { Genesis_constants.Compiled.genesis_constants.protocol with
+    { G.genesis_constants.protocol with
       k = 20
     ; delta = 0
     ; slots_per_epoch = 3 * 8 * 20
@@ -70,12 +71,9 @@ let default_constants =
     }
   in
   { genesis_constants =
-      { Genesis_constants.Compiled.genesis_constants with
-        protocol
-      ; txpool_max_size = 3000
-      }
-  ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-  ; compile_config = Mina_compile_config.Compiled.t
+      { G.genesis_constants with protocol; txpool_max_size = 3000 }
+  ; constraint_constants = G.constraint_constants
+  ; compile_config = Mina_compile_config.of_node_config (module Node_config)
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -199,7 +197,7 @@ let transaction_capacity_log_2 (config : t) =
           - At least 3 ensures a transaction per block and the staged-ledger
             unit tests pass.
       *)
-      1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+      1 + Core.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
 
 let transaction_capacity config =
   let i = transaction_capacity_log_2 config in

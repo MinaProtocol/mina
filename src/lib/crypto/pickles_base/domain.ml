@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 [@@@warning "-4"] (* sexp-related fragile pattern-matching warning *)
 

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Mina_stdlib
@@ -47,7 +47,7 @@ let check_commands ledger ~verifier
     |> Deferred.return
   in
   let partitioner cmd =
-    let open Core_kernel.Either in
+    let open Core.Either in
     match
       verify_command_with_transaction_pool_proxy ~transaction_pool_proxy cmd
     with
@@ -82,4 +82,4 @@ let check_commands ledger ~verifier
       | `Valid_assuming _ ->
           Error
             (Verifier.Failure.Verification_failed
-               (Error.of_string "batch verification failed") ) ) )
+               (Error.of_string "batch verification failed") ) ))

@@ -18,8 +18,7 @@ struct
   let random_point =
     let rec pt x =
       let y2 = G.Params.(T.Field.(b + (x * (a + (x * x))))) in
-      if T.Field.is_square y2 then (x, T.Field.sqrt y2)
-      else pt T.Field.(x + one)
+      if T.Field.is_square y2 then (x, T.Field.sqrt y2) else pt T.Field.(x + one)
     in
     G.Constant.of_affine (pt (T.Field.of_int 0))
 
@@ -58,7 +57,7 @@ struct
     Quickcheck.test ~trials:10
       Quickcheck.Generator.(
         map (list_with_length n Bool.quickcheck_generator) ~f:(fun bs ->
-            Field.Constant.project bs |> Field.Constant.unpack ))
+            Field.Constant.project bs |> Field.Constant.unpack ) )
       ~f:(fun xs ->
         try
           T.Test.test_equal ~equal:G.Constant.equal
@@ -67,8 +66,7 @@ struct
             G.typ
             (fun (g, s) ->
               make_checked (fun () ->
-                  scale_fast ~num_bits:n g (Shifted_value (Field.project s)) )
-              )
+                  scale_fast ~num_bits:n g (Shifted_value (Field.project s)) ) )
             (fun (g, s) ->
               let open G.Constant.Scalar in
               let s = project s in

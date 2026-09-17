@@ -77,7 +77,7 @@ type t = Executor.t
 
 let run t ~archive_uri ~input_config ~interval_checkpoint ?target_state_hash
     ?checkpoint_output_folder ?checkpoint_file_prefix ~output_ledger =
-  let config_folder = Filename.temp_dir "replayer" "" in
+  let config_folder = Filename_unix.temp_dir "replayer" "" in
   let input_file = Filename.of_parts [ config_folder; "replayer_input.json" ] in
   let checkpoint_output_folder =
     match checkpoint_output_folder with

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module State = State
 
 module Make_ext (M : Monad.S) = struct

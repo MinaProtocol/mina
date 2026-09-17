@@ -1,5 +1,5 @@
 open Signature_lib
-open Core_kernel
+open Core
 
 type t =
   { keypair : Keypair.t

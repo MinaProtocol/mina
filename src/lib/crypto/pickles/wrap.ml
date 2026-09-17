@@ -104,7 +104,7 @@ module For_tests_only = struct
               { Tick.Proof.Challenge_polynomial.commitment
               ; challenges = Vector.to_array cs
               } )
-          |> to_list)
+          |> to_list )
         public_input proof
     in
     let x_hat =
@@ -244,7 +244,7 @@ module For_tests_only = struct
                   ~r ~xi ~zeta ~zetaw
                   ~old_bulletproof_challenges:prev_challenges ~env:tick_env
                   ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
-                  ~plonk:tick_plonk_minimal)
+                  ~plonk:tick_plonk_minimal )
         ; branch_data =
             { proofs_verified =
                 ( match actual_proofs_verified with
@@ -285,8 +285,7 @@ let wrap
     (module Max_local_max_proof_verifieds : Hlist.Maxes.S
       with type ns = max_local_max_proofs_verifieds
        and type length = max_proofs_verified )
-    (( module
-      Req ) :
+    (( module Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
@@ -364,8 +363,7 @@ let wrap
             (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
             (E01 (Step_acc))
             (struct
-              let f :
-                  type a.
+              let f : type a.
                      a
                      P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared
                      .t
@@ -438,8 +436,7 @@ let wrap
         (P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared)
         (E01 (Tick.Curve.Affine))
         (struct
-          let f :
-              type n.
+          let f : type n.
                  n P.Base.Messages_for_next_proof_over_same_field.Wrap.Prepared.t
               -> _ =
            fun t -> t.challenge_polynomial_commitment
@@ -513,7 +510,8 @@ let wrap
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
-          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
+          ~f:(fun
+              { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
             let create_proof () =
               Backend.Tock.Proof.create_async ~primary:public_inputs

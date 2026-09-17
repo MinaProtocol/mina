@@ -1,11 +1,15 @@
 (executable
  (name delegation_verify)
  (libraries
+  core_unix.date_unix
   core_kernel
   async
   async_kernel
   async_unix
   core
+  core_unix.command_unix
+  core_unix.filename_unix
+  core_unix.time_float_unix
   stdio
   base
   base.caml

@@ -262,16 +262,21 @@ make build
 Prerequisites: 
 
 - debian package previously built
-- aptly app
+- dpkg-dev (provides dpkg-scanpackages; pre-installed in the mina-toolchain image)
 
 Steps:
 
-1. Start local debian repository
+1. Stage the locally-built debians into the docker build context
+
+scripts/docker/build.sh stages any .deb files found in the docker build context
+(the dockerfiles/ directory) into dockerfiles/_debs and generates an apt index
+there with dpkg-scanpackages, which the Dockerfiles install from. Copy your
+locally-built debians into the context:
 ```
-./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
+cp _build/*.deb dockerfiles/
 ```
 
-IMPORTANT: debians should be placed in _build folder
+IMPORTANT: debians should be placed in the _build folder first
 
 2. Build docker:
 ```
@@ -331,7 +336,7 @@ the submodule's repository, it is automatically re-pinned in CI.
 
 If you add a new package in the Mina repository or as a submodule, you must do all of the following:
 
-2. Update [`dockerfiles/stages/`](dockerfiles/stages) with the required packages
+2. Update [`dockerfiles/toolchain/`](dockerfiles/toolchain) with the required packages
 
 ## Tests
 

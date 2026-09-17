@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Signature_lib
 module Root_ledger = Mina_ledger.Root
@@ -50,7 +50,7 @@ type t =
   ; demo_mode : bool [@default false]
   ; log_block_creation : bool [@default false]
   ; precomputed_values : Precomputed_values.t
-  ; start_time : Time.t
+  ; start_time : Time_float.t
   ; precomputed_blocks_path : string option
   ; log_precomputed_blocks : bool
   ; start_filtered_logs : string list

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Zkapp_command
 open Signature_lib
@@ -42,8 +42,7 @@ let target_nonce_on_success_overflow () =
 let nonce_increments_test () =
   Quickcheck.test ~trials:50 Valid_size.zkapp_type_gen ~f:(fun (x, _y) ->
       let total_nonce (input : int Public_key.Compressed.Map.t) : int =
-        Public_key.Compressed.Map.fold input ~init:0
-          ~f:(fun ~key:_ ~data accum -> data + accum)
+        Map.fold input ~init:0 ~f:(fun ~key:_ ~data accum -> data + accum)
       in
       [%test_pred: int * int]
         (fun (a, b) -> a >= b)

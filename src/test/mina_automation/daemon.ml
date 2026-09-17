@@ -116,15 +116,17 @@ module Config = struct
       Unix.putenv ~key:"MINA_LIBP2P_PASS" ~data:"naughty blue worm" ;
       Unix.putenv ~key:"MINA_PRIVKEY_PASS" ~data:"naughty blue worm" ;
       (* create empty config dir to avoid any issues with the default config dir *)
-      let conf = Filename.temp_dir ~in_dir:root_path config_dir "" in
-      let genesis = Filename.temp_dir ~in_dir:root_path genesis_dir "" in
-      let libp2p_keypair = Filename.temp_dir ~in_dir:root_path p2p_dir "" in
+      let conf = Filename_unix.temp_dir ~in_dir:root_path config_dir "" in
+      let genesis = Filename_unix.temp_dir ~in_dir:root_path genesis_dir "" in
+      let libp2p_keypair =
+        Filename_unix.temp_dir ~in_dir:root_path p2p_dir ""
+      in
       { root_path; conf; genesis; libp2p_keypair }
 
     let dirs t = [ t.conf; t.genesis; t.libp2p_keypair ]
 
     let default =
-      let root = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
+      let root = Filename_unix.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
       create ~root_path:root ()
 
     let mina_log t = t.conf ^/ "mina.log"
@@ -243,9 +245,9 @@ let archive_blocks t ~archive_address ~format blocks =
 type t = { config : Config.t; executor : Executor.t }
 
 let archive_blocks_from_files t ~archive_address ~format ?(sleep = 5) blocks =
-  Deferred.List.iter blocks ~f:(fun block ->
+  Deferred.List.iter ~how:`Sequential blocks ~f:(fun block ->
       let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
-      after (Time.Span.of_sec (Float.of_int sleep)) )
+      after (Time_float.Span.of_sec (Float.of_int sleep)) )
 
 let of_test_config test_config =
   { config =

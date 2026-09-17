@@ -47,16 +47,20 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                 RunInToolchain.runInToolchain
-                  [ "POSTGRES_PASSWORD=${password}"
-                  , "POSTGRES_USER=${user}"
-                  , "POSTGRES_DB=${db}"
-                  , "GO=/usr/lib/go/bin/go"
-                  , "DUNE_INSTRUMENT_WITH=bisect_ppx"
-                  , "COVERALLS_TOKEN"
-                  ]
-                  ( WithCargo.withCargo
-                      "./buildkite/scripts/tests/archive-node-unit-tests.sh ${user} ${password} ${db} ${command_key}"
-                  )
+                  RunInToolchain.Config::{
+                  , submodules = True
+                  , environment =
+                    [ "POSTGRES_PASSWORD=${password}"
+                    , "POSTGRES_USER=${user}"
+                    , "POSTGRES_DB=${db}"
+                    , "GO=/usr/lib/go/bin/go"
+                    , "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                    , "COVERALLS_TOKEN"
+                    ]
+                  , innerScript =
+                      WithCargo.withCargo
+                        "./buildkite/scripts/tests/archive-node-unit-tests.sh ${user} ${password} ${db} ${command_key}"
+                  }
             , label = "Archive node unit tests"
             , key = command_key
             , target = Size.Large

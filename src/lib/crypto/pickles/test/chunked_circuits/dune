@@ -1,5 +1,5 @@
 (tests
- (names chunks2 chunks4 chunks8)
+ (names chunks2 chunks2_roundtrip chunks4 chunks8)
  (libraries
   ;; opam libraries
   alcotest
@@ -8,7 +8,6 @@
   result
   base.caml
   bignum.bigint
-  core_kernel
   base64
   digestif
   ppx_inline_test.config

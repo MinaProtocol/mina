@@ -2,6 +2,12 @@
 
 This folder contains all dhall code which is a backbone for our CI related code for buildkite.
 
+> **New here?** If you want to *add* a job, start with
+> [`../HOWTO-add-a-job.md`](../HOWTO-add-a-job.md). This README is a system
+> reference (modes, stages, filters, entrypoints) — it explains how the
+> pipeline is wired, not how to write a job for it. To run a job locally
+> see [`../local/README.md`](../local/README.md).
+
 # Structure
 
 Buildkite CI consist of two layers dhall and scripts. Basically idea is to use [Dhall](https://dhall-lang.org/) to create pipeline configuration in yaml. Pipeline configuration defines execution setup for scripts under `buildkite/scripts` folder. All Dhall files can be find in `buildkite/src` files. Each individual job is placed in `buildkite/src/Jobs` folder. Then `Prepare.dhall` file generates jobs collection based on content of `buildkite/src/Jobs`. Another important module is `Monorepo.dhall` which selects which jobs are meant to run (based on `BUILDKITE_PIPELINE_MODE` env in pipeline definition)

@@ -1,6 +1,6 @@
 (* base58_check.mli -- implementation of Base58Check algorithm *)
 
-open Core_kernel
+open Core
 
 exception Invalid_base58_checksum of string
 

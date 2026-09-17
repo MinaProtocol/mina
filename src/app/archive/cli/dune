@@ -2,6 +2,8 @@
  (name archive_cli)
  (public_name archive.cli)
  (libraries
+  core_unix.time_float_unix
+  core_unix.command_unix
   ;;opam libraries
   async
   async.async_command

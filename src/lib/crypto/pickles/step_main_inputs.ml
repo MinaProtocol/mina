@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Common
 open Backend
 module Impl = Impls.Step
@@ -16,7 +16,7 @@ open Impl
 let read_step_circuit_field_element_as_hex fe =
   let prover_fe = As_prover.read Field.typ fe in
   Kimchi_backend.Pasta.Vesta_based_plonk.(
-    Bigint.to_hex (Field.to_bigint prover_fe))
+    Bigint.to_hex (Field.to_bigint prover_fe) )
 
 module Other_field = struct
   type t = Tock.Field.t [@@deriving sexp]
@@ -165,7 +165,7 @@ module Inner_curve = struct
                 (C.of_affine (read typ t))
                 (Tock.Field.inv
                    (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
-              |> C.to_affine_exn)
+              |> C.to_affine_exn )
     in
     assert_equal t (scale res bs) ;
     res

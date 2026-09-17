@@ -242,7 +242,7 @@ let%test_module "multisig_account" =
                             in
                             let proof =
                               Run.exists (Typ.prover_value ())
-                                ~compute:(fun () -> assert false)
+                                ~compute:(fun () -> assert false )
                             in
                             Impl.run_checked
                               (Transaction_snark.dummy_constraints ()) ;
@@ -288,8 +288,7 @@ let%test_module "multisig_account" =
                  let id = Account_id.create pk Token_id.default in
                  Ledger.get_or_create_account ledger id
                    (Account.create id
-                      Currency.Balance.(
-                        Option.value_exn (add_amount zero total)) )
+                      Currency.Balance.(Option.value_exn (add_amount zero total)) )
                  |> Or_error.ok_exn
                in
                let _is_new, loc =

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Ipc
 
 module type Struct_builder_intf = sig

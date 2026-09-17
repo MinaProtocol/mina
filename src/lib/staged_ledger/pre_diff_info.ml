@@ -126,7 +126,7 @@ let create_coinbase
     let%bind _ =
       underflow_err rem_coinbase
         (Option.value_map ~default:Currency.Amount.zero ft2
-           ~f:(fun { fee; _ } -> Currency.Amount.of_fee fee) )
+           ~f:(fun { fee; _ } -> Currency.Amount.of_fee fee ) )
     in
     let%bind cb1 =
       coinbase_or_error
@@ -197,9 +197,9 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
     let singles =
       (if Currency.Fee.(equal zero delta) then [] else [ (public_key, delta) ])
       @ List.filter_map completed_works ~f:(fun w ->
-            let fee = T.fee w in
-            if Currency.Fee.equal fee Currency.Fee.zero then None
-            else Some (T.prover w, fee) )
+          let fee = T.fee w in
+          if Currency.Fee.equal fee Currency.Fee.zero then None
+          else Some (T.prover w, fee) )
     in
     let%bind singles_map =
       Or_error.try_with (fun () ->
@@ -211,20 +211,19 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
     Or_error.try_with (fun () ->
         List.fold coinbase_fts ~init:singles_map
           ~f:(fun accum { Coinbase.Fee_transfer.receiver_pk; fee = cb_fee } ->
-            match Public_key.Compressed.Map.find accum receiver_pk with
+            match Map.find accum receiver_pk with
             | None ->
                 accum
             | Some fee ->
                 let new_fee = Option.value_exn (Currency.Fee.sub fee cb_fee) in
                 if Currency.Fee.(new_fee > Currency.Fee.zero) then
-                  Public_key.Compressed.Map.update accum receiver_pk
-                    ~f:(fun _ -> new_fee)
-                else Public_key.Compressed.Map.remove accum receiver_pk )
+                  Map.update accum receiver_pk ~f:(fun _ -> new_fee)
+                else Map.remove accum receiver_pk )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
         |> List.map ~f:(fun (receiver_pk, fee) ->
-               Fee_transfer.Single.create ~receiver_pk ~fee
-                 ~fee_token:Token_id.default )
+            Fee_transfer.Single.create ~receiver_pk ~fee
+              ~fee_token:Token_id.default )
         |> One_or_two.group_list
         |> List.map ~f:Fee_transfer.of_singles
         |> Or_error.all )
@@ -305,10 +304,8 @@ let get_individual_info (type c)
     (commands : c With_status.t list) completed_works ~internal_command_statuses
     ~to_user_command =
   let open Result.Let_syntax in
-  let%bind { Transaction_data.commands
-           ; coinbases = coinbase_parts
-           ; fee_transfers
-           } =
+  let%bind
+      { Transaction_data.commands; coinbases = coinbase_parts; fee_transfers } =
     get_transaction_data ~constraint_constants coinbase_parts ~receiver
       ~coinbase_amount commands completed_works ~to_user_command
   in
@@ -346,7 +343,7 @@ let check_coinbase
   match
     ( (fst diff).coinbase
     , Option.value_map ~default:Staged_ledger_diff.At_most_one.Zero (snd diff)
-        ~f:(fun d -> d.coinbase) )
+        ~f:(fun d -> d.coinbase ) )
   with
   | Zero, Zero | Zero, One _ | One _, Zero | Two _, Zero ->
       Ok ()

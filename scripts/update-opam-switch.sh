@@ -19,18 +19,18 @@ fi
 sum="$(cksum opam.export | grep -oE '^\S*')"
 switch_dir=opam_switches/"$sum"
 # The version must be the same as the version used in:
-# - dockerfiles/1-build-deps
+# - dockerfiles/toolchain/1-build-deps
 # - opam.export
 # - scripts/update_opam_switch.sh
 ocaml_version=4.14.2
 
 # The version must be the same as the version used in:
-# - dockerfiles/1-build-deps
+# - dockerfiles/toolchain/1-build-deps
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
-OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
-O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
+OPAM_REPOSITORY_COMMIT=3e41859015888fe8240e84dfc5f31bfa12a557e8
+O1LABS_OPAM_REPOSITORY_COMMIT=2bb1c7f64e025320b1ff242ca99a9dc23a4924c0
 
 if [[ -d _opam ]]; then
     read -rp "Directory '_opam' exists and will be removed. You can also bypass the check by setting the variable BYPASS_OPAM_SWITCH_UPDATE to any value. Continue? [y/N] " \

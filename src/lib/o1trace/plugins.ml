@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* TODO: ensure plugin names are unique (use encapsulated type as proof of functor application) *)
 
@@ -26,11 +26,11 @@ end
 module type Plugin_intf = sig
   include Registered_plugin_spec_intf
 
-  val on_job_enter : Thread.Fiber.t -> unit
+  val on_job_enter : O1thread.Fiber.t -> unit
 
-  val on_job_exit : Thread.Fiber.t -> Time_ns.Span.t -> unit
+  val on_job_exit : O1thread.Fiber.t -> Time_ns.Span.t -> unit
 
-  val on_new_fiber : Thread.Fiber.t -> unit
+  val on_new_fiber : O1thread.Fiber.t -> unit
 
   val on_cycle_end : unit -> unit
 end
@@ -53,12 +53,12 @@ let plugins : (module Plugin_intf) String.Table.t = String.Table.create ()
 
 let plugin_state (type a)
     (module Plugin : Registered_plugin_spec_intf with type state = a) thread =
-  match Thread.load_state thread Plugin.state_id with
+  match O1thread.load_state thread Plugin.state_id with
   | Some state ->
       state
   | None ->
       let state = Plugin.init_state thread.name in
-      Thread.set_state thread Plugin.state_id state ;
+      O1thread.set_state thread Plugin.state_id state ;
       state
 
 let enable_plugin (module Plugin : Plugin_intf) =

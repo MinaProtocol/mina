@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles.Impls.Step.Internal_Basic
 
 module State = struct

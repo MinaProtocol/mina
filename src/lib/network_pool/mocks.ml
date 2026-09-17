@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 
@@ -36,7 +36,7 @@ module Transition_frontier = struct
 
   let add_statements table stmts =
     List.iter stmts ~f:(fun s ->
-        Transaction_snark_work.Statement.Table.change table s ~f:(function
+        Hashtbl.change table s ~f:(function
           | None ->
               Some 1
           | Some count ->

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Backend
 open Pickles_types
 
@@ -55,7 +55,7 @@ let hash_messages_for_next_wrap_proof (type n)
   in
   Tock_field_sponge.digest Tock_field_sponge.params
     (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
-     .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
+     .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ] )
     )
 
 (* Pad the messages_for_next_wrap_proof of a proof *)

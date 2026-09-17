@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** A Single.t identifies one part of a One_or_two work *)
 module Single : sig

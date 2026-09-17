@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 module type Inputs_intf = sig
   val handle_unconsumed_cache_item :
@@ -312,8 +312,8 @@ let%test_module "cache_lib test instance" =
         (module String)
       |> f
 
-    let%test_unit "cached objects do not trigger unconsumption hook when \
-                   invalidated" =
+    let%test_unit
+        "cached objects do not trigger unconsumption hook when invalidated" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
@@ -354,8 +354,9 @@ let%test_module "cache_lib test instance" =
       Gc.full_major () ;
       assert (!dropped_cache_items = 0)
 
-    let%test_unit "garbage collection of derived cached objects do not trigger \
-                   unconsumption handler for parents" =
+    let%test_unit
+        "garbage collection of derived cached objects do not trigger \
+         unconsumption handler for parents" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
@@ -368,8 +369,9 @@ let%test_module "cache_lib test instance" =
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
-    let%test_unit "properly invalidated derived cached objects do not trigger \
-                   any unconsumption handler calls" =
+    let%test_unit
+        "properly invalidated derived cached objects do not trigger any \
+         unconsumption handler calls" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
@@ -381,8 +383,9 @@ let%test_module "cache_lib test instance" =
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
-    let%test_unit "invalidate original cached object would also remove the \
-                   derived cached object" =
+    let%test_unit
+        "invalidate original cached object would also remove the derived \
+         cached object" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->

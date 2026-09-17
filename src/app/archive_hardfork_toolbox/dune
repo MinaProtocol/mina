@@ -2,6 +2,8 @@
  (name archive_hardfork_toolbox_lib)
  (public_name archive_hardfork_toolbox.lib)
  (libraries
+  core_unix.time_float_unix
+  core_unix.command_unix
   ;; opam libraries
   async_unix
   core
@@ -9,7 +11,6 @@
   async_kernel
   uri
   stdio
-  yojson
   caqti-driver-postgresql
   caqti
   cli_lib
@@ -19,6 +20,7 @@
   base
   base.caml
   integers
+  yojson
   ppx_deriving_yojson.runtime
   ;; local libraries
   logger
@@ -43,7 +45,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules logic sql utils change_plan)
+ (modules logic sql config utils change_plan)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -69,7 +71,6 @@
   async_kernel
   uri
   stdio
-  yojson
   caqti-driver-postgresql
   caqti
   cli_lib
@@ -80,6 +81,7 @@
   base.caml
   async.async_command
   integers
+  yojson
   ;; local libraries
   archive_hardfork_toolbox_lib
   logger

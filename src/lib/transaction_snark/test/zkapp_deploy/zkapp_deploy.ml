@@ -87,8 +87,8 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-snapp account to zkApp account/deploy a smart \
-                   contract" =
+    let%test_unit
+        "change a non-snapp account to zkApp account/deploy a smart contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
@@ -120,8 +120,9 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-zkApp account to zkApp account/deploy a smart \
-                   contract- different fee payer" =
+    let%test_unit
+        "change a non-zkApp account to zkApp account/deploy a smart contract- \
+         different fee payer" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
@@ -154,8 +155,9 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "Fails to deploy if the account is not present and amount is \
-                   insufficient" =
+    let%test_unit
+        "Fails to deploy if the account is not present and amount is \
+         insufficient" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->

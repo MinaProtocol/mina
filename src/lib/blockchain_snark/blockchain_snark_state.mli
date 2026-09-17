@@ -52,7 +52,7 @@
 
 open Mina_base
 open Mina_state
-open Core_kernel
+open Core
 open Pickles_types
 
 module Witness : sig

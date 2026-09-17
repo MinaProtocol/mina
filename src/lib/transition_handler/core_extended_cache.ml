@@ -1,6 +1,6 @@
 open Core
 
-(*  *)
+(* *)
 
 module type Strategy = sig
   type 'a t
@@ -26,7 +26,11 @@ module Memoized = struct
         raise e
 
   let create ~f arg =
-    try Result.Ok (f arg) with Sys.Break as e -> raise e | e -> Result.Error e
+    try Result.Ok (f arg) with
+    | Sys_unix.Break as e ->
+        raise e
+    | e ->
+        Result.Error e
 end
 
 module type Store = sig

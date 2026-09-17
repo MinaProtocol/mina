@@ -1,7 +1,7 @@
 (** Step Verifier Implementation - see step_verifier.mli for documentation. *)
 
 (* q > p *)
-open Core_kernel
+open Core
 module SC = Scalar_challenge
 open Import
 open Common
@@ -10,21 +10,19 @@ open Types.Step
 open Pickles_types
 
 module Make
-    (Inputs : Intf.Step_main_inputs.S
-                with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.field_var = Step_main_inputs.Impl.field_var
-                 and type Impl.Bigint.t = Backend.Tick.Bigint.t
-                 and type Impl.Constraint.t = Backend.Tick.Constraint.t
-                 and type 'a Impl.Internal_Basic.Checked.t =
-                  'a Step_main_inputs.Impl.Internal_Basic.Checked.t
-                 and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
-                  ( 'var
-                  , 'value
-                  , 'aux )
-                  Step_main_inputs.Impl.Internal_Basic.Typ.typ'
-                 and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
-                  ('var, 'value) Step_main_inputs.Impl.Internal_Basic.Typ.typ
-                 and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
+    (Inputs :
+      Intf.Step_main_inputs.S
+        with type Impl.field = Backend.Tick.Field.t
+         and type Impl.field_var = Step_main_inputs.Impl.field_var
+         and type Impl.Bigint.t = Backend.Tick.Bigint.t
+         and type Impl.Constraint.t = Backend.Tick.Constraint.t
+         and type 'a Impl.Internal_Basic.Checked.t =
+          'a Step_main_inputs.Impl.Internal_Basic.Checked.t
+         and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
+          ('var, 'value, 'aux) Step_main_inputs.Impl.Internal_Basic.Typ.typ'
+         and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
+          ('var, 'value) Step_main_inputs.Impl.Internal_Basic.Typ.typ
+         and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
   open Impl
@@ -46,7 +44,7 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x))
+            printf !"%s: %{sexp:Backend.Tick.Field.t}\n%!" lab (read_var x) )
 
   let print_bool lab x =
     if debug then
@@ -128,12 +126,12 @@ struct
               | `Field (Constant c) | `Packed_bits (Constant c, _) ->
                   First
                     ( if Field.Constant.(equal zero) c then None
-                    else if Field.Constant.(equal one) c then Some g
-                    else
-                      Some
-                        (Inner_curve.Constant.scale g
-                           (Inner_curve.Constant.Scalar.project
-                              (Field.Constant.unpack c) ) ) )
+                      else if Field.Constant.(equal one) c then Some g
+                      else
+                        Some
+                          (Inner_curve.Constant.scale g
+                             (Inner_curve.Constant.Scalar.project
+                                (Field.Constant.unpack c) ) ) )
               | `Field x ->
                   Second (`Field x, g)
               | `Packed_bits (x, n) ->
@@ -168,10 +166,10 @@ struct
               let cc = pow2pow x n in
               (cc, rr) )
           |> List.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
-                 (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2) )
+              (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2) )
         in
         Inner_curve.(
-          acc + constant (Constant.negate correction |> add_opt constant_part)) )
+          acc + constant (Constant.negate correction |> add_opt constant_part) ) )
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (Sponge.squeeze sponge) ~constrain_low_bits:true
@@ -221,7 +219,7 @@ struct
             Field.(
               (x * x * x)
               + (constant Inner_curve.Params.a * x)
-              + constant Inner_curve.Params.b) )
+              + constant Inner_curve.Params.b ) )
         |> unstage )
     in
     fun x -> Lazy.force f x
@@ -255,16 +253,18 @@ struct
           with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments
                 ~reduce_without_degree_bound:Array.to_list
-                ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
-                                                 .With_degree_bound
-                                                 .unshifted
-                                               ; shifted
-                                               } ->
-                  Array.to_list unshifted @ [ shifted ] )
-                ~scale_and_add:(fun ~(acc :
-                                       [ `Maybe_finite of
-                                         Boolean.var * Inner_curve.t
-                                       | `Finite of Inner_curve.t ] ) ~xi p ->
+                ~reduce_with_degree_bound:(fun
+                    { Plonk_types.Poly_comm.With_degree_bound.unshifted
+                    ; shifted
+                    }
+                  -> Array.to_list unshifted @ [ shifted ] )
+                ~scale_and_add:(fun
+                    ~(acc :
+                       [ `Maybe_finite of Boolean.var * Inner_curve.t
+                       | `Finite of Inner_curve.t ] )
+                    ~xi
+                    p
+                  ->
                   match acc with
                   | `Maybe_finite (acc_is_finite, (acc : Inner_curve.t)) -> (
                       match p with
@@ -287,8 +287,7 @@ struct
                         | `Finite p ->
                             p + xi_acc
                         | `Maybe_finite (p_is_finite, p) ->
-                            if_ p_is_finite ~then_:(p + xi_acc) ~else_:xi_acc )
-                  )
+                            if_ p_is_finite ~then_:(p + xi_acc) ~else_:xi_acc ) )
                 ~xi
                 ~init:(function
                   | `Finite x ->
@@ -300,11 +299,11 @@ struct
                 (Vector.map with_degree_bound
                    ~f:
                      (let open Plonk_types.Poly_comm.With_degree_bound in
-                     fun { shifted; unshifted } ->
-                       let f x = `Maybe_finite x in
-                       { unshifted = Array.map ~f unshifted
-                       ; shifted = f shifted
-                       }) ) )
+                      fun { shifted; unshifted } ->
+                        let f x = `Maybe_finite x in
+                        { unshifted = Array.map ~f unshifted
+                        ; shifted = f shifted
+                        } ) ) )
           |> function `Finite x -> x | `Maybe_finite _ -> assert false
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
@@ -427,16 +426,16 @@ struct
             | `Field (Constant c) | `Packed_bits (Constant c, _) ->
                 First
                   ( if Field.Constant.(equal zero) c then None
-                  else if Field.Constant.(equal one) c then Some (lagrange i)
-                  else
-                    Some
-                      ( select_curve_points ~points_for_domain:(fun d ->
-                            [ Inner_curve.Constant.scale
-                                (lagrange_commitment d i)
-                                (Inner_curve.Constant.Scalar.project
-                                   (Field.Constant.unpack c) )
-                            ] )
-                      |> Vector.unsingleton ) )
+                    else if Field.Constant.(equal one) c then Some (lagrange i)
+                    else
+                      Some
+                        ( select_curve_points ~points_for_domain:(fun d ->
+                              [ Inner_curve.Constant.scale
+                                  (lagrange_commitment d i)
+                                  (Inner_curve.Constant.Scalar.project
+                                     (Field.Constant.unpack c) )
+                              ] )
+                        |> Vector.unsingleton ) )
             | `Field x ->
                 Second (i, (x, Public_input_scalar.Constant.size_in_bits))
             | `Packed_bits (x, n) ->
@@ -459,7 +458,7 @@ struct
             | `Cond_add _ ->
                 None
             | `Add_with_correction (_, [ _; corr ]) ->
-                Some corr ) )
+                Some corr ))
           ~f
       in
       let init =
@@ -655,7 +654,7 @@ struct
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                    (snd
                       Plonk_types.(
-                        Columns.add (fst (Columns.add Permuts_minus_1.n))) ) )
+                        Columns.add (fst (Columns.add Permuts_minus_1.n)) ) ) )
               (snd
                  (Wrap_hack.Padded_length.add
                     num_commitments_without_degree_bound ) )
@@ -765,7 +764,7 @@ struct
 
   let shift1 =
     Shifted_value.Type1.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:Field.constant (create (module Field.Constant)) )
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
@@ -787,7 +786,7 @@ struct
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
       |> List.dedup_and_sort ~compare:(fun d1 d2 ->
-             Int.compare (Domain.log2_size d1) (Domain.log2_size d2) )
+          Int.compare (Domain.log2_size d1) (Domain.log2_size d2) )
       |> Vector.of_list
     in
     let which_log2 =
@@ -1091,12 +1090,12 @@ struct
           let a =
             Evals.In_circuit.to_list e
             |> List.map ~f:(function
-                 | Nothing ->
-                     [||]
-                 | Just a ->
-                     Array.map a ~f:Opt.just
-                 | Maybe (b, a) ->
-                     Array.map a ~f:(Opt.maybe b) )
+              | Opt.Nothing ->
+                  [||]
+              | Just a ->
+                  Array.map a ~f:Opt.just
+              | Maybe (b, a) ->
+                  Array.map a ~f:(Opt.maybe b) )
           in
           let v =
             List.append sg_evals
@@ -1201,10 +1200,10 @@ struct
             { t with
               old_bulletproof_challenges =
                 Vector.map2 proofs_verified_mask t.old_bulletproof_challenges
-                  ~f:(fun b v -> Vector.map v ~f:(fun x -> `Opt (b, x)))
+                  ~f:(fun b v -> Vector.map v ~f:(fun x -> `Opt (b, x)) )
             ; challenge_polynomial_commitments =
                 Vector.map2 proofs_verified_mask
-                  t.challenge_polynomial_commitments ~f:(fun b g -> (b, g))
+                  t.challenge_polynomial_commitments ~f:(fun b g -> (b, g) )
             }
           in
           let not_opt x = `Not_opt x in
@@ -1260,10 +1259,10 @@ struct
             (Types.Wrap.Statement.In_circuit.to_data ~option_map:Opt.map
                statement ) )
       |> Array.map ~f:(function
-           | `Field (Shifted_value.Type1.Shifted_value x) ->
-               `Field x
-           | `Packed_bits (x, n) ->
-               `Packed_bits (x, n) )
+        | `Field (Shifted_value.Type1.Shifted_value x) ->
+            `Field x
+        | `Packed_bits (x, n) ->
+            `Packed_bits (x, n) )
     in
     (* == IVC Step 2: Initialize sponge and extract deferred values == *)
     let sponge = Sponge.create sponge_params in

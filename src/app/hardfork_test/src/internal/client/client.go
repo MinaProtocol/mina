@@ -1,100 +1,71 @@
 package client
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"sync"
 	"time"
 
-	"github.com/tidwall/gjson"
+	sdk "github.com/MinaProtocol/mina-sdk-go"
 )
 
-// Client represents a GraphQL client for querying Mina nodes
+// retryDelay is the pause between retries of a failed GraphQL request.
+//
+// The SDK retries on a fixed interval, whereas this client previously backed
+// off exponentially starting at 10s. We keep the initial step as the constant
+// delay: the daemons under test are local, so a failure is far more often "not
+// up yet" than "overloaded", and a constant delay bounds the total wait.
+const retryDelay = 10 * time.Second
+
+// Client queries Mina daemons over GraphQL.
+//
+// The test drives several daemons at once, addressing each by its REST port,
+// while an SDK client is bound to a single endpoint. Client therefore keeps one
+// SDK client per port, created on first use.
 type Client struct {
-	httpClient *http.Client
+	timeout    time.Duration
 	maxRetries int
+
+	mu      sync.Mutex
+	clients map[int]*sdk.Client
 }
 
 // NewClient creates a new GraphQL client with the specified timeout in seconds and max retries
 func NewClient(timeoutSeconds int, maxRetries int) *Client {
 	return &Client{
-		httpClient: &http.Client{
-			Timeout: time.Duration(timeoutSeconds) * time.Second,
-		},
+		timeout:    time.Duration(timeoutSeconds) * time.Second,
 		maxRetries: maxRetries,
+		clients:    make(map[int]*sdk.Client),
 	}
 }
 
-// query sends a GraphQL query to the specified port with retry logic
-func (c *Client) query(port int, query string) (gjson.Result, error) {
-	url := fmt.Sprintf("http://localhost:%d/graphql", port)
+// forPort returns the SDK client addressing the daemon on the given port.
+func (c *Client) forPort(port int) *sdk.Client {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	// Format the query payload
-	payload := map[string]string{
-		"query": fmt.Sprintf("query Q {%s}", query),
+	if sdkClient, ok := c.clients[port]; ok {
+		return sdkClient
 	}
 
-	// Convert payload to JSON
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		return gjson.Result{}, fmt.Errorf("failed to marshal query payload: %w", err)
+	sdkClient := sdk.NewClient(
+		sdk.WithGraphQLURI(fmt.Sprintf("http://localhost:%d/graphql", port)),
+		sdk.WithTimeout(c.timeout),
+		sdk.WithRetries(c.maxRetries),
+		sdk.WithRetryDelay(retryDelay),
+	)
+	c.clients[port] = sdkClient
+	return sdkClient
+}
+
+// Close releases the connections held by every per-port client.
+func (c *Client) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, sdkClient := range c.clients {
+		sdkClient.Close()
 	}
-
-	var lastErr error
-	for attempt := 1; attempt <= c.maxRetries; attempt++ {
-		backoff := 10 * time.Duration(1<<uint(attempt-1)) * time.Second
-
-		// Create the request
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
-		if err != nil {
-			return gjson.Result{}, fmt.Errorf("failed to create request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		// Send the request
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < c.maxRetries {
-				time.Sleep(backoff)
-				continue
-			}
-			return gjson.Result{}, fmt.Errorf("failed to send request after %d attempts: %w", c.maxRetries, err)
-		}
-		defer resp.Body.Close()
-
-		// Read the response
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			lastErr = err
-			if attempt < c.maxRetries {
-				time.Sleep(backoff)
-				continue
-			}
-			return gjson.Result{}, fmt.Errorf("failed to read response body after %d attempts: %w", c.maxRetries, err)
-		}
-
-		// Parse the response
-		result := gjson.ParseBytes(body)
-
-		// Check for GraphQL errors in response
-		if result.Get("errors").Exists() {
-			lastErr = fmt.Errorf("GraphQL error: %s", result.Get("errors").String())
-			if attempt < c.maxRetries {
-				time.Sleep(backoff)
-				continue
-			}
-			return gjson.Result{}, fmt.Errorf("GraphQL query failed after %d attempts: %w", c.maxRetries, lastErr)
-		}
-
-		// Success
-		return result, nil
-	}
-
-	// This shouldn't be reached but included for safety
-	return gjson.Result{}, fmt.Errorf("query failed after %d attempts: %w", c.maxRetries, lastErr)
 }
 
 // BlockData represents the structured block data from GraphQL queries
@@ -126,106 +97,46 @@ func (block BlockData) String() string {
 	return string(b)
 }
 
-const genesisBlockQuery = `
-genesisBlock {
-  commandTransactionCount
-  protocolState {
-    consensusState {
-      blockHeight
-      slotSinceGenesis
-      epoch
-      stakingEpochData {
-        ledger { hash }
-        seed
-      }
-      nextEpochData {
-        ledger { hash }
-        seed
-      }
-    }
-    blockchainState {
-      stagedLedgerHash
-      snarkedLedgerHash
-    }
-  }
-  transactions {
-    coinbase
-    feeTransfer { fee }
-  }
-  stateHash
-}
-`
-
-const blocksQueryWithLimit = `
-bestChain (maxLength: %d){
-  commandTransactionCount
-  protocolState {
-    consensusState {
-      blockHeight
-      slotSinceGenesis
-      epoch
-      stakingEpochData {
-        ledger { hash }
-        seed
-      }
-      nextEpochData {
-        ledger { hash }
-        seed
-      }
-    }
-    blockchainState {
-      stagedLedgerHash
-      snarkedLedgerHash
-    }
-  }
-  transactions {
-    coinbase
-    feeTransfer { fee }
-  }
-  stateHash
-}
-`
-
-func parseBlock(value gjson.Result) *BlockData {
-	block := &BlockData{
-		StateHash:       value.Get("stateHash").String(),
-		BlockHeight:     int(value.Get("protocolState.consensusState.blockHeight").Int()),
-		Slot:            int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
-		CurEpochHash:    value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
-		CurEpochSeed:    value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
-		NextEpochHash:   value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
-		NextEpochSeed:   value.Get("protocolState.consensusState.nextEpochData.seed").String(),
-		StagedHash:      value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
-		SnarkedHash:     value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
-		Epoch:           int(value.Get("protocolState.consensusState.epoch").Int()),
-		NumUserCommands: int(value.Get("commandTransactionCount").Int()),
-		NumFeeTransfers: len(value.Get("transactions.feeTransfer").Array()),
-		Coinbase:        value.Get("transactions.coinbase").String(),
+// fromBlockInfo projects the SDK's block representation onto the fields the
+// hardfork test asserts on.
+func fromBlockInfo(info sdk.BlockInfo) BlockData {
+	return BlockData{
+		StateHash:       info.StateHash,
+		BlockHeight:     info.Height,
+		Slot:            info.GlobalSlotSinceGenesis,
+		CurEpochHash:    info.StakingEpochLedgerHash,
+		CurEpochSeed:    info.StakingEpochSeed,
+		NextEpochHash:   info.NextEpochLedgerHash,
+		NextEpochSeed:   info.NextEpochSeed,
+		StagedHash:      info.StagedLedgerHash,
+		SnarkedHash:     info.SnarkedLedgerHash,
+		Epoch:           info.Epoch,
+		NumUserCommands: info.CommandTransactionCount,
+		NumFeeTransfers: info.FeeTransferCount,
+		Coinbase:        info.Coinbase,
 	}
-
-	return block
 }
 
 func (c *Client) GenesisBlock(port int) (*BlockData, error) {
-	result, err := c.query(port, genesisBlockQuery)
+	info, err := c.forPort(port).GetGenesisBlock()
 	if err != nil {
 		return nil, err
 	}
-	return parseBlock(result.Get("data.genesisBlock")), nil
+
+	block := fromBlockInfo(*info)
+	return &block, nil
 }
 
 func (c *Client) RecentBlocks(port int, limit int) ([]BlockData, error) {
-	result, err := c.query(port, fmt.Sprintf(blocksQueryWithLimit, limit))
+	infos, err := c.forPort(port).GetBestChain(limit)
 	if err != nil {
 		return nil, err
 	}
 
 	var blocks []BlockData
-
-	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
-		blocks = append(blocks, *parseBlock(value))
-		return true
-	})
+	for _, info := range infos {
+		blocks = append(blocks, fromBlockInfo(info))
+	}
 
 	return blocks, nil
 }
@@ -242,28 +153,25 @@ func (c *Client) BestTip(port int) (*BlockData, error) {
 	return &blocks[0], nil
 }
 
-func (c *Client) ForkConfig(port int) (gjson.Result, error) {
-	result, err := c.query(port, "fork_config")
-	if err != nil {
-		return gjson.Result{}, err
-	}
-
-	return result.Get("data.fork_config"), nil
+// ForkConfig returns the daemon's fork_config verbatim. The blob is large and
+// version-dependent, so callers parse out only what they need; a daemon that
+// has not reached the fork point yet returns the JSON literal `null`.
+func (c *Client) ForkConfig(port int) ([]byte, error) {
+	return c.forPort(port).GetForkConfig()
 }
 
 func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
-	result, err := c.query(port, "bestChain { commandTransactionCount }")
+	blocks, err := c.RecentBlocks(port, 0)
 	if err != nil {
 		return 0, err
 	}
 
 	count := 0
-	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
-		if value.Get("commandTransactionCount").Int() > 0 {
+	for _, block := range blocks {
+		if block.NumUserCommands > 0 {
 			count++
 		}
-		return true
-	})
+	}
 
 	return count, nil
 }

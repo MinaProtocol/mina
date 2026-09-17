@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_state
 
@@ -7,7 +7,7 @@ module Stable = struct
   module V3 = struct
     module T = struct
       type t =
-        { state : Protocol_state.Value.Stable.V3.t; proof : Proof.Stable.V2.t }
+        { state : Protocol_state.Value.Stable.V3.t; proof : Proof.Stable.V3.t }
       [@@deriving fields, sexp, yojson]
     end
 

@@ -50,7 +50,7 @@ let merge (old_env, old_vc) (new_env, new_vc) =
   , vc )
 
 let add (t : t) ~parent new_child =
-  State_hash.Table.update t parent ~f:(function
+  Hashtbl.update t parent ~f:(function
     | None ->
         [ new_child ]
     | Some children ->
@@ -77,10 +77,12 @@ let add (t : t) ~parent new_child =
         if b then children' else new_child :: children )
 
 let data t =
-  let collected_transitions = State_hash.Table.data t |> List.concat in
+  let collected_transitions = Hashtbl.data t |> List.concat in
   assert (
     Stdlib.List.compare_lengths collected_transitions
-      (List.stable_dedup collected_transitions)
+      (Staged.unstage
+         (List.stable_dedup_staged ~compare:Poly.compare)
+         collected_transitions )
     = 0 )
   (* TODO: make this assertion more efficient *) ;
   collected_transitions

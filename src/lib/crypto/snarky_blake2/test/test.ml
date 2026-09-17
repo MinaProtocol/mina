@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snarky_blake2
 
 (* Module for Blake2 Snarky implementation tests
@@ -37,8 +37,7 @@ module Blake2_tests = struct
   (* Native Blake2 implementation for comparison *)
   let blake2_unchecked s =
     Blake2.string_to_bits
-      Digestif.BLAKE2S.(
-        digest_string (Blake2.bits_to_string s) |> to_raw_string)
+      Digestif.BLAKE2S.(digest_string (Blake2.bits_to_string s) |> to_raw_string)
 
   (* Utility to convert bit array to string representation *)
   let to_bitstring bits =

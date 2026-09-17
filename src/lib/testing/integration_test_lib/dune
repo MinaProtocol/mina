@@ -21,6 +21,7 @@
    lens.ppx_deriving
    ppx_pipebang))
  (libraries
+  core_unix.signal_unix
   ;; opam libraries
   result
   base.base_internalhash_types
@@ -31,13 +32,14 @@
   cmdliner
   async
   core
+  core_unix.time_float_unix
   lens
   core_kernel
   async_kernel
   ppx_inline_test.config
   async_unix
   stdio
-  sexp_diff_kernel
+  sexp_diff
   ;; local libraries
   key_gen
   visualization

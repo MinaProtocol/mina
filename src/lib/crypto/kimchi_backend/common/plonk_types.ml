@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
@@ -1357,9 +1357,12 @@ module All_evals = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type ('f, 'f_multi) t =
-        { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
+        { evals :
+            ( 'f_multi * 'f_multi
+            , 'f_multi * 'f_multi )
+            With_public_input.Stable.V1.t
         ; ft_eval1 : 'f
         }
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
@@ -1367,7 +1370,7 @@ module All_evals = struct
   end]
 
   type ('f, 'f_multi) t =
-        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V1.t =
+        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V2.t =
     { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }
@@ -1686,8 +1689,7 @@ module Messages = struct
     in
     let lookup =
       Lookup.opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
-        ~runtime_tables ~dummy:[| dummy |]
-        (wo [ z ])
+        ~runtime_tables ~dummy:[| dummy |] (wo [ z ])
     in
     of_hlistable
       [ Plonkish_prelude.Vector.typ (wo w_lens) Columns.n
@@ -1717,8 +1719,7 @@ module Messages = struct
     in
     let lookup =
       Lookup.wrap_opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
-        ~runtime_tables ~dummy:[| dummy |]
-        (wo [ z ])
+        ~runtime_tables ~dummy:[| dummy |] (wo [ z ])
     in
     of_hlistable
       [ Plonkish_prelude.Vector.wrap_typ (wo w_lens) Columns.n
@@ -1751,7 +1752,7 @@ module Proof = struct
 end
 
 module Shifts = struct
-  open Core_kernel
+  open Core
 
   [%%versioned
   module Stable = struct

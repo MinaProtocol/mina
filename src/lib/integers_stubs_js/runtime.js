@@ -222,54 +222,60 @@ function integers_uint64_of_int64(i) {
 }
 
 //Provides: integers_uint_of_string
-//Requires: caml_ml_string_length, caml_failwith, caml_string_unsafe_get, caml_int64_create_lo_mi_hi, caml_int64_of_int32, caml_parse_digit, caml_int64_ult, caml_int64_add, caml_int64_mul, caml_int64_neg
+//Requires: caml_ml_string_length, caml_failwith, caml_string_unsafe_get, caml_int64_create_lo_mi_hi, caml_int64_of_int32, caml_parse_digit, caml_int64_ult, caml_int64_add, caml_int64_mul
 function integers_uint_of_string(s, max_val) {
-    // Note: This code matches the behavior of the C function.
+    // Note: This code matches the behavior of the C function (integers >= 0.5).
     // In particular,
-    // - only base-10 numbers are accepted
-    // - negative numbers are accepted and coerced to 2's-complement uint64
-    // - the longest numeric prefix is accepted, only raising an error when there
-    //   isn't a numeric prefix
-    var i = 0, len = caml_ml_string_length(s), negative = false;
+    // - an optional leading '+' is accepted
+    // - a base prefix selects the radix: 0x/0X -> 16, 0o/0O -> 8, 0b/0B -> 2,
+    //   0u/0U -> unsigned marker (no-op), otherwise base 10
+    // - '_' digit separators are ignored
+    // - the longest valid prefix is accepted; overflow pins to the maximum value
+    var i = 0, len = caml_ml_string_length(s), base = 10;
     if (i >= len) {
         caml_failwith("int_of_string");
     }
-    var c = caml_string_unsafe_get(s, i);
-    if (c === 45) { // Minus sign
+    // Strip a leading '+' sign, if given.
+    if (caml_string_unsafe_get(s, i) === 43) {
         i++;
-        negative = true;
-    } else if (c === 43) { // Plus sign
-        i++;
+    }
+    // Detect a base prefix on a leading '0'.
+    if (i < len && caml_string_unsafe_get(s, i) === 48 /* '0' */ && i + 1 < len) {
+        var p = caml_string_unsafe_get(s, i + 1);
+        if (p === 120 || p === 88) { base = 16; i += 2; }      // 0x / 0X
+        else if (p === 111 || p === 79) { base = 8; i += 2; }  // 0o / 0O
+        else if (p === 98 || p === 66) { base = 2; i += 2; }   // 0b / 0B
+        else if (p === 117 || p === 85) { i += 2; }            // 0u / 0U (no-op)
     }
     var no_digits = true;
     // Ensure that the high byte is unsigned before division.
     max_val.hi = max_val.hi >>> 0;
-    var ten = caml_int64_of_int32(10);
-    var max_base_10 = max_val.udivmod(ten).quotient;
+    var js_base = caml_int64_of_int32(base);
+    var max_prefix = max_val.udivmod(js_base).quotient;
     var res = caml_int64_of_int32(0);
     for (; i < len; i++) {
         var c = caml_string_unsafe_get(s, i);
+        if (c === 95) { // '_' digit separator
+            continue;
+        }
         var d = caml_parse_digit(c);
-        if (d < 0 || d >= 10) {
+        if (d < 0 || d >= base) {
             break;
         }
         no_digits = false;
-        // Any digit here would overflow. Pin to the maximum value.
-        if (caml_int64_ult(max_base_10, res)) {
+        // Any further digit would overflow. Pin to the maximum value.
+        if (caml_int64_ult(max_prefix, res)) {
             return max_val;
         }
         d = caml_int64_of_int32(d);
-        res = caml_int64_add(caml_int64_mul(ten, res), d);
-        // The given digit was too large. Pin to the maximum value.
+        res = caml_int64_add(caml_int64_mul(js_base, res), d);
+        // The addition overflowed. Pin to the maximum value.
         if (caml_int64_ult(res, d)) {
             return max_val;
         }
     }
     if (no_digits) {
         caml_failwith("int_of_string");
-    }
-    if (negative) {
-        res = caml_int64_neg(res);
     }
     // Set the high byte as unsigned.
     res.hi = res.hi >>> 0;

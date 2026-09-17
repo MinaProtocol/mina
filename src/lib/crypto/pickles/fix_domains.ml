@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Import
 
 let zk_rows = 3
@@ -7,17 +7,17 @@ let rough_domains =
   let d = Domain.Pow_2_roots_of_unity 20 in
   { Domains.h = d }
 
-module Make (Env : sig
-  type field
+module Make
+    (Env : sig
+      type field
 
-  type gates
-end)
-(Impl : Snarky_backendless.Snark_intf.Run
-          with type field = Env.field
-           and type R1CS_constraint_system.t =
-            ( Env.field
-            , Env.gates )
-            Kimchi_backend_common.Plonk_constraint_system.t) =
+      type gates
+    end)
+    (Impl :
+      Snarky_backendless.Snark_intf.Run
+        with type field = Env.field
+         and type R1CS_constraint_system.t =
+          (Env.field, Env.gates) Kimchi_backend_common.Plonk_constraint_system.t) =
 struct
   let domains_impl ?feature_flags (typ, conv, _conv_inv)
       (return_typ, _ret_conv, ret_conv_inv) main =
@@ -53,11 +53,11 @@ struct
               (if range_check_table_used then Int.pow 2 12 else 0)
               + (if xor_table_used then Int.pow 2 8 else 0)
               + ( if lookup then (
-                  Kimchi_backend_common.Plonk_constraint_system
-                  .finalize_fixed_lookup_tables sys ;
-                  Kimchi_backend_common.Plonk_constraint_system
-                  .get_concatenated_fixed_lookup_table_size sys )
-                else 0 )
+                    Kimchi_backend_common.Plonk_constraint_system
+                    .finalize_fixed_lookup_tables sys ;
+                    Kimchi_backend_common.Plonk_constraint_system
+                    .get_concatenated_fixed_lookup_table_size sys )
+                  else 0 )
               +
               if runtime_tables then (
                 Kimchi_backend_common.Plonk_constraint_system

@@ -179,7 +179,7 @@ val configure :
   -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
-  -> known_private_ip_nets:Core.Unix.Cidr.t list
+  -> known_private_ip_nets:Core_unix.Cidr.t list
   -> topic_config:string list list
   -> unit Deferred.Or_error.t
 
@@ -287,10 +287,21 @@ end
 module Libp2p_stream : sig
   type t
 
+  type queue_release_reason =
+    [ `Lost | `Handler_done | `Handshake_failed | `Shutdown_or_release ]
+
   (** [pipes t] returns the reader/writer pipe for our half of the stream. *)
   val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
   val remote_peer : t -> Peer.t
+
+  val register_rpc_adapter_queue : t -> string Pipe.Reader.t -> unit
+
+  val record_rpc_adapter_enqueue : t -> bytes:int -> unit
+
+  val release_rpc_adapter_queue : t -> reason:queue_release_reason -> unit
+
+  val release_buffers : t -> reason:queue_release_reason -> unit
 
   val max_chunk_size : int
 end

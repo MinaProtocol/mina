@@ -21,8 +21,9 @@
   ppx_version.runtime
   result
   sexplib0
-  ;; local libraries
-  mina_stdlib
+   ;; local libraries
+   backoff
+   mina_stdlib
   cli_lib
   currency
   error_json

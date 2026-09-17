@@ -31,14 +31,14 @@ let block_dir_flag =
   let open Command.Param in
   flag "--block-dir" ~aliases:[ "-block-dir" ]
     ~doc:"the path to the directory containing blocks for the submission"
-    (required Filename.arg_type)
+    (required Filename_unix.arg_type)
 
 let cassandra_executable_flag =
   let open Command.Param in
   flag "--executable"
     ~aliases:[ "-executable"; "--cqlsh"; "-cqlsh" ]
     ~doc:"the path to the cqlsh executable"
-    (optional Filename.arg_type)
+    (optional Filename_unix.arg_type)
 
 let timestamp =
   let open Command.Param in
@@ -163,17 +163,16 @@ let filesystem_command =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
-      and inputs = anon (sequence ("filename" %: Filename.arg_type))
+      and inputs = anon (sequence ("filename" %: Filename_unix.arg_type))
       and no_checks = no_checks_flag
       and config_file = config_flag
       and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
+        let (module G) = Genesis_constants.profiled () in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
+        let genesis_constants = G.genesis_constants in
+        let constraint_constants = G.constraint_constants in
+        let proof_level = G.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -195,7 +194,7 @@ let filesystem_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
@@ -210,11 +209,11 @@ let cassandra_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
+
+        let (module G) = Genesis_constants.profiled () in
+        let genesis_constants = G.genesis_constants in
+        let constraint_constants = G.constraint_constants in
+        let proof_level = G.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -239,7 +238,7 @@ let cassandra_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let stdin_command =
   Command.async
@@ -251,11 +250,11 @@ let stdin_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
+
+        let (module G) = Genesis_constants.profiled () in
+        let genesis_constants = G.genesis_constants in
+        let constraint_constants = G.constraint_constants in
+        let proof_level = G.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -273,7 +272,7 @@ let stdin_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let command =
   Command.group
@@ -283,4 +282,4 @@ let command =
     ; ("stdin", stdin_command)
     ]
 
-let () = Async.Command.run command
+let () = Command_unix.run command

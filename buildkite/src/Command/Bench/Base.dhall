@@ -10,8 +10,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let BuildFlags = ../../Constants/BuildFlags.dhall
-
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Command = ../../Command/Base.dhall
@@ -26,9 +24,10 @@ let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
+let B/SoftFailExit =
+      B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
 
 let Spec =
       { Type =
@@ -48,13 +47,7 @@ let Spec =
           }
       , default =
           { size = Size.Perf
-          , dependsOn =
-                DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , build_flag = BuildFlags.Type.Instrumented
-                  }
-              # DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
+          , dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
@@ -70,7 +63,7 @@ let command
             Command.Config::{
             , commands =
                   spec.preCommands
-                # RunInToolchain.runInToolchain
+                # RunInToolchain.runInDefaultToolchain
                     (   Benchmarks.toEnvList Benchmarks.Type::{=}
                       # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
                         ]
@@ -82,7 +75,10 @@ let command
             , label = "Perf: ${spec.label}"
             , key = spec.key
             , target = spec.size
-            , soft_fail = Some (B/SoftFail.Boolean False)
+            , soft_fail = Some
+                ( B/SoftFail.ListSoft_fail/Type
+                    [ { exit_status = Some (B/SoftFailExit.Number 1) } ]
+                )
             , docker = None Docker.Type
             , depends_on = spec.dependsOn
             }
@@ -99,7 +95,6 @@ let pipeline
                       "dhall"
                   , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
                   , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
-                  , SelectFiles.contains "scripts/benchmark"
                   , SelectFiles.exactly
                       "buildkite/src/Jobs/Bench/${spec.name}"
                       "dhall"

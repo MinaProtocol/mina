@@ -36,7 +36,11 @@ module No_annotations = struct
     (* Field annotations *)
     (match t_fields_annots "a" with [] -> () | _ -> assert false) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Toplevel_doc_comment = struct
@@ -53,7 +57,11 @@ module Toplevel_doc_comment = struct
     (* Field annotations *)
     (match t_fields_annots "a" with [] -> () | _ -> assert false) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Toplevel_string_annot = struct
@@ -69,7 +77,11 @@ module Toplevel_string_annot = struct
     (* Field annotations *)
     (match t_fields_annots "a" with [] -> () | _ -> assert false) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Toplevel_argless_annot = struct
@@ -85,7 +97,11 @@ module Toplevel_argless_annot = struct
     (* Field annotations *)
     (match t_fields_annots "a" with [] -> () | _ -> assert false) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Toplevel_all = struct
@@ -99,9 +115,17 @@ module Toplevel_all = struct
         [ ("ocaml.doc", Some " Comment "); ("foo", Some "bar"); ("baz", None) ]
       (t_toplevel_annots ()) ;
     (* Field annotations *)
-    (match t_fields_annots "a" with [] -> () | _ -> assert false) ;
+    ( match t_fields_annots "a" with
+    | [] ->
+        ()
+    | _ ->
+        assert false ) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Field_doc_comment = struct
@@ -117,7 +141,11 @@ module Field_doc_comment = struct
     | _ ->
         assert false ) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Fields_doc_comments = struct
@@ -151,7 +179,11 @@ module Fields_doc_comments = struct
     | _ ->
         assert false ) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "d" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "d" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Field_string_annot = struct
@@ -167,7 +199,11 @@ module Field_string_annot = struct
     | _ ->
         assert false ) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Field_argless_annot = struct
@@ -183,7 +219,11 @@ module Field_argless_annot = struct
     | _ ->
         assert false ) ;
     (* Missing field is not resolved *)
-    match t_fields_annots "b" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "b" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module Fields_all = struct
@@ -220,7 +260,11 @@ module Fields_all = struct
         ]
       (t_fields_annots "c") ;
     (* Missing field is not resolved *)
-    match t_fields_annots "d" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "d" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 module All = struct
@@ -261,7 +305,11 @@ module All = struct
         ]
       (t_fields_annots "c") ;
     (* Missing field is not resolved *)
-    match t_fields_annots "d" with _ -> assert false | exception _ -> ()
+    match t_fields_annots "d" with
+    | _ ->
+        assert false
+    | exception _ ->
+        ()
 end
 
 let test_all () =

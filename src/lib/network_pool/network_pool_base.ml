@@ -1,13 +1,15 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib
 open Network_peer
 
-module Make (Transition_frontier : sig
-  type t
-end)
-(Resource_pool : Intf.Resource_pool_intf
-                   with type transition_frontier := Transition_frontier.t) :
+module Make
+    (Transition_frontier : sig
+      type t
+    end)
+    (Resource_pool :
+      Intf.Resource_pool_intf
+        with type transition_frontier := Transition_frontier.t) :
   Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
@@ -108,7 +110,7 @@ end)
     ; write_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Writer.t
     ; read_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Reader.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
-    ; block_window_duration : Time.Span.t
+    ; block_window_duration : Time_float.Span.t
     }
 
   let resource_pool { resource_pool; _ } = resource_pool
@@ -118,7 +120,8 @@ end)
   let create_rate_limiter () =
     Rate_limiter.create
       ~capacity:
-        (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
+        ( Resource_pool.Diff.max_per_15_seconds
+        , `Per (Time_float.Span.of_sec 15.0) )
 
   let apply_and_broadcast ({ logger; _ } as t)
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
@@ -251,10 +254,11 @@ end)
   *)
   let rebroadcast_loop : t -> Logger.t -> unit Deferred.t =
    fun t logger ->
-    let rebroadcast_interval = Time.Span.of_min 10. in
-    let rebroadcast_window = Time.Span.scale rebroadcast_interval 5. in
+    let rebroadcast_interval = Time_float.Span.of_min 10. in
+    let rebroadcast_window = Time_float.Span.scale rebroadcast_interval 5. in
     let has_timed_out time =
-      if Time.(add time rebroadcast_window < now ()) then `Timed_out else `Ok
+      if Time_float.(add time rebroadcast_window < now ()) then `Timed_out
+      else `Ok
     in
     let rec go () =
       let rebroadcastable =
@@ -276,7 +280,7 @@ end)
             ] ;
       let nonce = Time_ns.to_int_ns_since_epoch (Time_ns.now ()) in
       let%bind () =
-        Deferred.List.iter rebroadcastable ~f:(fun message ->
+        Deferred.List.iter rebroadcastable ~how:`Sequential ~f:(fun message ->
             Linear_pipe.write t.write_broadcasts With_nonce.{ message; nonce } )
       in
       let%bind () = Async.after rebroadcast_interval in
@@ -290,7 +294,7 @@ end)
     (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
-        create ~name:"Network pool transition frontier diffs" Synchronous)
+        create ~name:"Network pool transition frontier diffs" Synchronous )
     in
     let t, remotes, locals =
       of_resource_pool_and_diffs

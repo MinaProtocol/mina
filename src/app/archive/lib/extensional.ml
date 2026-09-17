@@ -1,6 +1,6 @@
 (* extensional.ml -- extensional representations of archive db data *)
 
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Signature_lib
@@ -108,7 +108,7 @@ module Zkapp_command = struct
   let accounts_referenced { fee_payer; account_updates; _ } =
     Account_id.create fee_payer.public_key Token_id.default
     :: List.map account_updates ~f:(fun { public_key; token_id; _ } ->
-           Account_id.create public_key token_id )
+        Account_id.create public_key token_id )
 end
 
 module Block = struct

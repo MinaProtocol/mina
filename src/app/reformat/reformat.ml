@@ -49,7 +49,7 @@ let process_throttle =
 
 let rec fold_over_files ~path ~process_path ~f =
   let%bind all = Sys.ls_dir path in
-  Deferred.List.iter all ~f:(fun x ->
+  Deferred.List.iter ~how:`Sequential all ~f:(fun x ->
       let full_path = path ^/ x in
       match%bind Sys.is_directory full_path with
       | `Yes when process_path `Dir full_path ->
@@ -113,6 +113,6 @@ let _cli =
          ~doc:"Return with error code if any file needs formatting"
      in
      fun () -> main dry_run check path )
-  |> Command.run
+  |> Command_unix.run
 
 let () = never_returns (Scheduler.go ())

@@ -3,7 +3,7 @@
     This module provides private keys based on the inner curve scalar field,
     used for generating cryptographic signatures in the Mina protocol. *)
 
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 [%%versioned:

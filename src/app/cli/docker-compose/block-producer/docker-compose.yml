@@ -1,0 +1,49 @@
+services:
+  generate_wallet_key:
+    image: '${MINA_DAEMON_IMAGE}'
+    environment:
+      MINA_PRIVKEY_PASS: ${MINA_PRIVKEY_PASS}
+    entrypoint: []
+    command: >
+      bash -c '
+        if [ -f /root/.mina-config/keys/wallet-key ]; then
+          echo "Wallet key already exists, skipping generation."
+          exit 0
+        fi
+        mina advanced generate-keypair --privkey-path /root/.mina-config/keys/wallet-key
+        chmod -R 0700 /root/.mina-config/keys
+        chmod -R 0600 /root/.mina-config/keys/wallet-key
+      '
+    volumes:
+      - './mina_node/.mina-config:/root/.mina-config'
+
+  mina_block_producer:
+    image: '${MINA_DAEMON_IMAGE}'
+    restart: always
+    environment:
+      MINA_PRIVKEY_PASS: ${MINA_PRIVKEY_PASS}
+      MINA_LIBP2P_PASS: ${MINA_LIBP2P_PASS}
+      MINA_CLIENT_TRUSTLIST: "0.0.0.0/0"
+    healthcheck:
+      test: ["CMD-SHELL", "mina client status"]
+      interval: 60s
+      timeout: 10s
+      retries: 100
+    entrypoint: []
+    command: >
+      bash -c '
+        mina daemon \
+             --peer-list-url ${MINA_PEERLIST_URL} \
+             --block-producer-key /root/.mina-config/keys/wallet-key \
+             --external-port ${MINA_P2P_PORT} \
+             --insecure-rest-server \
+             --rest-port ${MINA_REST_PORT}
+      '
+    volumes:
+      - './mina_node/.mina-config:/root/.mina-config'
+    ports:
+      - '${MINA_REST_PORT}:${MINA_REST_PORT}'
+      - '${MINA_P2P_PORT}:${MINA_P2P_PORT}'
+    depends_on:
+      generate_wallet_key:
+        condition: service_completed_successfully

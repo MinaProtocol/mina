@@ -30,9 +30,9 @@
   ;; opam libraries
   core_kernel
   yojson
-  angstrom
+  angstrom)
   ;; local libraries
-  )
+  
  (instrumentation
   (backend bisect_ppx))
  (preprocess

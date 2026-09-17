@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base_import
 
 (** See documentation of the {!Mina_wire_types} library *)
@@ -110,7 +110,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let fee_excess ft =
     ft
     |> One_or_two.map ~f:(fun { fee_token; fee; _ } ->
-           (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
+        (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
     |> Fee_excess.of_one_or_two
 
   let receiver_pks t =

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Signature_lib
@@ -66,7 +66,7 @@ module Stable = struct
       ; protocol_state : Protocol_state.Stable.V3.t
       ; transactions : Transactions.Stable.V3.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
-      ; proof : Proof.Stable.V2.t
+      ; proof : Proof.Stable.V3.t
       }
 
     let to_latest = Fn.id
@@ -87,16 +87,16 @@ let participants
   let open Account_id.Set in
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
-        union set
+        Set.union set
           (of_list @@ User_command.accounts_referenced user_command.data.data) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
-        add set (Fee_transfer.Single.receiver ft) )
+        Set.add set (Fee_transfer.Single.receiver ft) )
   in
-  add
-    (add
-       (union user_command_set fee_transfer_participants)
+  Set.add
+    (Set.add
+       (Set.union user_command_set fee_transfer_participants)
        (Account_id.create creator Token_id.default) )
     (Account_id.create winner Token_id.default)
 
@@ -105,15 +105,17 @@ let participant_pks
   let open Public_key.Compressed.Set in
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
-        union set @@ of_list
+        Set.union set @@ of_list
         @@ List.map ~f:Account_id.public_key
         @@ User_command.accounts_referenced user_command.data.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
-        add set ft.receiver_pk )
+        Set.add set ft.receiver_pk )
   in
-  add (add (union user_command_set fee_transfer_participants) creator) winner
+  Set.add
+    (Set.add (Set.union user_command_set fee_transfer_participants) creator)
+    winner
 
 let commands { transactions = { Transactions.Stable.Latest.commands; _ }; _ } =
   commands
@@ -167,8 +169,7 @@ let of_transition block tracked_participants
           let should_include_transaction command participants =
             List.exists (User_command.accounts_referenced command)
               ~f:(fun account_id ->
-                Public_key.Compressed.Set.mem participants
-                  (Account_id.public_key account_id) )
+                Set.mem participants (Account_id.public_key account_id) )
           in
           match tracked_participants with
           | `Some interested_participants
@@ -200,7 +201,7 @@ let of_transition block tracked_participants
             | `Some interested_participants ->
                 List.filter
                   ~f:(fun ({ receiver_pk = pk; _ }, _) ->
-                    Public_key.Compressed.Set.mem interested_participants pk )
+                    Set.mem interested_participants pk )
                   fee_transfer_list
           in
           { acc_transactions with
@@ -224,7 +225,7 @@ let of_transition block tracked_participants
           ; coinbase_receiver = Some receiver
           ; coinbase =
               Currency.Amount.(
-                Option.value_exn (add amount acc_transactions.coinbase))
+                Option.value_exn (add amount acc_transactions.coinbase) )
           } )
   in
   let snark_jobs =

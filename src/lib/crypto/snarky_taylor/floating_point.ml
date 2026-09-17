@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snarky_backendless
 open Snark
 open Snarky_integer

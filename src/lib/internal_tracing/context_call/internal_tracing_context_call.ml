@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let last_call_id = ref 0
 

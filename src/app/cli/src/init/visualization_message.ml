@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let success visualization_type filepath =
   sprintf

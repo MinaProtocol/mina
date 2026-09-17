@@ -1,5 +1,5 @@
 (* transaction_union_payload.ml *)
-open Core_kernel
+open Core
 open Currency
 open Snark_params.Tick
 open Signature_lib

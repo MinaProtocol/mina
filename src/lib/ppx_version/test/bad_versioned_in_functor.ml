@@ -1,6 +1,6 @@
 (* versioned in functor body *)
 
-open Core_kernel
+open Core
 
 module Functor (X : sig end) = struct
   [%%versioned

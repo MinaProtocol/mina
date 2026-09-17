@@ -3,6 +3,7 @@
  (name heap_usage)
  (public_name heap_usage)
  (libraries
+  core_unix.command_unix
   ;; opam libraries
   async_unix
   core

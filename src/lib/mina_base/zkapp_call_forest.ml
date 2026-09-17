@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* Same as the type of the field account_updates in Mina_base.Zkapp_command.t *)
 type t =
@@ -48,29 +48,32 @@ module Checked = struct
     let (Typ typ) =
       Typ.(
         Account_update.Body.typ () * Prover_value.typ ()
-        * Zkapp_command.Digest.Account_update.typ)
+        * Zkapp_command.Digest.Account_update.typ )
       |> Typ.transport
            ~back:(fun ((body, authorization), hash) ->
              { With_hash.data = Account_update.with_aux ~body ~authorization
              ; hash
              } )
-           ~there:(fun { With_hash.data =
-                           { Account_update.Poly.body; authorization; aux = _ }
-                       ; hash
-                       } -> ((body, authorization), hash) )
+           ~there:(fun
+               { With_hash.data =
+                   { Account_update.Poly.body; authorization; aux = _ }
+               ; hash
+               }
+             -> ((body, authorization), hash) )
       |> Typ.transport_var
            ~back:(fun ((account_update, control), hash) ->
              { account_update = { hash; data = account_update }; control } )
-           ~there:(fun { account_update = { hash; data = account_update }
-                       ; control
-                       } -> ((account_update, control), hash) )
+           ~there:(fun
+               { account_update = { hash; data = account_update }; control } ->
+             ((account_update, control), hash) )
     in
     Typ
       { typ with
         check =
           (fun ( { account_update = { hash; data = account_update }
                  ; control = _
-                 } as x ) ->
+                 } as x )
+          ->
             Impl.make_checked (fun () ->
                 Impl.run_checked (typ.check x) ;
                 Field.Assert.equal
@@ -209,7 +212,7 @@ module Checked = struct
             ; data =
                 V.(
                   create (fun () ->
-                      match get r with _ :: tl -> tl | [] -> [] ))
+                      match get r with _ :: tl -> tl | [] -> [] ) )
             } )
           : (account_update * t) * t ) )
 
@@ -250,7 +253,7 @@ module Checked = struct
                 Zkapp_command.Digest.Forest.(
                   equal
                     (As_prover.read typ hash_cons)
-                    (Zkapp_command.Call_forest.hash res)) ) ;
+                    (Zkapp_command.Call_forest.hash res) ) ) ;
               res )
         in
         ({ hash = hash_cons; data } : t) )

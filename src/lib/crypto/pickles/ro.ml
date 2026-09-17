@@ -1,15 +1,16 @@
-open Core_kernel
+open Core
 open Backend
 open Import
 
 let bits_random_oracle =
-  let h = Digestif.blake2s 32 in
-  fun ~length s ->
-    Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
-    |> List.concat_map ~f:(fun c ->
-           let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
-    |> fun a -> List.take a length
+ fun ~length s ->
+  Digestif.digest_string Digestif.blake2s s
+  |> Digestif.to_raw_string Digestif.blake2s
+  |> String.to_list
+  |> List.concat_map ~f:(fun c ->
+      let c = Char.to_int c in
+      List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
+  |> fun a -> List.take a length
 
 let ro lab length f =
   let r = ref 0 in
