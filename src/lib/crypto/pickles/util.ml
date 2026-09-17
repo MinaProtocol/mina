@@ -86,17 +86,18 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
     , to_field (Bignum_bigint.shift_right c 128) )
 
   (* Asserts [lo + 2^128 hi < bound] as integers, for [lo] and [hi] below
-     [2^128]: [hi <= bound_hi], and [lo <= bound_lo - 1] when
-     [hi = bound_hi]. A caller that does not range-check [lo] relies on its
-     consumers to bound it. *)
+     [2^128], with one range-checked difference: [bound_lo - 1 - lo] when
+     [hi = bound_hi], else [bound_hi - 1 - hi]. A negative difference wraps
+     past [2^128] and fails, so the first case pins [lo < bound_lo] and the
+     second [hi < bound_hi]. A caller that does not range-check [lo] relies
+     on its consumers to bound it. *)
   let assert_split_below ~assert_128_bits ~lo ~hi (bound : Bignum_bigint.t) =
     let bound_lo, bound_hi = split_constant_128 bound in
-    assert_128_bits Field.(constant bound_hi - hi) ;
     let hi_is_top = Field.equal hi (Field.constant bound_hi) in
     let d =
       Field.if_ hi_is_top
         ~then_:Field.(constant Constant.(bound_lo - one) - lo)
-        ~else_:Field.one
+        ~else_:Field.(constant Constant.(bound_hi - one) - hi)
     in
     assert_128_bits d
 
