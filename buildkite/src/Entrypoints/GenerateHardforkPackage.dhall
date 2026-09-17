@@ -190,6 +190,16 @@ let generateDockerForCodename =
                   }
                 ]
 
+          let dependsOnDaemonProfiled =
+                [ { name = pipelineName
+                  , key =
+                      "${Docker.lowerName
+                           ( Docker.Type.DaemonProfiled { profile = profile }
+                           )}-${Profiles.lowerName
+                                  profile}-${lowerNameCodename}-docker-image"
+                  }
+                ]
+
           let dependsOnRosettaAppsOnly =
                 [ { name = pipelineName
                   , key = "rosetta_apps_only-${lowerNameCodename}-docker-image"
@@ -211,10 +221,12 @@ let generateDockerForCodename =
                                     }
                                     [ "FORCE_DOCKER_OVERWRITE" ]
                                     (     "./buildkite/scripts/release/manager.sh persist "
-                                      ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
-                                                                                              spec.network},mina-archive-${Network.lowerName
-                                                                                                                             spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                            spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
+                                      ++  " --backend local --artifacts mina-logproc,mina-${Profiles.lowerName
+                                                                                              profile}-profile,mina-${Profiles.lowerName
+                                                                                                                        profile}-generic,mina-${Network.lowerName
+                                                                                                                                                  spec.network},mina-archive-${Network.lowerName
+                                                                                                                                                                                 spec.network},mina-rosetta-${Network.lowerName
+                                                                                                                                                                                                                spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
                                       ++  " --buildkite-build-id ${cached_build_id}"
                                       ++  " --codename ${lowerNameCodename} "
                                       ++  " --target \\\${BUILDKITE_BUILD_ID} "
@@ -232,6 +244,7 @@ let generateDockerForCodename =
                         , artifacts =
                           [ Artifact.Type.LogProc
                           , Artifact.Type.Daemon { network = spec.network }
+                          , Artifact.Type.DaemonProfiled { profile = profile }
                           , Artifact.Type.Archive { network = spec.network }
                           , Artifact.Type.Rosetta { network = spec.network }
                           , Artifact.Type.TxTools
@@ -332,6 +345,22 @@ let generateDockerForCodename =
                       }
                     , DockerImage.ReleaseSpec::{
                       , deps = dependsOnBuildHfDebian # dependsOnDaemonOnly
+                      , service =
+                          Docker.Type.DaemonProfiled { profile = profile }
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_install_mode =
+                          DockerImage.DebianInstallMode.DownloadOnly
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , size = spec.size
+                      , deb_version = spec.version
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    , DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian # dependsOnDaemonProfiled
                       , service = Docker.Type.Daemon { network = spec.network }
                       , network = spec.network
                       , deb_codename = codename.DebVersion
