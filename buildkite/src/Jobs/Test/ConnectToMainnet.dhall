@@ -12,6 +12,8 @@ let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Expr = ../../Pipeline/Expr.dhall
@@ -58,6 +60,7 @@ in  Pipeline.build
             ConnectToNetwork.Spec::{
             , dependsOn = dependsOn
             , mina_suffix = "${Network.lowerName network}"
+            , mina_profile = Profiles.lowerName (Profiles.fromNetwork network)
             , testnet = "${Network.lowerName network}"
             , peer_list_url = Network.peerListUrl network
             }

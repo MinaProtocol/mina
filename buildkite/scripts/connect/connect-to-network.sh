@@ -19,6 +19,7 @@ set -eox pipefail
 
 # --- Initialization ---
 MINA_DEBIAN_NETWORK=""
+MINA_PROFILE_ARG=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
 SYNC_TIMEOUT=""
@@ -33,6 +34,7 @@ Usage: $0 [OPTIONS]
 
 All arguments are mandatory unless noted:
   --mina-debian-network <val>        Mina debian network name
+  --mina-profile <val>               Node profile (dev, devnet, lightnet, mainnet)
   --network-name <val>               Testnet name (used for seeds URL and validation)
   --wait-between-polling <val>       Duration to wait between GraphQL polling
   --sync-timeout <val>               Duration to wait before considering the sync is failed
@@ -41,7 +43,7 @@ All arguments are mandatory unless noted:
   --help                             Display this help message
 
 Example:
-  $0 --mina-debian-network devnet --network-name devnet --wait-between-polling 10s --sync-timeout 20min
+  $0 --mina-debian-network devnet --mina-profile devnet --network-name devnet --wait-between-polling 10s --sync-timeout 20min
 EOF
     exit 1
 }
@@ -50,6 +52,7 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --mina-debian-network) MINA_DEBIAN_NETWORK="$2"; shift 2 ;;
+        --mina-profile) MINA_PROFILE_ARG="$2"; shift 2 ;;
         --network-name) NETWORK_NAME="$2"; shift 2 ;;
         --peer-list-url) PEER_LIST_URL="$2"; shift 2 ;;
         --wait-between-polling) WAIT_BETWEEN_POLLING_GRAPHQL="$2"; shift 2 ;;
@@ -61,10 +64,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Validation ---
-if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" || -z "$PEER_LIST_URL" ]]; then
+if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$MINA_PROFILE_ARG" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" || -z "$PEER_LIST_URL" ]]; then
     echo "Error: All required arguments must be provided."
     usage
 fi
+
+export MINA_PROFILE="$MINA_PROFILE_ARG"
 
 # --- Main Script Logic ---
 
