@@ -90,7 +90,7 @@ else
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
       ;;
-      mina-devnet-instrumented|mina-mainnet-instrumented|mina-mesa-instrumented)
+      mina-devnet-instrumented|mina-mainnet-instrumented)
         # Instrumented daemon depends on mina-logproc and the non-instrumented
         # network-config deb (config files are the same for both flavors).
           network_pkg=${i%-instrumented}
