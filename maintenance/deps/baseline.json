@@ -7,7 +7,7 @@
   ],
   "entrypoints": {
     "exe:app/archive:archive": {
-      "libs": 189,
+      "libs": 190,
       "opam": 51
     },
     "exe:app/archive_blocks:archive_blocks": {
@@ -15,7 +15,7 @@
       "opam": 51
     },
     "exe:app/archive_hardfork_toolbox:archive_hardfork_toolbox": {
-      "libs": 188,
+      "libs": 189,
       "opam": 51
     },
     "exe:app/batch_txn_tool:batch_txn_tool": {
@@ -90,12 +90,16 @@
       "libs": 107,
       "opam": 36
     },
+    "exe:app/mina_box:mina_box": {
+      "libs": 277,
+      "opam": 65
+    },
     "exe:app/mina_graphql_client:mina_graphql_client_app": {
       "libs": 237,
       "opam": 60
     },
     "exe:app/mina_healthcheck:mina_healthcheck": {
-      "libs": 237,
+      "libs": 238,
       "opam": 60
     },
     "exe:app/missing_blocks_auditor:missing_blocks_auditor": {
@@ -115,15 +119,15 @@
       "opam": 13
     },
     "exe:app/rosetta/client:rosetta_client_cli": {
-      "libs": 4,
+      "libs": 5,
       "opam": 11
     },
     "exe:app/rosetta/healthcheck:rosetta_healthcheck": {
-      "libs": 4,
+      "libs": 5,
       "opam": 11
     },
     "exe:app/rosetta/ocaml-signer:signer": {
-      "libs": 207,
+      "libs": 208,
       "opam": 54
     },
     "exe:app/rosetta/ocaml-signer:signer_mainnet_signatures": {
@@ -135,7 +139,7 @@
       "opam": 54
     },
     "exe:app/rosetta:rosetta": {
-      "libs": 205,
+      "libs": 206,
       "opam": 54
     },
     "exe:app/rosetta:rosetta_mainnet_signatures": {
@@ -147,7 +151,7 @@
       "opam": 54
     },
     "exe:app/runtime_genesis_ledger:runtime_genesis_ledger": {
-      "libs": 185,
+      "libs": 186,
       "opam": 49
     },
     "exe:app/test_executive:test_executive": {
@@ -227,7 +231,7 @@
       "opam": 4
     },
     "exe:lib/snark_worker/standalone:run_snark_worker": {
-      "libs": 234,
+      "libs": 235,
       "opam": 60
     },
     "exe:lib/transaction_snark/test/print_transaction_snark_vk:print_transaction_snark_vk": {
