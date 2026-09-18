@@ -39,8 +39,7 @@ in  Pipeline.build
             , PipelineTag.Type.Jammy
             ]
           , debVersion = DebianVersions.DebVersion.Jammy
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Release ]
           , includeIf =
             [ Expr.Type.DescendantOf
                 { ancestor = MainlineBranch.Type.Mesa

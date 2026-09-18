@@ -40,8 +40,7 @@ in  Pipeline.build
             , PipelineTag.Type.Bullseye
             ]
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Release ]
           , includeIf =
             [ Expr.Type.DescendantOf
                 { ancestor = MainlineBranch.Type.Mesa

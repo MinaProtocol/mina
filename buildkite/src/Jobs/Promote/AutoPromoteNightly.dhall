@@ -66,10 +66,7 @@ let specs_for_branch =
             ]
           , profile = profile
           , networks = [ Network.Type.Devnet ]
-          , codenames =
-            [ DebianVersions.DebVersion.Noble
-            , DebianVersions.DebVersion.Bookworm
-            ]
+          , codenames = [ DebianVersions.DebVersion.Bookworm ]
           , debian_repo = DebianRepo.Type.Nightly
           , channel = channel
           , new_docker_tags = new_tags
