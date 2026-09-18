@@ -318,14 +318,20 @@ let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 let account_access_statuses (t : t) (status : Transaction_status.t) =
-  match status with
-  | Applied ->
-      List.map
-        [ fee_payer t; receiver t ]
-        ~f:(fun acct_id -> (acct_id, `Accessed))
-  | Failed _ ->
-      (fee_payer t, `Accessed)
-      :: List.map [ receiver t ] ~f:(fun acct_id -> (acct_id, `Not_accessed))
+  let receiver_status =
+    match (status, t.body) with
+    | Applied, Stake_delegation _
+      when Public_key.Compressed.equal (receiver_pk t)
+             Public_key.Compressed.empty ->
+        (* Unstaking: the empty key is the "no delegate" sentinel, not a real
+           account, so no account is accessed at the receiver. *)
+        `Not_accessed
+    | Applied, _ ->
+        `Accessed
+    | Failed _, _ ->
+        `Not_accessed
+  in
+  [ (fee_payer t, `Accessed); (receiver t, receiver_status) ]
 
 let dummy : t =
   { common =

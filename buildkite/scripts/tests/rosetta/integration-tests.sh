@@ -157,11 +157,11 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "ledger": {
     "add_genesis_winner": true,
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "600000000", "delegate": null, "sk": null },
+      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "600000000", "delegate": "${BLOCK_PRODUCER_PUB_KEY}", "sk": null },
       { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PUB_KEY}", "sk": null },
-      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": "${ZKAPP_FEE_PAYER_PUB_KEY}", "sk": null },
+      { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": "${ZKAPP_SENDER_PUB_KEY}", "sk": null },
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": "${ZKAPP_ACCOUNT_PUB_KEY}", "sk": null },
       { "pk": "${TIME_VESTING_ACCOUNT_1_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "10", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "0" } },
       { "pk": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}", "balance": "2000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "5", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "200000" } }
     ]

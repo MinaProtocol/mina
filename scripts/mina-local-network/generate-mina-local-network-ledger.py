@@ -283,14 +283,14 @@ def generate_ledger(generate_remainder,
             "pk": service["public_key"],
             "sk": None,
             "balance": encode_nanominas(service["balance"]),
-            "delegate": None
+            "delegate": service["public_key"]
         })
 
         annotated_ledger.append({
             "pk": service["public_key"],
             "sk": None,
             "balance": encode_nanominas(service["balance"]),
-            "delegate": None,
+            "delegate": service["public_key"],
             "nickname": service["service"]
         })
 
@@ -300,14 +300,14 @@ def generate_ledger(generate_remainder,
             "pk": snark_coordinator["public_key"],
             "sk": None,
             "balance": encode_nanominas(snark_coordinator["balance"]),
-            "delegate": None
+            "delegate": snark_coordinator["public_key"]
         })
 
         annotated_ledger.append({
             "pk": snark_coordinator["public_key"],
             "sk": None,
             "balance": encode_nanominas(snark_coordinator["balance"]),
-            "delegate": None,
+            "delegate": snark_coordinator["public_key"],
         })
 
     # Check that there are enough fish keys for all stakers
