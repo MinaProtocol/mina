@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <profile>  (dev, devnet, lightnet or mainnet)" >&2
+  exit 1
+fi
+export MINA_PROFILE=$1
+
 # state in _build can cause non-determinism in proof_caches
 rm -rf _build
-for DIR in $(find ./src -name proof_cache.json | xargs dirname); do
+while IFS= read -r DIR; do
   # I'm not sure why but using proof_cache.json directly causes non-determinism
   # Initialize the target file
   echo [] > $DIR/proof_cache_new.json
@@ -13,4 +19,4 @@ for DIR in $(find ./src -name proof_cache.json | xargs dirname); do
   # Re-run the tests using the cache. Throws an error if the test is
   # non-deterministic and caused a cache miss.
   ERROR_ON_PROOF=true dune runtest $DIR
-done
+done < <(find ./src -name proof_cache.json -exec dirname {} \;)

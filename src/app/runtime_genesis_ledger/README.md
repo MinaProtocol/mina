@@ -43,7 +43,7 @@ $ dune build src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --profile
 Or use the following make command:
 
 ```shell
-$ make genesis_ledger
+$ make genesis_ledger MINA_PROFILE=devnet
 ```
 
 The executable will be built at:

@@ -40,7 +40,7 @@ The Mina codebase has several categories of tests that range from fast in-proces
 | Rosetta tests | Rosetta API + daemon | ⚠️ (CI recommended) | custom scripts |
 | Replayer test | Archive replayer | ⚠️ (needs PostgreSQL) | `mina-replayer` |
 | Fuzzy ZkApp tests | ZkApp logic | ✅ | `dune exec` |
-| Coverage tests | Unit tests with coverage | ✅ | `make test-coverage` |
+| Coverage tests | Unit tests with coverage | ✅ | `make test-coverage MINA_PROFILE=dev` |
 
 ---
 
@@ -65,7 +65,7 @@ dune runtest src/lib/<library-name> --profile=dev
 **Run a single inline test case** (using the helper script):
 
 ```bash
-./scripts/testone.sh src/lib/<library-name>/<file>.ml [<test-name>]
+MINA_PROFILE=dev ./scripts/testone.sh src/lib/<library-name>/<file>.ml [<test-name>]
 ```
 
 **Tips:**
@@ -316,7 +316,7 @@ To measure code coverage of the unit test suite, use the bisect_ppx-instrumented
 **Run all unit tests with coverage instrumentation:**
 
 ```bash
-make test-coverage
+make test-coverage MINA_PROFILE=dev
 ```
 
 This calls `scripts/create_coverage_profiles.sh`, which runs:
@@ -328,7 +328,7 @@ dune runtest --instrument-with bisect_ppx --force src/lib --profile=dev
 **Run coverage for a specific library only:**
 
 ```bash
-scripts/create_coverage_profiles.sh <library-name>
+MINA_PROFILE=dev scripts/create_coverage_profiles.sh <library-name>
 ```
 
 **Generate reports after running tests with coverage:**

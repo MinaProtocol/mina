@@ -96,10 +96,9 @@ case "$BENCHMARK" in
   *)             BARE_EXE="" ;;
 esac
 
-# The daemon binary resolves its node profile from MINA_PROFILE, defaulting to
-# "dev" (ledger_depth 10) when unset. Benches run against devnet-sized data, so
-# pin the profile to devnet (ledger_depth 35) -- the .deb path gets this from
-# /etc/coda/build_config/PROFILE, the bare-cache binary needs it set explicitly.
+# The daemon binary refuses to start without a node profile. Benches run against
+# devnet-sized data, so pin devnet (ledger_depth 35) -- the .deb path gets this
+# from /etc/coda/build_config/PROFILE, the bare-cache binary needs it set explicitly.
 export MINA_PROFILE=devnet
 
 INSTALLED_BARE=false

@@ -18,6 +18,7 @@ in  { step =
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
                     [ "APPS_BUILD_FLAG=instrumented"
+                    , "MINA_PROFILE=devnet"
                     , "APPS_BARE_BINARIES=dump_slot_ledger.exe:mina-dump-slot-ledger"
                     ]
                     ( Some
