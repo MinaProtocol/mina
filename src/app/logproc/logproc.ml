@@ -3,12 +3,6 @@ open Logproc_lib
 
 let invalid_line_prefix = "!!! "
 
-let find_timezone () =
-  let ch = Unix.open_process_in {|date +"%z"|} in
-  let input = Option.value_exn (In_channel.input_line ch) in
-  In_channel.close ch ;
-  Time.Zone.of_utc_offset ~hours:(int_of_string input / 100)
-
 let format_timestamp ~timezone time =
   let date, of_day = Time.to_date_ofday ~zone:timezone time in
   sprintf "%d-%d-%d %s" (Date.year date)
@@ -188,7 +182,7 @@ let main timezone_str interpolation_config filter_str =
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse "true") in *)
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse ".level === \"Info\"") in *)
   let timezone =
-    if String.is_empty timezone_str then find_timezone ()
+    if String.is_empty timezone_str then Lazy.force Time.Zone.local
     else Time.Zone.of_string timezone_str
   in
   iter_lines_prefixed_with In_channel.stdin stdout ~prefix:'{'
