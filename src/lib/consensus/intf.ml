@@ -224,6 +224,7 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.Signed.t
+    -> stake_change:Currency.Amount.Signed.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> protocol_state * consensus_transition
@@ -237,6 +238,7 @@ module type State_hooks = sig
     -> prev_state:protocol_state_var
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
+    -> Currency.Amount.Signed.var
     -> Currency.Amount.Signed.var
     -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
        Snark_params.Tick.Checked.t
@@ -299,6 +301,7 @@ module type S = sig
     module Hashed : sig
       type t =
         { total_currency : Currency.Amount.t
+        ; total_stake : Currency.Amount.t
         ; hash : Mina_base.Frozen_ledger_hash.t
         }
 

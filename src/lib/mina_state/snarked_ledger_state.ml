@@ -131,6 +131,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; connecting_ledger_left : 'ledger_hash
           ; connecting_ledger_right : 'ledger_hash
           ; supply_increase : 'amount
+          ; stake_change : 'amount
           ; fee_excess : 'fee_excess
           ; sok_digest : 'sok_digest
           }
@@ -138,12 +139,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    let with_empty_local_state ~supply_increase ~fee_excess ~sok_digest
-        ~source_first_pass_ledger ~target_first_pass_ledger
+    let with_empty_local_state ~supply_increase ~stake_change ~fee_excess
+        ~sok_digest ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger ~target_second_pass_ledger
         ~connecting_ledger_left ~connecting_ledger_right
         ~pending_coinbase_stack_state : _ t =
       { supply_increase
+      ; stake_change
       ; fee_excess
       ; sok_digest
       ; connecting_ledger_left
@@ -177,6 +179,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; registers
         ; ledger_hash
         ; ledger_hash
+        ; amount
         ; amount
         ; fee_excess
         ; sok_digest
@@ -241,6 +244,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     ; supply_increase =
         Currency.Amount.Signed.to_yojson t.supply_increase
         |> Yojson.Safe.to_string
+    ; stake_change =
+        Currency.Amount.Signed.to_yojson t.stake_change |> Yojson.Safe.to_string
     ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
     ; sok_digest = ()
     }
@@ -258,6 +263,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     ; connecting_ledger_left = genesis_ledger_hash
     ; connecting_ledger_right = genesis_ledger_hash
     ; supply_increase = Currency.Amount.Signed.zero
+    ; stake_change = Currency.Amount.Signed.zero
     ; fee_excess = Fee_excess.empty
     ; sok_digest = ()
     }
@@ -268,6 +274,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        ; connecting_ledger_left
        ; connecting_ledger_right
        ; supply_increase
+       ; stake_change
        ; fee_excess
        ; sok_digest = _
        } :
@@ -279,6 +286,7 @@ module Make_str (A : Wire_types.Concrete) = struct
          ; Frozen_ledger_hash.to_input connecting_ledger_left
          ; Frozen_ledger_hash.to_input connecting_ledger_right
          ; Amount.Signed.to_input supply_increase
+         ; Amount.Signed.to_input stake_change
          ; Fee_excess.to_input fee_excess
         |]
     in
@@ -300,6 +308,7 @@ module Make_str (A : Wire_types.Concrete) = struct
          ; connecting_ledger_left
          ; connecting_ledger_right
          ; supply_increase
+         ; stake_change
          ; fee_excess
          ; sok_digest = _
          } :
@@ -312,6 +321,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind supply_increase =
         Amount.Signed.Checked.to_input supply_increase
       in
+      let%bind stake_change = Amount.Signed.Checked.to_input stake_change in
       let input =
         Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
           [| source
@@ -319,6 +329,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; Frozen_ledger_hash.var_to_input connecting_ledger_left
            ; Frozen_ledger_hash.var_to_input connecting_ledger_right
            ; supply_increase
+           ; stake_change
            ; fee_excess
           |]
       in
@@ -628,6 +639,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     and supply_increase =
       Currency.Amount.Signed.add s1.supply_increase s2.supply_increase
       |> option "Error adding supply_increase"
+    and stake_change =
+      Currency.Amount.Signed.add s1.stake_change s2.stake_change
+      |> option "Error adding stake_change"
     in
     ( { source = s1.source
       ; target = s2.target
@@ -635,6 +649,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; connecting_ledger_right
       ; fee_excess
       ; supply_increase
+      ; stake_change
       ; sok_digest = ()
       }
       : t )
@@ -649,13 +664,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     and connecting_ledger_left = Frozen_ledger_hash.gen
     and connecting_ledger_right = Frozen_ledger_hash.gen
     and fee_excess = Fee_excess.gen
-    and supply_increase = Currency.Amount.Signed.gen in
+    and supply_increase = Currency.Amount.Signed.gen
+    and stake_change = Currency.Amount.Signed.gen in
     ( { source
       ; target
       ; connecting_ledger_left
       ; connecting_ledger_right
       ; fee_excess
       ; supply_increase
+      ; stake_change
       ; sok_digest = ()
       }
       : t )
