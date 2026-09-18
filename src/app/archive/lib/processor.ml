@@ -178,7 +178,7 @@ module Token = struct
       ~owner_token_id =
     Conn.find
       (find_req
-         Caqti_type.(t3 int int int)
+         Typ.(t3 int int int)
          Caqti_type.int
          {sql| UPDATE tokens
                SET owner_public_key_id = $2, owner_token_id = $3
@@ -342,7 +342,7 @@ module Account_identifiers = struct
         | Some tok_id ->
             Conn.find_opt
               (find_opt_req
-                 Caqti_type.(t2 int int)
+                 Typ.(t2 int int)
                  Caqti_type.int
                  (Mina_caqti.select_cols ~select:"id" ~table_name
                     ~cols:Fields.names () ) )
@@ -356,7 +356,7 @@ module Account_identifiers = struct
     let%bind token_id = Token.find (module Conn) token in
     Conn.find
       (find_req
-         Caqti_type.(t2 int int)
+         Typ.(t2 int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
       (public_key_id, token_id)
@@ -606,7 +606,7 @@ module Protocol_versions = struct
   let find (module Conn : CONNECTION) ~transaction ~network ~patch =
     Conn.find
       (find_req
-         Caqti_type.(t3 int int int)
+         Typ.(t3 int int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
       (transaction, network, patch)
@@ -2147,7 +2147,7 @@ module Internal_command = struct
       ~(command_type : string) =
     Conn.find_opt
       (find_opt_req
-         Caqti_type.(t2 string string)
+         Typ.(t2 string string)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name
             ~tannot:(function
@@ -2356,7 +2356,7 @@ module Block_and_internal_command = struct
       ~sequence_no ~secondary_sequence_no =
     Conn.find_opt
       (find_opt_req
-         Caqti_type.(t4 int int int int)
+         Typ.(t4 int int int int)
          Caqti_type.string
          {sql| SELECT 'exists' FROM blocks_internal_commands
                WHERE block_id = $1
@@ -2388,7 +2388,7 @@ module Block_and_internal_command = struct
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
       (find_req
-         Caqti_type.(t4 int int int int)
+         Typ.(t4 int int int int)
          typ
          (sprintf
             {sql| SELECT %s FROM blocks_internal_commands
@@ -2454,7 +2454,7 @@ module Block_and_signed_command = struct
     match%bind
       Conn.find_opt
         (find_opt_req
-           Caqti_type.(t3 int int int)
+           Typ.(t3 int int int)
            Caqti_type.string
            {sql| SELECT 'exists' FROM blocks_user_commands
                  WHERE block_id = $1
@@ -2475,7 +2475,7 @@ module Block_and_signed_command = struct
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
       (find_req
-         Caqti_type.(t3 int int int)
+         Typ.(t3 int int int)
          typ
          (sprintf
             {sql| SELECT %s FROM blocks_user_commands
@@ -2552,8 +2552,7 @@ module Block_and_zkapp_command = struct
           Some (Array.of_list failure_reasons_ids_list)
     in
     Mina_caqti.select_insert_into_cols
-      ~select:
-        ("block_id, zkapp_command_id, sequence_no", Caqti_type.(t3 int int int))
+      ~select:("block_id, zkapp_command_id, sequence_no", Typ.(t3 int int int))
       ~table_name
       ~cols:
         ( [ "block_id"
@@ -2578,7 +2577,7 @@ module Block_and_zkapp_command = struct
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
       (find_req
-         Caqti_type.(t3 int int int)
+         Typ.(t3 int int int)
          typ
          (Mina_caqti.select_cols ~table_name ~select:comma_cols
             ~cols:[ "block_id"; "zkapp_command_id"; "sequence_no" ]
@@ -2705,7 +2704,7 @@ module Accounts_accessed = struct
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find_opt
       (find_opt_req
-         Caqti_type.(t2 int int)
+         Typ.(t2 int int)
          typ
          (sprintf
             {sql| SELECT %s
@@ -2776,7 +2775,7 @@ module Accounts_accessed = struct
           }
         in
         Mina_caqti.select_insert_into_cols
-          ~select:("block_id,account_identifier_id", Caqti_type.(t2 int int))
+          ~select:("block_id,account_identifier_id", Typ.(t2 int int))
           ~table_name ~cols:(Fields.names, typ)
           (module Conn)
           account_accessed
@@ -2817,7 +2816,7 @@ module Accounts_created = struct
     in
     let creation_fee = Currency.Fee.to_string creation_fee in
     Mina_caqti.select_insert_into_cols
-      ~select:("block_id,account_identifier_id", Caqti_type.(t2 int int))
+      ~select:("block_id,account_identifier_id", Typ.(t2 int int))
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       { block_id; account_identifier_id; creation_fee }
@@ -3555,7 +3554,9 @@ module Block = struct
         in
         let%map entries =
           Conn.collect_list
-            (Mina_caqti.collect_req Caqti_type.unit
+            (* SQL embeds the values being looked up, so it differs per
+               call and must not be memoised *)
+            (Mina_caqti.collect_req ~oneshot:true Caqti_type.unit
                Caqti_type.(t2 typ int)
                query )
             ()
@@ -3574,7 +3575,8 @@ module Block = struct
           String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
         in
         Conn.collect_list
-          (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
+          (* values are rendered into the SQL: per-call text, never shared *)
+          (Mina_caqti.collect_req ~oneshot:true Caqti_type.unit Caqti_type.int
              (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                 fields_sql values_sql ) )
           () )
@@ -4065,7 +4067,8 @@ module Block = struct
       let ids_sql = String.concat ~sep:"," ids in
       let parent_ids_sql = String.concat ~sep:"," parent_ids in
       Conn.exec
-        (Mina_caqti.exec_req Caqti_type.unit
+        (* ids are rendered into the SQL: per-call text, never shared *)
+        (Mina_caqti.exec_req ~oneshot:true Caqti_type.unit
            (sprintf
               "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
@@ -4301,7 +4304,7 @@ module Block = struct
       ~(parent_id : int) =
     Conn.exec
       (Mina_caqti.exec_req
-         Caqti_type.(t2 int string)
+         Typ.(t2 int string)
          {sql| UPDATE blocks SET parent_id = ?
                WHERE parent_hash = ?
                AND parent_id IS NULL
@@ -4319,7 +4322,7 @@ module Block = struct
     let columns = concat Fields.names in
     Conn.collect_list
       (Mina_caqti.collect_req
-         Caqti_type.(t2 int int)
+         Typ.(t2 int int)
          typ
          (sprintf
             {sql| WITH RECURSIVE chain AS (
@@ -4346,7 +4349,7 @@ module Block = struct
   let get_highest_canonical_block_opt (module Conn : Mina_caqti.CONNECTION) =
     Conn.find_opt
       (find_opt_req Caqti_type.unit
-         Caqti_type.(t2 int int64)
+         Typ.(t2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY \
           height DESC LIMIT 1" )
 
@@ -4354,7 +4357,7 @@ module Block = struct
       height =
     Conn.find
       (find_req Caqti_type.int64
-         Caqti_type.(t2 int int64)
+         Typ.(t2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
           height > ? ORDER BY height ASC LIMIT 1" )
       height
@@ -4363,7 +4366,7 @@ module Block = struct
       height =
     Conn.find
       (find_req Caqti_type.int64
-         Caqti_type.(t2 int int64)
+         Typ.(t2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
           height < ? ORDER BY height DESC LIMIT 1" )
       height
@@ -4378,7 +4381,7 @@ module Block = struct
       =
     Conn.exec
       (Mina_caqti.exec_req
-         Caqti_type.(t2 string int64)
+         Typ.(t2 string int64)
          {sql| UPDATE blocks SET chain_status='orphaned'
                WHERE height = $2
                AND state_hash <> $1
@@ -4488,7 +4491,7 @@ module Block = struct
         (* Delete user commands from old blocks. *)
         Conn.exec
           (Mina_caqti.exec_req
-             Caqti_type.(t2 int int64)
+             Typ.(t2 int int64)
              "DELETE FROM user_commands\n\
               WHERE id IN\n\
               (SELECT user_command_id FROM blocks_user_commands\n\
@@ -4500,7 +4503,7 @@ module Block = struct
         (* Delete old blocks. *)
         Conn.exec
           (Mina_caqti.exec_req
-             Caqti_type.(t2 int int64)
+             Typ.(t2 int int64)
              "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
               ?" )
           (height, timestamp)
@@ -4797,11 +4800,17 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               | Some acct ->
                   (index, acct) )
         in
+        (* Chunk the ids and materialise accounts per batch: reading all
+           accounts up front holds every genesis account in memory (~550 MiB
+           for mainnet) for the whole insertion. [chunks_length] bounds the
+           Postgres transaction, not the archive's own heap. *)
         let%bind list_of_results =
-          List.map account_ids ~f:(fun acct_id ->
-              acccount_with_index_of_id ~ledger acct_id )
-          |> List.chunks_of ~length:chunks_length
-          |> Deferred.List.mapi ~f:(fun i batch ->
+          List.chunks_of account_ids ~length:chunks_length
+          |> Deferred.List.mapi ~how:`Sequential ~f:(fun i id_batch ->
+                 let batch =
+                   List.map id_batch ~f:(fun acct_id ->
+                       acccount_with_index_of_id ~ledger acct_id )
+                 in
                  match%bind
                    Pool.use
                      (fun (module Conn : CONNECTION) ->
