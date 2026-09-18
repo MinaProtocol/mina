@@ -299,6 +299,14 @@ copy_common_daemon_configs() {
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+      # The verification keys generated for this config, named after it and the
+      # profile the daemon is built with, since both determine them. Without
+      # them the daemon spends ~30s and several GB computing the same keys at
+      # every start. They get their own directory because /var/lib/coda is also
+      # probed by the Pickles key cache, whose files these are not.
+      mkdir -p "${BUILDDIR}/var/lib/coda/verification_keys/${DUNE_PROFILE}"
+      cp ../genesis_ledgers/"${NETWORK_NAME}"_verification_keys.bin \
+        "${BUILDDIR}/var/lib/coda/verification_keys/${DUNE_PROFILE}/config_${GITHASH_CONFIG}.bin"
       ;;
     *)
       echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
@@ -851,6 +859,14 @@ copy_common_daemon_hardfork_configs() {
   cp "../genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
 
   cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+
+  # The keys copied above belong to the pre-fork config we just replaced, and a
+  # daemon refuses to start on keys that disagree with its constants. The fork
+  # constants only exist at this point, so there is nothing committed to install
+  # here; these nodes compute their keys at start instead.
+  # ponytail: costs post-fork nodes ~30s and a 2.6GB spike at every start.
+  # Generate the keys here once the hardfork tooling can run a built binary.
+  rm -f "${BUILDDIR}/var/lib/coda/verification_keys/${DUNE_PROFILE}/config_${GITHASH_CONFIG}.bin"
 }
 
 

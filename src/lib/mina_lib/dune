@@ -80,6 +80,7 @@
   network_pool
   timeout_lib
   prover
+  verification_keys
   verifier
   snark_work_lib
   ledger_catchup
