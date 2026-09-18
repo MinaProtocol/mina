@@ -25,6 +25,7 @@ SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk
 WHALES=2
 FISH=1
 NODES=1
+PROFILE_ARG=""
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
@@ -93,6 +94,9 @@ help() {
 
   cat <<EOF
 
+--profile <profile>                      | Node profile: dev, devnet, lightnet or mainnet
+                                         |   Default: the MINA_PROFILE environment variable if set, otherwise devnet
+                                         |   The dev profile only runs with --proof-level check
 -w   |--whales <#>                       | Number of BP Whale Nodes (bigger stake) to spin-up
                                          |   Default: ${WHALES}
 -f   |--fish <#>                         | Number of BP Fish Nodes (less stake) to spin-up
@@ -664,6 +668,10 @@ while [[ "$#" -gt 0 ]]; do
     NODE_STATUS_URL="${2}"
     shift
     ;;
+  --profile)
+    PROFILE_ARG="${2}"
+    shift
+    ;;
   --extra-files-root)
     EXTRA_FILES_ROOT="${2}"
     shift
@@ -676,6 +684,15 @@ while [[ "$#" -gt 0 ]]; do
   esac
   shift
 done
+
+# The script is used outside this repo, so a missing --profile falls back to an
+# exported MINA_PROFILE and then to devnet instead of failing.
+export MINA_PROFILE="${PROFILE_ARG:-${MINA_PROFILE:-devnet}}"
+echo "mina-local-network: using profile ${MINA_PROFILE}"
+if [[ "${MINA_PROFILE}" == dev && "${PROOF_LEVEL}" != check ]]; then
+  echo "The dev profile only runs with --proof-level check (got ${PROOF_LEVEL})" >&2
+  exit 1
+fi
 
 
 cat <<'EOF'

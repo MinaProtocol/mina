@@ -28,7 +28,8 @@ let lintStep =
       ->  RunInToolchain.runInToolchain
             RunInToolchain.Config::{
             , submodules = submodules
-            , environment = DebianVersions.overrideEnvs
+            , environment =
+                DebianVersions.overrideEnvs # [ "MINA_PROFILE=devnet" ]
             , innerScript = script
             }
 
@@ -48,7 +49,7 @@ let buildTestCmd
                 # lintStep
                     False
                     "buildkite/scripts/version-linter.sh ${release_branch}"
-            , label = "Versioned type linter for ${release_branch}"
+            , label = "Versioned type linter (devnet) for ${release_branch}"
             , key = "version-linter-${release_branch}"
             , soft_fail = Some soft_fail
             , target = cmd_target

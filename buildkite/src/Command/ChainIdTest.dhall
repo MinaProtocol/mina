@@ -16,6 +16,8 @@ let Size = ../Command/Size.dhall
 
 let Network = ../Constants/Network.dhall
 
+let Profiles = ../Constants/Profiles.dhall
+
 let MainlineBranch = ../Pipeline/MainlineBranch.dhall
 
 let Expr = ../Pipeline/Expr.dhall
@@ -33,7 +35,10 @@ let buildTestStep =
                 , commands =
                     RunInToolchain.runInDefaultToolchain
                       DebianVersions.overrideEnvs
-                      "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId}"
+                      "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId} ${Profiles.lowerName
+                                                                                                ( Profiles.fromNetwork
+                                                                                                    network
+                                                                                                )}"
                 , label = "Test chain-id for ${networkName}"
                 , key = "test-chain-id-${networkName}"
                 , target = Size.Small

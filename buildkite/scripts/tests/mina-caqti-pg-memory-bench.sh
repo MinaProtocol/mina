@@ -31,6 +31,7 @@ perf_file="${PERF_OUTPUT_FILE:-/workdir/mina_caqti_pg_memory.perf}"
 export PATH="/home/opam/.cargo/bin:$PATH"
 
 eval "$(opam config env)"
+export MINA_PROFILE=dev
 
 echo "Building the micro-benchmark..."
 dune build src/lib/mina_caqti/test/pg_memory/main.exe

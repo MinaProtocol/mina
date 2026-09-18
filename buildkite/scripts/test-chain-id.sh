@@ -4,6 +4,9 @@ set -eo pipefail
 
 MINA_DEBIAN_NETWORK=$1
 EXPECTED_CHAIN_ID=$2
+# Node profile; a separate concept from the network, passed explicitly.
+MINA_PROFILE=${3:?"usage: $0 <network> <expected-chain-id> <profile>"}
+export MINA_PROFILE
 
 echo "--- Testing chain_id command for ${MINA_DEBIAN_NETWORK}"
 

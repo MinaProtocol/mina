@@ -130,6 +130,7 @@ let
   allDeps = dune-nix.allDeps info;
   commonOverrides = {
     DUNE_PROFILE = "dev";
+    MINA_PROFILE = "dev";
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
@@ -147,6 +148,7 @@ let
     commit = inputs.self.sourceInfo.rev or "<dirty>";
     commitShort = builtins.substring 0 8 commit;
     cmdLineTest = ''
+      export MINA_PROFILE=dev
       mina --version
       mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
       chmod +x tests.exe
@@ -490,6 +492,7 @@ let
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          MINA_PROFILE = "dev";
         };
         extraInputs = [ pkgs.ephemeralpg ];
       } ''

@@ -54,6 +54,8 @@ fi
 
 eval "$(opam config env)"
 
+export MINA_PROFILE=dev
+
 echo "Setting up database for archive node tests..."
 
 source ./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} 

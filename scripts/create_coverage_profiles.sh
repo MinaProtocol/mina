@@ -7,6 +7,7 @@ run_unit_tests_with_coverage() {
   if [ "${DUNE_PROFILE}" = "" ]; then
     DUNE_PROFILE=dev
   fi
+  : "${MINA_PROFILE:?MINA_PROFILE must be set (dev, devnet, lightnet or mainnet)}"
   NPROC=${NPROC:-$(nproc --all)} # Linux-specific
   # force to make sure all coverage files generated
   # don't test nonconsensus code
