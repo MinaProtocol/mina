@@ -1,6 +1,6 @@
 ARG deb_version=latest
 ARG deb_codename=bullseye
-ARG deb_profile=devnet
+ARG deb_profile
 ARG docker_repo=gcr.io/o1labs-192920
 ARG image_name=mina-daemon
 ARG custom_suffix=""

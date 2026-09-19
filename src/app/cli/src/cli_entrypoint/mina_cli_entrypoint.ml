@@ -829,6 +829,13 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let (module G) = Genesis_constants.profiled () in
           let genesis_constants = G.genesis_constants in
           let constraint_constants = G.constraint_constants in
+          [%log info] "Daemon running with node profile $profile"
+            ~metadata:
+              [ ("profile", `String Node_config.profile)
+              ; ( "constraint_constants"
+                , Genesis_constants.Constraint_constants.to_yojson
+                    constraint_constants )
+              ] ;
           let compile_config =
             Mina_compile_config.of_node_config (module Node_config)
           in

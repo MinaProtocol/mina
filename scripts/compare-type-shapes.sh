@@ -56,7 +56,7 @@ dump_shapes() {
     ulimit -s 65532 2>/dev/null || true
     ulimit -n 10240 2>/dev/null || true
     dune build "$MINA_EXE_TARGET" 1>&2
-    "./_build/default/$MINA_EXE_TARGET" internal dump-type-shapes
+    MINA_PROFILE=devnet "./_build/default/$MINA_EXE_TARGET" internal dump-type-shapes
   ) | sort
 }
 

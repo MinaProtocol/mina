@@ -14,7 +14,7 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
-ARG deb_profile=devnet
+ARG deb_profile
 ARG deb_suffix
 ARG build_flags_suffix
 

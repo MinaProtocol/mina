@@ -8,6 +8,11 @@ if [[ $# -ne 1 ]]; then
 fi
 
 profile=$1
+# The dune profile and the node profile are separate settings; map explicitly.
+case "$profile" in
+  dev|devnet|mainnet|lightnet) export MINA_PROFILE="$profile" ;;
+  *) echo "No node profile for dune profile '$profile'" >&2; exit 1 ;;
+esac
 
 if [ "$NIGHTLY" = true ]
 then

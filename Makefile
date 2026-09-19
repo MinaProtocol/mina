@@ -163,9 +163,10 @@ endif
 
 .PHONY: genesis_ledger
 genesis_ledger: ocaml_checks ## Build runtime genesis ledger
+	$(if $(MINA_PROFILE),,$(error MINA_PROFILE must be set, e.g. make genesis_ledger MINA_PROFILE=devnet))
 	$(info 🏗️  Building runtime_genesis_ledger with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
-	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	env MINA_PROFILE=$(MINA_PROFILE) MINA_COMMIT_SHA1=$(GITLONGHASH) \
 	dune exec \
 		--profile=$(DUNE_PROFILE) \
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- \
@@ -781,12 +782,12 @@ docker-build-toolchain: ## Build the toolchain to be used in CI
 .PHONY: docker-build-archive-devnet
 docker-build-archive-devnet: SHELL := /bin/bash
 docker-build-archive-devnet: start-local-debian-repo ## Build the archive Docker image for devnet
-	$(call build_docker_image,mina-archive,devnet)
+	$(call build_docker_image,mina-archive,devnet,--deb-profile devnet)
 
 .PHONY: docker-build-archive-mainnet
 docker-build-archive-mainnet: SHELL := /bin/bash
 docker-build-archive-mainnet: start-local-debian-repo ## Build the archive Docker image for mainnet
-	$(call build_docker_image,mina-archive,mainnet)
+	$(call build_docker_image,mina-archive,mainnet,--deb-profile mainnet)
 
 .PHONY: docker-build-daemon-devnet-generic
 docker-build-daemon-devnet-generic: SHELL := /bin/bash
@@ -807,27 +808,27 @@ docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker 
 .PHONY: docker-build-daemon-devnet-automode-hardfork
 docker-build-daemon-devnet-automode-hardfork: SHELL := /bin/bash
 docker-build-daemon-devnet-automode-hardfork: start-local-debian-repo ## Build the daemon Docker image for automode devnet post hardfork
-	$(call build_docker_image,mina-daemon-auto-hardfork,devnet)
+	$(call build_docker_image,mina-daemon-auto-hardfork,devnet,--deb-profile devnet)
 
 .PHONY: docker-build-daemon-mainnet-automode-hardfork
 docker-build-daemon-mainnet-automode-hardfork: SHELL := /bin/bash
 docker-build-daemon-mainnet-automode-hardfork: start-local-debian-repo ## Build the daemon Docker image for automode mainnet post hardfork
-	$(call build_docker_image,mina-daemon-auto-hardfork,mainnet)
+	$(call build_docker_image,mina-daemon-auto-hardfork,mainnet,--deb-profile mainnet)
 
 .PHONY: docker-build-rosetta
 docker-build-rosetta-devnet-generic: SHELL := /bin/bash
 docker-build-rosetta-devnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
-	$(call build_docker_image,mina-rosetta,devnet-generic)
+	$(call build_docker_image,mina-rosetta,devnet-generic,--deb-profile devnet)
 
 .PHONY: docker-build-rosetta-devnet
 docker-build-rosetta-devnet: SHELL := /bin/bash
 docker-build-rosetta-devnet: start-local-debian-repo ## Build the Rosetta Docker image for devnet
-	$(call build_docker_image,mina-rosetta,devnet,--deb-suffix generic)
+	$(call build_docker_image,mina-rosetta,devnet,--deb-suffix generic --deb-profile devnet)
 
 .PHONY: docker-build-rosetta-mainnet
 docker-build-rosetta-mainnet: SHELL := /bin/bash
 docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docker image for mainnet
-	$(call build_docker_image,mina-rosetta,mainnet,--deb-suffix generic)
+	$(call build_docker_image,mina-rosetta,mainnet,--deb-suffix generic --deb-profile mainnet)
 
 .PHONY: docker-build-base
 docker-build-base: SHELL := /bin/bash
@@ -899,6 +900,7 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 
 	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,PROFILE)
 	$(call check_env_var,CODENAME)
 	$(call check_env_var,BRANCH_NAME)
 
@@ -934,6 +936,7 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
 		--network $(NETWORK_NAME) \
+		--deb-profile $(PROFILE) \
 		--custom-suffix configured \
 		--no-cache \
 		--load-only
@@ -946,6 +949,7 @@ docker-build-hardfork-rosetta-docker: SHELL := /bin/bash
 docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,PROFILE)
 	$(call check_env_var,CODENAME)
 	$(call check_env_var,BRANCH_NAME)
 
@@ -963,6 +967,7 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
 		--network $(NETWORK_NAME) \
+		--deb-profile $(PROFILE) \
 		--deb-suffix generic \
 		--custom-suffix generic \
 		--load-only \
@@ -981,6 +986,7 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
 		--network $(NETWORK_NAME) \
+		--deb-profile $(PROFILE) \
 		--custom-suffix configured \
 		--custom-arg "--build-arg image_name=mina-rosetta" \
 		--no-cache \

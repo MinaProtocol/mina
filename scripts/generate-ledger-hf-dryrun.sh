@@ -85,6 +85,7 @@ EXTRA_KEYS="$DEFAULT_EXTRA_KEYS"
 PLAIN_BALANCE="$DEFAULT_PLAIN_BALANCE"
 PREFIX="$DEFAULT_PREFIX"
 OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
+PROFILE_ARG=""
 MINA_BINARY=""
 RUNTIME_GENESIS_LEDGER_BINARY=""
 PAD_APP_STATE=""
@@ -109,7 +110,7 @@ close as possible to real mainnet conditions, which is crucial for validating
 that hard fork procedures will work correctly on mainnet.
 
 USAGE:
-  ./generate-ledger-hf-dryrun.sh [OPTIONS]
+  ./generate-ledger-hf-dryrun.sh --profile devnet [OPTIONS]
 
 OPTIONS:
   -t, --timestamp TIMESTAMP    Genesis timestamp (ISO 8601 format)
@@ -141,6 +142,7 @@ OPTIONS:
   --output-dir DIR            Output directory for generated files
                                Default: $DEFAULT_OUTPUT_DIR
 
+  --profile PROFILE           Node profile, exported as MINA_PROFILE: dev, devnet, lightnet or mainnet (required)
   --mina-binary PATH          Path to mina binary (builds if not specified or missing)
 
   --runtime-genesis-ledger-binary PATH
@@ -157,16 +159,16 @@ OPTIONS:
 
 EXAMPLES:
   # Basic usage with defaults ($DEFAULT_BP_KEYS BP keys, $DEFAULT_PLAIN_KEYS plain keys)
-  ./generate-ledger-hf-dryrun.sh
+  ./generate-ledger-hf-dryrun.sh --profile devnet
 
   # Generate more keys for larger test network
-  ./generate-ledger-hf-dryrun.sh --bp-keys 5 --plain-keys 10
+  ./generate-ledger-hf-dryrun.sh --profile devnet --bp-keys 5 --plain-keys 10
 
   # Custom timestamp and smaller balance
-  ./generate-ledger-hf-dryrun.sh -t "2024-12-01T10:00:00Z" -b 50000000
+  ./generate-ledger-hf-dryrun.sh --profile devnet -t "2024-12-01T10:00:00Z" -b 50000000
 
   # Full customization
-  ./generate-ledger-hf-dryrun.sh \\
+  ./generate-ledger-hf-dryrun.sh --profile devnet \\
     --timestamp "2024-11-15T14:30:00Z" \\
     --bp-keys 3 \\
     --plain-keys 6 \\
@@ -317,6 +319,10 @@ while [[ $# -gt 0 ]]; do
             fi
             shift 2
             ;;
+        --profile)
+            PROFILE_ARG="$2"
+            shift 2
+            ;;
         --mina-binary)
             MINA_BINARY="$2"
             shift 2
@@ -398,6 +404,12 @@ if [[ -n "$RUNTIME_GENESIS_LEDGER_BINARY" ]] && [[ "$RUNTIME_GENESIS_LEDGER_BINA
     RUNTIME_GENESIS_LEDGER_BINARY="$rgl_dir_abs/$rgl_base"
 fi
 
+if [[ -z "$PROFILE_ARG" ]]; then
+    echo "Error: --profile is required (dev, devnet, lightnet or mainnet)" >&2
+    exit 1
+fi
+export MINA_PROFILE="$PROFILE_ARG"
+
 # Check if nix is needed after parsing arguments
 check_nix_if_needed
 
@@ -448,7 +460,7 @@ ensure_binary() {
     
     echo "Building $binary_name..."
     local nix_result
-    nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1"#"$nix_target")
+    nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1#$nix_target")
     local new_binary_path="$nix_result/bin/$binary_name"
     
     if [[ ! -x "$new_binary_path" ]]; then

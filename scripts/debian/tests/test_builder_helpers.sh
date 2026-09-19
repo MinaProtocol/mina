@@ -715,6 +715,10 @@ test_build_daemon_devnet_postfork_deb() {
     load_captured_state
     assert_eq "deb name" "mina-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-postfork-mesa"
+    # The node has no default profile, and the runtimes mina-dispatch execs read
+    # none from /etc/default/mina-dispatch, so the profile package must come along.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-profile (=${EXPECTED_VERSION})"
+    assert_file_not_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
@@ -748,6 +752,10 @@ test_build_daemon_mainnet_postfork_deb() {
     load_captured_state
     assert_eq "deb name" "mina-mainnet-postfork-mesa" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-postfork-mesa"
+    # The node has no default profile, and the runtimes mina-dispatch execs read
+    # none from /etc/default/mina-dispatch, so the profile package must come along.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-profile (=${EXPECTED_VERSION})"
+    assert_file_not_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
 
     # Postfork config comes from the config package, not this one
     assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
