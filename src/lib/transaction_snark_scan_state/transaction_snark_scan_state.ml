@@ -194,6 +194,7 @@ module Job_view = struct
                   ]
               ] )
         ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
+        ; ("Stake Change", Currency.Amount.Signed.to_yojson s.stake_change)
         ]
     in
     let job_to_yojson =
@@ -395,6 +396,7 @@ let create_expected_statement ~constraint_constants
   ; connecting_ledger_right = connecting_merkle_root
   ; fee_excess
   ; supply_increase
+  ; stake_change = Currency.Amount.Signed.zero
   ; sok_digest = ()
   }
 
@@ -688,6 +690,7 @@ struct
           ; connecting_ledger_left = _
           ; connecting_ledger_right = _
           ; supply_increase = _
+          ; stake_change = _
           ; sok_digest = ()
           } as t ) ->
         let open Or_error.Let_syntax in
@@ -1035,6 +1038,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; second_pass_ledger = ledger
             ; fee_excess = t.global_state.fee_excess
             ; supply_increase = t.global_state.supply_increase
+            ; stake_change = t.global_state.stake_change
             ; protocol_state = t.global_state.protocol_state
             ; block_global_slot = t.global_state.block_global_slot
             }
@@ -1048,6 +1052,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
                 t.local_state.full_transaction_commitment
             ; excess = t.local_state.excess
             ; supply_increase = t.local_state.supply_increase
+            ; stake_change = t.local_state.stake_change
             ; ledger
             ; success = t.local_state.success
             ; account_update_index = t.local_state.account_update_index
