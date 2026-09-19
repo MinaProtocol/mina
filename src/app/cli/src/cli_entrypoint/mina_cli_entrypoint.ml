@@ -506,7 +506,18 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
       (optional string)
-      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
+      ~doc:
+        "PATH Deprecated, use --precomputed-blocks-dir. Append every \
+         precomputed block as one JSON line to this file. The file grows \
+         without limit and nothing rotates it"
+  and precomputed_blocks_dir =
+    flag "--precomputed-blocks-dir"
+      ~aliases:[ "precomputed-blocks-dir" ]
+      (optional string)
+      ~doc:
+        "DIR Write each precomputed block to its own file in this directory, \
+         named <network>-<height>-<state-hash>.json, the same name the \
+         precomputed block bucket uses. The directory must exist"
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
@@ -1469,11 +1480,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~is_archive_rocksdb ~work_reassignment_wait
                  ~archive_process_location ~log_block_creation
                  ~precomputed_values ~start_time ?precomputed_blocks_path
-                 ~log_precomputed_blocks ~start_filtered_logs
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~stop_time_interval ~node_status_url
-                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 ~precomputed_blocks_dir ~log_precomputed_blocks
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~stop_time_interval
+                 ~node_status_url ~graphql_control_port:itn_graphql_port
+                 ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  ~itn_features ~compile_config ~hardfork_handling
                  ~ledger_backing () )
