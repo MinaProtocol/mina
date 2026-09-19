@@ -22,7 +22,7 @@ source "${SCRIPTPATH}/../export-git-env-vars.sh"
 # SUGGESTED_DEPS should only be used for Suggests, not Depends.
 SUGGESTED_DEPS="jq, curl, wget"
 
-TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
+TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce, libpq5 "
 
 case "${MINA_DEB_CODENAME}" in
   noble)
@@ -84,7 +84,7 @@ signature_of_network() {
     mainnet)
       printf "mainnet"
       ;;
-    devnet|mesa)
+    devnet)
       printf "testnet"
       ;;
     *)
@@ -295,7 +295,7 @@ copy_common_daemon_configs() {
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
   case "${NETWORK_NAME}" in
-    devnet|mainnet|mesa)
+    devnet|mainnet)
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
@@ -566,10 +566,6 @@ build_daemon_deb() {
       package_name="${MINA_DEB_NAME}"
       seed_list_url='seed-lists/devnet_seeds.txt'
       ;;
-    mesa)
-      package_name="mina-mesa"
-      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
-      ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
       ;;
@@ -739,9 +735,6 @@ build_daemon_postfork_deb() {
       ;;
     devnet)
       seed_list_url='seed-lists/devnet_seeds.txt'
-      ;;
-    mesa)
-      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
     *)
       echo "Unknown network name provided: ${prefork_network}"; exit 1
@@ -956,9 +949,6 @@ build_archive_deb () {
       ;;
     devnet)
       package_name="$MINA_ARCHIVE_DEB_NAME"
-      ;;
-    mesa)
-      package_name="mina-archive-mesa${DEB_SUFFIX}"
       ;;
     *)
       echo "Unknown network name provided: ${network}" >&2

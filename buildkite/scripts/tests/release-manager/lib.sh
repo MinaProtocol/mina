@@ -131,7 +131,9 @@ assert_package_exists() {
 presetup_tools() {
     if ! command -v aws &> /dev/null; then
         log_info "Installing awscli..."
-        pip install --user awscli || {
+        # Set here too, so the suite also runs on a machine that does not
+        # already export it. Older pip ignores the variable.
+        PIP_BREAK_SYSTEM_PACKAGES=1 pip install --user awscli || {
             log_error "Failed to install awscli. Please install manually."
             exit 1
         }
@@ -153,7 +155,7 @@ presetup_tools() {
             fi
         fi
 
-        local DEBS3_VERSION="0.11.7"
+        local DEBS3_VERSION="0.11.8"
         curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem
         gem install deb-s3-${DEBS3_VERSION}.gem
         rm -f deb-s3-${DEBS3_VERSION}.gem
