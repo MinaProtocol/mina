@@ -403,7 +403,6 @@ SVCEOF
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
-    echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
