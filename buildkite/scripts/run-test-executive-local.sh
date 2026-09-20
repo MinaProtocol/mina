@@ -75,8 +75,25 @@ DISK_PRUNE_THRESHOLD=0 ./buildkite/scripts/docker/disk-cleanup.sh
   || echo "cache miss for $ARCHIVE_IMAGE"
 
 # Restore mina-test-executive and mina-logproc bare from the apps cache. Their
-# .deb comes from the packaging job, which the nightly no longer runs; the agent
-# image already carries the runtime libraries the .deb pulled in.
+# .deb comes from the packaging job, which the nightly no longer runs.
+#
+# The bare binary carries no apt metadata, so nothing honours the package's
+# Depends. mina-test-executive declares "mina-logproc, python3, docker-ce,
+# libpq5" (scripts/debian/builder-helpers.sh, TEST_EXECUTIVE_DEPS): the agent
+# already provides python3 and docker-ce, mina-logproc is restored below, but
+# libpq5 is not on the agent, so test_executive aborts at start with
+#   error while loading shared libraries: libpq.so.5
+# Install it here, the same way block-race-test.sh provisions its own python3.
+SUDO=""
+if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+fi
+if ! { command -v ldconfig >/dev/null && ldconfig -p | grep -q "libpq\.so\.5"; }; then
+  export DEBIAN_FRONTEND=noninteractive
+  $SUDO apt-get update -qq
+  $SUDO apt-get install -y --no-install-recommends libpq5
+fi
+
 ./buildkite/scripts/apps/restore_app.sh test_executive.exe mina-test-executive
 ./buildkite/scripts/apps/restore_app.sh logproc.exe mina-logproc
 
