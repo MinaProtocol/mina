@@ -45,7 +45,22 @@ let%test_module "Epoch ledger sync tests" =
              () )
         ()
 
-    let default_timeout_min = 5.0
+    (* Upper limit, in minutes, for one epoch-ledger-sync test.
+
+       This limit protects against a test that never completes; it is not a
+       measurement of how fast the test must be. When the test runs on a quiet
+       machine it takes about 100 s, the same as its siblings.
+
+       The old limit of 5 min was too small for a loaded machine. In CI these
+       tests run under [dune runtest src/lib], which starts up to 32 test
+       binaries at the same time, and the first pass is further slowed by
+       bisect_ppx instrumentation. The first test of the module then measured
+       253 s to over 300 s on nightly builds 1646 to 1652, against a 300 s
+       limit, and went red whenever the retry pass was also loaded.
+
+       A larger limit costs nothing when the test is healthy, because the timer
+       is only read if the test has not finished. *)
+    let default_timeout_min = 15.0
 
     let dir_prefix = "sync_test_data"
 
