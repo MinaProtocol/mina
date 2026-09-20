@@ -7,6 +7,7 @@ mod graphql;
 mod keys;
 mod native;
 mod output;
+mod postgres;
 mod service;
 mod supervisor;
 mod topology;
@@ -180,7 +181,10 @@ fn main() -> Result<()> {
                     ExecutionMode::Native => {
                         // Nothing to stop here: the supervisor owns the processes
                         // ('network stop'), and deleting the network directory
-                        // below removes all native on-disk state.
+                        // below removes all native on-disk state — except the
+                        // postgres socket dir, which lives under /tmp precisely
+                        // because it cannot live in the network dir.
+                        native::postgres::remove_socket_dir(&network_id);
                     }
                 }
 
@@ -1032,10 +1036,14 @@ fn create_network_docker(
     network_id: &str,
     services: &[ServiceConfig],
 ) -> Result<()> {
-    // Archive: stage the schema SQLs for the postgres container's initdb.d.
+    // Archive: provision the database. On docker that means staging SQL where
+    // the postgres container's entrypoint applies it on first boot — the archive
+    // contract decides what to apply, the staging decides when.
     if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
         let network_path = directory_manager.network_path(network_id);
-        docker::archive::stage_schema(&network_path, archive_node)?;
+        let staging =
+            docker::postgres::InitdbStaging::new(&network_path, &postgres::PgConfig::default())?;
+        archive::provision_db(&staging, archive_node, &network_path)?;
     }
     if let Err(e) = directory_manager.save_network_info(network_id, services) {
         error!("Error generating network.json: {e}");
@@ -1057,12 +1065,15 @@ fn create_network_native(
     info!("Successfully prepared native network '{network_id}'!");
 
     // Archive: initialize an ephemeral postgres cluster under the network dir and
-    // apply the schema now, so at `network start` the supervisor just runs
-    // `postgres` on a ready datadir (no dependency on a system postgres server).
+    // provision it now, so at `network start` the supervisor just runs `postgres`
+    // on a ready datadir (no dependency on a system postgres server). The session
+    // stops the server it started as soon as provisioning is done or fails.
     if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
         let network_path = directory_manager.network_path(network_id);
         default::LedgerGenerator::generate_replayer_input(&network_path)?;
-        if let Err(e) = native::archive::provision(&network_path, network_id, archive_node) {
+        let provisioned = native::postgres::ProvisionSession::begin(&network_path, network_id)
+            .and_then(|session| archive::provision_db(&session, archive_node, &network_path));
+        if let Err(e) = provisioned {
             return exit_with(format!("Failed to provision native archive postgres: {e}"));
         }
     }

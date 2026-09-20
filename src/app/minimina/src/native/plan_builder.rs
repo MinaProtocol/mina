@@ -4,10 +4,11 @@
 
 use crate::archive;
 use crate::directory_manager::{CONFIG_DIRECTORY, LOGS_DIRECTORY};
-use crate::native::archive as native_archive;
 use crate::native::port_manager;
+use crate::native::postgres as native_postgres;
+use crate::postgres;
 use crate::service::{daemon_env, keypair_pass_env, ServiceConfig, ServiceType};
-use crate::supervisor::plan::{NativeBackendSpec, NativeNodeSpec, SupervisorPlan};
+use crate::supervisor::plan::{NativeBackendSpec, NativeNodeSpec, Readiness, SupervisorPlan};
 use log::warn;
 use std::fs;
 use std::io::Result;
@@ -53,44 +54,60 @@ impl NativePlanBuilder {
         services: &[ServiceConfig],
         network_id: &str,
     ) -> Result<SupervisorPlan> {
-        let ports = port_manager::collect_all_ports(services);
-        port_manager::check_ports_available(&ports)?;
-
-        let network_path_str = self.network_path.to_str().unwrap();
+        let mut ports = port_manager::collect_all_ports(services);
         let mut nodes = Vec::new();
 
-        // Archive: an ephemeral postgres process (its cluster is `initdb`'d and
-        // schema-applied at `network create`) + the mina-archive service, both
-        // launched before the daemons. The archive-node daemon itself is emitted
-        // by the loop below (build_command adds `-archive-address 127.0.0.1:PORT`).
-        if let Some(archive) = ServiceConfig::get_archive_node(services) {
-            let archive_port = archive.resolved_archive_port();
-            let pgdata = native_archive::pgdata_dir(&self.network_path);
-            let socket_dir = native_archive::postgres_socket_dir(network_id);
+        // Archive: the ephemeral postgres cluster (already `initdb`'d and
+        // provisioned at `network create`) plus the mina-archive service, both
+        // ahead of the daemons and both gated, so nothing downstream can connect
+        // to a database or a service that is not up yet. The archive-node daemon
+        // itself is emitted by the loop below (build_command adds
+        // `-archive-address 127.0.0.1:PORT`).
+        if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
+            let archive_port = archive_node.resolved_archive_port();
+            let pg = native_postgres::pg_config(&self.network_path)?;
+            let pgdata = native_postgres::pgdata_dir(&self.network_path);
+            let socket_dir = native_postgres::socket_dir(network_id);
             fs::create_dir_all(&socket_dir)?;
+            ports.push(pg.port);
+            ports.push(archive_port);
+
             nodes.push(
                 NativeNodeSpec::new(
-                    native_archive::POSTGRES_UNIT_NAME,
+                    postgres::UNIT_NAME,
                     PathBuf::from("postgres"),
                     self.logs_dir().join("postgres.log"),
                 )
-                .args(native_archive::postgres_server_args(
-                    pgdata.to_str().unwrap(),
-                    socket_dir.to_str().unwrap(),
-                )),
+                .args(native_postgres::server_args(&pgdata, &socket_dir, pg.port))
+                .wait_for(Readiness::TcpPort(pg.port))
+                // SIGTERM is postgres' *smart* shutdown — it waits for every
+                // client to disconnect, which the archive-service's connection
+                // pool never does in time. SIGINT is the fast one.
+                .stop_signal(nix::sys::signal::Signal::SIGINT as i32),
             );
 
-            let svc_name = archive::archive_service_unit_name(&archive.service_name);
+            let svc_name = archive::archive_service_unit_name(&archive_node.service_name);
             nodes.push(
                 NativeNodeSpec::new(
                     &svc_name,
                     self.bin_path.join("mina-archive"),
                     self.logs_dir().join(format!("{svc_name}.log")),
                 )
-                .args(archive::archive_service_args("localhost", archive_port))
-                .env(keypair_pass_env()),
+                .args(archive::archive_service_args(
+                    &pg,
+                    "localhost",
+                    archive_port,
+                ))
+                .env(keypair_pass_env())
+                .wait_for(Readiness::TcpPort(archive_port)),
             );
         }
+
+        // Checked after the archive ports are known, and before anything is
+        // spawned.
+        port_manager::check_ports_available(&ports)?;
+
+        let network_path_str = self.network_path.to_str().unwrap();
 
         for service in services {
             if service.service_type == ServiceType::UptimeServiceBackend {
