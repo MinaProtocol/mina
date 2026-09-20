@@ -57,6 +57,7 @@ in  Pipeline.build
             , commands =
               [ RunWithPostgres.runInToolchainWithPostgresAndDebs
                   [ "APPS_BUILD_FLAG=instrumented"
+                  , "MINA_PROFILE=devnet"
                   , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
                   ]
                   ( Some
@@ -76,6 +77,7 @@ in  Pipeline.build
                   "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
               , RunWithPostgres.runInToolchainWithPostgresAndDebs
                   [ "APPS_BUILD_FLAG=instrumented"
+                  , "MINA_PROFILE=devnet"
                   , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
                   ]
                   ( Some
