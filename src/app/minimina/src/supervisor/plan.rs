@@ -8,6 +8,32 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// How the supervisor decides a unit is up before launching the next one.
+///
+/// A unit with no readiness is launched fire-and-forget (the historical
+/// behavior); one that declares readiness blocks the launch loop until it
+/// answers. Backends interpret the variants (see `Backend::probe`), but the
+/// timeout and liveness policy is backend-independent.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Readiness {
+    /// Ready when a TCP connect to `127.0.0.1:<port>` succeeds. Under docker
+    /// this reaches the unit only if the port is published.
+    TcpPort(u16),
+    /// Ready when the command exits 0 — run on the host (native) or inside the
+    /// unit via `docker exec` (docker).
+    Command(Vec<String>),
+}
+
+impl std::fmt::Display for Readiness {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Readiness::TcpPort(port) => write!(f, "tcp connect 127.0.0.1:{port}"),
+            Readiness::Command(cmd) => write!(f, "`{}`", cmd.join(" ")),
+        }
+    }
+}
+
 /// A native daemon: a local process the supervisor spawns and owns.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NativeNodeSpec {
@@ -17,6 +43,55 @@ pub struct NativeNodeSpec {
     #[serde(default)]
     pub env: Vec<(String, String)>,
     pub log_file: PathBuf,
+    /// Gate the rest of the launch loop on this unit coming up.
+    #[serde(default)]
+    pub wait_for: Option<Readiness>,
+    /// Signal for a graceful stop; `None` means SIGTERM. Postgres needs SIGINT
+    /// (its *fast* shutdown) because SIGTERM makes it wait for every client to
+    /// disconnect first.
+    #[serde(default)]
+    pub stop_signal: Option<i32>,
+}
+
+impl NativeNodeSpec {
+    /// A minimal process spec: everything else defaults to empty and is filled
+    /// fluently, so call sites state only what is non-default.
+    pub fn new(name: impl Into<String>, binary: impl Into<PathBuf>, log_file: PathBuf) -> Self {
+        NativeNodeSpec {
+            name: name.into(),
+            binary: binary.into(),
+            args: vec![],
+            env: vec![],
+            log_file,
+            wait_for: None,
+            stop_signal: None,
+        }
+    }
+
+    pub fn args(mut self, args: Vec<String>) -> Self {
+        self.args = args;
+        self
+    }
+
+    pub fn env(mut self, env: Vec<(String, String)>) -> Self {
+        self.env = env;
+        self
+    }
+
+    /// Non-default by nature: only units something else depends on declare
+    /// readiness, and only units that mishandle SIGTERM declare a signal — so
+    /// these setters stay unused until such a unit exists.
+    #[allow(dead_code)]
+    pub fn wait_for(mut self, readiness: Readiness) -> Self {
+        self.wait_for = Some(readiness);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn stop_signal(mut self, signal: i32) -> Self {
+        self.stop_signal = Some(signal);
+        self
+    }
 }
 
 /// A host↔container bind mount.
@@ -47,6 +122,9 @@ pub struct DockerNodeSpec {
     /// Network aliases (service-name DNS) — replaces compose service names.
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// Gate the rest of the launch loop on this unit coming up.
+    #[serde(default)]
+    pub wait_for: Option<Readiness>,
 }
 
 impl DockerNodeSpec {
@@ -64,7 +142,15 @@ impl DockerNodeSpec {
             env: vec![],
             ports: vec![],
             mounts: vec![],
+            wait_for: None,
         }
+    }
+
+    /// See [`NativeNodeSpec::wait_for`] on why this can sit unused.
+    #[allow(dead_code)]
+    pub fn wait_for(mut self, readiness: Readiness) -> Self {
+        self.wait_for = Some(readiness);
+        self
     }
 
     pub fn entrypoint(mut self, entrypoint: Vec<String>) -> Self {
@@ -161,19 +247,30 @@ pub enum NodeStatus {
     Failed { error: String },
 }
 
-/// Uniform access to a node spec's name, whichever backend it belongs to.
+/// Uniform access to the backend-independent parts of a node spec — its name
+/// and its readiness gate — whichever backend it belongs to. Lets the launch
+/// loop stay generic while the probe itself is the backend's business.
 pub trait NamedSpec {
     fn name(&self) -> &str;
+    fn readiness(&self) -> Option<&Readiness>;
 }
 
 impl NamedSpec for NativeNodeSpec {
     fn name(&self) -> &str {
         &self.name
     }
+
+    fn readiness(&self) -> Option<&Readiness> {
+        self.wait_for.as_ref()
+    }
 }
 
 impl NamedSpec for DockerNodeSpec {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn readiness(&self) -> Option<&Readiness> {
+        self.wait_for.as_ref()
     }
 }

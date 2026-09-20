@@ -42,7 +42,7 @@ use log::{error, info, warn};
 use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
-use backend::Backend;
+use backend::{Backend, READY_POLL, READY_TIMEOUT};
 use plan::{NamedSpec, NodeStatus};
 
 // ---------------------------------------------------------------------------
@@ -106,10 +106,21 @@ async fn run_backend<B: Backend>(
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
-    // Launch every unit, each with a waiter task that reaps its exit.
+    // Launch every unit, each with a waiter task that reaps its exit. A unit
+    // that declares readiness gates the ones after it: whatever comes next was
+    // ordered after it for a reason, so if it never comes up, starting the rest
+    // only produces a network that fails silently.
     for node in B::nodes(spec) {
         match backend.launch(node).await {
-            Ok((unit, killer, pid)) => register_unit::<B>(&state, node.name(), pid, unit, killer),
+            Ok((unit, killer, pid)) => {
+                register_unit::<B>(&state, node.name(), pid, unit, killer);
+                if let Err(e) = await_ready::<B>(&backend, node, &state).await {
+                    error!("supervisor: {e}");
+                    stop_units::<B>(&state).await;
+                    backend.teardown().await;
+                    return Err(e);
+                }
+            }
             Err(e) => fail_unit(&state, node.name(), e.to_string()),
         }
     }
@@ -167,6 +178,66 @@ fn register_unit<B: Backend>(
     });
 }
 
+/// Block until `node`'s readiness probe passes, it dies, or the budget runs
+/// out. A unit with no declared readiness returns immediately.
+///
+/// The policy is here rather than in the backends so both share one budget and
+/// one diagnosis; the backends only answer "is it up right now?"
+/// ([`Backend::probe`]). Watching the unit's own status matters as much as the
+/// timeout: a unit that exits on startup would otherwise burn the whole budget
+/// before reporting a failure its waiter task already knows about.
+///
+/// The budget wraps the whole wait rather than being checked between attempts,
+/// so a probe that hangs — a connect to a black hole, an exec the daemon never
+/// answers — costs the deadline and not the session.
+async fn await_ready<B: Backend>(
+    backend: &B,
+    node: &B::NodeSpec,
+    state: &Arc<Mutex<SupervisorState<B::Killer>>>,
+) -> std::io::Result<()> {
+    let Some(readiness) = node.readiness() else {
+        return Ok(());
+    };
+    let name = node.name();
+    info!("supervisor: waiting for '{name}' ({readiness})");
+
+    let poll = async {
+        loop {
+            if backend.probe(node, readiness).await {
+                info!("supervisor: '{name}' is ready");
+                return Ok(());
+            }
+            if let Some(status) = unit_exit(state, name) {
+                return Err(std::io::Error::other(format!(
+                    "unit '{name}' {status} before becoming ready ({readiness}); \
+                     see its log for details"
+                )));
+            }
+            tokio::time::sleep(READY_POLL).await;
+        }
+    };
+
+    tokio::time::timeout(READY_TIMEOUT, poll)
+        .await
+        .unwrap_or_else(|_| {
+            Err(std::io::Error::other(format!(
+                "unit '{name}' not ready after {}s ({readiness})",
+                READY_TIMEOUT.as_secs()
+            )))
+        })
+}
+
+/// `Some(description)` if the unit is no longer running — the waiter task has
+/// reaped it, or it never started.
+fn unit_exit<K>(state: &Arc<Mutex<SupervisorState<K>>>, name: &str) -> Option<String> {
+    let st = state.lock().unwrap();
+    match st.nodes.get(name).map(|n| &n.status) {
+        Some(NodeStatus::Exited { code }) => Some(format!("exited (code {code:?})")),
+        Some(NodeStatus::Failed { error }) => Some(format!("failed ({error})")),
+        _ => None,
+    }
+}
+
 fn fail_unit<K>(state: &Arc<Mutex<SupervisorState<K>>>, name: &str, error: String) {
     error!("supervisor: failed to start '{name}': {error}");
     state.lock().unwrap().nodes.insert(
@@ -203,7 +274,9 @@ async fn stop_units<B: Backend>(state: &Arc<Mutex<SupervisorState<B::Killer>>>) 
 #[cfg(test)]
 mod tests {
     use super::native::process_alive;
-    use super::plan::{DockerBackendSpec, DockerNodeSpec, NativeBackendSpec, NativeNodeSpec};
+    use super::plan::{
+        DockerBackendSpec, DockerNodeSpec, NativeBackendSpec, NativeNodeSpec, Readiness,
+    };
     use super::rpc::{dispatch, RpcRequest, METHOD_NOT_FOUND};
     use super::*;
 
@@ -219,13 +292,9 @@ mod tests {
             network_id: "test-net".into(),
             socket_path: socket_path.clone(),
             spec: Box::new(NativeBackendSpec {
-                nodes: vec![NativeNodeSpec {
-                    name: "sleeper".into(),
-                    binary: "/bin/sleep".into(),
-                    args: vec!["300".into()],
-                    env: vec![],
-                    log_file,
-                }],
+                nodes: vec![
+                    NativeNodeSpec::new("sleeper", "/bin/sleep", log_file).args(vec!["300".into()])
+                ],
             }),
         };
 
@@ -255,6 +324,167 @@ mod tests {
         assert!(!socket_path.exists(), "socket should be removed");
     }
 
+    /// Wait for the supervisor's socket to appear, up to `budget`.
+    fn await_socket(socket_path: &Path, budget: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + budget;
+        while std::time::Instant::now() < deadline {
+            if socket_path.exists() {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        false
+    }
+
+    /// A port nothing is listening on (bind to :0, learn the port, release it).
+    fn free_port() -> u16 {
+        std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port()
+    }
+
+    /// A `TcpPort` gate holds the launch loop until the port answers: the RPC
+    /// socket is bound only after the loop finishes, so it must not appear
+    /// before the port opens.
+    #[test]
+    fn tcp_readiness_gate_holds_the_launch_loop() {
+        let dir = tempdir::TempDir::new("supervisor-ready-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        let port = free_port();
+
+        // The port opens ~700ms in; the gate must still be waiting until then.
+        let opener = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(700));
+            let listener = std::net::TcpListener::bind(("127.0.0.1", port)).unwrap();
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            drop(listener);
+        });
+
+        let plan = SupervisorPlan {
+            network_id: "ready-net".into(),
+            socket_path: socket_path.clone(),
+            spec: Box::new(NativeBackendSpec {
+                nodes: vec![NativeNodeSpec::new(
+                    "gated",
+                    "/bin/sleep",
+                    dir.path().join("gated.log"),
+                )
+                .args(vec!["300".into()])
+                .wait_for(Readiness::TcpPort(port))],
+            }),
+        };
+
+        let started = std::time::Instant::now();
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+        assert!(
+            await_socket(&socket_path, std::time::Duration::from_secs(10)),
+            "socket never appeared"
+        );
+        let waited = started.elapsed();
+        assert!(
+            waited >= std::time::Duration::from_millis(500),
+            "launch loop did not wait for the port (finished in {waited:?})"
+        );
+
+        let _ = rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+        let _ = opener.join();
+    }
+
+    /// A unit that dies while being waited on fails `network start` immediately
+    /// — without burning the full readiness budget — and the units ordered
+    /// after it never launch.
+    #[test]
+    fn readiness_gate_aborts_when_the_unit_dies() {
+        let dir = tempdir::TempDir::new("supervisor-dead-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        let downstream_log = dir.path().join("downstream.log");
+
+        let plan = SupervisorPlan {
+            network_id: "dead-net".into(),
+            socket_path: socket_path.clone(),
+            spec: Box::new(NativeBackendSpec {
+                nodes: vec![
+                    // Exits at once, and its probe never passes.
+                    NativeNodeSpec::new("quitter", "/bin/true", dir.path().join("quitter.log"))
+                        .wait_for(Readiness::Command(vec!["/bin/false".into()])),
+                    NativeNodeSpec::new("downstream", "/bin/sleep", downstream_log.clone())
+                        .args(vec!["300".into()]),
+                ],
+            }),
+        };
+
+        let started = std::time::Instant::now();
+        let err = run_blocking(plan).expect_err("start must fail when a gated unit dies");
+        assert!(
+            started.elapsed() < READY_TIMEOUT,
+            "should fail on the unit's exit, not on the timeout"
+        );
+        let msg = err.to_string();
+        assert!(
+            msg.contains("quitter") && msg.contains("before becoming ready"),
+            "unhelpful error: {msg}"
+        );
+        assert!(
+            !downstream_log.exists(),
+            "units after a failed gate must not launch"
+        );
+        assert!(!socket_path.exists(), "RPC socket should never be bound");
+    }
+
+    /// A unit that asks for SIGINT gets SIGINT: this one ignores SIGTERM and
+    /// touches a marker from its INT handler, so the marker's existence is
+    /// proof of which signal was delivered (the 2s force-kill would leave none).
+    #[test]
+    fn stop_signal_override_is_honored() {
+        let dir = tempdir::TempDir::new("supervisor-signal-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        let marker = dir.path().join("got-sigint");
+        let trapped = dir.path().join("traps-installed");
+
+        // The unit announces its traps are installed, and the readiness gate
+        // waits for that — otherwise `stop` can land in the window before the
+        // trap exists, where SIGINT just kills the shell and no marker appears.
+        let script = format!(
+            "trap '' TERM; trap 'touch {}; kill $p; exit 7' INT; touch {}; sleep 300 & p=$!; wait",
+            marker.display(),
+            trapped.display()
+        );
+        let plan = SupervisorPlan {
+            network_id: "signal-net".into(),
+            socket_path: socket_path.clone(),
+            spec: Box::new(NativeBackendSpec {
+                nodes: vec![NativeNodeSpec::new(
+                    "trapper",
+                    "/bin/sh",
+                    dir.path().join("trapper.log"),
+                )
+                .args(vec!["-c".into(), script])
+                .wait_for(Readiness::Command(vec![
+                    "/usr/bin/test".into(),
+                    "-f".into(),
+                    trapped.display().to_string(),
+                ]))
+                .stop_signal(nix::sys::signal::Signal::SIGINT as i32)],
+            }),
+        };
+
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+        assert!(
+            await_socket(&socket_path, std::time::Duration::from_secs(10)),
+            "socket never appeared"
+        );
+        let _ = rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+
+        assert!(
+            marker.exists(),
+            "unit was not stopped with its declared signal"
+        );
+    }
+
     #[test]
     fn unknown_method_returns_error() {
         let state = Arc::new(Mutex::new(SupervisorState::<u32>::new()));
@@ -281,16 +511,8 @@ mod tests {
             socket_path: socket_path.clone(),
             spec: Box::new(DockerBackendSpec {
                 network_name: "minimina-suptest-net".into(),
-                nodes: vec![DockerNodeSpec {
-                    name: "minimina-suptest-ctr".into(),
-                    image: "alpine:3.19".into(),
-                    entrypoint: None,
-                    cmd: vec!["sleep".into(), "300".into()],
-                    env: vec![],
-                    ports: vec![],
-                    mounts: vec![],
-                    aliases: vec!["suptest-node".into()],
-                }],
+                nodes: vec![DockerNodeSpec::new("minimina-suptest-ctr", "alpine:3.19")
+                    .cmd(vec!["sleep".into(), "300".into()])],
             }),
         };
 
