@@ -62,6 +62,16 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
+            , commands = [ Cmd.run "scripts/check-ci-fences.sh" ]
+            , label = "Check CI fences"
+            , key = "ci-fences"
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
+            }
+        , Command.build
+            Command.Config::{
             , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh master" ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems master branch"

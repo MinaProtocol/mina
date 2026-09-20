@@ -63,6 +63,40 @@ We have CI jobs named `check-merges-cleanly-into-BRANCH` that fail if a PR intro
 
 If that CI job passes, then you can proceed and no further action is needed.
 
+### Guarding branch-only code with CI fences
+
+`check-merges-cleanly-into-*` only catches conflicts. To stop branch-only code (a mainnet-only hotfix, a hardfork-only pin) from riding a back-merge into a branch where it does not belong, put a **CI fence** next to it: a small script inside a comment. The `Check CI fences` job (`scripts/check-ci-fences.sh`) runs every fence in the tree on every build and fails if any exits nonzero.
+
+```dockerfile
+# !!!CI-FENCE-BEGIN master/compatible-only bullseye pin; remove it when back-merging further
+# #!/usr/bin/env bash
+# branch="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-$BUILDKITE_BRANCH}"
+# case "$branch" in master|compatible) ;; *) echo "pin must not exist on $branch"; exit 1 ;; esac
+# grep -q '^ARG image=.*bullseye-slim' dockerfiles/Dockerfile-mina-daemon
+# !!!CI-FENCE-END
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
+```
+
+In OCaml, Dhall, Rust and other block-comment languages, write the body bare and close the comment after the END marker:
+
+```ocaml
+(* !!!CI-FENCE-BEGIN master-only: must not be back-merged
+#!/usr/bin/env bash
+branch="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-$BUILDKITE_BRANCH}"
+[ "$branch" = master ] || { echo "master-only code found on $branch"; exit 1; }
+!!!CI-FENCE-END *)
+```
+
+Rules:
+- The text after `!!!CI-FENCE-BEGIN` is the caption, shown on failure. It must not be empty; put the remediation hint there.
+- The text before `!!!CI-FENCE-END` on its line (`# `, indentation, or nothing) is stripped from every body line; each non-blank body line must start with it.
+- The stripped body must start with a shebang. It runs from the repo root with the job's environment and a 60s timeout. The checker sets no variables: the fence finds the branch itself, as above (`BUILDKITE_PULL_REQUEST_BASE_BRANCH` on PR builds, `BUILDKITE_BRANCH` on pushes).
+- In `.ml`/`.mli`, `.dhall` and `.rs`/`.go`/`.nix`/`.js`/`.ts` files the body must not contain that language's comment closer (`*)`, `-}`, `*/`).
+- `README-branching.md` (these examples) and the checker's test file are not scanned.
+- A fence is only as good as its script: a typo like `masterr` silently never fires, and deleting a fence goes unnoticed. Review fence diffs like the code they guard.
+
+Run locally with e.g. `BUILDKITE_BRANCH=develop scripts/check-ci-fences.sh`; tests are in `scripts/tests/test_check_ci_fences.sh`.
+
 PRs resolving merge conflicts (merge-PRs) should only be merged after the original PR is approved, and all changes from the original PR are incorporated into the merge-PRs. Consider a PR which is made from `mybranch` branch against `rampup`, and causes conflicts in `berkeley` and `develop`. In this case the workflow is as follows:
 - Review and approve the original PR against `rampup` (PR-rampup). CI passes except for `check-merges-cleanly-into-*` jobs.
 - Incorporate all changes from PR-rampup into a new PR against `berkeley` (PR-berkeley) and resolve conflicts. Concretely, make a new branch+PR based off of `mybranch` called `mybranch-berkeley` (for example), and then merge `berkeley` into `mybranch-berkeley`. Fix any merge errors that result.
