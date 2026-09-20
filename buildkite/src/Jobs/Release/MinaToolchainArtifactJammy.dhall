@@ -31,7 +31,7 @@ in  Pipeline.build
         , tags = [ PipelineTag.Type.Toolchain ]
         }
       , steps =
-        [ let toolchainBullseyeSpec =
+        [ let toolchainJammySpec =
                 DockerImage.ReleaseSpec::{
                 , service = Artifacts.Type.Toolchain
                 , deb_codename = DebianVersions.DebVersion.Jammy
@@ -40,6 +40,6 @@ in  Pipeline.build
                 , size = Size.XLarge
                 }
 
-          in  DockerImage.generateStep toolchainBullseyeSpec
+          in  DockerImage.generateStep toolchainJammySpec
         ]
       }

@@ -403,7 +403,6 @@ SVCEOF
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
-    echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -503,6 +502,9 @@ test_build_test_executive_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "python3"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "docker-ce"
+    # test_executive reaches libpq through mina_graphql -> archive_lib ->
+    # caqti-driver-postgresql, so it needs libpq5 at run time.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq5"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-test-executive"
 }

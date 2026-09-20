@@ -93,7 +93,6 @@
           '';
     in {
       overlays = {
-        crates-io = import ./nix/crates-io.nix;
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
@@ -291,6 +290,11 @@
             else
               flag) flags);
 
+        # Even if rocksdb is in o1-labs/opam-repository (as rocksdb_stubs),
+        # we rely on a version from nixpkgs. Previous attempts to use the opam
+        # version failed, see https://github.com/MinaProtocol/mina/pull/17343
+        # The nixpkgs build is passed to rocksdb_stubs through MINA_ROCKSDB,
+        # see nix/ocaml.nix
         rocksdbOverlay = pkgs: prev: {
           rocksdb-mina = let
             # Get the full derivation from unstable but build with current nixpkgs

@@ -54,7 +54,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                  "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
                   ( Some
@@ -68,14 +68,14 @@ in  Pipeline.build
                   Cmd.Docker::{ image = rosettaDocker }
                   "buildkite/scripts/tests/rosetta-integration-tests.sh"
               ]
-            , label = "Rosetta integration tests Bullseye"
-            , key = "rosetta-integration-tests-bullseye"
+            , label = "Rosetta integration tests Bookworm"
+            , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
+                  , codename = Dockers.Type.Bookworm
                   , artifact = Artifacts.Type.RosettaAppsOnly
                   , network = network
                   }

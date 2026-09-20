@@ -42,7 +42,7 @@ log_error() { echo -e "${RED}[ERROR]${CLEAR} $*"; }
 # CLI
 ################################################################################
 
-CODENAME="bullseye"
+CODENAME="bookworm"
 NETWORK="devnet"
 APTLY_PORT=8080
 
@@ -50,7 +50,7 @@ usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -c, --codename    Debian codename (default: bullseye)"
+    echo "  -c, --codename    Debian codename (default: bookworm)"
     echo "  -N, --network     Network name (default: devnet)"
     echo "  -h, --help        Show this help"
 }
@@ -236,11 +236,11 @@ log_info "=== Step 3: Start local apt repository ==="
 
 # Add local repo to apt sources
 $SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-# Via update.sh rather than a bare apt-get update: this test defaults to
-# bullseye, whose upstream security pocket now serves an expired Release and
-# fails apt outright. update.sh disables just that pocket and retries, and it
-# also bypasses the APT proxy for localhost, where aptly serves the debians
-# under test.
+# Via update.sh rather than a bare apt-get update: on --codename bullseye the
+# upstream security pocket now serves an expired Release and fails apt
+# outright. update.sh disables just that pocket and retries, and it also
+# bypasses the APT proxy for localhost, where aptly serves the debians under
+# test.
 ./buildkite/scripts/debian/update.sh --verbose
 
 log_info "Available packages:"
