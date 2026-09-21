@@ -43,7 +43,6 @@ in  Pipeline.build
             ]
           , debVersion = DebianVersions.DebVersion.Noble
           , profile = Profiles.Type.Mainnet
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Release ]
           }
       )
