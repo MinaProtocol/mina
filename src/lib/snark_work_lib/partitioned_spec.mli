@@ -1,3 +1,10 @@
+(** Top-level job specification dispatched to SNARK workers via RPC.
+
+    Wraps either a {!Single_spec} (non-zkApp) or {!Sub_zkapp_spec} (zkApp)
+    with job metadata including the job ID and sok_message for prover
+    attribution.
+*)
+
 open Core_kernel
 
 module Poly : sig
@@ -15,14 +22,17 @@ module Poly : sig
     end
   end]
 
+  (** Transform the spec types. *)
   val map :
        f_single_spec:('a -> 'b)
     -> f_subzkapp_spec:('c -> 'd)
     -> ('a, 'c) t
     -> ('b, 'd) t
 
+  (** Get the statement of knowledge message for prover attribution. *)
   val sok_message : _ t -> Mina_base.Sok_message.t
 
+  (** Get the job identifier. *)
   val get_id : _ t -> Id.Any.t
 end
 
@@ -37,8 +47,10 @@ module Stable : sig
 
     val to_latest : t -> t
 
+    (** Get the SNARK statement. *)
     val statement : t -> Transaction_snark.Statement.t
 
+    (** Get the statement of knowledge message. *)
     val sok_message : t -> Mina_base.Sok_message.t
   end
 end]

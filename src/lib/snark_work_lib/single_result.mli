@@ -1,3 +1,8 @@
+(** Result of completing a single SNARK job.
+
+    Contains the original spec, the generated proof, and elapsed proving time.
+*)
+
 open Core_kernel
 
 module Poly : sig
@@ -13,6 +18,7 @@ module Poly : sig
     end
   end]
 
+  (** Transform the spec and proof types. *)
   val map : f_spec:('a -> 'b) -> f_proof:('c -> 'd) -> ('a, 'c) t -> ('b, 'd) t
 end
 
