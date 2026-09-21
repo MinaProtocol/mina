@@ -4226,8 +4226,8 @@ let challenge_digest_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   ()
 
 (* Sub-circuit: sponge_and_challenges on the Wrap side (Wrap_verifier.finalize_other_proof,
-   step 4): the plain challenge digest, the fr-sponge schedule, xi by squeeze_scalar and r
-   by squeeze_challenge, both expanded through the Step inner curve's endomorphism.
+   step 4): the plain challenge digest, the fr-sponge schedule, xi and r each by
+   squeeze_challenge, both expanded through the Step inner curve's endomorphism.
    Input layout (122 fields): the step layout without the mask —
      0-31:    prev_challenges (2 x 16)
      32:      sponge_digest_before_evaluations
@@ -4317,7 +4317,7 @@ let sponge_and_challenges_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
     Util.Wrap.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
   in
   let xi =
-    lowest_128_bits ~constrain_low_bits:false (Wrap_main_inputs.Sponge.squeeze sponge)
+    lowest_128_bits ~constrain_low_bits:true (Wrap_main_inputs.Sponge.squeeze sponge)
   in
   let r_actual =
     lowest_128_bits ~constrain_low_bits:true (Wrap_main_inputs.Sponge.squeeze sponge)
