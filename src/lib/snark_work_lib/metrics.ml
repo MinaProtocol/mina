@@ -1,3 +1,11 @@
+(** Metrics emission for SNARK work timing and performance tracking.
+
+    Logs and records histograms for different job types:
+    - Merge SNARKs
+    - Transition SNARKs (zkApp vs non-zkApp)
+    - Sub-zkApp segments and merges
+*)
+
 open Core_kernel
 module Transaction_type = Mina_transaction.Transaction_type
 

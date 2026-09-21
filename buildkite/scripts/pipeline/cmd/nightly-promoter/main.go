@@ -23,14 +23,18 @@ const (
 	defaultArtifacts         = "mina-logproc,mina-daemon,mina-archive,mina-rosetta,mina-generic"
 	defaultLightnetArtifacts = "mina-logproc,mina-generic"
 	defaultNetworks          = "devnet"
-	defaultCodenames         = "noble,bookworm"
-	defaultArchs             = "amd64,arm64"
-	defaultDebianRepo        = "nightly.apt.packages.minaprotocol.com"
-	defaultSignKey           = "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
-	defaultBackend           = "local"
-	defaultProfile           = "lightnet"
-	defaultSourceDockerRepo  = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
-	defaultTargetDockerRepo  = "gcr.io/o1labs-192920"
+	// Nightly builds only bookworm amd64 (the other codenames are Release-scoped,
+	// see MinaArtifact*.dhall), so promoting noble would look for packages that
+	// were never built. This carries over the codename trim #19541 made to the
+	// AutoPromoteNightly job this pipeline replaces.
+	defaultCodenames        = "bookworm"
+	defaultArchs            = "amd64,arm64"
+	defaultDebianRepo       = "nightly.apt.packages.minaprotocol.com"
+	defaultSignKey          = "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+	defaultBackend          = "local"
+	defaultProfile          = "lightnet"
+	defaultSourceDockerRepo = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
+	defaultTargetDockerRepo = "gcr.io/o1labs-192920"
 )
 
 func main() {

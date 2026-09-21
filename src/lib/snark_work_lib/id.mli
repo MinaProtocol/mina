@@ -1,6 +1,12 @@
+(** Job identifiers for tracking SNARK work.
+
+    Jobs are paired (one or two per work unit). Each job has a pairing_id
+    and a position indicator ([`First], [`Second], or [`One] if unpaired).
+*)
+
 open Core_kernel
 
-(** A Single.t identifies one part of a One_or_two work *)
+(** Identifies one part of a One_or_two work unit. *)
 module Single : sig
   [%%versioned:
   module Stable : sig
@@ -29,7 +35,7 @@ module Range : sig
   end]
 end
 
-(** A Sub_zkapp.t identifies a sub-zkapp level work *)
+(** Identifies a sub-zkApp level work unit with a range of account updates. *)
 module Sub_zkapp : sig
   [%%versioned:
   module Stable : sig
@@ -47,8 +53,10 @@ module Sub_zkapp : sig
     end
   end]
 
+  (** Create a Sub_zkapp ID from a Single ID with a range. *)
   val of_single : range:Range.t -> Single.t -> t
 
+  (** Extract the Single ID portion, discarding the range. *)
   val to_single : t -> Single.t
 end
 
