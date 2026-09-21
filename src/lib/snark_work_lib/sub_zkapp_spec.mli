@@ -1,3 +1,12 @@
+(** Job specification for zkApp command segments.
+
+    zkApp commands are broken into segments for proving. Each segment may
+    contain account updates with optional proofs.
+
+    - [Segment]: Prove a single zkApp command segment
+    - [Merge]: Combine two segment proofs
+*)
+
 open Core
 
 [%%versioned:
@@ -37,6 +46,7 @@ module Stable : sig
           }
     [@@deriving sexp, yojson]
 
+    (** Get the SNARK statement from a Segment or merged proofs. *)
     val statement : t -> Transaction_snark.Statement.t
 
     (** Upgrade. Discards the embedded digest, which is a placeholder. *)

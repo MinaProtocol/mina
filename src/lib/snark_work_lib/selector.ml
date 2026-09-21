@@ -1,3 +1,9 @@
+(** Concretized types for SNARK work selection and RPC.
+
+    [Spec]: Work specification sent from coordinator to SNARK worker.
+    [Result]: Proof result returned from SNARK worker to coordinator.
+*)
+
 (* WARN:
    This file would be rewritten finally
 *)
