@@ -366,6 +366,7 @@ MOCKEXE
     create_mock_exe "default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe"
     create_mock_exe "default/src/app/delegation_verify/delegation_verify.exe"
     create_mock_exe "default/src/app/dump_slot_ledger/dump_slot_ledger.exe"
+    create_mock_exe "default/src/app/mina_graphql_client/mina_graphql_client_app.exe"
 
     #---------------------------------------------------------------------------
     # Source files under PROJECT_ROOT (referenced via ../ from BUILD_DIR)
