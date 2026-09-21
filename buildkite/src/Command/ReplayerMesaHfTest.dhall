@@ -34,7 +34,7 @@ in  { step =
                             }
                         )
                     )
-                    ContainerImages.minaToolchainBullseye.amd64
+                    ContainerImages.minaToolchainBookworm.amd64
                     debs
                     "./buildkite/scripts/replayer-mesa-hf-test.sh"
                 , Cmd.run
