@@ -226,9 +226,9 @@ struct
     in
     fun x -> Lazy.force f x
 
-  let scale_fast2 p (s : Other_field.t Shifted_value.Type2.t) =
+  let scale_fast2 ?(num_bits = Field.size_in_bits) p (s : Other_field.t Shifted_value.Type2.t) =
     with_label __LOC__ (fun () ->
-        Ops.scale_fast2 p s ~num_bits:Field.size_in_bits )
+        Ops.scale_fast2 p s ~num_bits )
 
   let check_bulletproof ~(sponge : Sponge.t) ~xi
       ~(* Corresponds to y in figure 7 of WTS *)
@@ -309,7 +309,7 @@ struct
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
-          let uc = scale_fast2 u advice.combined_inner_product in
+          let uc = scale_fast2 ~num_bits:(Field.size_in_bits - 1) u advice.combined_inner_product in
           combined_polynomial + uc
         in
         let q = p_prime + lr_prod in

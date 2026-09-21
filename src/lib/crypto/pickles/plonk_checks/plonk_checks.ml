@@ -472,6 +472,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         with_label __LOC__ (fun () ->
             List.map
               ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
-              [ perm ] )
+              [ perm; zeta_to_srs_length; zeta_to_domain_size ] )
         |> Boolean.all )
 end

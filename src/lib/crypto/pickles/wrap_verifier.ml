@@ -1711,7 +1711,7 @@ struct
     sponge.state <- sponge_state ;
     (* == Step 5: Sample and verify xi challenge ==
        Squeeze xi and r from the reconstructed sponge. Verify xi matches. *)
-    let xi_actual = squeeze_scalar sponge in
+    let xi_actual = Import.Scalar_challenge.create (squeeze_challenge sponge) in
     let r_actual = squeeze_challenge sponge in
     let xi_correct =
       with_label __LOC__ (fun () ->
