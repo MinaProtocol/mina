@@ -1,8 +1,11 @@
 (** Component test for [mina-missing-blocks-guardian].
 
-    An archive database is filled from the sample precomputed blocks with one
-    block in the middle withheld, so exactly one block has no parent. The test
-    then checks, against that real database:
+    An archive database is filled from the sample precomputed blocks with the
+    parent of the middle block withheld, so that the middle block is stranded
+    with no parent. The sample is a forked chain that does not reach back to
+    genesis, so more than one block sits at its lowest height and each of
+    those has no parent either; the test measures that floor rather than
+    assume a number. It then checks, against that real database:
 
     - [audit] reports the gap and sets bit 0 of its exit code;
     - a block source that answers 404 is refused, and nothing is written;
@@ -97,6 +100,36 @@ let lowest_height ~archive_uri =
   count ~archive_uri ~what:"read the lowest block height"
     "SELECT MIN(height) FROM blocks"
 
+(** State hashes of the blocks that name [parent_hash] as their parent.  The
+    sample archive is a forked chain, so a block may have more than one. *)
+let children_of ~archive_uri ~parent_hash =
+  let connection = Psql.Conn_str archive_uri in
+  match%map
+    Psql.run_command ~connection
+      (sprintf "SELECT state_hash FROM blocks WHERE parent_hash = '%s'"
+         parent_hash )
+  with
+  | Ok result ->
+      String.split_lines result |> List.map ~f:String.strip
+      |> List.filter ~f:(Fn.non String.is_empty)
+  | Error err ->
+      failwithf "Failed to list the children of %s: %s" parent_hash
+        (Error.to_string_hum err) ()
+
+(* The unpacked blocks are named <network>-<height>-<state hash>.json, and a
+   state hash holds no '-', so the last field is the state hash. *)
+let state_hash_of_block_file file =
+  Filename.basename file |> String.split ~on:'-' |> List.last_exn
+  |> String.chop_suffix_if_exists ~suffix:".json"
+
+(* The state hash the precomputed block names as its parent. *)
+let parent_hash_of_block_file file =
+  Yojson.Safe.from_file file
+  |> Yojson.Safe.Util.member "data"
+  |> Yojson.Safe.Util.member "protocol_state"
+  |> Yojson.Safe.Util.member "previous_state_hash"
+  |> Yojson.Safe.Util.to_string
+
 (* Blocks written straight into the archive by [mina-archive-blocks] are all
    [pending]: canonicalization is the running archive node's job, and there is
    none here.  An archive where nothing is canonical is a problem the audit
@@ -185,16 +218,34 @@ let test_case (test_data : t) =
   let total = List.length precomputed_blocks in
   if total < 3 then
     failwithf "Need at least 3 sample blocks to leave a hole, got %d" total () ;
-  (* Withhold one block from the middle, so exactly one block has no parent.
-     The first and the last are left in place: a gap at either end is not the
-     kind of gap the guardian closes. *)
-  let withheld_index = total / 2 in
-  let withheld = List.nth_exn precomputed_blocks withheld_index in
-  [%log info] "Withholding $block so that its child has no parent"
-    ~metadata:[ ("block", `String withheld) ] ;
+  (* Withhold the parent of the block in the middle of the list, so that the
+     middle block is left with no parent.  Withholding the middle block itself
+     would not do: the sample is a forked chain, its blocks come back sorted by
+     height only, and a fork tip has no child to strand, so which block the
+     middle index names -- and whether it has a child at all -- depends on the
+     order the files are read in.  Naming the parent makes the hole certain.
+     The first and the last blocks stay in place: a gap at either end is not
+     the kind of gap the guardian closes. *)
+  let stranded = List.nth_exn precomputed_blocks (total / 2) in
+  let withheld_hash = parent_hash_of_block_file stranded in
+  let withheld =
+    match
+      List.find precomputed_blocks ~f:(fun file ->
+          String.equal (state_hash_of_block_file file) withheld_hash )
+    with
+    | Some file ->
+        file
+    | None ->
+        failwithf
+          "The sample blocks hold no parent %s for %s, so no hole can be made \
+           below it"
+          withheld_hash stranded ()
+  in
+  [%log info] "Withholding $block so that $stranded has no parent"
+    ~metadata:[ ("block", `String withheld); ("stranded", `String stranded) ] ;
   let kept =
-    List.filteri precomputed_blocks ~f:(fun i _ ->
-        not (Int.equal i withheld_index) )
+    List.filter precomputed_blocks ~f:(fun file ->
+        not (String.equal file withheld) )
   in
   let%bind (_ : string) =
     Archive_blocks.run Archive_blocks.default ~blocks:kept ~archive_uri
@@ -204,19 +255,22 @@ let test_case (test_data : t) =
   if not (Int.equal archived (List.length kept)) then
     failwithf "Expected %d blocks in the archive, found %d" (List.length kept)
       archived () ;
-  (* The sample archive does not reach back to a genesis block, so its lowest
-     block will always have no parent and its own parent can never be fetched.
-     --min-height stops the walk there instead of asking the block source for
-     blocks that cannot exist. *)
+  (* The sample archive does not reach back to a genesis block, so the blocks
+     at its lowest height will always have no parent and their own parent can
+     never be fetched.  --min-height stops the walk there instead of asking
+     the block source for blocks that cannot exist. *)
   let%bind min_height = lowest_height ~archive_uri in
-  let%bind unparented = unparented_count ~archive_uri in
-  (* The lowest block in the sample has no parent by construction, and so does
-     the child of the block we withheld. *)
-  if not (Int.equal unparented 2) then
-    failwithf
-      "Expected two blocks with no parent after withholding %s (the lowest \
-       block and the child of the hole), found %d"
-      withheld unparented () ;
+  (* The sample archive is a forked chain, so more than one block can sit at
+     its lowest height, and every one of them has no parent by construction.
+     The absolute number of parentless blocks is therefore a property of the
+     sample, not of the hole; measure it instead of assuming it, and count the
+     blocks the hole strands separately. *)
+  let%bind stranded_blocks =
+    children_of ~archive_uri ~parent_hash:withheld_hash
+  in
+  if List.is_empty stranded_blocks then
+    failwithf "Withholding %s stranded no block at all" withheld () ;
+  let%bind unparented_with_hole = unparented_count ~archive_uri in
 
   (* 1. The audit must report the gap. *)
   let%bind audit =
@@ -231,6 +285,10 @@ let test_case (test_data : t) =
        the exit code was %d"
       what audit.exit_code () ;
   assert_output_mentions ~what audit.stdout "Block has no parent in archive db" ;
+  (* The blocks at the lowest height have no parent either, but --min-height
+     declares that height to be the bottom of this archive, so the blocks the
+     hole stranded are the ones the audit has to name. *)
+  List.iter stranded_blocks ~f:(assert_output_mentions ~what audit.stdout) ;
 
   (* 2. A bucket that does not hold the block must not be ingested. *)
   let%bind () =
@@ -260,17 +318,25 @@ let test_case (test_data : t) =
       "%s: expected the archive to hold all %d blocks after the repair, but it \
        holds %d"
       what total blocks_after () ;
-  let%bind unparented = unparented_count ~archive_uri in
-  if not (Int.equal unparented 1) then
+  let%bind unparented_after = unparented_count ~archive_uri in
+  (* Writing the withheld block re-parents every block it stranded, and the
+     withheld block itself has a parent in the archive, so the count drops by
+     exactly the number of stranded blocks and only the bottom of the archive
+     is left without a parent. *)
+  let expected_unparented =
+    unparented_with_hole - List.length stranded_blocks
+  in
+  if not (Int.equal unparented_after expected_unparented) then
     failwithf
-      "%s: expected only the lowest block to have no parent after the repair, \
-       found %d such blocks"
-      what unparented () ;
+      "%s: expected the repair to leave %d blocks with no parent, but the \
+       count went from %d to %d"
+      what expected_unparented unparented_with_hole unparented_after () ;
 
   (* 5. And the audit is clean.  The sample archive does not reach back to a
      genesis block, so --min-height is what makes a clean result reachable at
      all: it tells the guardian where this archive is meant to start, and the
-     lowest block is then the bottom of the archive rather than a gap. *)
+     blocks at the lowest height are then the bottom of the archive rather
+     than a gap. *)
   let%bind () = canonicalize_chain ~archive_uri in
   let%bind final_audit =
     run_guardian ~min_height ~archive_uri ~precomputed_blocks:good_source
