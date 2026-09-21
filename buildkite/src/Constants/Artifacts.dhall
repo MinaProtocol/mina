@@ -34,7 +34,7 @@ let Artifact
       | DaemonStorageToolbox
       >
 
-let AllButTests =
+let All =
       [ Artifact.Daemon
       , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonPrefork
@@ -54,6 +54,7 @@ let AllButTests =
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
       , Artifact.DaemonStorageToolbox
+      , Artifact.FunctionalTestSuite
       ]
 
 let Main =
@@ -63,8 +64,6 @@ let Main =
       , Artifact.Archive
       , Artifact.Rosetta
       ]
-
-let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
 let capitalName =
           \(artifact : Artifact)
@@ -510,6 +509,5 @@ in  { Type = Artifact
     , dockerTag = dockerTag
     , fullDockerTag = fullDockerTag
     , All = All
-    , AllButTests = AllButTests
     , Main = Main
     }
