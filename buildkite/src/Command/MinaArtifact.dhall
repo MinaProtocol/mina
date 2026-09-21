@@ -51,6 +51,7 @@ let Expr = ../Pipeline/Expr.dhall
 let MinaBuildSpec =
       { Type =
           { prefix : Text
+          , jobSuffix : Text
           , artifacts : List Artifacts.Type
           , debVersion : DebianVersions.DebVersion
           , profile : Profiles.Type
@@ -74,6 +75,7 @@ let MinaBuildSpec =
           }
       , default =
           { prefix = "MinaArtifact"
+          , jobSuffix = ""
           , artifacts = Artifacts.All
           , buildScript = "./buildkite/scripts/build-release.sh"
           , debVersion = DebianVersions.DebVersion.Bookworm
@@ -215,6 +217,7 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , nameSuffix = spec.jobSuffix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.Daemon
@@ -237,6 +240,7 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , nameSuffix = spec.jobSuffix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.DaemonLegacyHardfork
@@ -279,6 +283,7 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , nameSuffix = spec.jobSuffix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.DaemonAppsOnly
@@ -394,6 +399,7 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , nameSuffix = spec.jobSuffix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.RosettaAppsOnly
@@ -481,6 +487,22 @@ let onlyDebianPipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder spec [ build_artifacts spec ]
 
+let dockersPipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.dockerDirtyWhen
+            , path = "Release"
+            , name = "${spec.prefix}${nameSuffix spec}Dockers"
+            , tags = spec.tags
+            , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = docker_commands (spec // { jobSuffix = "Dockers" })
+          }
+
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -488,6 +510,7 @@ let pipeline
 
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
+    , dockersPipeline = dockersPipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts
