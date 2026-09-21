@@ -5,6 +5,6 @@ let ArtifactSpecs = ../../Command/MinaArtifactSpecs.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 in  Pipeline.build
-      ( ArtifactPipelines.onlyDebianPipeline
+      ( ArtifactPipelines.dockersPipeline
           ArtifactSpecs.bookwormDevnetDevnetInstrumented
       )

@@ -46,6 +46,7 @@ let DepsSpec =
           , buildFlags : BuildFlags.Type
           , arch : Arch.Type
           , suffix : Text
+          , nameSuffix : Text
           }
       , default =
           { codename = Docker.Bookworm
@@ -56,6 +57,7 @@ let DepsSpec =
           , buildFlags = BuildFlags.Type.None
           , suffix = "docker-image"
           , arch = Arch.Type.Amd64
+          , nameSuffix = "Dockers"
           }
       }
 
@@ -79,7 +81,7 @@ let dependsOn =
 
           in  [ { name =
                     "${spec.prefix}${capitalName
-                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}${archSuffix}"
+                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}${archSuffix}${spec.nameSuffix}"
                 , key = key
                 }
               ]
