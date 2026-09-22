@@ -97,17 +97,27 @@ fi
 ./buildkite/scripts/apps/restore_app.sh test_executive.exe mina-test-executive
 ./buildkite/scripts/apps/restore_app.sh logproc.exe mina-logproc
 
-# Continuously snapshot each swarm service's container logs while the test runs,
-# so the seed daemon's own output survives test_executive's teardown and can be
-# collected as a CI artifact (the polling log engine can't capture a daemon that
-# never finishes initialising). The latest non-empty snapshot per service is
-# kept once the stack is removed.
-( while true; do
+# Snapshot each swarm service's container log to a file while the test runs, so
+# a daemon that never finishes initialising still leaves an artifact.
+#
+# set +x, and no command substitution: this script runs with xtrace, which
+# prints the whole expansion, so holding the log in a variable re-dumped every
+# service's (growing) log on every pass. That is what pushed the long nightly
+# integration tests past buildkite's 1 GiB job-log limit and got them cancelled.
+# Temp name + mv keeps the last snapshot of a service that has gone away; the
+# temp name must not match the *.local.test.log artifact glob.
+( set +x
+  while true; do
     for stack in $(docker stack ls --format "{{.Name}}" 2>/dev/null); do
       for svc in $(docker stack services "$stack" --format "{{.Name}}" 2>/dev/null)
       do
-        logs=$(docker service logs --raw "$svc" 2>/dev/null) || continue
-        [ -n "$logs" ] && printf '%s\n' "$logs" >"${TEST_NAME}-${svc}.local.test.log"
+        snapshot="${TEST_NAME}-${svc}.service-log.partial"
+        if docker service logs --raw "$svc" > "$snapshot" 2>/dev/null \
+           && [ -s "$snapshot" ]; then
+          mv "$snapshot" "${TEST_NAME}-${svc}.local.test.log"
+        else
+          rm -f "$snapshot"
+        fi
       done
     done
     sleep 20
