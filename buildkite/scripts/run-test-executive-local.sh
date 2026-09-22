@@ -30,8 +30,21 @@ MINA_DOCKER_NAME="mina-daemon"
 MINA_ARCHIVE_DOCKER_NAME="mina-archive"
 
 
-MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:$MINA_DOCKER_TAG-devnet-generic"
-ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:$MINA_DOCKER_TAG-devnet"
+# Use the short-hash "HASHTAG" image names: that is what IntegrationTestDockerImages
+# builds and saves to the Hetzner CI cache (<githash>-<codename>-<network>[-generic]).
+# Those images are built --load-only and never pushed, so the swarm must deploy
+# exactly the tag we load from the cache; the full version tag exists neither
+# locally nor in any registry.
+MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:${GITHASH}-${MINA_DEB_CODENAME}-devnet-generic"
+ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:${GITHASH}-${MINA_DEB_CODENAME}-devnet"
+
+# Load both images from the shared CI cache instead of pulling them from the
+# registry. A cache miss leaves the image absent and the swarm deploy fails,
+# which is the intended signal that IntegrationTestDockerImages did not run.
+./buildkite/scripts/docker/load_from_cache.sh "$MINA_IMAGE" \
+  || echo "cache miss for $MINA_IMAGE"
+./buildkite/scripts/docker/load_from_cache.sh "$ARCHIVE_IMAGE" \
+  || echo "cache miss for $ARCHIVE_IMAGE"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
