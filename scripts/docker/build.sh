@@ -38,7 +38,7 @@ function usage() {
   echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
-  echo "      --save-to-ci-cache ROOT  After a --load-only build, save the image as ROOT/<service>/<tag>.tar.zst for other jobs to load"
+  echo "      --save-to-ci-cache ROOT  Save the built image as ROOT/<service>/<tag>.tar.zst for other jobs to load (works with or without --load-only)"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -318,22 +318,21 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_STORAGE_REPAIR_VERSION $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG -t "$TAG" -t "$HASHTAG" -
+  --load --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_STORAGE_REPAIR_VERSION $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
+
+# The build above always --loads, so the local hash tag is present for both the
+# CI cache save below and any --load-only consumer. Re-assert it: the local image
+# store is not stable on agents shared between concurrent jobs.
+docker tag "$TAG" "$HASHTAG"
 
 # Save the freshly built image into the shared Hetzner CI cache, so that another
 # job on another agent can load it with buildkite/scripts/docker/load_from_cache.sh
-# instead of pulling it from a registry. Only meaningful for a --load-only build:
-# a pushed build never materialises the image in the local docker store, so there
-# would be nothing for `docker save` to read.
+# instead of pulling it from a registry. This works for pushed images too: the
+# build materialised the image locally before the push.
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
-
-  if [[ "$DOCKER_ACTION" != "load" ]]; then
-    echo "ERROR: --save-to-ci-cache requires --load-only" >&2
-    exit 1
-  fi
 
   FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${HASHTAG_VERSION_PART}.tar.zst"
 
@@ -354,6 +353,20 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
   mkdir -p "$(dirname "${FULL_IMAGE_PATH}")"
   echo "Saving built image to CI cache at ${FULL_IMAGE_PATH}"
   docker save "$TAG" "$HASHTAG" | zstd -T0 -3 > "${FULL_IMAGE_PATH}"
+fi
+
+if [[ "$DOCKER_ACTION" == "push" ]]; then
+  docker push "$TAG"
+
+  # The hash tag is only an alias for a manifest that is now in the registry, so
+  # create it there instead of pushing the local tag again. A second `docker push`
+  # re-reads the local image store, which is not stable on agents shared between
+  # concurrent jobs, and fails with "tag does not exist" when the tag is evicted
+  # during the (multi-GB, multi-minute) push above.
+  echo "📎 Tagging pushed image as ${HASHTAG} (registry-side)"
+  docker buildx imagetools create --tag "$HASHTAG" "$TAG"
+else
+  echo "Skipping push to remote registry, image loaded to local docker daemon only."
 fi
 
 # Clean up temp Dockerfile if one was created
