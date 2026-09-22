@@ -4330,6 +4330,149 @@ let sponge_and_challenges_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _r_field = scalar (Import.Scalar_challenge.create r_actual) in
   ()
 
+(* ==== Step finalize other proof circuit, chunked (Tick/Fp field) ====
+
+   [finalize_other_proof_circuit] at [num_chunks] chunks per evaluation:
+   the step verifier's finalize over a chunked step proof, which absorbs
+   every chunk and recombines them in circuit. Every other parameter is
+   the one-chunk circuit's, but [zk_rows] follows the chunk count.
+
+   Input layout ([63 + 88 * num_chunks] fields), as the one-chunk circuit's
+   with each evaluation widened to its chunks:
+     0-28:    deferred values and branch data, as the one-chunk circuit
+     29-:     44 columns, each its [num_chunks] zeta chunks then its
+              [num_chunks] zeta*omega chunks, in the order public, w (15),
+              coefficients (15), z, s (6), then the six selectors
+              (generic, poseidon, complete_add, mul, emul, endomul_scalar)
+     then:    ft_eval1, prev_challenges (2 x 16), sponge digest *)
+let finalize_other_proof_chunked_circuit ~num_chunks
+    (inputs : Impl.Field.t array) () =
+  let open Pickles_types in
+  let open Kimchi_backend_common.Plonk_types in
+  let as_bool (x : Impl.Field.t) : Impl.Boolean.var =
+    Impl.Boolean.Unsafe.of_cvar x
+  in
+  let column k =
+    let base = 29 + (2 * num_chunks * k) in
+    ( Array.init num_chunks ~f:(fun c -> inputs.(base + c))
+    , Array.init num_chunks ~f:(fun c -> inputs.(base + num_chunks + c)) )
+  in
+  let tail = 29 + (88 * num_chunks) in
+  let f_ = Impl.Boolean.false_ in
+  let feature_flags =
+    { Kimchi_backend_common.Plonk_types.Features.range_check0 = f_
+    ; range_check1 = f_
+    ; foreign_field_add = f_
+    ; foreign_field_mul = f_
+    ; xor = f_
+    ; rot = f_
+    ; lookup = f_
+    ; runtime_tables = f_
+    }
+  in
+  let plonk
+      : ( Impl.Field.t
+        , Impl.Field.t Import.Scalar_challenge.t
+        , Impl.Field.t Shifted_value.Type1.t
+        , (Impl.Field.t Shifted_value.Type1.t, Impl.Boolean.var) Opt.t
+        , (Impl.Field.t Import.Scalar_challenge.t, Impl.Boolean.var) Opt.t
+        , Impl.Boolean.var )
+        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+      =
+    { alpha = { Kimchi_types.inner = inputs.(0) }
+    ; beta = inputs.(1)
+    ; gamma = inputs.(2)
+    ; zeta = { Kimchi_types.inner = inputs.(3) }
+    ; zeta_to_srs_length = Shifted_value.Type1.Shifted_value inputs.(4)
+    ; zeta_to_domain_size = Shifted_value.Type1.Shifted_value inputs.(5)
+    ; perm = Shifted_value.Type1.Shifted_value inputs.(6)
+    ; feature_flags
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let deferred_values =
+    { Composition_types.Wrap.Proof_state.Deferred_values.plonk
+    ; combined_inner_product = Shifted_value.Type1.Shifted_value inputs.(7)
+    ; b = Shifted_value.Type1.Shifted_value inputs.(8)
+    ; xi = { Kimchi_types.inner = inputs.(9) }
+    ; bulletproof_challenges =
+        Vector.init Nat.N16.n ~f:(fun i ->
+            { Import.Bulletproof_challenge.prechallenge =
+                { Kimchi_types.inner = inputs.(10 + i) }
+            } )
+    ; branch_data =
+        { Import.Branch_data.Checked.Step.proofs_verified_mask =
+            Vector.[ as_bool inputs.(26); as_bool inputs.(27) ]
+        ; domain_log2 = inputs.(28)
+        }
+    }
+  in
+  let evals_evals :
+      (Impl.Field.t array * Impl.Field.t array, Impl.Boolean.var)
+      Evals.In_circuit.t =
+    { w = Vector.init Nat.N15.n ~f:(fun j -> column (1 + j))
+    ; coefficients = Vector.init Nat.N15.n ~f:(fun j -> column (16 + j))
+    ; z = column 31
+    ; s = Vector.init Nat.N6.n ~f:(fun j -> column (32 + j))
+    ; generic_selector = column 38
+    ; poseidon_selector = column 39
+    ; complete_add_selector = column 40
+    ; mul_selector = column 41
+    ; emul_selector = column 42
+    ; endomul_scalar_selector = column 43
+    ; range_check0_selector = Opt.Nothing
+    ; range_check1_selector = Opt.Nothing
+    ; foreign_field_add_selector = Opt.Nothing
+    ; foreign_field_mul_selector = Opt.Nothing
+    ; xor_selector = Opt.Nothing
+    ; rot_selector = Opt.Nothing
+    ; lookup_aggregation = Opt.Nothing
+    ; lookup_table = Opt.Nothing
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> Opt.Nothing)
+    ; runtime_lookup_table = Opt.Nothing
+    ; runtime_lookup_table_selector = Opt.Nothing
+    ; xor_lookup_selector = Opt.Nothing
+    ; lookup_gate_lookup_selector = Opt.Nothing
+    ; range_check_lookup_selector = Opt.Nothing
+    ; foreign_field_mul_lookup_selector = Opt.Nothing
+    }
+  in
+  let all_evals :
+      (Impl.Field.t, Impl.Field.t array, Impl.Boolean.var) All_evals.In_circuit.t
+      =
+    { evals = { public_input = column 0; evals = evals_evals }
+    ; ft_eval1 = inputs.(tail)
+    }
+  in
+  let prev_challenges :
+      ((Impl.Field.t, Nat.N16.n) Vector.t, Nat.N2.n) Vector.t =
+    Vector.
+      [ Vector.init Nat.N16.n ~f:(fun j -> inputs.(tail + 1 + j))
+      ; Vector.init Nat.N16.n ~f:(fun j -> inputs.(tail + 17 + j))
+      ]
+  in
+  let sponge_params =
+    Sponge.Params.map Tick_field_sponge.params ~f:Impl.Field.constant
+  in
+  let sponge =
+    let sponge = Step_main_inputs.Sponge.create sponge_params in
+    Step_main_inputs.Sponge.absorb sponge (`Field inputs.(tail + 33)) ;
+    sponge
+  in
+  let step_domains :
+      [ `Known of (Import.Domains.t, Nat.N2.n) Vector.t | `Side_loaded ] =
+    let d = { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 } in
+    `Known Vector.[ d; d ]
+  in
+  let _finalized, _challenges =
+    Step_verifier.finalize_other_proof
+      (module Nat.N2)
+      ~step_domains
+      ~zk_rows:(((16 * num_chunks) + 5) / 7)
+      ~sponge ~prev_challenges deferred_values all_evals
+  in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4673,7 +4816,13 @@ let run ~output_dir =
     ~input_typ:array55_field_wrap ~return_typ:WrapImpl.Typ.unit ;
   let array172_field_wrap = WrapImpl.Typ.array ~length:172 WrapImpl.Field.typ in
   dump_wrap "check_bulletproof_wrap_circuit" check_bulletproof_wrap_circuit
-    ~input_typ:array172_field_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array172_field_wrap ~return_typ:WrapImpl.Typ.unit ;
+  (* The step finalize over a two-chunk step proof, dumped after every
+     earlier fixture for the same reason as [cip_wrap_circuit]. *)
+  let array239_field = Impl.Typ.array ~length:239 Impl.Field.typ in
+  dump_step "finalize_other_proof_chunks2_step_circuit"
+    (finalize_other_proof_chunked_circuit ~num_chunks:2)
+    ~input_typ:array239_field ~return_typ:Impl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
