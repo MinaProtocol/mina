@@ -1833,9 +1833,20 @@ let server ?forward_uri ~port ~logger () =
        ~registry:CollectorRegistry.default )
 
 module Archive = struct
+  (* How long the archive held one block ingest request, in milliseconds.
+     The interesting range is wide: a healthy write is a few milliseconds,
+     while the daemon that sent the block gives up at the RPC heartbeat
+     timeout of 60 s. Buckets 1, 4, 16, ... 16384 ms cover both ends. *)
+  module Ingest_duration_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1. 4. 8
+  end)
+
   type t =
     { registry : CollectorRegistry.t
     ; gauge_metrics : (string, Gauge.t) Hashtbl.t
+    ; ingest_duration_ms : string -> Ingest_duration_histogram.t
+          (** Keyed by the source that sent the block: see
+              {!Mina_metrics.Archive.ingest_duration_ms}. *)
     }
 
   let subsystem = "Archive"
@@ -1868,6 +1879,17 @@ module Archive = struct
     let name = "missing_blocks" in
     find_or_add t ~name ~help ~subsystem
 
+  (** [ingest_duration_ms t source] is the histogram of how long the archive
+      held an ingest request from [source], which names the RPC that carried
+      the block: "diff" for the daemon feed, "precomputed" or "extensional"
+      for a block pushed by a client.
+
+      This is the time the sender waits, not the time the database write
+      takes, so it includes queueing behind whatever the archive is already
+      doing. That is what makes it the number to watch when anything else is
+      given work to do inside the archive process. *)
+  let ingest_duration_ms t = t.ingest_duration_ms
+
   let create_archive_server ?forward_uri ~port ~logger () =
     let open Async_kernel.Deferred.Let_syntax in
     let archive_registry = CollectorRegistry.create () in
@@ -1876,6 +1898,13 @@ module Archive = struct
     in
     { registry = archive_registry
     ; gauge_metrics = Hashtbl.create (module String)
+    ; ingest_duration_ms =
+        Ingest_duration_histogram.v_label ~label_name:"source"
+          ~registry:archive_registry
+          ~help:
+            "Time the archive held a block ingest request, in milliseconds, by \
+             the source that sent it"
+          ~namespace ~subsystem "ingest_duration_ms"
     }
 end
 
