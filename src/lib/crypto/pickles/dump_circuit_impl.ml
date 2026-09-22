@@ -4473,6 +4473,179 @@ let finalize_other_proof_chunked_circuit ~num_chunks
   in
   ()
 
+(* [xhat_circuit] at a domain of [2^domain_log2] over the same [2^16] SRS: above the SRS
+   every Lagrange commitment is chunked, so the fold runs one accumulator per chunk. The body
+   is [xhat_circuit]'s; defined here, just before [run], so every earlier fixture's [__LOC__]
+   labels are unchanged. *)
+let xhat_chunked_circuit ~domain_log2 (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let module Ops = Plonk_curve_ops.Make (Impls.Wrap) (Inner_curve) in
+  (* SRS setup — set_urs_info called externally before circuit generation *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  (* Single branch, domain 2^domain_log2 — lagrange helpers below are inlined for this case *)
+  (* Build tagged public_input — same as IVP wrap *)
+  let public_input =
+    let split i =
+      `Field (inputs.(i), Boolean.Unsafe.of_cvar inputs.(i + 1))
+    in
+    let packed n i = `Packed_bits (inputs.(i), n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> split (2 * j))
+      ; [| packed 255 10
+         ; packed 128 11 ; packed 128 12
+         ; packed 128 13 ; packed 128 14 ; packed 128 15 |]
+      ; Array.init 15 ~f:(fun j -> packed 128 (16 + j))
+      ; [| packed 1 31 ; packed 255 32 ; packed 255 33 |]
+      ]
+  in
+  (* Expand tags: Field(x,b) -> [Field(x,255); Field(b,1)], Packed(x,n) -> [Field(x,n)] *)
+  let public_input =
+    Array.concat_map public_input ~f:(function
+      | `Field (x, b) ->
+          [| `Field (x, Field.size_in_bits)
+           ; `Field ((b :> Field.t), 1)
+          |]
+      | `Packed_bits (x, n) ->
+          [| `Field (x, n) |] )
+  in
+  (* Helper: get SRS lagrange commitment at index i for domain 2^domain_log2 *)
+  let lagrange_pt i =
+    let d = Int.pow 2 domain_log2 in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).unshifted
+    in
+    Array.map chunks ~f:(function
+      | Finite g ->
+          Inner_curve.constant (Inner_curve.Constant.of_affine g)
+      | Infinity ->
+          assert false )
+  in
+  (* For single-branch, the domain-masking reduces to identity.
+     lagrange ~domain srs i = lagrange_pt i
+     scaled_lagrange ~domain c srs i = scale each point by c *)
+  let scaled_lagrange_pt c i =
+    let d = Int.pow 2 domain_log2 in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).unshifted
+    in
+    Array.map chunks ~f:(function
+      | Finite g ->
+          Inner_curve.Constant.scale (Inner_curve.Constant.of_affine g) c
+          |> Inner_curve.constant
+      | Infinity ->
+          assert false )
+  in
+  let lagrange_with_correction_pt ~input_length i =
+    let actual_shift =
+      Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
+    in
+    let rec field2pow f k =
+      if k = 1 then f
+      else
+        let j = k - 1 in
+        Inner_curve.Constant.Scalar.(f * field2pow f j)
+    in
+    let two_to_actual_shift =
+      field2pow (Inner_curve.Constant.Scalar.of_int 2) actual_shift
+    in
+    let d = Int.pow 2 domain_log2 in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).unshifted
+    in
+    Array.map chunks ~f:(function
+      | Finite g ->
+          let open Inner_curve.Constant in
+          let g = of_affine g in
+          ( Inner_curve.constant g
+          , Inner_curve.constant (negate (scale g two_to_actual_shift)) )
+      | Infinity ->
+          assert false )
+  in
+  (* Partition into constant_part and non_constant_part *)
+  let constant_part, non_constant_part =
+    List.partition_map
+      Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
+      ~f:(fun (i, t) ->
+        match[@warning "-4"] t with
+        | `Field (Constant c, _) ->
+            First
+              ( if Field.Constant.(equal zero) c then None
+              else if Field.Constant.(equal one) c then
+                Some (lagrange_pt i)
+              else
+                Some
+                  (scaled_lagrange_pt
+                     (Inner_curve.Constant.Scalar.project
+                        (Field.Constant.unpack c) )
+                     i ) )
+        | `Field x ->
+            Second (i, x) )
+  in
+  (* Build terms *)
+  let terms =
+    List.map non_constant_part ~f:(fun (i, x) ->
+        match x with
+        | b, 1 ->
+            assert_ (Constraint.boolean (b :> Field.t)) ;
+            `Cond_add
+              (Boolean.Unsafe.of_cvar b, lagrange_pt i)
+        | x, n ->
+            `Add_with_correction
+              ( (x, n)
+              , lagrange_with_correction_pt ~input_length:n i ) )
+  in
+  (* Compute correction = sum of correction points from Add_with_correction terms *)
+  let correction =
+    with_label __LOC__ (fun () ->
+        List.reduce_exn
+          (List.filter_map terms ~f:(function
+            | `Cond_add _ ->
+                None
+            | `Add_with_correction (_, chunks) ->
+                Some (Array.map ~f:snd chunks) ) )
+          ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
+  in
+  (* Module matching Wrap_verifier.Other_field.With_top_bit0 *)
+  let module With_top_bit0 = struct
+    module Constant = Wrap_main_inputs.Other_field
+    type t = Impls.Wrap.Other_field.t
+    let typ = Impls.Wrap.Other_field.typ_unchecked
+  end in
+  (* Fold: init = correction + constant_parts, then fold non-constant terms *)
+  let x_hat =
+    with_label __LOC__ (fun () ->
+        let init =
+          List.fold
+            (List.filter_map ~f:Fn.id constant_part)
+            ~init:correction
+            ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
+        in
+        List.fold terms ~init ~f:(fun acc term ->
+            match term with
+            | `Cond_add (b, g) ->
+                with_label __LOC__ (fun () ->
+                    Array.map2_exn acc g ~f:(fun acc g ->
+                        Inner_curve.if_ b
+                          ~then_:(Ops.add_fast g acc)
+                          ~else_:acc ) )
+            | `Add_with_correction ((x, num_bits), chunks) ->
+                Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
+                    Ops.add_fast acc
+                      (Ops.scale_fast2'
+                         (module With_top_bit0)
+                         g x ~num_bits ) ) ) )
+    |> Array.map ~f:Inner_curve.negate
+  in
+  (* Add blinding generator H *)
+  let _x_hat =
+    with_label "x_hat blinding" (fun () ->
+        Array.map x_hat ~f:(fun x_hat ->
+            Ops.add_fast x_hat
+              (Inner_curve.constant (Lazy.force Wrap_main_inputs.Generators.h)) ) )
+  in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4822,7 +4995,11 @@ let run ~output_dir =
   let array239_field = Impl.Typ.array ~length:239 Impl.Field.typ in
   dump_step "finalize_other_proof_chunks2_step_circuit"
     (finalize_other_proof_chunked_circuit ~num_chunks:2)
-    ~input_typ:array239_field ~return_typ:Impl.Typ.unit
+    ~input_typ:array239_field ~return_typ:Impl.Typ.unit ;
+  (* The wrap-side x_hat at a 2^17 domain over the 2^16 SRS: two chunks per Lagrange
+     commitment. Dumped last for the same reason. *)
+  dump_wrap "xhat_wrap_chunks2_circuit" (xhat_chunked_circuit ~domain_log2:17)
+    ~input_typ:array34_wrap ~return_typ:Impls.Wrap.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
