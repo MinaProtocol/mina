@@ -242,9 +242,10 @@ test_daemon_command() {
     assert_has_line "the debian version defaults to the version" "$args" "deb_version=3.1.0"
     assert_has_line "version build argument" "$args" "version=3.1.0"
     assert_has_line "registry" "$args" "docker_repo=testreg"
-    # The daemon tag holds no network. The hash tag always holds one.
+    # The daemon image is network-free, so neither tag holds a network. Only
+    # the profiled daemon, which is built for one network, keeps the segment.
     assert_has_line "readable tag" "$args" "testreg/mina-daemon:3.1.0"
-    assert_has_line "hash tag" "$args" "testreg/mina-daemon:abcdefg-bullseye-devnet"
+    assert_has_line "hash tag" "$args" "testreg/mina-daemon:abcdefg-bullseye"
     assert_has_line "buildx loads the image" "$args" "--load"
 }
 
@@ -385,6 +386,23 @@ test_configured_service_uses_docker_tag_for_the_output() {
         "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet"
 }
 
+# The generic daemon carries no network: no configuration and no profile
+# package. Both of its tags must stay free of a network name, or it takes the
+# hash tag of the profiled image of the same commit, and whichever of the two
+# builds runs last owns that tag and the CI cache entry behind it.
+test_generic_daemon_has_no_network_in_either_tag() {
+    local args="${STUB_DIR}/generic-daemon.args"
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-suffix generic
+
+    assert_has_line "readable tag" "$args" \
+        "testreg/mina-daemon:3.1.0-generic"
+    assert_has_line "hash tag" "$args" \
+        "testreg/mina-daemon:abcdefg-bullseye-generic"
+    assert_not_called "no network in the hash tag" "$args" "abcdefg-bullseye-devnet"
+}
+
 test_profiled_service_uses_its_own_dockerfile() {
     local args="${STUB_DIR}/profiled.args"
     run_build "$args" \
@@ -394,13 +412,12 @@ test_profiled_service_uses_its_own_dockerfile() {
     assert_has_line "dockerfile" "$args" "dockerfiles/Dockerfile-install-profile"
     assert_has_line "output tag" "$args" \
         "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet-generic"
-    # The hash tag already names the network, so the profile must not add it a
-    # second time. It did, and the integration tests could not find the image:
-    # they ask for "<githash>-<codename>-<network>-generic", which is also what
-    # the readable tag above says.
-    assert_has_line "hash tag names the network once" "$args" \
+    # Both tags carry the profile and neither carries the network, so they hold
+    # the same suffix. The integration tests ask for
+    # "<githash>-<codename>-<profile>-generic".
+    assert_has_line "hash tag holds the profile" "$args" \
         "testreg/mina-daemon:abcdefg-bullseye-devnet-generic"
-    assert_not_called "the network is not doubled" "$args" "devnet-devnet"
+    assert_not_called "the profile is not doubled" "$args" "devnet-devnet"
 
     # The debian package inside the image is a different name: there the
     # network is a prefix and the profile is part of the suffix, so
@@ -410,7 +427,8 @@ test_profiled_service_uses_its_own_dockerfile() {
 }
 
 # A lightnet profiled image has no "-generic", and its suffix is the same in
-# both tags.
+# both tags. The lightnet profile is not a network, so neither tag names the
+# "--network devnet" the build was given.
 test_profiled_lightnet_suffix() {
     local args="${STUB_DIR}/profiled-lightnet.args"
     run_build "$args" \
@@ -420,7 +438,37 @@ test_profiled_lightnet_suffix() {
     assert_has_line "readable tag" "$args" \
         "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-lightnet"
     assert_has_line "hash tag" "$args" \
-        "testreg/mina-daemon:abcdefg-bullseye-devnet-lightnet"
+        "testreg/mina-daemon:abcdefg-bullseye-lightnet"
+}
+
+# The network and the profile are two axes. A profiled image is named by its
+# profile, so two profiles built on one network must not meet in one hash tag.
+test_profiled_images_of_two_profiles_differ() {
+    local devnet_args="${STUB_DIR}/profiled-two-devnet.args"
+    local mainnet_args="${STUB_DIR}/profiled-two-mainnet.args"
+    local dev_args="${STUB_DIR}/profiled-two-dev.args"
+
+    run_build "$devnet_args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet
+    run_build "$mainnet_args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile mainnet
+    run_build "$dev_args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile dev
+
+    assert_has_line "devnet profile" "$devnet_args" \
+        "testreg/mina-daemon:abcdefg-bullseye-devnet-generic"
+    assert_has_line "mainnet profile on the devnet network" "$mainnet_args" \
+        "testreg/mina-daemon:abcdefg-bullseye-mainnet-generic"
+    # dev is not a network, and its profile package is "mina-dev" with no
+    # -generic, so neither part appears in the tag.
+    assert_has_line "dev profile, which is no network" "$dev_args" \
+        "testreg/mina-daemon:abcdefg-bullseye-dev"
+    assert_has_line "dev readable tag" "$dev_args" \
+        "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-dev"
+    assert_has_line "dev installs mina-dev" "$dev_args" "deb_suffix=dev"
 }
 
 # Instrumented builds append to both suffixes, and the network still appears
@@ -672,8 +720,10 @@ main() {
     run_test test_base_image_service
     run_test test_hardfork_targets
     run_test test_configured_service_uses_docker_tag_for_the_output
+    run_test test_generic_daemon_has_no_network_in_either_tag
     run_test test_profiled_service_uses_its_own_dockerfile
     run_test test_profiled_lightnet_suffix
+    run_test test_profiled_images_of_two_profiles_differ
     run_test test_profiled_instrumented_suffix
     run_test test_rosetta_configured_keeps_the_rosetta_name
     run_test test_toolchain_joins_the_stage_files
