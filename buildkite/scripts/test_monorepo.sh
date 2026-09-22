@@ -731,6 +731,61 @@ EOF
   assert_equals "1" "$build_uploads" "Shared dependency DepBuild uploaded exactly once"
 }
 
+# Test: Integration test - dependency NOT pulled when it is selectable on its own.
+# In full mode (and in multi-phase runs generally) a dependency is uploaded by
+# its own triage step, so pulling it here would duplicate the step key. Only
+# dependencies that triage would reject (e.g. dirty-when miss) should be pulled.
+test_integration_dependency_skip_when_selectable() {
+  echo -e "\n${YELLOW}Testing: Integration - dependency not pulled when selectable${NC}"
+
+  # A test that depends on a build carrying a different tag (its own "phase").
+  cat > "$TEST_DIR/jobs/FullDepTest.yml" << 'EOF'
+spec:
+  name: FullDepTest
+  path: Test
+  tags:
+    - FullDep
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: full-dep-test-run
+      depends_on:
+        - step: _FullDepBuild-build-deb-pkg
+EOF
+  echo "^.*$" > "$TEST_DIR/jobs/FullDepTest.dirtywhen"
+
+  cat > "$TEST_DIR/jobs/FullDepBuild.yml" << 'EOF'
+spec:
+  name: FullDepBuild
+  path: Release
+  tags:
+    - BuildOnly
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: _FullDepBuild-build-deb-pkg
+EOF
+  echo "^.*$" > "$TEST_DIR/jobs/FullDepBuild.dirtywhen"
+
+  # Full selection: every job is selected on its own, so the build is uploaded
+  # by its own step and must NOT be pulled as a dependency.
+  local output
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+    --scopes pullrequest \
+    --tags fulldep \
+    --filter-mode any \
+    --selection-mode full \
+    --jobs "$TEST_DIR/jobs" \
+    --git-diff-file "$TEST_DIR/git_diff.txt" \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
+    --dry-run 2>&1 || true)
+
+  assert_contains "$output" "Including job FullDepTest" "Dependent test is selected"
+  assert_not_contains "$output" "Including dependency job FullDepBuild" "Selectable build is NOT pulled as a dependency"
+}
+
 # Test: Integration test - both excludeIf and includeIf (includeIf matches, excludeIf doesn't)
 test_integration_both_include_exclude_include_wins() {
   echo -e "\n${YELLOW}Testing: Integration - includeIf matches, excludeIf doesn't${NC}"
@@ -855,6 +910,7 @@ main() {
   test_integration_include_if_not_matching
   test_integration_dependency_resolution
   test_integration_dependency_dedup
+  test_integration_dependency_skip_when_selectable
 
   teardown
 
