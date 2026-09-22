@@ -112,12 +112,20 @@ end
 
 type 'mlmb t = (unit, 'mlmb) With_data.t
 
-let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
-    h t =
+let dummy ?(num_chunks = 1) (type h r) (h : h Nat.t)
+    (most_recent_width : r Nat.t) ~domain_log2 : h t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
+  (* The step circuit reads a prev's evaluations at the chunk count of the
+     step proof it verifies. A dummy's evaluations are never checked, so the
+     chunks past the drawn one are zero, and the draws stay as they are at
+     one chunk. *)
+  let pad xs =
+    Array.append xs
+      (Array.create ~len:(num_chunks - Array.length xs) Tick.Field.zero)
+  in
   let lengths =
     Commitment_lengths.default ~num_chunks:Plonk_checks.num_chunks_by_default
     (* TODO *)
@@ -196,11 +204,11 @@ let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
     ; prev_evals =
         (let e =
            Plonk_types.Evals.map Evaluation_lengths.default ~f:(fun n ->
-               (tick_arr n, tick_arr n) )
+               (pad (tick_arr n), pad (tick_arr n)) )
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =
-               ([| tick () |], [| tick () |])
+               (pad [| tick () |], pad [| tick () |])
            ; evals = e
            }
          in
