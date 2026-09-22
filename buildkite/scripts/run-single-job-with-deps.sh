@@ -8,10 +8,17 @@
 # Flow:
 # - Reads generated job pipeline YAMLs in --jobs.
 # - Resolves the requested job by name (case-insensitive).
-# - Walks step dependencies to find prerequisite jobs.
+# - Walks step dependencies to find prerequisite jobs (shared with monorepo triage).
 # - Orders jobs topologically and uploads each pipeline.
 
 set -euo pipefail
+
+# Get the directory of this script and source the shared dependency-resolution
+# helpers (build_step_index, job_dependency_files) so the walk logic lives in one
+# place and stays consistent with the monorepo triage.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/monorepo_lib.sh
+source "$SCRIPT_DIR/monorepo_lib.sh"
 
 show_help() {
   cat << EOF
@@ -88,17 +95,17 @@ if ! command -v yq &> /dev/null; then
   fi
 fi
 
-# Index job files by name and map step keys to job names.
-declare -A step_key_to_job
-declare -A job_file_by_name
-declare -A job_display_by_name
-
 mapfile -t job_files < <(find "$JOBS_DIR" -type f -name "*.yml" | sort)
 
 if [[ ${#job_files[@]} -eq 0 ]]; then
   echo "Error: no job pipeline files found in $JOBS_DIR" >&2
   exit 1
 fi
+
+# Index job files by name (for resolving the requested job) and build the shared
+# step-key -> file index used by job_dependency_files.
+declare -A file_by_name_key
+declare -A display_by_name_key
 
 for file in "${job_files[@]}"; do
   job_name=$(yq -r '.spec.name' "$file")
@@ -107,115 +114,75 @@ for file in "${job_files[@]}"; do
     job_name="${job_name%.yml}"
   fi
 
-  job_name_key=$(to_lower "$job_name")
-  if [[ -n "${job_file_by_name[$job_name_key]-}" && "${job_display_by_name[$job_name_key]}" != "$job_name" ]]; then
-    echo "Error: job name collision (case-insensitive): '${job_display_by_name[$job_name_key]}' and '$job_name'." >&2
+  name_key=$(to_lower "$job_name")
+  if [[ -n "${file_by_name_key[$name_key]-}" && "${display_by_name_key[$name_key]}" != "$job_name" ]]; then
+    echo "Error: job name collision (case-insensitive): '${display_by_name_key[$name_key]}' and '$job_name'." >&2
     exit 1
   fi
-  job_file_by_name["$job_name_key"]="$file"
-  job_display_by_name["$job_name_key"]="$job_name"
-
-  while IFS= read -r step_key; do
-    [[ -z "$step_key" || "$step_key" == "null" ]] && continue
-    if [[ -n "${step_key_to_job[$step_key]-}" && "${step_key_to_job[$step_key]}" != "$job_name_key" ]]; then
-      echo "Warning: duplicate step key '$step_key' in $file (already mapped to ${job_display_by_name[${step_key_to_job[$step_key]}]})." >&2
-    fi
-    step_key_to_job["$step_key"]="$job_name_key"
-  done < <(yq -r '.pipeline.steps[].key' "$file")
+  file_by_name_key["$name_key"]="$file"
+  display_by_name_key["$name_key"]="$job_name"
 done
 
-# Resolve the requested job name.
-job_name_key=$(to_lower "$JOB_NAME")
-if [[ -z "${job_file_by_name[$job_name_key]-}" ]]; then
+build_step_index "$JOBS_DIR"
+
+# Resolve the requested job name to a file.
+name_key=$(to_lower "$JOB_NAME")
+if [[ -z "${file_by_name_key[$name_key]-}" ]]; then
   candidate="$JOBS_DIR/$JOB_NAME.yml"
   if [[ -f "$candidate" ]]; then
     resolved_name=$(yq -r '.spec.name' "$candidate")
-    if [[ -n "$resolved_name" && "$resolved_name" != "null" ]]; then
-      job_name_key=$(to_lower "$resolved_name")
-      JOB_NAME="$resolved_name"
-    else
-      base_name=$(basename "$candidate")
-      base_name="${base_name%.yml}"
-      job_name_key=$(to_lower "$base_name")
-      JOB_NAME="$base_name"
+    if [[ -z "$resolved_name" || "$resolved_name" == "null" ]]; then
+      resolved_name=$(basename "$candidate")
+      resolved_name="${resolved_name%.yml}"
     fi
+    name_key=$(to_lower "$resolved_name")
+    JOB_NAME="$resolved_name"
   fi
 fi
 
-if [[ -z "${job_file_by_name[$job_name_key]-}" ]]; then
+if [[ -z "${file_by_name_key[$name_key]-}" ]]; then
   echo "Error: job '$JOB_NAME' not found in $JOBS_DIR" >&2
   exit 1
 fi
 
-# Extract dependency step keys from a pipeline file.
-list_dep_steps() {
-  local file="$1"
-  yq -r '.pipeline.steps[].depends_on[]? | .step' "$file"
-}
+start_file="${file_by_name_key[$name_key]}"
 
-# Map dependency step keys to job names and return unique deps.
-get_job_deps() {
-  local job="$1"
-  local file="${job_file_by_name[$job]}"
-  declare -A seen=()
-
-  while IFS= read -r dep_step; do
-    [[ -z "$dep_step" || "$dep_step" == "null" ]] && continue
-    dep_job="${step_key_to_job[$dep_step]-}"
-    if [[ -z "$dep_job" ]]; then
-      echo "Error: dependency step '$dep_step' referenced by job '${job_display_by_name[$job]}' not found in $JOBS_DIR." >&2
-      exit 1
-    fi
-    if [[ "$dep_job" == "$job" ]]; then
-      continue
-    fi
-    if [[ -z "${seen[$dep_job]-}" ]]; then
-      seen["$dep_job"]=1
-      echo "$dep_job"
-    fi
-  done < <(list_dep_steps "$file")
-}
-
-# Depth-first walk for topological ordering with cycle detection.
+# Depth-first walk for topological ordering with cycle detection, using the
+# shared job_dependency_files helper for immediate dependencies.
 declare -A temp_mark
 declare -A perm_mark
-declare -a ordered_jobs
+declare -a ordered_files
 
-visit_job() {
-  local job="$1"
-  if [[ -n "${perm_mark[$job]-}" ]]; then
+visit_file() {
+  local file="$1"
+  if [[ -n "${perm_mark[$file]-}" ]]; then
     return
   fi
-  if [[ -n "${temp_mark[$job]-}" ]]; then
-    echo "Error: circular dependency detected at job '$job'." >&2
+  if [[ -n "${temp_mark[$file]-}" ]]; then
+    echo "Error: circular dependency detected at job '$(yq -r '.spec.name' "$file")'." >&2
     exit 1
   fi
 
-  temp_mark["$job"]=1
+  temp_mark["$file"]=1
 
-  while IFS= read -r dep; do
-    [[ -z "$dep" ]] && continue
-    if [[ -z "${job_file_by_name[$dep]-}" ]]; then
-      echo "Error: dependency job '${job_display_by_name[$dep]-$dep}' not found in $JOBS_DIR" >&2
-      exit 1
-    fi
-    visit_job "$dep"
-  done < <(get_job_deps "$job")
+  while IFS= read -r dep_file; do
+    [[ -z "$dep_file" ]] && continue
+    visit_file "$dep_file"
+  done < <(job_dependency_files "$file")
 
-  perm_mark["$job"]=1
-  ordered_jobs+=("$job")
+  perm_mark["$file"]=1
+  ordered_files+=("$file")
 }
 
-visit_job "$job_name_key"
+visit_file "$start_file"
 
 if [[ "$DEBUG" == true ]]; then
-  echo "Debug: upload order: ${ordered_jobs[*]}"
+  echo "Debug: upload order: ${ordered_files[*]}"
 fi
 
 # Upload pipelines in dependency order (or print in dry-run).
-for job in "${ordered_jobs[@]}"; do
-  file="${job_file_by_name[$job]}"
-  display_name="${job_display_by_name[$job]}"
+for file in "${ordered_files[@]}"; do
+  display_name=$(yq -r '.spec.name' "$file")
   if [[ "$DRY_RUN" == true ]]; then
     echo "Dry run: would upload job '$display_name' from $file"
     continue
