@@ -427,10 +427,11 @@ let wrap_main
                     (* Pin each slot's index to the domain its branch was
                        compiled for: the index is advice, and the finalize
                        check below is only sound at the finalized proof's
-                       own domain. A side-loaded predecessor has no
-                       compile-time domain, so its branches leave the index
-                       free. Padding slots are pinned to [1], the index the
-                       prover supplies for them. *)
+                       own domain. Padding slots are pinned to [1], the
+                       index the prover supplies for them. A side-loaded
+                       predecessor's domain comes from its key, which does
+                       not reach this circuit, so where such a branch is
+                       active the index stays unconstrained. *)
                     with_label __LOC__ (fun () ->
                         let domain_index d =
                           let (Domain.Pow_2_roots_of_unity d) = d in
@@ -452,12 +453,22 @@ let wrap_main
                             let at_slot =
                               Vector.map known ~f:(fun ks -> List.nth_exn ks i)
                             in
+                            (* A side-loaded branch's term is zero on both
+                               sides of the constraint below, so while it is
+                               active the constraint reads [0 = 0]. *)
+                            let term = function
+                              | Some j ->
+                                  Field.of_int j
+                              | None ->
+                                  Field.zero
+                            in
                             let chosen =
                               Wrap_verifier.Pseudo.choose (which_branch, at_slot)
-                                ~f:(fun k ->
-                                  Field.of_int (Option.value k ~default:0) )
+                                ~f:term
                             in
                             if Vector.for_all at_slot ~f:Option.is_some then
+                              (* The one-hot bits sum to one, so the general
+                                 constraint below is this equality. *)
                               Field.Assert.equal index chosen
                             else
                               let known_branch =
