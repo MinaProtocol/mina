@@ -22,6 +22,8 @@ let DebianRepo = ../../Constants/DebianRepo.dhall
 
 let DockerPublish = ../../Constants/DockerPublish.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
@@ -61,11 +63,10 @@ let imageSpec =
       }
 
 let hardforkDocker =
-      Artifacts.fullDockerTag
-        Artifacts.Tag::{
-        , artifact = Artifacts.Type.DaemonAutoHardfork
-        , network = network
-        }
+          "${DockerRepo.show
+               DockerRepo.Type.InternalEurope}/${Artifacts.dockerName
+                                                   Artifacts.Type.DaemonAutoHardfork}"
+      ++  ":\\\${GITHASH}-bookworm-${Network.lowerName network}"
 
 in  Pipeline.build
       Pipeline.Config::{
