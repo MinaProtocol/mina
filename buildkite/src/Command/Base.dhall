@@ -294,7 +294,7 @@ let build
 
               let submoduleCredentialsPart =
                     [ toMap
-                        { `MinaProtocol/submodule-credentials#v1.0.0` =
+                        { `MinaProtocol/submodule-credentials#v1.1.0` =
                             Plugins.SubmoduleCredentials
                               SubmoduleCredentials::{=}
                         }
