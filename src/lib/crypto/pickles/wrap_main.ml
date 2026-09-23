@@ -151,7 +151,8 @@ let wrap_main
       Vector.t
       Promise.t
       Lazy.t ) (step_widths : (int, branches) Vector.t)
-    (step_domains : (Domains.t, branches) Vector.t Promise.t) ~srs
+    (step_domains : (Domains.t, branches) Vector.t Promise.t)
+    ~(prev_wrap_domains : (Domain.t option list, branches) Vector.t) ~srs
     (max_proofs_verified :
       (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
@@ -423,6 +424,51 @@ let wrap_main
                       exists (Vector.wrap_typ Field.typ Max_proofs_verified.n)
                         ~request:(fun () -> Req.Wrap_domain_indices)
                     in
+                    (* Pin each slot's index to the domain its branch was
+                       compiled for: the index is advice, and the finalize
+                       check below is only sound at the finalized proof's
+                       own domain. A side-loaded predecessor has no
+                       compile-time domain, so its branches leave the index
+                       free. Padding slots are pinned to [1], the index the
+                       prover supplies for them. *)
+                    with_label __LOC__ (fun () ->
+                        let domain_index d =
+                          let (Domain.Pow_2_roots_of_unity d) = d in
+                          Vector.foldi ~init:None all_possible_domains
+                            ~f:(fun j acc (Domain.Pow_2_roots_of_unity d') ->
+                              if Int.equal d d' then Some j else acc )
+                          |> Option.value_exn
+                        in
+                        let known =
+                          Vector.map prev_wrap_domains ~f:(fun ds ->
+                              let pad =
+                                Nat.to_int Max_proofs_verified.n
+                                - List.length ds
+                              in
+                              List.init pad ~f:(fun _ -> Some 1)
+                              @ List.map ds ~f:(Option.map ~f:domain_index) )
+                        in
+                        Vector.iteri wrap_domain_indices ~f:(fun i index ->
+                            let at_slot =
+                              Vector.map known ~f:(fun ks -> List.nth_exn ks i)
+                            in
+                            let chosen =
+                              Wrap_verifier.Pseudo.choose (which_branch, at_slot)
+                                ~f:(fun k ->
+                                  Field.of_int (Option.value k ~default:0) )
+                            in
+                            if Vector.for_all at_slot ~f:Option.is_some then
+                              Field.Assert.equal index chosen
+                            else
+                              let known_branch =
+                                Wrap_verifier.Pseudo.choose
+                                  (which_branch, at_slot) ~f:(fun k ->
+                                    if Option.is_some k then Field.one
+                                    else Field.zero )
+                              in
+                              Field.Assert.equal
+                                Field.(known_branch * index)
+                                chosen ) ) ;
                     Vector.map wrap_domain_indices ~f:(fun index ->
                         let which_branch =
                           Wrap_verifier.One_hot_vector.of_index index

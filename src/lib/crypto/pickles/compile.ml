@@ -507,6 +507,42 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
+    (* Per branch, the wrap domain of each predecessor proof, [None] for a
+       side-loaded one; [Wrap_main] pins the finalize domain to it. *)
+    let prev_wrap_domains =
+      let module Prev_domains = struct
+        type t = Domain.t option list
+      end in
+      let module M =
+        H4.Map (IR) (E04 (Prev_domains))
+          (struct
+            module HT = H4.T (Tag)
+
+            let f : type a b c d. (a, b, c, d) IR.t -> Prev_domains.t =
+             fun r ->
+              let rec go : type a b c d. (a, b, c, d) HT.t -> Prev_domains.t =
+                function
+                | [] ->
+                    []
+                | t :: ts ->
+                    let d =
+                      if Type_equal.Id.same t.id self.id then
+                        Some wrap_domains.h
+                      else
+                        match t.kind with
+                        | Compiled ->
+                            Some (Types_map.lookup_compiled t.id).wrap_domains.h
+                        | Side_loaded ->
+                            None
+                    in
+                    d :: go ts
+              in
+              go r.prevs
+          end)
+      in
+      let module V = H4.To_vector (Prev_domains) in
+      V.f prev_varss_length (M.f choices)
+    in
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
@@ -762,7 +798,7 @@ struct
           let srs = Tick.Keypair.load_urs () in
           Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds all_step_domains
-            max_proofs_verified
+            ~prev_wrap_domains max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we
              have been asked to create proof in an 'adversarial' way, where

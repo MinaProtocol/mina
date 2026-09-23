@@ -43,6 +43,7 @@ struct
     let _, main =
       Wrap_main.wrap_main ~feature_flags ~num_chunks ~srs full_signature
         choices_length dummy_step_keys dummy_step_widths dummy_step_domains
+        ~prev_wrap_domains:(Vector.init num_choices ~f:(fun _ -> []))
         max_proofs_verified
     in
     Timer.clock __LOC__ ;
