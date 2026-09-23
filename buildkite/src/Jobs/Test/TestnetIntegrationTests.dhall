@@ -10,14 +10,15 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let Command = ../../Command/Base.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let dependsOn =
-        Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Daemon }
-      # Dockers.dependsOn
-          Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
+let dependsOn
+    : List Command.TaggedKey.Type
+    = [ { name = "IntegrationTestDockerImages"
+        , key = "daemon_apps_only-docker-image"
+        }
+      , { name = "IntegrationTestDockerImages", key = "archive-docker-image" }
+      ]
 
 in  Pipeline.build
       Pipeline.Config::{
