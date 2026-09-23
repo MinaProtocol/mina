@@ -12,7 +12,15 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DockerImage = ../../Command/DockerImage.dhall
+
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
+let DockerPublish = ../../Constants/DockerPublish.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
@@ -32,7 +40,21 @@ let dirtyWhen =
           "sh"
       , S.exactly "scripts/docker/build" "sh"
       , S.exactly "scripts/debian/builder-helpers" "sh"
+      , S.exactly "buildkite/scripts/docker/load_from_cache" "sh"
       ]
+
+let imageSpec =
+      DockerImage.ReleaseSpec::{
+      , deps = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+      , service = Artifacts.Type.DaemonAutoHardfork
+      , network = network
+      , deb_codename = DebianVersions.DebVersion.Bookworm
+      , deb_profile = Profiles.Type.Devnet
+      , deb_repo = DebianRepo.Type.Local
+      , docker_publish = DockerPublish.Type.Disabled
+      , save_to_ci_cache = True
+      , size = Size.XLarge
+      }
 
 let hardforkDocker =
       Artifacts.fullDockerTag
@@ -54,11 +76,14 @@ in  Pipeline.build
           ]
         }
       , steps =
-        [ Command.build
+        [ DockerImage.generateStep imageSpec
+        , Command.build
             Command.Config::{
             , commands =
               [ Cmd.run
                   "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh"
+              , Cmd.run
+                  "./buildkite/scripts/docker/load_from_cache.sh ${hardforkDocker}"
               , Cmd.run
                   "buildkite/scripts/tests/hardfork/dispatcher-tests.sh --docker ${hardforkDocker}"
               ]
@@ -67,12 +92,10 @@ in  Pipeline.build
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
-                Dockers.dependsOn
-                  Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bookworm
-                  , artifact = Artifacts.Type.DaemonAutoHardfork
-                  , network = network
-                  }
+              [ { name = "AutoHardforkTest"
+                , key = DockerImage.stepKey imageSpec
+                }
+              ]
             }
         , Command.build
             Command.Config::{
