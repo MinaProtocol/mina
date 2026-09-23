@@ -136,7 +136,7 @@ let runInDockerWithPostgresConn
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
-                    , "sleep 5"
+                    , "timeout 120 docker exec ${postgresDockerName} sh -c 'until pg_isready -h localhost -p ${port} -U ${user} -q; do sleep 1; done'"
                     ]
                   # runInitScript
                   # [ "docker run --pid=container:postgres --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
@@ -233,7 +233,7 @@ let runInToolchainWithPostgresAndDebs
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
-                    , "sleep 5"
+                    , "timeout 120 docker exec ${postgresDockerName} sh -c 'until pg_isready -h localhost -p ${port} -U ${user} -q; do sleep 1; done'"
                     ]
                   # runInitScript
                   # [ "docker run --pid=container:postgres --network host --volume /var/storagebox:/var/storagebox --volume /var/secrets:/var/secrets --volume ${outerDir}:/workdir --workdir /workdir --entrypoint /bin/bash${bkEnvVars}${extraEnvVars}${gitEnvVars} ${toolchain} -c '${installAndRun}'"
