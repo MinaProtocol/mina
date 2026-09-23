@@ -30,6 +30,8 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
+let MinaArtifact = ../../Command/MinaArtifact.dhall
+
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
@@ -46,6 +48,8 @@ let Size = ../../Command/Size.dhall
 
 let debDeps = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
+let artifactDefaults = MinaArtifact.MinaBuildSpec.default
+
 let daemonSpec =
       DockerImage.ReleaseSpec::{
       , deps = debDeps
@@ -55,6 +59,9 @@ let daemonSpec =
       , deb_codename = DebianVersions.DebVersion.Bookworm
       , deb_profile = Profiles.Type.Devnet
       , deb_repo = DebianRepo.Type.Local
+      , deb_legacy_version = artifactDefaults.deb_legacy_version
+      , deb_storage_repair_version = Some
+          artifactDefaults.deb_storage_repair_version
       , docker_publish = DockerPublish.Type.Disabled
       , save_to_ci_cache = True
       , size = Size.XLarge
@@ -68,6 +75,9 @@ let archiveSpec =
       , deb_codename = DebianVersions.DebVersion.Bookworm
       , deb_profile = Profiles.Type.Devnet
       , deb_repo = DebianRepo.Type.Local
+      , deb_legacy_version = artifactDefaults.deb_legacy_version
+      , deb_storage_repair_version = Some
+          artifactDefaults.deb_storage_repair_version
       , docker_publish = DockerPublish.Type.Disabled
       , save_to_ci_cache = True
       , size = Size.XLarge
