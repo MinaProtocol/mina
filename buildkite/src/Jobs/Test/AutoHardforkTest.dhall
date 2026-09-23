@@ -14,6 +14,8 @@ let Size = ../../Command/Size.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
+let ArtifactPipelines = ../../Command/MinaArtifact.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
@@ -51,6 +53,8 @@ let imageSpec =
       , deb_codename = DebianVersions.DebVersion.Bookworm
       , deb_profile = Profiles.Type.Devnet
       , deb_repo = DebianRepo.Type.Local
+      , deb_legacy_version =
+          ArtifactPipelines.MinaBuildSpec.default.deb_legacy_version
       , docker_publish = DockerPublish.Type.Disabled
       , save_to_ci_cache = True
       , size = Size.XLarge
