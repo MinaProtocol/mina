@@ -97,8 +97,6 @@ struct
     end
 
     module With_top_bit0 = struct
-      (* When the top bit is 0, there is no need to check that this is not
-         equal to one of the forbidden values. The scaling is safe. *)
       module Constant = Other_field
 
       type t = Impls.Wrap.Other_field.t

@@ -120,10 +120,6 @@ module Step : sig
     (** The constant (out-of-circuit) representation uses Tock's field. *)
     module Constant = Backend.Tock.Field
 
-    (** Field values that cannot be used due to shifted value encoding.
-        These values would alias with other values after shifting. *)
-    val forbidden_shifted_values : (Impl.field * bool) list lazy_t
-
     (** Typ without range checking - use only when values are known safe. *)
     val typ_unchecked : (t, Constant.t) Typ.t
 
@@ -264,9 +260,6 @@ module Wrap : sig
 
     (** The constant (out-of-circuit) representation uses Tick's field. *)
     module Constant = Backend.Tick.Field
-
-    (** Field values that cannot be used due to shifted value encoding. *)
-    val forbidden_shifted_values : Impl.field list lazy_t
 
     (** Typ without range checking - use only when values are known safe. *)
     val typ_unchecked : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
