@@ -45,7 +45,7 @@ The format string for the message will support interpolation of the form `$<id>`
 ### Logger Interface
 [detailed-design-logger-interface]: #detailed-design-logger-interface
 
-The logger interface will be changed slightly to support the new format. Most noticably, it will take an associative list of json values for the metadata field. It will also support the ability to derive a new logger with some added context, much like the old `Logger.child` system. However, rather than tracking source, this will allow for passing metadata down to log statements without explicitly providing them to the log function each time. The logger will check the correctness of the format string at compile time.
+The logger interface will be changed slightly to support the new format. Most noticeably, it will take an associative list of json values for the metadata field. It will also support the ability to derive a new logger with some added context, much like the old `Logger.child` system. However, rather than tracking source, this will allow for passing metadata down to log statements without explicitly providing them to the log function each time. The logger will check the correctness of the format string at compile time.
 
 ### Logging PPX
 [detailed-design-logging-ppx]: #detailed-design-logging-ppx
