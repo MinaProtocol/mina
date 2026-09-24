@@ -2274,6 +2274,27 @@ let pseudo_choose_n3_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
     Pseudo.Wrap.choose (bits, Vector.[ 13; 14; 15 ]) ~f:Field.of_int) in
   ()
 
+(* Pseudo.Domain.to_domain over the three wrap domains, as [wrap_main]
+   selects each slot's finalize domain: the one-hot of the index, then the
+   selected domain's vanishing polynomial at [inputs.(1)]. The generator and
+   shifts are masks over constants and emit no constraints. *)
+let pseudo_to_domain_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let which =
+    Wrap_verifier.One_hot_vector.of_index inputs.(0)
+      ~length:Wrap_verifier.num_possible_domains
+  in
+  let domain =
+    Wrap_verifier.Pseudo.Domain.to_domain
+      ~shifts:(fun ~log2_size -> Common.tock_shifts ~log2_size)
+      ~domain_generator:(fun ~log2_size ->
+        Backend.Tock.Field.domain_generator ~log2_size |> Field.constant )
+      (which, Wrap_verifier.all_possible_domains ())
+  in
+  let _v = with_label "pseudo_to_domain" (fun () ->
+    domain#vanishing_polynomial inputs.(1)) in
+  ()
+
 (* choose_key: single branch (N1) with dummy VK, matching wrap_main dump *)
 (* Minimal test: single (b :> t) * constant multiplication *)
 let scale_bool_const_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
@@ -4812,6 +4833,8 @@ let run ~output_dir =
     ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
   dump_wrap "pseudo_choose_n3_wrap_circuit" pseudo_choose_n3_wrap_circuit
     ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_wrap "pseudo_to_domain_wrap_circuit" pseudo_to_domain_wrap_circuit
+    ~input_typ:array2_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   dump_wrap "scale_bool_const_wrap_circuit" scale_bool_const_wrap_circuit
     ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   dump_wrap "choose_key_n1_wrap_circuit" choose_key_n1_wrap_circuit
