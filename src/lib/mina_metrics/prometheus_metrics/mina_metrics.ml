@@ -474,6 +474,13 @@ module Transaction_pool = struct
     let help = "Size of verification key refcount table" in
     Gauge.v "vk_refcount_table_size" ~help ~namespace ~subsystem
 
+  let vk_refcount_leaks_detected : Counter.t =
+    let help =
+      "Number of times the verification key refcount table was found holding \
+       keys while the transaction pool was empty"
+    in
+    Counter.v "vk_refcount_leaks_detected" ~help ~namespace ~subsystem
+
   let zkapp_transactions_added_to_pool : Counter.t =
     let help =
       "Number of zkapp transactions added to the pool since the node start"

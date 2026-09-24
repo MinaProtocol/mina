@@ -339,14 +339,12 @@ struct
         { verification_keys :
             (int * Zkapp_vk_cache_tag.t) Zkapp_basic.F_map.Table.t
         ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
-        ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
         ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         }
 
       let create vk_cache_db () =
         { verification_keys = Zkapp_basic.F_map.Table.create ()
         ; account_id_to_vks = Account_id.Table.create ()
-        ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
         ; vk_cache_db
         }
 
@@ -378,8 +376,6 @@ struct
               (count + 1, vk) ) ;
         Hashtbl.update t.account_id_to_vks account_id
           ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
-        Hashtbl.update t.vk_to_account_ids vk.hash
-          ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
             (Float.of_int (Hashtbl.length t.verification_keys)) )
@@ -398,8 +394,6 @@ struct
                  (count', value) ) ) ;
         Hashtbl.change t.account_id_to_vks account_id
           ~f:(Option.bind ~f:(dec_map vk_hash)) ;
-        Hashtbl.change t.vk_to_account_ids vk_hash
-          ~f:(Option.bind ~f:(dec_map account_id)) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
             (Float.of_int (Hashtbl.length t.verification_keys)) )
@@ -449,20 +443,95 @@ struct
       Transition_frontier.best_tip frontier
       |> Breadcrumb.staged_ledger |> Staged_ledger.ledger
 
+    (** Remove [cmds] from both locally-generated tables, returning those that
+        were found in one of them.
+
+        The predicate mutates: [find_and_remove] deletes the entry it reports
+        on, so it has to run exactly once per command. Returning the lazy
+        [Sequence.filter] would instead re-run it on every forcing, and a
+        caller that tests the result for emptiness before listing it would see
+        the first match consumed by the emptiness test and then missing from
+        the list. *)
+    let remove_locally_generated t cmds =
+      List.filter cmds ~f:(fun cmd ->
+          let find_remove_bool tbl =
+            Locally_generated.find_and_remove tbl cmd |> Option.is_some
+          in
+          let dropped_committed =
+            find_remove_bool t.locally_generated_committed
+          in
+          let dropped_uncommitted =
+            find_remove_bool t.locally_generated_uncommitted
+          in
+          (* Nothing should be in both tables. *)
+          assert (not (dropped_committed && dropped_uncommitted)) ;
+          dropped_committed || dropped_uncommitted )
+
+    (** The only function permitted to assign [t.pool].
+
+        Refcounts are derived from the pool here rather than restated at each
+        call site: [Indexed_pool.diff] reports exactly which commands entered
+        and left, so the table cannot drift from pool membership.
+
+        This assumes every caller reads [t.pool], derives [new_pool] from it,
+        and calls here without an intervening bind. All of them do today: [apply]
+        is documented as synchronous, and the transition frontier handlers
+        contain no [Deferred] at all. Introducing an await between the read and
+        the call would make the diff report the concurrent writer's additions as
+        removals, corrupting the refcounts silently -- so keep these paths
+        synchronous. *)
+    let set_pool t new_pool =
+      let { Indexed_pool.Membership_diff.added; removed } =
+        Indexed_pool.diff ~before:t.pool ~after:new_pool
+      in
+      let lift = Vk_refcount_table.lift_hashed t.verification_key_table in
+      (* Increment before decrementing: a vk migrating between accounts within
+         a single transition must not transiently hit zero, which would drop
+         its Zkapp_vk_cache_tag and with it the disk cache entry. *)
+      List.iter added ~f:(lift Vk_refcount_table.inc) ;
+      List.iter removed
+        ~f:
+          (lift (fun table ~account_id ~(vk : Verification_key_wire.t) ->
+               Vk_refcount_table.dec table ~account_id ~vk_hash:vk.hash ) ) ;
+      t.pool <- new_pool ;
+      let pool_size = Indexed_pool.size new_pool in
+      (* The degenerate case of the refcount invariant, cheap enough to keep on
+         in the daemon: an empty pool must hold no refcounts. The full
+         recompute costs a pass over the pool with extract_vks per command, so
+         it lives in For_tests instead. Log and meter here -- never crash a node
+         over a mempool side table. *)
+      if
+        pool_size = 0
+        && not (Hashtbl.is_empty t.verification_key_table.verification_keys)
+      then (
+        [%log' error t.logger]
+          "Verification key refcount table still holds $size keys while the \
+           transaction pool is empty"
+          ~metadata:
+            [ ( "size"
+              , `Int (Hashtbl.length t.verification_key_table.verification_keys)
+              )
+            ] ;
+        Mina_metrics.(
+          Counter.inc_one Transaction_pool.vk_refcount_leaks_detected ) ) ;
+      Mina_metrics.(
+        Gauge.set Transaction_pool.pool_size (Float.of_int pool_size) )
+
     let drop_until_below_max_size :
            pool_max_size:int
         -> Indexed_pool.t
         -> Indexed_pool.t
-           * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+           * Transaction_hash.User_command_with_valid_signature.t list =
      fun ~pool_max_size pool ->
+      (* [dropped] is accumulated in reverse and flipped once on the way out. *)
       let rec go pool' dropped =
         if Indexed_pool.size pool' > pool_max_size then (
           let dropped', pool'' = Indexed_pool.remove_lowest_fee pool' in
-          assert (not (Sequence.is_empty dropped')) ;
-          go pool'' @@ Sequence.append dropped dropped' )
-        else (pool', dropped)
+          assert (not (List.is_empty dropped')) ;
+          go pool'' @@ List.rev_append dropped' dropped )
+        else (pool', List.rev dropped)
       in
-      go pool @@ Sequence.empty
+      go pool []
 
     let has_sufficient_fee ~pool_max_size pool cmd : bool =
       match Indexed_pool.min_fee pool with
@@ -548,17 +617,10 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
 
-         Don't forget to modify the refcount table as well as remove from the
-         index pool.
+         The refcount table is not touched here: every pool assignment below
+         goes through [set_pool], which derives the refcount change from the
+         pool itself.
       *)
-      let vk_table_inc = Vk_refcount_table.inc in
-      let vk_table_dec t ~account_id ~(vk : Verification_key_wire.t) =
-        Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash
-      in
-      let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
-      let vk_table_lift_hashed =
-        Vk_refcount_table.lift_hashed t.verification_key_table
-      in
       let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
@@ -574,8 +636,6 @@ struct
               ]
             @ metadata )
       in
-      List.iter new_commands ~f:(vk_table_lift vk_table_inc) ;
-      List.iter removed_commands ~f:(vk_table_lift vk_table_dec) ;
       let compact_json =
         Fn.compose User_command.fee_payer_summary_json User_command.forget_check
       in
@@ -592,46 +652,51 @@ struct
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
-        List.fold (List.rev removed_commands) ~init:(t.pool, Sequence.empty)
-          ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
-            let cmd =
-              Transaction_hash.User_command_with_valid_signature.create
-                unhashed_cmd.data
-            in
-            ( match
-                Locally_generated.find_and_remove t.locally_generated_committed
-                  cmd
-              with
-            | None ->
-                ()
-            | Some time_added ->
-                [%log' info t.logger]
-                  "Locally generated command $cmd committed in a block!"
-                  ~metadata:
-                    [ ( "cmd"
-                      , With_status.to_yojson User_command.Valid.to_yojson
-                          unhashed_cmd )
-                    ] ;
-                Locally_generated.add_exn t.locally_generated_uncommitted
-                  ~key:cmd ~data:time_added ) ;
-            let pool', dropped_seq =
-              match cmd |> Indexed_pool.add_from_backtrack pool with
-              | Error e ->
-                  let error_str, metadata = indexed_pool_error_log_info e in
-                  log_indexed_pool_error error_str ~metadata cmd ;
-                  (pool, Sequence.empty)
-              | Ok indexed_pool ->
-                  drop_until_below_max_size ~pool_max_size indexed_pool
-            in
-            (pool', Sequence.append dropped_so_far dropped_seq) )
+        (* Accumulated in reverse and flipped once below: appending each chunk
+           with [@] instead would be quadratic in the number of backtracked
+           commands. *)
+        let pool', dropped_rev =
+          List.fold (List.rev removed_commands) ~init:(t.pool, [])
+            ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
+              let cmd =
+                Transaction_hash.User_command_with_valid_signature.create
+                  unhashed_cmd.data
+              in
+              ( match
+                  Locally_generated.find_and_remove
+                    t.locally_generated_committed cmd
+                with
+              | None ->
+                  ()
+              | Some time_added ->
+                  [%log' info t.logger]
+                    "Locally generated command $cmd committed in a block!"
+                    ~metadata:
+                      [ ( "cmd"
+                        , With_status.to_yojson User_command.Valid.to_yojson
+                            unhashed_cmd )
+                      ] ;
+                  Locally_generated.add_exn t.locally_generated_uncommitted
+                    ~key:cmd ~data:time_added ) ;
+              let pool', dropped_seq =
+                match cmd |> Indexed_pool.add_from_backtrack pool with
+                | Error e ->
+                    let error_str, metadata = indexed_pool_error_log_info e in
+                    log_indexed_pool_error error_str ~metadata cmd ;
+                    (pool, [])
+                | Ok indexed_pool ->
+                    drop_until_below_max_size ~pool_max_size indexed_pool
+              in
+              (pool', List.rev_append dropped_seq dropped_so_far) )
+        in
+        (pool', List.rev dropped_rev)
       in
-      Sequence.iter dropped_backtrack ~f:(vk_table_lift_hashed vk_table_dec) ;
       (* Track what locally generated commands were removed from the pool
          during backtracking due to the max size constraint. *)
       let locally_generated_dropped =
-        Sequence.filter dropped_backtrack
+        List.filter dropped_backtrack
           ~f:(Locally_generated.mem t.locally_generated_uncommitted)
-        |> Sequence.to_list_rev
+        |> List.rev
       in
       if not (List.is_empty locally_generated_dropped) then
         [%log' debug t.logger]
@@ -685,14 +750,12 @@ struct
               in
               Set.add set cmd_hash )
         in
-        Sequence.to_list dropped_commands
-        |> List.partition_tf ~f:(fun cmd ->
+        List.partition_tf dropped_commands ~f:(fun cmd ->
             Set.mem command_hashes
               (Transaction_hash.User_command_with_valid_signature
                .transaction_hash cmd ) )
       in
       List.iter committed_commands ~f:(fun cmd ->
-          vk_table_lift_hashed vk_table_dec cmd ;
           Locally_generated.find_and_remove t.locally_generated_uncommitted cmd
           |> Option.iter ~f:(fun data ->
               Locally_generated.add_exn t.locally_generated_committed ~key:cmd
@@ -719,17 +782,13 @@ struct
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
-        (Sequence.length dropped_backtrack) ;
-      Mina_metrics.(
-        Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool'')) ) ;
-      t.pool <- pool'' ;
+        (List.length dropped_backtrack) ;
+      set_pool t pool'' ;
       List.iter locally_generated_dropped ~f:(fun cmd ->
           (* If the dropped transaction was included in the winning chain, it'll
              be in locally_generated_committed. If it wasn't, try re-adding to
              the pool. *)
           let remove_cmd () =
-            vk_table_lift_hashed vk_table_dec cmd ;
             assert (
               Option.is_some
               @@ Locally_generated.find_and_remove
@@ -787,18 +846,14 @@ struct
                             , Transaction_hash.User_command_with_valid_signature
                               .to_yojson cmd )
                           ] ;
-                      vk_table_lift_hashed Vk_refcount_table.inc cmd ;
-                      Mina_metrics.(
-                        Gauge.set Transaction_pool.pool_size
-                          (Float.of_int (Indexed_pool.size pool''')) ) ;
-                      t.pool <- pool''' )
+                      set_pool t pool''' )
               | None ->
                   log_and_remove "Fee_payer_account not found"
                     ~metadata:
                       [ ("user_command", User_command.to_yojson unchecked) ] ) ;
       (*Remove any expired user commands*)
       let expired_commands, pool = Indexed_pool.remove_expired t.pool in
-      Sequence.iter expired_commands ~f:(fun cmd ->
+      List.iter expired_commands ~f:(fun cmd ->
           [%log' debug t.logger]
             "Dropping expired user command from the pool $cmd"
             ~metadata:
@@ -806,15 +861,11 @@ struct
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd )
               ] ;
-          vk_table_lift_hashed vk_table_dec cmd ;
           ignore
             ( Locally_generated.find_and_remove t.locally_generated_uncommitted
                 cmd
               : (Time_float.t * [ `Batch of int ]) option ) ) ;
-      Mina_metrics.(
-        Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool)) ) ;
-      t.pool <- pool
+      set_pool t pool
 
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
@@ -895,45 +946,21 @@ struct
                                 account"
                              (Base_ledger.get validation_ledger loc) )
                  in
-                 (* The dropped commands leave the pool here, so their vk
-                    refcounts must be decremented to match the increments
-                    made when they were added. *)
-                 let dec_vk_refcounts =
-                   Vk_refcount_table.lift_hashed t.verification_key_table
-                     (fun vk_table ~account_id ~vk ->
-                       Vk_refcount_table.dec vk_table ~account_id
-                         ~vk_hash:vk.hash )
-                 in
-                 Sequence.iter dropped ~f:dec_vk_refcounts ;
                  let dropped_locally_generated =
-                   Sequence.filter dropped ~f:(fun cmd ->
-                       let find_remove_bool tbl =
-                         Locally_generated.find_and_remove tbl cmd
-                         |> Option.is_some
-                       in
-                       let dropped_committed =
-                         find_remove_bool t.locally_generated_committed
-                       in
-                       let dropped_uncommitted =
-                         find_remove_bool t.locally_generated_uncommitted
-                       in
-                       (* Nothing should be in both tables. *)
-                       assert (not (dropped_committed && dropped_uncommitted)) ;
-                       dropped_committed || dropped_uncommitted )
+                   remove_locally_generated t dropped
                  in
                  (* In this situation we don't know whether the commands aren't
                     valid against the new ledger because they were already
                     committed or because they conflict with others,
                     unfortunately. *)
-                 if not (Sequence.is_empty dropped_locally_generated) then
+                 if not (List.is_empty dropped_locally_generated) then
                    [%log info]
                      "Dropped locally generated commands $cmds from pool when \
                       transition frontier was recreated."
                      ~metadata:
                        [ ( "cmds"
                          , `List
-                             (List.map
-                                (Sequence.to_list dropped_locally_generated)
+                             (List.map dropped_locally_generated
                                 ~f:
                                   Transaction_hash
                                   .User_command_with_valid_signature
@@ -942,11 +969,8 @@ struct
                  [%log debug]
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
-                   (Sequence.length dropped) (Indexed_pool.size t.pool) ;
-                 Mina_metrics.(
-                   Gauge.set Transaction_pool.pool_size
-                     (Float.of_int (Indexed_pool.size new_pool)) ) ;
-                 t.pool <- new_pool ;
+                   (List.length dropped) (Indexed_pool.size t.pool) ;
+                 set_pool t new_pool ;
                  t.best_tip_diff_relay <-
                    Some
                      (Broadcast_pipe.Reader.iter
@@ -1337,7 +1361,7 @@ struct
                 in
                 let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
                 if already_in_pool then
-                  Ok ((cmd, pool, Sequence.empty), Command_state.Rebroadcast)
+                  Ok ((cmd, pool, []), Command_state.Rebroadcast)
                 else
                   match
                     Indexed_pool.add_from_gossip_exn pool cmd account.nonce
@@ -1359,40 +1383,20 @@ struct
               | Error err ->
                   (pool, Error (cmd, err)) )
         in
-        let added_cmds =
-          List.filter_map add_results ~f:(function
-            | Ok (cmd, _, Command_state.New_command) ->
-                Some cmd
-            | Ok (_, _, Command_state.Rebroadcast) | Error _ ->
-                None )
-        in
         let dropped_for_add =
           List.filter_map add_results ~f:(function
             | Ok (_, dropped, Command_state.New_command) ->
-                Some (Sequence.to_list dropped)
+                Some dropped
             | Ok (_, _, Command_state.Rebroadcast) | Error _ ->
                 None )
           |> List.concat
         in
         (* drop commands from the pool to retain max size *)
         let pool, dropped_for_size =
-          let pool, dropped =
-            drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
-          in
-          (pool, Sequence.to_list dropped)
+          drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
         in
         (* handle drops of locally generated commands *)
         let all_dropped_cmds = dropped_for_add @ dropped_for_size in
-
-        (* apply changes to the vk-refcount-table here *)
-        let () =
-          let lift = Vk_refcount_table.lift_hashed t.verification_key_table in
-          List.iter added_cmds ~f:(lift Vk_refcount_table.inc) ;
-          List.iter all_dropped_cmds
-            ~f:
-              (lift (fun t ~account_id ~vk ->
-                   Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash ) )
-        in
         let dropped_for_add_hashes =
           List.map dropped_for_add
             ~f:
@@ -1448,10 +1452,9 @@ struct
             | Error _ ->
                 () ) ;
         (* finalize the update to the pool *)
-        t.pool <- pool ;
+        set_pool t pool ;
         let pool_size_after = Indexed_pool.size pool in
         Mina_metrics.(
-          Gauge.set Transaction_pool.pool_size (Float.of_int pool_size_after) ;
           List.iter
             (List.init (max 0 (pool_size_after - pool_size_before)) ~f:Fn.id)
             ~f:(fun _ ->
@@ -1629,6 +1632,60 @@ struct
              (List.map ~f:(fun (txn, _) ->
                   Transaction_hash.User_command_with_valid_signature.command txn
                   |> User_command.read_all_proofs_from_disk ) )
+
+    module For_tests = struct
+      (** Recompute the refcount table from pool membership and check the two
+          agree. If this throws there is a bug -- the same contract as
+          [Indexed_pool.For_tests.assert_pool_consistency], which it
+          deliberately mirrors.
+
+          Living in [For_tests] is the gate: this walks the pool and runs
+          [extract_vks] per command, which is too much for the daemon on a path
+          that runs per gossip diff. [set_pool] keeps the O(1) degenerate case
+          instead. *)
+      let assert_refcount_consistency t =
+        let expected_by_account =
+          Indexed_pool.get_all t.pool
+          |> List.concat_map ~f:(fun cmd ->
+              Transaction_hash.User_command_with_valid_signature.forget_check
+                cmd
+              |> With_hash.data |> User_command.extract_vks )
+          |> List.fold ~init:Account_id.Map.empty
+               ~f:(fun acc (account_id, (vk : Verification_key_wire.t)) ->
+                 Map.update acc account_id ~f:(fun vks ->
+                     Map.update
+                       (Option.value vks ~default:Zkapp_basic.F_map.Map.empty)
+                       vk.hash ~f:(function
+                       | None ->
+                           1
+                       | Some count ->
+                           count + 1 ) ) )
+        in
+        let actual_by_account =
+          Hashtbl.to_alist t.verification_key_table.account_id_to_vks
+          |> Account_id.Map.of_alist_exn
+        in
+        assert (
+          Map.equal (Map.equal Int.equal) expected_by_account actual_by_account ) ;
+        (* [verification_keys] carries one count per vk, summed over every
+           account referencing it. *)
+        let expected_by_vk =
+          Map.fold expected_by_account ~init:Zkapp_basic.F_map.Map.empty
+            ~f:(fun ~key:_ ~data:vks acc ->
+              Map.fold vks ~init:acc ~f:(fun ~key:vk_hash ~data:count acc ->
+                  Map.update acc vk_hash ~f:(function
+                    | None ->
+                        count
+                    | Some total ->
+                        total + count ) ) )
+        in
+        let actual_by_vk =
+          Hashtbl.to_alist t.verification_key_table.verification_keys
+          |> List.map ~f:(fun (vk_hash, (count, _tag)) -> (vk_hash, count))
+          |> Zkapp_basic.F_map.Map.of_alist_exn
+        in
+        assert (Map.equal Int.equal expected_by_vk actual_by_vk)
+    end
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
@@ -1946,6 +2003,7 @@ let%test_module _ =
 
     let assert_pool_txs test txs =
       Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
+      Test.Resource_pool.For_tests.assert_refcount_consistency test.txn_pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal
@@ -1958,7 +2016,8 @@ let%test_module _ =
                User_command.(forget_check tx |> read_all_proofs_from_disk) )
            txs )
 
-    let setup_test ?(verifier = verifier) ?permissions ?slot_tx_end () =
+    let setup_test ?(verifier = verifier) ?(pool_max_size = pool_max_size)
+        ?permissions ?slot_tx_end () =
       let frontier, best_tip_diff_w =
         Mock_transition_frontier.create ?permissions ()
       in
@@ -2695,6 +2754,43 @@ let%test_module _ =
           assert_pool_txs t (List.drop independent_cmds 3) ;
           Deferred.unit )
 
+    (* [remove_locally_generated] both mutates the locally-generated tables and
+       reports what it took out of them, so it has to traverse its argument
+       exactly once. A lazy filter under-reports: the caller tests the result
+       for emptiness, which consumes the first match and removes its table
+       entry, and the listing that follows then re-runs the predicate and finds
+       that entry already gone. Pin both halves of the contract -- everything
+       removed is reported, and nothing is left behind. *)
+    let%test_unit
+        "removing locally generated commands reports every one of them (user \
+         cmds)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          let%bind _ = add_commands t independent_cmds in
+          assert_pool_txs t independent_cmds ;
+          let hashed =
+            List.map independent_cmds
+              ~f:Transaction_hash.User_command_with_valid_signature.create
+          in
+          (* Guards the set comparison below against passing vacuously. *)
+          assert (List.length hashed > 1) ;
+          let reported =
+            Test.Resource_pool.remove_locally_generated t.txn_pool hashed
+          in
+          let hashes cmds =
+            List.map cmds
+              ~f:
+                Transaction_hash.User_command_with_valid_signature
+                .transaction_hash
+            |> Transaction_hash.Set.of_list
+          in
+          [%test_eq: Transaction_hash.Set.t] (hashes hashed) (hashes reported) ;
+          [%test_eq: int] 0
+            (List.length
+               (Locally_generated.to_alist
+                  t.txn_pool.locally_generated_uncommitted ) ) ;
+          Deferred.unit )
+
     let%test_unit
         "vk refcounts are decremented for commands dropped when the transition \
          frontier is recreated (zkapps)" =
@@ -2729,6 +2825,291 @@ let%test_module _ =
           in
           assert_pool_txs t [] ;
           [%test_eq: int] 0 (vk_table_size ()) ;
+          Deferred.unit )
+
+    (* Build a zkApp command that Sets the shared [vk] on [account_idx] under
+       signature authorization. Even-index test accounts are not zkappified by
+       Mock_transition_frontier.create, so for them this is the only way the vk
+       can reach the ledger. *)
+    let mk_vk_setting_command ?(fee = minimum_fee) ~account_idx ~nonce () =
+      let kp = test_keys.(account_idx) in
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
+        { sender = (kp, Account.Nonce.of_int nonce)
+        ; fee = Currency.Fee.of_nanomina_int_exn fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ kp ]
+        ; memo = Signed_command_memo.create_from_string_exn "set vk"
+        ; new_zkapp_account = false
+        ; snapp_update =
+            { Account_update.Update.dummy with
+              verification_key = Zkapp_basic.Set_or_keep.Set vk
+            }
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.update_states ~constraint_constants spec
+      in
+      User_command.Zkapp_command
+        (Or_error.ok_exn
+           (Zkapp_command.Valid.For_tests.to_valid ~failed:false
+              ~find_vk:(fun _ _ -> Ok vk)
+              zkapp_command ) )
+
+    (* Build a command carrying a proof-authorized account update against
+       [account_idx]. Converting this to a verifiable requires finding the vk
+       for that account, which is the lookup under test. *)
+    let mk_proof_authorized_command ~account_idx ~nonce =
+      let kp = test_keys.(account_idx) in
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
+        { sender = (kp, Account.Nonce.of_int nonce)
+        ; fee = Currency.Fee.of_nanomina_int_exn minimum_fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ kp ]
+        ; memo = Signed_command_memo.create_from_string_exn "use vk"
+        ; new_zkapp_account = false
+        ; snapp_update =
+            { Account_update.Update.dummy with
+              zkapp_uri = Zkapp_basic.Set_or_keep.Set "https://example.com"
+            }
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          ~zkapp_prover_and_vk:(prover, Deferred.return vk)
+          spec
+      in
+      User_command.Zkapp_command
+        (Or_error.ok_exn
+           (Zkapp_command.Valid.For_tests.to_valid ~failed:false
+              ~find_vk:(fun _ _ -> Ok vk)
+              zkapp_command ) )
+
+    let%test_unit
+        "a committed vk stays reachable through the best tip ledger once chain \
+         refcounts are gone (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let vk_table_size () =
+            Hashtbl.length t.txn_pool.verification_key_table.verification_keys
+          in
+          (* Even index: Mock_transition_frontier zkappifies only odd ones, so
+             this account starts with no verification key at all. *)
+          let account_idx = 2 in
+          let account_id =
+            Account_id.create
+              (Public_key.compress test_keys.(account_idx).public_key)
+              Token_id.default
+          in
+          let ledger_vk () =
+            let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
+            let%bind.Option loc =
+              Mina_ledger.Ledger.location_of_account ledger account_id
+            in
+            let%bind.Option account = Mina_ledger.Ledger.get ledger loc in
+            let%bind.Option zkapp = account.zkapp in
+            zkapp.verification_key
+          in
+          (* Precondition: the vk is nowhere -- not in the ledger, not in the
+             table. Without this the test could pass vacuously. *)
+          assert (Option.is_none (ledger_vk ())) ;
+          [%test_eq: int] 0 (vk_table_size ()) ;
+          (* Commit a vk-setting command the way a block would: apply it to the
+             ledger and announce it as part of the new best tip. *)
+          let%bind setter = mk_vk_setting_command ~account_idx ~nonce:0 () in
+          let%bind () = advance_chain t [ setter ] in
+          (* The ledger now carries the vk, and the command has left the pool.
+             When this test was written the chain refs were still in place, so
+             one table entry survived here and the test cleared the table by
+             hand to reach the state below. Refcounts now track pool membership
+             only, so the empty pool empties the table on its own -- what was a
+             counterfactual is the real behaviour. *)
+          assert (Option.is_some (ledger_vk ())) ;
+          assert_pool_txs t [] ;
+          [%test_eq: int] 0 (vk_table_size ()) ;
+          (* A proof-authorized command against that account must still
+             convert to a verifiable and pass verification, finding the vk via
+             the ledger alone. *)
+          let%bind proof_cmd =
+            mk_proof_authorized_command ~account_idx ~nonce:1
+          in
+          match%map
+            Test.Resource_pool.Diff.verify t.txn_pool
+              (Envelope.Incoming.wrap
+                 ~data:
+                   [ User_command.(
+                       forget_check proof_cmd |> read_all_proofs_from_disk )
+                   ]
+                 ~sender:Envelope.Sender.Local )
+          with
+          | Ok _ ->
+              ()
+          | Error e ->
+              failwithf
+                "proof-authorized command failed to verify with only the \
+                 ledger holding the vk: %s"
+                (Error.to_string_hum (Intf.Verification_error.to_error e))
+                () )
+
+    let vk_table_size (t : test) =
+      Hashtbl.length t.txn_pool.verification_key_table.verification_keys
+
+    let account_id_of_idx idx =
+      Account_id.create
+        (Public_key.compress test_keys.(idx).public_key)
+        Token_id.default
+
+    (* Total refcount held against one account, across every vk. Unlike an
+       aggregate over the whole table this is deterministic, because the
+       commands below are built explicitly rather than generated. *)
+    let vk_refcount_for (t : test) ~account_idx =
+      match
+        Hashtbl.find t.txn_pool.verification_key_table.account_id_to_vks
+          (account_id_of_idx account_idx)
+      with
+      | None ->
+          0
+      | Some vks ->
+          Map.data vks |> List.fold ~init:0 ~f:( + )
+
+    (* The whole point of the effort: a command that commits and stays
+       committed must leave nothing behind in the refcount table. Before
+       refcounts were derived from pool membership, entering the best tip took
+       a reference that only a reorg would ever release, so a healthy chain
+       leaked one per zkApp command forever. *)
+    let%test_unit
+        "committing commands to the chain releases their vk refcounts (zkapps)"
+        =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let%bind zkapp_cmds = mk_zkapp_commands_single_block 7 t.txn_pool in
+          let%bind () = add_commands' t zkapp_cmds in
+          assert_pool_txs t zkapp_cmds ;
+          (* Guards the final check against passing vacuously. *)
+          [%test_eq: int] 1 (vk_table_size t) ;
+          let%bind () = advance_chain t zkapp_cmds in
+          assert_pool_txs t [] ;
+          [%test_eq: int] 0 (vk_table_size t) ;
+          Deferred.unit )
+
+    (* A command orphaned by a reorg goes back into the pool through
+       add_from_backtrack, which took no reference of its own, so the vk of a
+       command that had been committed and was then orphaned went untracked
+       while the command sat in the pool waiting to be re-included. *)
+    let%test_unit
+        "a command returned to the pool by backtracking holds a vk refcount \
+         (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          (* Even indices are not zkappified by Mock_transition_frontier, so
+             these accounts carry no verification key to begin with. *)
+          let pooled_idx = 0 and orphaned_idx = 2 in
+          let%bind pooled =
+            mk_vk_setting_command ~account_idx:pooled_idx ~nonce:0 ()
+          in
+          let%bind orphaned =
+            mk_vk_setting_command ~account_idx:orphaned_idx ~nonce:0 ()
+          in
+          let%bind () = add_commands' t [ pooled ] in
+          assert_pool_txs t [ pooled ] ;
+          [%test_eq: int] 0 (vk_refcount_for t ~account_idx:orphaned_idx) ;
+          (* [orphaned] belongs to the losing fork's chain and never passed
+             through the pool. The reorg hands it back, and
+             add_from_backtrack puts it in the pool. It is deliberately not
+             applied to the ledger: the mock frontier does not roll the ledger
+             back, so a command committed here would simply be revalidated
+             away again for a stale nonce. *)
+          let%bind () = reorg t [] [ orphaned ] in
+          assert_pool_txs t [ pooled; orphaned ] ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:orphaned_idx) ;
+          Deferred.unit )
+
+    (* A pooled command can be invalidated by a *different* command committing
+       at the same nonce. Those are partitioned away from the committed ones as
+       commit conflicts, and that branch released no refcount at all. *)
+    let%test_unit
+        "a command dropped for conflicting with a committed one releases its \
+         vk refcount (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let account_idx = 0 in
+          let%bind conflicted =
+            mk_vk_setting_command ~account_idx ~nonce:0 ()
+          in
+          let%bind () = add_commands' t [ conflicted ] in
+          assert_pool_txs t [ conflicted ] ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx) ;
+          (* A different command from the same account at the same nonce wins
+             the race to the chain, so [conflicted] can never apply. *)
+          let committed =
+            mk_payment ~sender_idx:account_idx ~fee:minimum_fee ~nonce:0
+              ~receiver_idx:5 ~amount:20_000_000_000 ~signature_kind ()
+          in
+          commit_commands t [ committed ] ;
+          let%bind () = reorg t [ committed ] [] in
+          assert_pool_txs t [] ;
+          [%test_eq: int] 0 (vk_refcount_for t ~account_idx) ;
+          Deferred.unit )
+
+    (* The double decrement. A command dropped while backtracking was
+       decremented once for leaving the pool and again when its re-add failed,
+       so a vk shared with a command still in the pool could be evicted from
+       the table -- taking with it the Zkapp_vk_cache_tag that load_vk_cache
+       needs to verify the command that remains. *)
+    let%test_unit
+        "a failed re-add after backtracking leaves a vk another pooled command \
+         still needs (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          (* Small enough that a single backtracked command overflows it. *)
+          let%bind t = setup_test ~pool_max_size:3 () in
+          assert_pool_txs t [] ;
+          (* [victim] pays the minimum, so it is what max-size eviction takes.
+             [keeper] sets the same vk from a different account and stays, so
+             the vk must survive the eviction. *)
+          let%bind victim = mk_vk_setting_command ~account_idx:0 ~nonce:0 () in
+          let%bind keeper =
+            mk_vk_setting_command ~account_idx:2 ~nonce:0
+              ~fee:(minimum_fee * 100) ()
+          in
+          let filler =
+            mk_payment ~sender_idx:6 ~fee:(minimum_fee * 100) ~nonce:0
+              ~receiver_idx:5 ~amount:1_000_000_000 ~signature_kind ()
+          in
+          let%bind () = add_commands' t [ victim; keeper; filler ] in
+          assert_pool_txs t [ victim; keeper; filler ] ;
+          [%test_eq: int] 1 (vk_table_size t) ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:0) ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:2) ;
+          (* A command comes back off the losing fork and overflows the pool.
+             [victim] is evicted to make room, and cannot be re-added: the pool
+             is full and its fee is the lowest in it. *)
+          let backtracked =
+            mk_payment ~sender_idx:4 ~fee:(minimum_fee * 100) ~nonce:0
+              ~receiver_idx:5 ~amount:1_000_000_000 ~signature_kind ()
+          in
+          let%bind () = reorg t [] [ backtracked ] in
+          assert_pool_txs t [ keeper; filler; backtracked ] ;
+          [%test_eq: int] 0 (vk_refcount_for t ~account_idx:0) ;
+          (* [keeper] is still in the pool, so its vk must still be tracked. *)
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:2) ;
+          [%test_eq: int] 1 (vk_table_size t) ;
           Deferred.unit )
 
     let%test_unit "transaction replacement works" =
