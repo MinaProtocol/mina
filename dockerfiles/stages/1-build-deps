@@ -136,8 +136,6 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
-# In addition to that, we also install cargo-xtask as it is used to build the
-# WebAssembly artefacts.
 USER opam
 RUN case "${TARGETARCH}" in \
         "amd64") RUSTUP_ARCH="x86_64" ;; \
@@ -158,7 +156,6 @@ RUN case "${TARGETARCH}" in \
     --component rust-src \
     --target wasm32-unknown-unknown \
     --no-self-update \
-  && "$HOME/.cargo/bin/cargo" install cargo-xtask \
   && rm /tmp/rustup-init
 USER root
 
