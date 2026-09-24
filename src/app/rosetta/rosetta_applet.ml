@@ -1,0 +1,12 @@
+open Lib.Rosetta
+open Async
+
+let run () =
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  Command_unix.run
+    (Command.async ~summary:"Run Rosetta process on top of Mina"
+       (command ()
+          ~account_creation_fee:constraint_constants.account_creation_fee
+          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee ) )
