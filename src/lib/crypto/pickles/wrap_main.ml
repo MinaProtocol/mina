@@ -49,6 +49,78 @@ let shifts ~log2_size = Common.tock_shifts ~log2_size
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
 
+(* The wrap circuit's finalize block: pin each slot's wrap domain index,
+   select each slot's domain from it, then finalize each slot's deferred
+   values against its domain and assert it finalized or was not to be.
+   Returns each slot's expanded bullet-proof challenges.
+
+   [known] holds, per branch, each slot's compile-time index into
+   [all_possible_domains], front-padded, [None] for a side-loaded slot. *)
+let finalize_prev_proofs ~which_branch ~known ~wrap_domain_indices
+    ~unfinalized_proofs ~old_bulletproof_challenges ~evals =
+  let all_possible_domains = Wrap_verifier.all_possible_domains () in
+  (* Pin each slot's index to the domain its branch was compiled for: the
+     index is advice, and the finalize check below is only sound at the
+     finalized proof's own domain. Padding slots are pinned to [1], the
+     index the prover supplies for them. A side-loaded predecessor's domain
+     comes from its key, which does not reach this circuit, so where such a
+     branch is active the index stays unconstrained. *)
+  with_label __LOC__ (fun () ->
+      Vector.iteri wrap_domain_indices ~f:(fun i index ->
+          let at_slot = Vector.map known ~f:(fun ks -> List.nth_exn ks i) in
+          (* A side-loaded branch's term is zero on both sides of the
+             constraint below, so while it is active the constraint reads
+             [0 = 0]. *)
+          let term = function Some j -> Field.of_int j | None -> Field.zero in
+          let chosen =
+            Wrap_verifier.Pseudo.choose (which_branch, at_slot) ~f:term
+          in
+          if Vector.for_all at_slot ~f:Option.is_some then
+            (* The one-hot bits sum to one, so the general constraint below
+               is this equality. *)
+            Field.Assert.equal index chosen
+          else
+            let known_branch =
+              Wrap_verifier.Pseudo.choose (which_branch, at_slot) ~f:(fun k ->
+                  if Option.is_some k then Field.one else Field.zero )
+            in
+            Field.Assert.equal Field.(known_branch * index) chosen ) ) ;
+  let wrap_domains =
+    Vector.map wrap_domain_indices ~f:(fun index ->
+        let which_branch =
+          Wrap_verifier.One_hot_vector.of_index index
+            ~length:Wrap_verifier.num_possible_domains
+        in
+        Wrap_verifier.Pseudo.Domain.to_domain ~shifts ~domain_generator
+          (which_branch, all_possible_domains) )
+  in
+  Vector.mapn
+    [ unfinalized_proofs; old_bulletproof_challenges; evals; wrap_domains ]
+    ~f:(fun
+         [ { Types.Step.Proof_state.Per_proof.deferred_values
+           ; sponge_digest_before_evaluations
+           ; should_finalize
+           }
+         ; old_bulletproof_challenges
+         ; evals
+         ; wrap_domain
+         ]
+       ->
+      let sponge =
+        let s = Sponge.create sponge_params in
+        Sponge.absorb s sponge_digest_before_evaluations ;
+        s
+      in
+      let finalized, chals =
+        with_label __LOC__ (fun () ->
+            Wrap_verifier.finalize_other_proof
+              (module Wrap_hack.Padded_length)
+              ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
+              ~sponge ~old_bulletproof_challenges deferred_values evals )
+      in
+      Boolean.(Assert.any [ finalized; not should_finalize ]) ;
+      chals )
+
 (* Split a field element into its high bits (packed) and the low bit.
 
    It does not check that the "high bits" actually fit into n - 1 bits,
@@ -415,132 +487,40 @@ let wrap_main
                   in
                   exists ty ~request:(fun () -> Req.Evals)
                 in
-                let chals =
-                  let wrap_domains =
-                    let all_possible_domains =
-                      Wrap_verifier.all_possible_domains ()
-                    in
-                    let wrap_domain_indices =
-                      exists (Vector.wrap_typ Field.typ Max_proofs_verified.n)
-                        ~request:(fun () -> Req.Wrap_domain_indices)
-                    in
-                    (* Pin each slot's index to the domain its branch was
-                       compiled for: the index is advice, and the finalize
-                       check below is only sound at the finalized proof's
-                       own domain. Padding slots are pinned to [1], the
-                       index the prover supplies for them. A side-loaded
-                       predecessor's domain comes from its key, which does
-                       not reach this circuit, so where such a branch is
-                       active the index stays unconstrained. *)
-                    with_label __LOC__ (fun () ->
-                        let domain_index d =
-                          let (Domain.Pow_2_roots_of_unity d) = d in
-                          Vector.foldi ~init:None all_possible_domains
-                            ~f:(fun j acc (Domain.Pow_2_roots_of_unity d') ->
-                              if Int.equal d d' then Some j else acc )
-                          |> Option.value_exn
-                        in
-                        let known =
-                          Vector.map prev_wrap_domains ~f:(fun ds ->
-                              let pad =
-                                Nat.to_int Max_proofs_verified.n
-                                - List.length ds
-                              in
-                              List.init pad ~f:(fun _ -> Some 1)
-                              @ List.map ds ~f:(Option.map ~f:domain_index) )
-                        in
-                        Vector.iteri wrap_domain_indices ~f:(fun i index ->
-                            let at_slot =
-                              Vector.map known ~f:(fun ks -> List.nth_exn ks i)
-                            in
-                            (* A side-loaded branch's term is zero on both
-                               sides of the constraint below, so while it is
-                               active the constraint reads [0 = 0]. *)
-                            let term = function
-                              | Some j ->
-                                  Field.of_int j
-                              | None ->
-                                  Field.zero
-                            in
-                            let chosen =
-                              Wrap_verifier.Pseudo.choose (which_branch, at_slot)
-                                ~f:term
-                            in
-                            if Vector.for_all at_slot ~f:Option.is_some then
-                              (* The one-hot bits sum to one, so the general
-                                 constraint below is this equality. *)
-                              Field.Assert.equal index chosen
-                            else
-                              let known_branch =
-                                Wrap_verifier.Pseudo.choose
-                                  (which_branch, at_slot) ~f:(fun k ->
-                                    if Option.is_some k then Field.one
-                                    else Field.zero )
-                              in
-                              Field.Assert.equal
-                                Field.(known_branch * index)
-                                chosen ) ) ;
-                    Vector.map wrap_domain_indices ~f:(fun index ->
-                        let which_branch =
-                          Wrap_verifier.One_hot_vector.of_index index
-                            ~length:Wrap_verifier.num_possible_domains
-                        in
-                        Wrap_verifier.Pseudo.Domain.to_domain ~shifts
-                          ~domain_generator
-                          (which_branch, all_possible_domains) )
-                  in
-                  Vector.mapn
-                    [ (* This is padded to max_proofs_verified for the benefit of wrapping with dummy unfinalized proofs *)
-                      prev_proof_state.unfinalized_proofs
-                    ; old_bp_chals
-                    ; evals
-                    ; wrap_domains
-                    ]
-                    ~f:(fun
-                         [ { deferred_values
-                           ; sponge_digest_before_evaluations
-                           ; should_finalize
-                           }
-                         ; old_bulletproof_challenges
-                         ; evals
-                         ; wrap_domain
-                         ]
-                       ->
-                      let sponge =
-                        let s = Sponge.create sponge_params in
-                        Sponge.absorb s sponge_digest_before_evaluations ;
-                        s
-                      in
-
-                      (* the type of the local max proofs-verified depends on
-                         which kind of step proof we are wrapping. *)
-                      (* For each i in [0..max_proofs_verified-1], we have
-                         max_local_max_proofs_verified, which is the largest
-                         Local_max_proofs_verified which is the i^th inner proof of a step proof.
-
-                         Need to compute this value from the which_branch.
-                      *)
-                      let (T
-                            ( _max_local_max_proofs_verified
-                            , old_bulletproof_challenges ) ) =
-                        old_bulletproof_challenges
-                      in
-                      let old_bulletproof_challenges =
-                        Wrap_hack.Checked.pad_challenges
-                          old_bulletproof_challenges
-                      in
-                      let finalized, chals =
-                        with_label __LOC__ (fun () ->
-                            Wrap_verifier.finalize_other_proof
-                              (module Wrap_hack.Padded_length)
-                              ~domain:
-                                (wrap_domain :> _ Plonk_checks.plonk_domain)
-                              ~sponge ~old_bulletproof_challenges
-                              deferred_values evals )
-                      in
-                      Boolean.(Assert.any [ finalized; not should_finalize ]) ;
-                      chals )
+                let wrap_domain_indices =
+                  exists (Vector.wrap_typ Field.typ Max_proofs_verified.n)
+                    ~request:(fun () -> Req.Wrap_domain_indices)
                 in
+                let known =
+                  let all_possible_domains =
+                    Wrap_verifier.all_possible_domains ()
+                  in
+                  let domain_index d =
+                    let (Domain.Pow_2_roots_of_unity d) = d in
+                    Vector.foldi ~init:None all_possible_domains
+                      ~f:(fun j acc (Domain.Pow_2_roots_of_unity d') ->
+                        if Int.equal d d' then Some j else acc )
+                    |> Option.value_exn
+                  in
+                  Vector.map prev_wrap_domains ~f:(fun ds ->
+                      let pad =
+                        Nat.to_int Max_proofs_verified.n - List.length ds
+                      in
+                      List.init pad ~f:(fun _ -> Some 1)
+                      @ List.map ds ~f:(Option.map ~f:domain_index) )
+                in
+                (* The type of each slot's local max proofs-verified depends
+                   on which kind of step proof is being wrapped; padding its
+                   challenges emits no constraints. *)
+                let old_bulletproof_challenges =
+                  Vector.map old_bp_chals
+                    ~f:(fun (Old_bulletproof_chals.T (_, chals)) ->
+                      Wrap_hack.Checked.pad_challenges chals )
+                in
+                let chals =
+                  finalize_prev_proofs ~which_branch ~known ~wrap_domain_indices
+                    ~unfinalized_proofs:prev_proof_state.unfinalized_proofs
+                    ~old_bulletproof_challenges ~evals                in
                 chals )
           in
           let prev_statement =

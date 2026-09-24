@@ -1436,37 +1436,44 @@ let finalize_other_proof_circuit (inputs : Impl.Field.t array) () =
    Total: 148 fields
 *)
 
-let finalize_other_proof_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+(* One slot's finalize inputs from [inputs] starting at [off], in the
+   148-field layout above: the deferred values, the evaluations, the two
+   padded previous-challenge vectors and the sponge digest. *)
+let wrap_fop_inputs (type n) ~(rounds : n Pickles_types.Nat.t) (inputs : Impls.Wrap.Field.t array)
+    (off : int) =
   let open Impls.Wrap in
   let open Pickles_types in
   let open Kimchi_backend_common.Plonk_types in
   let single x = [| x |] in
-  let eval_pair i = (single inputs.(i), single inputs.(i + 1)) in
+  let r = Nat.to_int rounds in
+  (* the evaluations and the tail sit [r - 16] past the 16-round layout *)
+  let sh = r - 16 in
+  let eval_pair i = (single inputs.(off + sh + i), single inputs.(off + sh + i + 1)) in
   (* -- Deferred values (Step type, no feature_flags/joint_combiner/branch_data) -- *)
   let plonk
     : ( Field.t
       , Field.t Import.Scalar_challenge.t
       , Field.t Shifted_value.Type2.t )
       Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit.t =
-    { alpha = { Kimchi_types.inner = inputs.(0) }
-    ; beta = inputs.(1)
-    ; gamma = inputs.(2)
-    ; zeta = { Kimchi_types.inner = inputs.(3) }
-    ; zeta_to_srs_length = Shifted_value.Type2.Shifted_value inputs.(4)
-    ; zeta_to_domain_size = Shifted_value.Type2.Shifted_value inputs.(5)
-    ; perm = Shifted_value.Type2.Shifted_value inputs.(6)
+    { alpha = { Kimchi_types.inner = inputs.(off + 0) }
+    ; beta = inputs.(off + 1)
+    ; gamma = inputs.(off + 2)
+    ; zeta = { Kimchi_types.inner = inputs.(off + 3) }
+    ; zeta_to_srs_length = Shifted_value.Type2.Shifted_value inputs.(off + 4)
+    ; zeta_to_domain_size = Shifted_value.Type2.Shifted_value inputs.(off + 5)
+    ; perm = Shifted_value.Type2.Shifted_value inputs.(off + 6)
     }
   in
   let deferred_values =
     { Composition_types.Step.Proof_state.Deferred_values.
       plonk
-    ; combined_inner_product = Shifted_value.Type2.Shifted_value inputs.(7)
-    ; b = Shifted_value.Type2.Shifted_value inputs.(8)
-    ; xi = { Kimchi_types.inner = inputs.(9) }
+    ; combined_inner_product = Shifted_value.Type2.Shifted_value inputs.(off + 7)
+    ; b = Shifted_value.Type2.Shifted_value inputs.(off + 8)
+    ; xi = { Kimchi_types.inner = inputs.(off + 9) }
     ; bulletproof_challenges =
-        Vector.init Nat.N16.n ~f:(fun i ->
+        Vector.init rounds ~f:(fun i ->
           { Import.Bulletproof_challenge.prechallenge =
-              { Kimchi_types.inner = inputs.(10 + i) }
+              { Kimchi_types.inner = inputs.(off + 10 + i) }
           })
     }
   in
@@ -1508,21 +1515,28 @@ let finalize_other_proof_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
     , Boolean.var )
     All_evals.In_circuit.t =
     { evals =
-        { public_input = (single inputs.(26), single inputs.(27))
+        { public_input = (single inputs.(off + sh + 26), single inputs.(off + sh + 27))
         ; evals = evals_evals
         }
-    ; ft_eval1 = inputs.(114)
+    ; ft_eval1 = inputs.(off + sh + 114)
     }
   in
   (* -- prev_challenges -- *)
-  let old_bulletproof_challenges :
-    ( (Field.t, Nat.N16.n) Vector.t
-    , Nat.N2.n )
-    Vector.t =
-    Vector.[
-      Vector.init Nat.N16.n ~f:(fun j -> inputs.(115 + j)) ;
-      Vector.init Nat.N16.n ~f:(fun j -> inputs.(131 + j))
-    ]
+  (* the two padded previous-challenge vectors, [r] each, then the digest *)
+  let prev = off + sh + 115 in
+  let old_bulletproof_challenges =
+    Vector.
+      [ Vector.init rounds ~f:(fun j -> inputs.(prev + j))
+      ; Vector.init rounds ~f:(fun j -> inputs.(prev + r + j))
+      ]
+  in
+  (deferred_values, all_evals, old_bulletproof_challenges, inputs.(prev + (2 * r)))
+
+let finalize_other_proof_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let deferred_values, all_evals, old_bulletproof_challenges, _ =
+    wrap_fop_inputs ~rounds:Nat.N16.n inputs 0
   in
   (* -- Sponge initialization -- *)
   let sponge_params =
@@ -1554,6 +1568,50 @@ let finalize_other_proof_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
       ~old_bulletproof_challenges
       deferred_values
       all_evals
+  in
+  ()
+
+(* Wrap_main.finalize_prev_proofs, the wrap circuit's finalize block, at two
+   branches and two slots: the domain index pins, each slot's domain
+   selection, then each slot's finalize and its [finalized or not
+   should_finalize] assertion. Branch 0's slots were compiled for wrap
+   domain indices [1; 1], branch 1's for [0; 2].
+
+   Input layout (295 fields):
+     0:               which_branch
+     1 + 147 i:       slot i's finalize inputs, in the layout of
+                      finalize_other_proof_wrap_circuit at the wrap
+                      circuit's 15 rounds (145 fields)
+     1 + 147 i + 145: slot i's should_finalize
+     1 + 147 i + 146: slot i's wrap domain index *)
+let wrap_finalize_n2_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let which_branch =
+    Wrap_verifier.One_hot_vector.of_index inputs.(0) ~length:Nat.N2.n
+  in
+  let slot i =
+    let off = 1 + (147 * i) in
+    let deferred_values, evals, old_bulletproof_challenges, digest =
+      wrap_fop_inputs ~rounds:Backend.Tock.Rounds.n inputs off
+    in
+    ( { Composition_types.Step.Proof_state.Per_proof.deferred_values
+      ; should_finalize = Boolean.Unsafe.of_cvar inputs.(off + 145)
+      ; sponge_digest_before_evaluations = digest
+      }
+    , old_bulletproof_challenges
+    , evals
+    , inputs.(off + 146) )
+  in
+  let u0, c0, e0, i0 = slot 0 in
+  let u1, c1, e1, i1 = slot 1 in
+  let _chals =
+    Wrap_main.finalize_prev_proofs ~which_branch
+      ~known:Vector.[ [ Some 1; Some 1 ]; [ Some 0; Some 2 ] ]
+      ~wrap_domain_indices:Vector.[ i0; i1 ]
+      ~unfinalized_proofs:Vector.[ u0; u1 ]
+      ~old_bulletproof_challenges:Vector.[ c0; c1 ]
+      ~evals:Vector.[ e0; e1 ]
   in
   ()
 
@@ -4807,6 +4865,9 @@ let run ~output_dir =
   let array148_wrap = Impls.Wrap.Typ.array ~length:148 Impls.Wrap.Field.typ in
   dump_wrap "finalize_other_proof_wrap_circuit" finalize_other_proof_wrap_circuit
     ~input_typ:array148_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array295_wrap = Impls.Wrap.Typ.array ~length:295 Impls.Wrap.Field.typ in
+  dump_wrap "wrap_finalize_n2_circuit" wrap_finalize_n2_circuit
+    ~input_typ:array295_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   (* IVP needs the Tick URS for Generators.h (blinding generator) *)
   Backend.Tick.Keypair.set_urs_info [] ;
   let array34_wrap = Impls.Wrap.Typ.array ~length:34 Impls.Wrap.Field.typ in
