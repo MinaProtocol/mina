@@ -498,6 +498,8 @@ build_rosetta_deb() {
     "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+  cp ./default/src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-connectivity-test"
 
   build_deb "${package_name}"
 }

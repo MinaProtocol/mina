@@ -69,13 +69,15 @@ let Spec =
       }
 
 let bareBinaries =
-    -- rosetta-client is required by scripts/tests/rosetta-helper.sh, which both
-    -- the sanity and the load test source. Restoring every binary the tests call
-    -- makes restore-or-install.sh skip the deb install entirely.
-          "mina.exe:mina"
+    -- The test app plus everything it starts. The guardian's helpers
+    -- (auditor, archive-blocks) back-fill the gap between the archive dump and
+    -- the daemon's first block.
+          "rosetta_connectivity_test.exe:mina-rosetta-connectivity-test"
+      ++  ",mina.exe:mina"
       ++  ",archive.exe:mina-archive"
       ++  ",rosetta.exe:mina-rosetta"
-      ++  ",rosetta_client_cli.exe:rosetta-client"
+      ++  ",missing_blocks_auditor.exe:mina-missing-blocks-auditor"
+      ++  ",archive_blocks.exe:mina-archive-blocks"
       ++  ",libp2p_helper:libp2p_helper"
 
 let envExports =
@@ -84,19 +86,21 @@ let envExports =
           , "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
           , "MINA_PROFILE=${Profiles.lowerName spec.profile}"
           , "APPS_BARE_BINARIES=${bareBinaries}"
+          , "APPS_BARE_SCRIPTS=scripts/archive/missing-blocks-guardian.sh:mina-missing-blocks-guardian"
           ]
 
 let connectivityScript =
           \(spec : Spec.Type)
-      ->      "./buildkite/scripts/tests/rosetta/connectivity.sh"
+      ->      "./buildkite/scripts/tests/rosetta/install-debs.sh"
+          ++  " && mina-rosetta-connectivity-test"
           ++  " --network ${Network.lowerName spec.network}"
+          ++  " --create-postgres-cluster /data/postgresql"
+          ++  " --workdir \\\${HOME}/rosetta-connectivity"
           ++  " --sync-timeout ${Natural/show spec.syncTimeout}"
           ++  " --new-block-timeout ${Natural/show spec.newBlockTimeout}"
-          ++  " --run-compatibility-test develop"
-          ++  " --run-load-test"
+          ++  " --compatibility"
           ++  " --branch \\\${BUILDKITE_BRANCH}"
           ++  " --commit \\\${BUILDKITE_COMMIT}"
-          ++  " --metrics-mode"
           ++  " --perf-output-file /workdir/rosetta.perf"
 
 let command
@@ -149,9 +153,9 @@ let pipeline
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
                   , S.exactly
-                      "buildkite/scripts/tests/rosetta/connectivity"
+                      "buildkite/scripts/tests/rosetta/install-debs"
                       "sh"
-                  , S.strictlyStart (S.contains "scripts/tests/rosetta-")
+                  , S.exactly "scripts/archive/missing-blocks-guardian" "sh"
                   , S.exactly
                       "buildkite/scripts/tests/rosetta/integration-tests"
                       "sh"

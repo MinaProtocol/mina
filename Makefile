@@ -254,6 +254,7 @@ build-test-utils: ocaml_checks reformat-diff ## Build test utilities
 		src/app/batch_txn_tool/batch_txn_tool.exe \
 		src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
 		src/app/rosetta/indexer_test/indexer_test.exe \
+		src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe \
 		src/app/ledger_export_bench/ledger_export_benchmark.exe \
 		src/app/disk_caching_stats/disk_caching_stats.exe \
 		src/app/heap_usage/heap_usage.exe \
