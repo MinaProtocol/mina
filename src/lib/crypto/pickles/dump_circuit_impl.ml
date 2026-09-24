@@ -2993,6 +2993,47 @@ let hash_messages_for_next_wrap_proof_circuit (inputs : Impls.Wrap.Field.t array
   in
   Field.Assert.equal digest inputs.(32)
 
+(* Wrap_verifier.x_hat, the deployed public-input commitment, at two branches whose step
+   domains are [log2s]: the one-hot of the branch index at [inputs.(0)] selects the Lagrange
+   bases, and [inputs.(1) ...] is [xhat_circuit]'s 34-field layout. Equal domains take the
+   constant-correction arm; different ones mask and seal the per-branch bases and corrections.
+   The blinding generator is added after, as in [xhat_circuit]. *)
+let xhat_wrap_branches_circuit (log2s : int * int)
+    (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  let which_branch =
+    Wrap_verifier.One_hot_vector.of_index inputs.(0) ~length:Nat.N2.n
+  in
+  let domain d = { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity d } in
+  let step_domains = Vector.[ domain (fst log2s); domain (snd log2s) ] in
+  let at i = inputs.(1 + i) in
+  let public_input =
+    let split i = `Field (at i, Boolean.Unsafe.of_cvar (at (i + 1))) in
+    let packed n i = `Packed_bits (at i, n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> split (2 * j))
+      ; [| packed 255 10
+         ; packed 128 11 ; packed 128 12
+         ; packed 128 13 ; packed 128 14 ; packed 128 15 |]
+      ; Array.init 15 ~f:(fun j -> packed 128 (16 + j))
+      ; [| packed 1 31 ; packed 255 32 ; packed 255 33 |]
+      ]
+  in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let module Ops = Plonk_curve_ops.Make (Impls.Wrap) (Inner_curve) in
+  let x_hat =
+    Wrap_verifier.x_hat ~which_branch ~step_domains ~srs ~public_input
+  in
+  let _x_hat =
+    with_label "x_hat blinding" (fun () ->
+        Array.map x_hat ~f:(fun x_hat ->
+            Ops.add_fast x_hat
+              (Inner_curve.constant (Lazy.force Wrap_main_inputs.Generators.h)) ) )
+  in
+  ()
+
 (* x_hat sub-circuit: public input commitment (MSM) from IVP wrap.
 
    Input layout (34 fields):
@@ -4771,6 +4812,11 @@ let run ~output_dir =
   let array34_wrap = Impls.Wrap.Typ.array ~length:34 Impls.Wrap.Field.typ in
   dump_wrap "xhat_wrap_circuit" xhat_circuit
     ~input_typ:array34_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array35_wrap = Impls.Wrap.Typ.array ~length:35 Impls.Wrap.Field.typ in
+  dump_wrap "xhat_wrap_branches_same_circuit" (xhat_wrap_branches_circuit (16, 16))
+    ~input_typ:array35_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_wrap "xhat_wrap_branches_diff_circuit" (xhat_wrap_branches_circuit (15, 16))
+    ~input_typ:array35_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   let array177_wrap = Impls.Wrap.Typ.array ~length:177 Impls.Wrap.Field.typ in
   dump_wrap "ivp_wrap_circuit" ivp_wrap_circuit
     ~input_typ:array177_wrap ~return_typ:Impls.Wrap.Typ.unit ;

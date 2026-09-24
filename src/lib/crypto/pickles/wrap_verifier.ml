@@ -877,6 +877,88 @@ struct
       Type parameters:
       - [b]: Number of proofs verified (type-level nat)
   *)
+  (* The public input's commitment, [x_hat] before blinding: the constant inputs' Lagrange
+     bases summed with the variable inputs' scaled bases, negated. The bases come from the
+     active branch's step domain, selected under [which_branch]. *)
+  let x_hat ~which_branch ~step_domains ~srs
+      ~(public_input :
+         [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
+         array ) =
+    let domain = (which_branch, step_domains) in
+    let public_input =
+      Array.concat_map public_input ~f:(function
+        | `Field (x, b) ->
+            [| `Field (x, Field.size_in_bits)
+             ; `Field ((b :> Field.t), 1)
+            |]
+        | `Packed_bits (x, n) ->
+            [| `Field (x, n) |] )
+    in
+    let constant_part, non_constant_part =
+      List.partition_map
+        Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
+        ~f:(fun (i, t) ->
+          match[@warning "-4"] t with
+          | `Field (Constant c, _) ->
+              First
+                ( if Field.Constant.(equal zero) c then None
+                else if Field.Constant.(equal one) c then
+                  Some (lagrange ~domain srs i)
+                else
+                  Some
+                    (scaled_lagrange ~domain
+                       (Inner_curve.Constant.Scalar.project
+                          (Field.Constant.unpack c) )
+                       srs i ) )
+          | `Field x ->
+              Second (i, x) )
+    in
+    with_label __LOC__ (fun () ->
+        let terms =
+          List.map non_constant_part ~f:(fun (i, x) ->
+              match x with
+              | b, 1 ->
+                  assert_ (Constraint.boolean (b :> Field.t)) ;
+                  `Cond_add
+                    (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
+              | x, n ->
+                  `Add_with_correction
+                    ( (x, n)
+                    , lagrange_with_correction ~input_length:n ~domain srs
+                        i ) )
+        in
+        let correction =
+          with_label __LOC__ (fun () ->
+              List.reduce_exn
+                (List.filter_map terms ~f:(function
+                  | `Cond_add _ ->
+                      None
+                  | `Add_with_correction (_, chunks) ->
+                      Some (Array.map ~f:snd chunks) ) )
+                ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
+        in
+        with_label __LOC__ (fun () ->
+            let init =
+              List.fold
+                (List.filter_map ~f:Fn.id constant_part)
+                ~init:correction
+                ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
+            in
+            List.fold terms ~init ~f:(fun acc term ->
+                match term with
+                | `Cond_add (b, g) ->
+                    with_label __LOC__ (fun () ->
+                        Array.map2_exn acc g ~f:(fun acc g ->
+                            Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
+                              ~else_:acc ) )
+                | `Add_with_correction ((x, num_bits), chunks) ->
+                    Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
+                        Ops.add_fast acc
+                          (Ops.scale_fast2'
+                             (module Other_field.With_top_bit0)
+                             g x ~num_bits ) ) ) ) )
+    |> Array.map ~f:Inner_curve.negate
+
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
@@ -946,82 +1028,7 @@ struct
         (* == IVC Step 3: Compute public input commitment (x_hat) ==
            Compute the commitment to the public input polynomial using
            Lagrange basis. The domain is selected based on which_branch. *)
-        let x_hat =
-          let domain = (which_branch, step_domains) in
-          let public_input =
-            Array.concat_map public_input ~f:(function
-              | `Field (x, b) ->
-                  [| `Field (x, Field.size_in_bits)
-                   ; `Field ((b :> Field.t), 1)
-                  |]
-              | `Packed_bits (x, n) ->
-                  [| `Field (x, n) |] )
-          in
-          let constant_part, non_constant_part =
-            List.partition_map
-              Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
-              ~f:(fun (i, t) ->
-                match[@warning "-4"] t with
-                | `Field (Constant c, _) ->
-                    First
-                      ( if Field.Constant.(equal zero) c then None
-                      else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain srs i)
-                      else
-                        Some
-                          (scaled_lagrange ~domain
-                             (Inner_curve.Constant.Scalar.project
-                                (Field.Constant.unpack c) )
-                             srs i ) )
-                | `Field x ->
-                    Second (i, x) )
-          in
-          with_label __LOC__ (fun () ->
-              let terms =
-                List.map non_constant_part ~f:(fun (i, x) ->
-                    match x with
-                    | b, 1 ->
-                        assert_ (Constraint.boolean (b :> Field.t)) ;
-                        `Cond_add
-                          (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
-                    | x, n ->
-                        `Add_with_correction
-                          ( (x, n)
-                          , lagrange_with_correction ~input_length:n ~domain srs
-                              i ) )
-              in
-              let correction =
-                with_label __LOC__ (fun () ->
-                    List.reduce_exn
-                      (List.filter_map terms ~f:(function
-                        | `Cond_add _ ->
-                            None
-                        | `Add_with_correction (_, chunks) ->
-                            Some (Array.map ~f:snd chunks) ) )
-                      ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
-              in
-              with_label __LOC__ (fun () ->
-                  let init =
-                    List.fold
-                      (List.filter_map ~f:Fn.id constant_part)
-                      ~init:correction
-                      ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
-                  in
-                  List.fold terms ~init ~f:(fun acc term ->
-                      match term with
-                      | `Cond_add (b, g) ->
-                          with_label __LOC__ (fun () ->
-                              Array.map2_exn acc g ~f:(fun acc g ->
-                                  Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
-                                    ~else_:acc ) )
-                      | `Add_with_correction ((x, num_bits), chunks) ->
-                          Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
-                              Ops.add_fast acc
-                                (Ops.scale_fast2'
-                                   (module Other_field.With_top_bit0)
-                                   g x ~num_bits ) ) ) ) )
-          |> Array.map ~f:Inner_curve.negate
-        in
+        let x_hat = x_hat ~which_branch ~step_domains ~srs ~public_input in
         (* == IVC Step 4: Apply blinding to x_hat and absorb ==
            Commitments always include a blinding factor (adding generator H).
            We add H to x_hat to match this convention. *)

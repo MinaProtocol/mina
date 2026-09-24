@@ -327,6 +327,19 @@ val assert_n_bits : n:int -> Impl.Field.t -> unit
 
 (** {2 Constraint Generation for Proof Verification} *)
 
+(** The public input's commitment before blinding, at the step domain [which_branch]
+    selects among [step_domains]. *)
+val x_hat :
+     which_branch:'n One_hot_vector.t
+  -> step_domains:(Import.Domains.t, 'n) Pickles_types.Vector.t
+  -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
+  -> public_input:
+       [ `Field of
+         Wrap_main_inputs.Impl.Field.t * Wrap_main_inputs.Impl.Boolean.var
+       | `Packed_bits of Wrap_main_inputs.Impl.Field.t * int ]
+       array
+  -> (Wrap_main_inputs.Impl.Field.t * Wrap_main_inputs.Impl.Field.t) array
+
 (** [incrementally_verify_proof] generates constraints for partial verification
     of a step proof within a wrap circuit, reconstructing the Fiat-Shamir
     transcript.
