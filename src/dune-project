@@ -197,7 +197,6 @@
 (package (name sync_status))
 (package (name test_genesis_ledger))
 (package (name test_util))
-(package (name timeout_lib))
 (package (name transaction_inclusion_status))
 (package (name transaction_protocol_state))
 (package (name transaction_snark))
