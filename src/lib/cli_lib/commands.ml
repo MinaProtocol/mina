@@ -52,12 +52,15 @@ let generate_test_ledger =
        Sequence.take balance_seq n
        |> Sequence.map ~f:(fun balance ->
            let kp = Keypair.create () in
+           let pk =
+             Public_key.compress kp.public_key
+             |> Public_key.Compressed.to_base58_check
+           in
            { Runtime_config.Json_layout.Accounts.Single.default with
-             pk =
-               Public_key.compress kp.public_key
-               |> Public_key.Compressed.to_base58_check
+             pk
            ; sk = Some (Private_key.to_base58_check kp.private_key)
            ; balance
+           ; delegate = Some pk
            } )
        |> Sequence.to_list
      in
