@@ -9,17 +9,24 @@ let filter ((x, _y) : t * int) : bool =
   + List.length (Call_forest.to_list x.account_updates)
   <= Unsigned.UInt32.to_int Unsigned.UInt32.max_int
 
-let filter_overflow ((x, _y) : t * int) : bool =
-  Unsigned.UInt32.to_int x.fee_payer.body.nonce
-  + 1
-  + List.length (Call_forest.to_list x.account_updates)
-  > Unsigned.UInt32.to_int Unsigned.UInt32.max_int
-
 let filtered =
   Base_quickcheck.Generator.filter Valid_size.zkapp_type_gen ~f:filter
 
+(* [target_nonce_on_success] advances the fee payer's nonce past the end of its
+   range when [succ] alone overflows, which is to say when the nonce is at its
+   maximum. Searching a generated nonce for that does not terminate in
+   practice, and each draw builds a call forest of up to a thousand account
+   updates, so set the nonce rather than filtering for it. *)
+let with_overflowing_nonce ((x : t), y) =
+  let fee_payer =
+    { x.fee_payer with
+      body = { x.fee_payer.body with nonce = Account.Nonce.max_value }
+    }
+  in
+  (({ x with fee_payer } : t), y)
+
 let filtered_overflow =
-  Base_quickcheck.Generator.filter Valid_size.zkapp_type_gen ~f:filter_overflow
+  Quickcheck.Generator.map Valid_size.zkapp_type_gen ~f:with_overflowing_nonce
 
 (* target_nonce_on_success *)
 (* Check that the nonce after the function has been applied is higher *)
