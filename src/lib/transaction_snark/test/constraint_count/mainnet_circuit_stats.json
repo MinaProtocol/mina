@@ -1,0 +1,32 @@
+{
+  "transaction-merge": {
+    "constraints": 634,
+    "public_input_size": 300,
+    "auxiliary_input_size": 1899,
+    "digest": "d71089b3a1669535999e8f181cd59afc"
+  },
+  "transaction-base": {
+    "constraints": 15357,
+    "public_input_size": 300,
+    "auxiliary_input_size": 63807,
+    "digest": "d31948e661cc662675b0c079458f714a"
+  },
+  "zkapp-opt_signed-opt_signed": {
+    "constraints": 18001,
+    "public_input_size": 300,
+    "auxiliary_input_size": 91179,
+    "digest": "ddaa38405c20a8f7a7cf5235c1ed1713"
+  },
+  "zkapp-opt_signed": {
+    "constraints": 9781,
+    "public_input_size": 300,
+    "auxiliary_input_size": 49639,
+    "digest": "d048877d85e30a1ff9ff4cbdfcc33639"
+  },
+  "zkapp-proved": {
+    "constraints": 6003,
+    "public_input_size": 300,
+    "auxiliary_input_size": 48205,
+    "digest": "2d8810bdbda316e4b1f9f41ae1b28f6c"
+  }
+}
