@@ -171,6 +171,7 @@ assert_rosetta_binaries() {
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta"
     assert_file_captured "$captured_files" "usr/local/bin/mina-ocaml-signer"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-indexer-test"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-connectivity-test"
 }
 
 assert_rosetta_configs() {
@@ -350,6 +351,7 @@ MOCKEXE
     create_mock_exe "default/src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
     create_mock_exe "default/src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe"
     create_mock_exe "default/src/app/rosetta/indexer_test/indexer_test.exe"
+    create_mock_exe "default/src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe"
     create_mock_exe "default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
     create_mock_exe "default/src/app/generate_keypair/generate_keypair.exe"
     create_mock_exe "default/src/app/validate_keypair/validate_keypair.exe"

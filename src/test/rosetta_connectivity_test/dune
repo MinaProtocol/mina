@@ -1,0 +1,23 @@
+(executable
+ (name rosetta_connectivity_test)
+ (modes native)
+ (libraries
+  core_kernel
+  core
+  async
+  async_kernel
+  async_unix
+  async.async_command
+  base
+  cohttp
+  cohttp-async
+  uri
+  yojson
+  caqti
+  caqti-async
+  mina_caqti
+  mina_automation)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
