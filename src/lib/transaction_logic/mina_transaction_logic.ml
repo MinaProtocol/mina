@@ -572,13 +572,6 @@ module Make (L : Ledger_intf.S) :
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_nonce)
     in
-    (* Charge the fee. This must happen, whether or not the command itself
-       succeeds, to ensure that the network is compensated for processing this
-       command.
-    *)
-    let%bind () =
-      set_with_location ledger fee_payer_location fee_payer_account
-    in
     let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in
     let ok_or_reject = function Ok x -> x | Error err -> raise (Reject err) in
@@ -718,7 +711,15 @@ module Make (L : Ledger_intf.S) :
           ( { common = applied_common; body = applied_body }
             : Transaction_applied.Signed_command_applied.t )
     | Error failure ->
-        (* Do not update the ledger. Except for the fee payer which is already updated *)
+        (* Charge the fee. This must happen, whether or not the command itself
+           succeeds, to ensure that the network is compensated for processing
+           this command. On success the fee payer is written as part of the
+           command's updates, so it is charged here only when the command
+           fails and those updates are discarded.
+        *)
+        let%bind () =
+          set_with_location ledger fee_payer_location fee_payer_account
+        in
         let applied_common : Transaction_applied.Signed_command_applied.Common.t
             =
           { user_command =
