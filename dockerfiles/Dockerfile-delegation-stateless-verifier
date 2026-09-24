@@ -3,7 +3,7 @@
 # - builds stateless verification tool
 # - should not include any data related to joining a specific network, only the node software itself
 #################################################################################################
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm-slim
+ARG image=docker.io/library/debian:bookworm-slim
 FROM ${image}
 
 ARG deb_version
