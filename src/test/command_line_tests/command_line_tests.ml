@@ -993,6 +993,61 @@ module NodeStatusReport = struct
             Node_status_mock_server.stop mock )
 end
 
+(** Smoke test for [Runtime_config.gen_valid]: start a daemon on a random
+    config produced by the generator and wait for init. *)
+module RandomConfigStartup = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let runtime_config = Quickcheck.random_value Runtime_config.gen_valid in
+    let runtime_config =
+      let genesis_timestamp =
+        let now_unix_ts = Unix.time () |> Float.to_int in
+        let genesis_unix_ts = now_unix_ts - (now_unix_ts mod 60) + 120 in
+        Time.of_span_since_epoch (Time.Span.of_int_sec genesis_unix_ts)
+        |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+      in
+      let genesis =
+        match runtime_config.genesis with
+        | Some g ->
+            Some { g with genesis_state_timestamp = Some genesis_timestamp }
+        | None ->
+            Some
+              { k = None
+              ; delta = None
+              ; slots_per_epoch = None
+              ; slots_per_sub_window = None
+              ; grace_period_slots = None
+              ; genesis_state_timestamp = Some genesis_timestamp
+              }
+      in
+      { runtime_config with genesis }
+    in
+    Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_file ledger_file ;
+    let%bind process = Daemon.start daemon in
+    match%bind Daemon.wait_for_node_init process with
+    | Ok () ->
+        let%map () = Daemon.Client.stop_daemon process.client in
+        Mina_automation_fixture.Intf.Passed
+    | Error e ->
+        let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+        let%bind logs =
+          match%bind Sys.file_exists log_file with
+          | `Yes ->
+              Reader.file_contents log_file
+          | `No | `Unknown ->
+              Deferred.return ""
+        in
+        let%map _ = Daemon.Process.force_kill process in
+        Mina_automation_fixture.Intf.Failed
+          (Error.tag e
+             ~tag:
+               (sprintf "Daemon failed to initialise.\nDaemon logs:\n%s" logs) )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1131,5 +1186,15 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (NodeStatusReport) ) )
+        ] )
+    ; ( "random-config-startup"
+      , [ test_case
+            "The mina daemon initialises on a random Runtime_config.gen_valid \
+             config"
+            `Slow
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (RandomConfigStartup) ) )
         ] )
     ]
