@@ -65,7 +65,7 @@ let command
                   spec.preCommands
                 # RunInToolchain.runInDefaultToolchain
                     (   Benchmarks.toEnvList Benchmarks.Type::{=}
-                      # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
+                      # [ "BRANCH=\\\${BUILDKITE_BRANCH}"
                         ]
                       # DebianVersions.overrideEnvs
                     )
