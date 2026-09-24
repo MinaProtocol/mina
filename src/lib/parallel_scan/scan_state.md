@@ -129,33 +129,44 @@ For a given throughput, the latency (number of blocks before a new ledger proof 
 ## Types
 
 ```ocaml
+type 'base base_node = Empty | Full of { job : 'base; status : job_status }
 
-type 'd base =
-    | Empty
-    | Full of ('d * sequence_number)
+type 'merge merge_node =
+  | Empty
+  | Part of 'merge
+  | Full of { left : 'merge; right : 'merge }
 
-type 'a merge =
-    | Empty
-    | Part of 'a
-    | Full of ('a * 'a * sequence_number)
+(* A tree is held flat: its nodes sit in arrays indexed by level and position,
+   rather than as a nested type whose shape doubles at every level. Access to a
+   node is arithmetic on its index, so updating a level costs a walk over a
+   slice of an array. *)
+type ('merge, 'base) tree =
+  { merges : 'merge merge_node array
+  ; bases : 'base base_node array
+  ; digests : hash array   (* one per node, maintained as the tree is filled *)
+  ; filled : int
+  ; level : int
+  ; proved : int
+  }
 
+type ('merge, 'base) t =
+  { trees : ('merge, 'base) tree list
+  ; acc : ('merge * 'base list) option
+      (* last emitted proof and the corresponding transactions *)
+  ; max_base_jobs : int (* 2**transaction_capacity_log_2 *)
+  ; delay : int
+  }
 
-type ('a, 'd) tree = Base of 'd | Merge of 'a * ('a * 'a, 'd * 'd) tree
-(*This structure works well because we always complete all the nodes on a specific level before proceeding to the next level and therefore O(log n) access for updating any number of nodes *)
-
-type ('a, 'd) t =
-    {trees: ('a merge, 'd base) tree list
-    ; acc: int * ('a * 'd list) option
-    (* last emitted proof and the corresponding transactions*)
-    ; curr_job_seq_no: int
-    (* Sequence number for the jobs added every block*)
-    ; max_base_jobs: int
-    (* 2**transaction_capacity_log_2*)
-    ; delay: int }
-
-val update :: ('a, 'd) t -> data:'d list -> work:'a list -> ('a, 'd) t
-(*T(n) = O((log n)^2) *)
-
-...
-
+val update : ('merge, 'base) t -> data:'base list -> completed_jobs:'merge list
+  -> ('merge, 'base) t Or_error.t
 ```
+
+There is no sequence number. Jobs were once numbered so that the work a block
+required could be named by a range of them; the flat representation names a job
+by its position instead, which is what the sync protocol quotes when it asks a
+peer for part of a tree.
+
+Each node carries a digest, so the hash of a scan state is a Merkle root over
+the forest rather than a fold over its contents. That is what lets a node
+verify a fragment of someone else's scan state without holding the whole of it.
+

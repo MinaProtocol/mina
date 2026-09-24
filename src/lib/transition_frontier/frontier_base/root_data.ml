@@ -2,19 +2,15 @@ open Core
 open Mina_base
 
 module Common = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V3 = struct
-      type t =
-        { scan_state : Staged_ledger.Scan_state.Stable.V3.t
-        ; pending_coinbase : Pending_coinbase.Stable.V2.t
-        }
-
-      let to_latest = Fn.id
-    end
-  end]
+  (* Unversioned, following the scan state it carries: this is written to the
+     frontier's own database, which versions itself, and never sent to a peer. *)
+  module Stored = struct
+    type t =
+      { scan_state : Staged_ledger.Scan_state.Stored.t
+      ; pending_coinbase : Pending_coinbase.Stable.V2.t
+      }
+    [@@deriving bin_io_unversioned]
+  end
 
   type t =
     { scan_state : Staged_ledger.Scan_state.t
@@ -35,7 +31,7 @@ module Common = struct
   let pending_coinbase t = t.pending_coinbase
 
   let read_all_proofs_from_disk { scan_state; pending_coinbase } =
-    { Stable.Latest.pending_coinbase
+    { Stored.pending_coinbase
     ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
     }
 end
@@ -70,30 +66,24 @@ module Historical = struct
 end
 
 module Limited = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+  (* Unversioned, following the common data it carries. *)
+  module Stored = struct
+    type t =
+      { transition : Mina_block.Validated.Stable.V3.t
+      ; protocol_states :
+          Mina_state.Protocol_state.Value.Stable.V3.t
+          Mina_base.State_hash.With_state_hashes.Stable.V1.t
+          list
+      ; common : Common.Stored.t
+      }
+    [@@deriving bin_io_unversioned, fields]
 
-    module V4 = struct
-      type t =
-        { transition : Mina_block.Validated.Stable.V3.t
-        ; protocol_states :
-            Mina_state.Protocol_state.Value.Stable.V3.t
-            Mina_base.State_hash.With_state_hashes.Stable.V1.t
-            list
-        ; common : Common.Stable.V3.t
-        }
-      [@@deriving fields]
+    let hashes t = Mina_block.Validated.Stable.Latest.hashes t.transition
 
-      let to_latest = Fn.id
-
-      let hashes t = Mina_block.Validated.Stable.Latest.hashes t.transition
-
-      let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
-        let common = { Common.Stable.V3.scan_state; pending_coinbase } in
-        { transition; common; protocol_states }
-    end
-  end]
+    let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
+      let common = { Common.Stored.scan_state; pending_coinbase } in
+      { transition; common; protocol_states }
+  end
 
   type t =
     { transition : Mina_block.Validated.t
@@ -124,25 +114,19 @@ module Limited = struct
 end
 
 module Minimal = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+  (* Unversioned, following the common data it carries. *)
+  module Stored = struct
+    type t = { hash : State_hash.Stable.V1.t; common : Common.Stored.t }
+    [@@deriving bin_io_unversioned, fields]
 
-    module V3 = struct
-      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
-      [@@deriving fields]
+    let of_limited ~common hash = { hash; common }
 
-      let of_limited ~common hash = { hash; common }
+    let common t = t.common
 
-      let to_latest = Fn.id
+    let scan_state t = t.common.Common.Stored.scan_state
 
-      let common t = t.common
-
-      let scan_state t = t.common.Common.Stable.Latest.scan_state
-
-      let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
-    end
-  end]
+    let pending_coinbase t = t.common.Common.Stored.pending_coinbase
+  end
 
   type t = { hash : State_hash.t; common : Common.t } [@@deriving fields]
 
@@ -176,7 +160,7 @@ module Minimal = struct
 
   let read_all_proofs_from_disk
       { hash; common = { scan_state; pending_coinbase } } =
-    { Stable.Latest.hash
+    { Stored.hash
     ; common =
         { pending_coinbase
         ; scan_state =

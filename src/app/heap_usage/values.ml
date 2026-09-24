@@ -71,12 +71,11 @@ let applied = Mina_base.Transaction_status.Applied
 let mk_scan_state_base_node
     (varying : Mina_transaction_logic.Transaction_applied.Varying.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
-    Transaction_snark_scan_state.Transaction_with_witness.t Parallel_scan.Base.t
-    =
-  let weight : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
-  let job :
+    Transaction_snark_scan_state.Transaction_with_witness.t
+    Parallel_scan.Base_node.t =
+  let node :
       Transaction_snark_scan_state.Transaction_with_witness.t
-      Parallel_scan.Base.Job.t =
+      Parallel_scan.Base_node.t =
     let get = Quickcheck.random_value in
     let state_hash = get Mina_base.State_hash.gen in
     let state_body_hash = get Mina_base.State_body_hash.gen in
@@ -134,12 +133,9 @@ let mk_scan_state_base_node
         ~second_pass_ledger_witness:ledger_witness
         ~block_global_slot:Mina_numbers.Global_slot_since_genesis.zero
     in
-    let record : _ Parallel_scan.Base.Record.t =
-      { job; seq_no = 1; status = Todo }
-    in
-    Full record
+    Parallel_scan.Base_node.Full { job; status = Todo }
   in
-  (weight, job)
+  node
 
 let scan_state_base_node_coinbase =
   let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
@@ -227,13 +223,11 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
   mk_scan_state_base_node varying ~constraint_constants
 
 let scan_state_merge_node ~proof_cache_db :
-    Transaction_snark_scan_state.Ledger_proof_with_hash.t Parallel_scan.Merge.t
-    =
-  let weight1 : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
-  let weight2 : Parallel_scan.Weight.t = { base = 88; merge = 77 } in
-  let job :
+    Transaction_snark_scan_state.Ledger_proof_with_hash.t
+    Parallel_scan.Merge_node.t =
+  let node :
       Transaction_snark_scan_state.Ledger_proof_with_hash.t
-      Parallel_scan.Merge.Job.t =
+      Parallel_scan.Merge_node.t =
     let left =
       let sok_msg : Mina_base.Sok_message.t =
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
@@ -267,9 +261,9 @@ let scan_state_merge_node ~proof_cache_db :
       Transaction_snark_scan_state.Ledger_proof_with_hash.create
         (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
     in
-    Full { left; right; seq_no = 1; status = Todo }
+    Parallel_scan.Merge_node.Full { left; right }
   in
-  ((weight1, weight2), job)
+  node
 
 let protocol_state =
   (* size is fixed *)

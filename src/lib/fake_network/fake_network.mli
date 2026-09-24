@@ -44,10 +44,6 @@ include sig
          ( Rpcs.Get_some_initial_peers.query
          , Rpcs.Get_some_initial_peers.response )
          Gossip_net.Fake.rpc_mock
-    -> ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
-         ( Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-         , Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
-         Gossip_net.Fake.rpc_mock
     -> ?answer_sync_ledger_query:
          ( Rpcs.Answer_sync_ledger_query.query
          , Rpcs.Answer_sync_ledger_query.response )

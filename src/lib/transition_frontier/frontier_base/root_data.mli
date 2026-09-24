@@ -1,18 +1,16 @@
+open Core
 open Mina_base
 
 module Common : sig
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  module Stored : sig
+    type t
 
-    module V3 : sig
-      type t
-    end
-  end]
+    include Binable.S with type t := t
+  end
 
   type t
 
-  val read_all_proofs_from_disk : t -> Stable.V3.t
+  val read_all_proofs_from_disk : t -> Stored.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -36,34 +34,31 @@ end
 (* Limited root data is similar to Minimal root data, except that it contains
  * the full validated transition at a root instead of just a pointer to one and protocol states for the root scan state *)
 module Limited : sig
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  module Stored : sig
+    type t
 
-    module V4 : sig
-      type t
+    include Binable.S with type t := t
 
-      val hashes : t -> State_hash.State_hashes.Stable.V1.t
+    val hashes : t -> State_hash.State_hashes.Stable.V1.t
 
-      val common : t -> Common.Stable.V3.t
+    val common : t -> Common.Stored.t
 
-      val protocol_states :
-           t
-        -> Mina_state.Protocol_state.Value.Stable.V3.t
-           Mina_base.State_hash.With_state_hashes.Stable.V1.t
+    val protocol_states :
+         t
+      -> Mina_state.Protocol_state.Value.Stable.V3.t
+         Mina_base.State_hash.With_state_hashes.Stable.V1.t
+         list
+
+    val create :
+         transition:Mina_block.Validated.Stable.V3.t
+      -> scan_state:Staged_ledger.Scan_state.Stored.t
+      -> pending_coinbase:Pending_coinbase.Stable.V2.t
+      -> protocol_states:
+           Mina_state.Protocol_state.value
+           State_hash.With_state_hashes.Stable.V1.t
            list
-
-      val create :
-           transition:Mina_block.Validated.Stable.V3.t
-        -> scan_state:Staged_ledger.Scan_state.Stable.V3.t
-        -> pending_coinbase:Pending_coinbase.Stable.V2.t
-        -> protocol_states:
-             Mina_state.Protocol_state.value
-             State_hash.With_state_hashes.Stable.V1.t
-             list
-        -> t
-    end
-  end]
+      -> t
+  end
 
   type t [@@deriving to_yojson]
 
@@ -95,24 +90,21 @@ end
  * pending_coinbase).
  *)
 module Minimal : sig
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  module Stored : sig
+    type t
 
-    module V3 : sig
-      type t
+    include Binable.S with type t := t
 
-      val hash : t -> State_hash.t
+    val hash : t -> State_hash.t
 
-      val of_limited : common:Common.Stable.V3.t -> State_hash.Stable.V1.t -> t
+    val of_limited : common:Common.Stored.t -> State_hash.Stable.V1.t -> t
 
-      val common : t -> Common.Stable.V3.t
+    val common : t -> Common.Stored.t
 
-      val scan_state : t -> Staged_ledger.Scan_state.Stable.V3.t
+    val scan_state : t -> Staged_ledger.Scan_state.Stored.t
 
-      val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
-    end
-  end]
+    val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+  end
 
   type t
 
@@ -137,7 +129,7 @@ module Minimal : sig
     -> pending_coinbase:Pending_coinbase.t
     -> t
 
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
+  val read_all_proofs_from_disk : t -> Stored.t
 end
 
 type t =
