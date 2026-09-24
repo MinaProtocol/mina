@@ -73,7 +73,7 @@ module Worker_state = struct
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string
-    ; signature_kind : Mina_signature_kind_type.t
+    ; signature_kind : Mina_signature_kind.t
     }
   [@@deriving bin_io_unversioned]
 
