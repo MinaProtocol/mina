@@ -868,15 +868,6 @@ struct
     | Pickles_types.Opt.Just x ->
         Pickles_types.Opt.Just (f sponge x)
 
-  (** Generate constraints for incremental verification of a step proof.
-
-      This function builds constraints that reconstruct the Fiat-Shamir
-      transcript and verify the IPA opening proof. It handles lookup
-      arguments when present.
-
-      Type parameters:
-      - [b]: Number of proofs verified (type-level nat)
-  *)
   (* The public input's commitment, [x_hat] before blinding: the constant inputs' Lagrange
      bases summed with the variable inputs' scaled bases, negated. The bases come from the
      active branch's step domain, selected under [which_branch]. *)
@@ -959,6 +950,15 @@ struct
                              g x ~num_bits ) ) ) ) )
     |> Array.map ~f:Inner_curve.negate
 
+  (** Generate constraints for incremental verification of a step proof.
+
+      This function builds constraints that reconstruct the Fiat-Shamir
+      transcript and verify the IPA opening proof. It handles lookup
+      arguments when present.
+
+      Type parameters:
+      - [b]: Number of proofs verified (type-level nat)
+  *)
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
