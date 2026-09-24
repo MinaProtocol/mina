@@ -6,7 +6,7 @@ val s3_keys_bucket_prefix : string
 
 val manual_install_path : string
 
-val brew_install_path : string
+val brew_install_paths : string list
 
 val cache : Key_cache.Spec.t list
 
