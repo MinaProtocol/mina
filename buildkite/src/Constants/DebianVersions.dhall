@@ -116,6 +116,29 @@ let dirtyWhen =
             }
             debVersion
 
+let dockerDirtyWhen =
+    -- Strictly what a docker-image job reads: the Dockerfiles, the image build
+    -- scripts, and the Dhall that defines the image steps.
+    --
+    -- It deliberately does NOT list the compile inputs (src, Makefile,
+    -- buildkite/scripts/build-artifact.sh). A docker step never compiles; it
+    -- installs the .deb the debian build already wrote to the local cache
+    -- (DebianRepo.Type.Local). A source-only change therefore rebuilds the
+    -- package but leaves the images alone.
+    --
+    -- Nor does it list the tests. A test that genuinely needs an image names it
+    -- in depends_on, and monorepo.sh phase 2 pulls this job in regardless of
+    -- this list.
+      [ S.strictlyStart (S.contains "dockerfiles")
+      , S.strictlyStart (S.contains "scripts/docker")
+      , S.exactly "buildkite/src/Command/DockerImage" "dhall"
+      , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
+      , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
+      , S.exactly "buildkite/src/Constants/Artifacts" "dhall"
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
+      ]
+
 let overrideEnvs = [ "OVERRIDE_TAG", "OVERRIDE_GITHASH", "SKIP_GITBRANCH" ]
 
 in  { DebVersion = DebVersion
@@ -123,6 +146,7 @@ in  { DebVersion = DebVersion
     , lowerName = lowerName
     , dependsOn = dependsOn
     , dirtyWhen = dirtyWhen
+    , dockerDirtyWhen = dockerDirtyWhen
     , DepsSpec = DepsSpec
     , overrideEnvs = overrideEnvs
     }
