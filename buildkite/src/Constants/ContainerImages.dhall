@@ -5,8 +5,7 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 =
-        "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet"
     , arm64 =
         "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet-arm64"
     }
