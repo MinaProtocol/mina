@@ -103,6 +103,23 @@ BEGIN
         );
     ELSIF
         latest_protocol_version = target_protocol_version AND
+        latest_migration_version < target_migration_version
+    THEN
+        -- An earlier revision of this script already ran. Its steps are
+        -- idempotent, so record a new attempt and apply them again.
+        RAISE NOTICE
+          'Advancing migration version % -> % for protocol version %',
+          latest_migration_version, target_migration_version, target_protocol_version;
+        INSERT INTO migration_history(
+            protocol_version, migration_version, description, status
+        ) VALUES (
+            target_protocol_version,
+            target_migration_version,
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'starting'::migration_status
+        );
+    ELSIF
+        latest_protocol_version = target_protocol_version AND
         latest_migration_version = target_migration_version
     THEN
         RAISE NOTICE
@@ -119,9 +136,10 @@ END$$;
 
 -- 2. Drop the user_commands account indexes added by upgrade.sql
 --
--- DROP INDEX takes a brief exclusive lock on user_commands; the lock_timeout
--- above makes it give up rather than queue behind long-running reads. On a live
--- archive, DROP INDEX CONCURRENTLY (outside this script) avoids the lock.
+-- DROP INDEX takes an ACCESS EXCLUSIVE lock on user_commands. lock_timeout
+-- above bounds how long it waits for that lock (it can queue behind running
+-- reads until then), not how long it is held. On a live archive,
+-- DROP INDEX CONCURRENTLY outside this script avoids the wait entirely.
 DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
 DROP INDEX IF EXISTS idx_user_commands_source_id;
 DROP INDEX IF EXISTS idx_user_commands_receiver_id;

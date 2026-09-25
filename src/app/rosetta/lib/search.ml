@@ -535,19 +535,22 @@ module Sql = struct
             ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
-    (* One account bounds the result only when an account or address filter is
-       present and filters are combined with AND (the default). With OR, rows
-       matching any other filter are returned too, so no single account can
-       drive the query. *)
+    (* A conservative test for "one account bounds the result, and nothing
+       bounds it better". An account or address filter combined with AND does.
+       An AND-combined transaction hash is unique, so the command-driven join
+       reaches the row through user_commands_hash_key instead. Some OR requests
+       also reduce to a single account, but they keep the command-driven join
+       rather than making this condition track sql_filters. *)
     let by_account { Transaction_query.operator; filter; _ } =
       let has_account =
         Option.is_some filter.Transaction_query.Filter.account_identifier
         || Option.is_some filter.address
       in
+      let has_txn_hash = Option.is_some filter.transaction_hash in
       let conjunctive =
         match operator with None | Some `And -> true | Some `Or -> false
       in
-      has_account && conjunctive
+      has_account && conjunctive && not has_txn_hash
 
     let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
       let open Deferred.Result.Let_syntax in
