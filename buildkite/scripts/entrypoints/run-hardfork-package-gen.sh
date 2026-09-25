@@ -102,6 +102,13 @@ if [[ -n "${GENESIS_TIMESTAMP:-}" && ! "${GENESIS_TIMESTAMP}" =~ Z$ ]]; then
   usage "GENESIS_TIMESTAMP must be in UTC format (ending with 'Z'), got: ${GENESIS_TIMESTAMP}"
 fi
 
+# Pin the git identity before uploading the pipeline whose jobs read it.
+# USE_ARTIFACTS_FROM_BUILDKITE_BUILD, when set, is the build the binaries come
+# from, so the identity is its rather than this checkout's. Must run before the
+# rewrite below turns that variable into a Dhall Optional.
+MINA_READ_CACHE_ROOT="${USE_ARTIFACTS_FROM_BUILDKITE_BUILD:-}" \
+  ./buildkite/scripts/git-env/pin.sh
+
 # Format GENESIS_TIMESTAMP as Optional Text for Dhall
 if [[ -z "${GENESIS_TIMESTAMP:-}" ]]; then
   GENESIS_TIMESTAMP="(None Text)"
