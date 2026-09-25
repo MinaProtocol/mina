@@ -93,30 +93,22 @@ Example of usage:
 
 ```
   
-### missing block auditor
-
-Missing block auditor is an shell script which detect any gaps in database that can be fixed with missing block guardian. Currently it is used as a sub component for missing_blocks_guardian app so there is no features rather than path to app detection
-
-
 ### missing block guardian
 
-Missing block guardian fills gaps of archive database
+Missing block guardian reports the gaps of an archive database and fills them
+from a block source. It is one executable: `run_mode = Audit` only reports,
+`run_mode = Run` also downloads and adds the missing blocks. There is no
+separate missing block auditor module any more.
 
 Example of usage:
 
 ```
-  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.standalone_path_exn 
-
-  let%bind archive_blocks_path =  Archive_blocks.standalone_path_exn in
-
   let config =
     { Missing_blocks_guardian.Config.archive_uri = Uri.of_string target_db
     ; precomputed_blocks = Uri.make ~scheme:"file" ~path:output_folder ()
     ; network = network_name
     ; run_mode = Run
-    ; missing_blocks_auditor = missing_blocks_auditor_path
-    ; archive_blocks = archive_blocks_path
-    ; block_format = Extensional
+    ; block_format = `Extensional
     } in
 
   let missing_blocks_guardian =
