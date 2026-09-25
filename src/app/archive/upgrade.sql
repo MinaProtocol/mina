@@ -103,6 +103,23 @@ BEGIN
         );
     ELSIF
         latest_protocol_version = target_protocol_version AND
+        latest_migration_version < target_migration_version
+    THEN
+        -- An earlier revision of this script already ran. Its steps are
+        -- idempotent, so record a new attempt and apply them again.
+        RAISE NOTICE
+          'Advancing migration version % -> % for protocol version %',
+          latest_migration_version, target_migration_version, target_protocol_version;
+        INSERT INTO migration_history(
+            protocol_version, migration_version, description, status
+        ) VALUES (
+            target_protocol_version,
+            target_migration_version,
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}.',
+            'starting'::migration_status
+        );
+    ELSIF
+        latest_protocol_version = target_protocol_version AND
         latest_migration_version = target_migration_version
     THEN
         IF latest_migration_status = 'failed'::migration_status THEN
@@ -125,52 +142,91 @@ END$$;
 -- Account lookups filter on fee_payer_id, source_id and receiver_id (e.g.
 -- Rosetta's /search/transactions) and otherwise scan the whole table.
 --
--- The catalog is checked first, so an index that is already present costs
--- nothing: CREATE INDEX IF NOT EXISTS would still take a SHARE lock on
--- user_commands before noticing it exists, which on a live archive waits for
--- and queues behind writers. An index left INVALID by an interrupted
--- CREATE INDEX CONCURRENTLY is rebuilt instead of being silently kept.
+-- Each part below is its own statement, so no lock is carried across them.
+-- An index that is already valid is skipped entirely: CREATE INDEX IF NOT
+-- EXISTS would still take a SHARE lock on user_commands before noticing that
+-- the index exists, which on a live archive waits for, and queues behind,
+-- writers.
 --
--- A build blocks inserts into user_commands (not reads) for its whole duration,
--- about ten seconds per index on a mainnet-sized archive. To avoid even that,
--- create them on the running archive first:
+-- Building an index takes a SHARE lock: reads continue, inserts into
+-- user_commands wait until the build finishes (order of ten seconds on an
+-- archive with ~10M user commands, and it grows with the table). To avoid
+-- blocking writers at all, create them on the running archive first:
 --   CREATE INDEX CONCURRENTLY idx_user_commands_fee_payer_id ON user_commands(fee_payer_id);
 --   CREATE INDEX CONCURRENTLY idx_user_commands_source_id    ON user_commands(source_id);
 --   CREATE INDEX CONCURRENTLY idx_user_commands_receiver_id  ON user_commands(receiver_id);
--- after which this step is only a catalog check.
-CREATE FUNCTION pg_temp.ensure_user_commands_index(p_index TEXT, p_column TEXT)
-RETURNS VOID AS $$
+-- after which this step only reads the catalog.
+
+-- 2a. Stop if one of the names is taken by a different index, rather than
+-- silently accepting it as ours.
+DO $$
 DECLARE
-    is_valid BOOLEAN;
+    mismatched text;
 BEGIN
-    SELECT i.indisvalid INTO is_valid
-    FROM pg_index i
-    JOIN pg_class c ON c.oid = i.indexrelid
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = p_index;
+    SELECT string_agg(c.relname, ', ')
+    INTO mismatched
+    FROM (VALUES
+        ('idx_user_commands_fee_payer_id', 'fee_payer_id'),
+        ('idx_user_commands_source_id', 'source_id'),
+        ('idx_user_commands_receiver_id', 'receiver_id')
+    ) AS wanted(index_name, column_name)
+    JOIN pg_class c ON c.relname = wanted.index_name
+    JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+    JOIN pg_index i ON i.indexrelid = c.oid
+    WHERE i.indrelid <> 'public.user_commands'::regclass
+       OR i.indpred IS NOT NULL
+       OR i.indexprs IS NOT NULL
+       OR c.relam <> (SELECT oid FROM pg_am WHERE amname = 'btree')
+       OR i.indnatts <> 1
+       OR i.indkey[0] <> (SELECT attnum FROM pg_attribute
+                          WHERE attrelid = 'public.user_commands'::regclass
+                            AND attname = wanted.column_name);
 
-    IF is_valid THEN
-        RAISE DEBUG 'Index % already present and valid', p_index;
-        RETURN;
+    IF mismatched IS NOT NULL THEN
+        RAISE EXCEPTION
+          'index name(s) % already used by a different index; drop them before migrating',
+          mismatched;
     END IF;
+END $$;
 
-    IF is_valid IS NOT NULL THEN
-        RAISE NOTICE 'Rebuilding invalid index %', p_index;
-        EXECUTE format('DROP INDEX public.%I', p_index);
-    END IF;
+-- 2b. Drop leftovers of an interrupted CREATE INDEX CONCURRENTLY: PostgreSQL
+-- keeps those as INVALID and never uses them for reads. This takes a brief
+-- ACCESS EXCLUSIVE lock on user_commands (lock_timeout above bounds the wait
+-- for it) and commits here, so the build below does not hold it.
+DO $$
+DECLARE
+    invalid_index text;
+BEGIN
+    FOR invalid_index IN
+        SELECT c.relname
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indexrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+        WHERE NOT i.indisvalid
+          AND c.relname IN ('idx_user_commands_fee_payer_id',
+                            'idx_user_commands_source_id',
+                            'idx_user_commands_receiver_id')
+    LOOP
+        RAISE NOTICE 'Dropping invalid index %', invalid_index;
+        EXECUTE format('DROP INDEX public.%I', invalid_index);
+    END LOOP;
+END $$;
 
-    EXECUTE format('CREATE INDEX %I ON public.user_commands(%I)', p_index, p_column);
-
-EXCEPTION
-    WHEN OTHERS THEN
-        PERFORM pg_temp.set_migration_status('failed'::migration_status);
-        RAISE EXCEPTION 'An error occurred while creating index %: %', p_index, SQLERRM;
-END
-$$ LANGUAGE plpgsql;
-
-SELECT pg_temp.ensure_user_commands_index('idx_user_commands_fee_payer_id', 'fee_payer_id');
-SELECT pg_temp.ensure_user_commands_index('idx_user_commands_source_id', 'source_id');
-SELECT pg_temp.ensure_user_commands_index('idx_user_commands_receiver_id', 'receiver_id');
+-- 2c. Create whatever is still missing. \gexec runs each generated statement on
+-- its own, so nothing is issued (and no lock taken) when all three are present.
+SELECT format('CREATE INDEX %I ON public.user_commands(%I)', wanted.index_name, wanted.column_name)
+FROM (VALUES
+    ('idx_user_commands_fee_payer_id', 'fee_payer_id'),
+    ('idx_user_commands_source_id', 'source_id'),
+    ('idx_user_commands_receiver_id', 'receiver_id')
+) AS wanted(index_name, column_name)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+    WHERE c.relname = wanted.index_name
+)
+\gexec
 
 -- 3. Update schema_history
 
