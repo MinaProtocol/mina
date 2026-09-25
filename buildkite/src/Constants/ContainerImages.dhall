@@ -4,19 +4,18 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet"
     , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:586ea35-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:586ea35-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:586ea35-jammy-devnet"
 , minaToolchain =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
+    "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet"
 , postgres = "docker.io/library/postgres:12.4-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
