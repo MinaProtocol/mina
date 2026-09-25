@@ -2,8 +2,8 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+# Supports docker.io/library/debian:bullseye-slim, and docker.io/library/ubuntu:focal
+ARG image=docker.io/library/ubuntu:focal
 ARG deb_codename
 ARG apt_cache_url=""
 

@@ -2,8 +2,7 @@
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBookworm
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
-{ toolchainBase =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
+{ toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
     { amd64 = "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet"
     , arm64 =
@@ -17,9 +16,7 @@
     "docker.io/minaprotocol/mina-toolchain:586ea35-jammy-devnet"
 , minaToolchain =
     "docker.io/minaprotocol/mina-toolchain:586ea35-bookworm-devnet"
-, postgres =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
-, xrefcheck =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
+, postgres = "docker.io/library/postgres:12.4-alpine"
+, xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
 }

@@ -23,6 +23,7 @@ services:
     image: '${MINA_PROVISION_IMAGE}'
     environment:
       MINA_NETWORK: ${MINA_NETWORK}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
     command:
       - archive
       # Leave an existing archive alone. Without this, every `compose down &&
@@ -30,7 +31,7 @@ services:
       # advanced since, losing the blocks collected in between.
       - --if-present=skip
       - --pg-uri
-      - postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - postgres://${POSTGRES_USER}@postgres:5432/${POSTGRES_DB}
       - --work-dir
       - /tmp
     depends_on:
@@ -83,6 +84,7 @@ services:
       bash -c '
         mina daemon --archive-address mina_archive:${MINA_ARCHIVE_PORT} \
              --peer-list-url ${MINA_PEERLIST_URL} \
+             --external-port ${MINA_P2P_PORT} \
              --insecure-rest-server \
              --rest-port ${MINA_REST_PORT}
       '
@@ -92,27 +94,5 @@ services:
       - '${MINA_REST_PORT}:${MINA_REST_PORT}'
       - '${MINA_P2P_PORT}:${MINA_P2P_PORT}'
     depends_on:
-      bootstrap_db:
-        condition: service_completed_successfully
-
-  mina_rosetta:
-    image: '${MINA_ROSETTA_IMAGE}'
-    restart: always
-    environment:
-      MINA_ROSETTA_MAX_DB_POOL_SIZE: ${MINA_ROSETTA_MAX_DB_POOL_SIZE}
-      MINA_ROSETTA_PG_DATA_INTERVAL: ${MINA_ROSETTA_PG_DATA_INTERVAL}
-    volumes:
-      - './mina_rosetta/.mina-config:/root/.mina-config'
-    entrypoint: []
-    command: >
-      bash -c '
-        mina-rosetta --port ${MINA_ROSETTA_PORT} \
-             --archive-uri postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} \
-             --graphql-uri http://mina_node:${MINA_REST_PORT}/graphql \
-             --log-level Info
-      '
-    ports:
-      - '${MINA_ROSETTA_PORT}:${MINA_ROSETTA_PORT}'
-    depends_on:
-      bootstrap_db:
-        condition: service_completed_successfully
+      mina_archive:
+        condition: service_started
