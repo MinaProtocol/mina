@@ -1,8 +1,9 @@
 -- =============================================================================
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
+-- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + record status in migration_history
 --
--- 5.0.0 needs no schema change yet. Add them here as they land, and bump
+-- Add further 5.0.0 schema changes here as they land, and bump
 -- archive.migration_version below.
 -- =============================================================================
 
@@ -22,7 +23,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '5.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.1';
+SET archive.migration_version = '0.0.2';
 
 -- TODO: put below in a common script
 
@@ -97,7 +98,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. No schema change.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}.',
             'starting'::migration_status
         );
     ELSIF
@@ -119,7 +120,59 @@ BEGIN
     END IF;
 END$$;
 
--- 2. Update schema_history
+-- 2. Index the user_commands account columns
+--
+-- Account lookups filter on fee_payer_id, source_id and receiver_id (e.g.
+-- Rosetta's /search/transactions) and otherwise scan the whole table.
+--
+-- The catalog is checked first, so an index that is already present costs
+-- nothing: CREATE INDEX IF NOT EXISTS would still take a SHARE lock on
+-- user_commands before noticing it exists, which on a live archive waits for
+-- and queues behind writers. An index left INVALID by an interrupted
+-- CREATE INDEX CONCURRENTLY is rebuilt instead of being silently kept.
+--
+-- A build blocks inserts into user_commands (not reads) for its whole duration,
+-- about ten seconds per index on a mainnet-sized archive. To avoid even that,
+-- create them on the running archive first:
+--   CREATE INDEX CONCURRENTLY idx_user_commands_fee_payer_id ON user_commands(fee_payer_id);
+--   CREATE INDEX CONCURRENTLY idx_user_commands_source_id    ON user_commands(source_id);
+--   CREATE INDEX CONCURRENTLY idx_user_commands_receiver_id  ON user_commands(receiver_id);
+-- after which this step is only a catalog check.
+CREATE FUNCTION pg_temp.ensure_user_commands_index(p_index TEXT, p_column TEXT)
+RETURNS VOID AS $$
+DECLARE
+    is_valid BOOLEAN;
+BEGIN
+    SELECT i.indisvalid INTO is_valid
+    FROM pg_index i
+    JOIN pg_class c ON c.oid = i.indexrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = p_index;
+
+    IF is_valid THEN
+        RAISE DEBUG 'Index % already present and valid', p_index;
+        RETURN;
+    END IF;
+
+    IF is_valid IS NOT NULL THEN
+        RAISE NOTICE 'Rebuilding invalid index %', p_index;
+        EXECUTE format('DROP INDEX public.%I', p_index);
+    END IF;
+
+    EXECUTE format('CREATE INDEX %I ON public.user_commands(%I)', p_index, p_column);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred while creating index %: %', p_index, SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_fee_payer_id', 'fee_payer_id');
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_source_id', 'source_id');
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_receiver_id', 'receiver_id');
+
+-- 3. Update schema_history
 
 DO $$
 BEGIN
