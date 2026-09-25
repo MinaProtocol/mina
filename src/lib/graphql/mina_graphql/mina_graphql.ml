@@ -2729,10 +2729,11 @@ module Queries = struct
       ~typ:(non_null Types.json)
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
-        let open Deferred.Result.Let_syntax in
-        Mina_lib.prover mina |> Prover.get_blockchain_verification_key
-        |> Deferred.Result.map_error ~f:Error.to_string_hum
-        >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
+        (* Reads the key the verifier was built from rather than asking the
+           prover, so that querying this does not oblige a node to run one. *)
+        Mina_lib.blockchain_verification_key mina
+        |> Pickles.Verification_key.to_yojson |> Yojson.Safe.to_basic
+        |> Deferred.Result.return )
 
   let network_id =
     field "networkID"
