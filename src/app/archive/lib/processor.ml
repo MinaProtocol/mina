@@ -4837,18 +4837,30 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       | Ok () ->
           () )
 
-let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
-    ~block_window_duration_ms pool =
+(* The metrics server is created before the RPC handlers are installed, rather
+   than alongside the polling loop that fills the gauges, because the handlers
+   record into the same registry. A consequence is that the metrics endpoint
+   answers earlier than it used to: from before the genesis ledger is
+   imported, rather than after. *)
+let create_metrics_server ~logger ~metrics_server_port =
   match metrics_server_port with
   | None ->
-      return ()
+      return None
   | Some port ->
+      let%map metric_server =
+        Mina_metrics.Archive.create_archive_server ~port ~logger ()
+      in
+      Some metric_server
+
+let serve_metrics_server ~logger ~metric_server ~missing_blocks_width
+    ~block_window_duration_ms pool =
+  match metric_server with
+  | None ->
+      return ()
+  | Some metric_server ->
       let missing_blocks_width =
         Option.value ~default:Metrics.default_missing_blocks_width
           missing_blocks_width
-      in
-      let%map metric_server =
-        Mina_metrics.Archive.create_archive_server ~port ~logger ()
       in
       let interval =
         Time.Span.of_ms @@ Float.of_int (block_window_duration_ms * 2)
@@ -4867,6 +4879,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
     =
+  let%bind metric_server = create_metrics_server ~logger ~metrics_server_port in
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4877,15 +4890,26 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
   let extensional_block_reader, extensional_block_writer =
     Strict_pipe.create ~name:"extensional_archive_block" Synchronous
   in
+  (* Each handler is timed as a whole, so the histogram records the span the
+     sender waits for, not the span the database write takes. A [Synchronous]
+     pipe does not acknowledge a write until the reader has taken it, and the
+     reader handles one block at a time, so this span already includes waiting
+     for whatever the archive was doing before. *)
+  let time_ingest = Metrics.time_ingest metric_server in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
-          Strict_pipe.Writer.write writer archive_diff )
+          time_ingest ~source:"diff" (fun () ->
+              Strict_pipe.Writer.write writer archive_diff ) )
     ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
         (fun () precomputed_block ->
-          Strict_pipe.Writer.write precomputed_block_writer precomputed_block )
+          time_ingest ~source:"precomputed" (fun () ->
+              Strict_pipe.Writer.write precomputed_block_writer
+                precomputed_block ) )
     ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
         (fun () extensional_block ->
-          Strict_pipe.Writer.write extensional_block_writer extensional_block )
+          time_ingest ~source:"extensional" (fun () ->
+              Strict_pipe.Writer.write extensional_block_writer
+                extensional_block ) )
     ]
   in
   match Mina_caqti.connect_pool ~max_size:30 postgres_address with
@@ -4972,7 +4996,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
                      Deferred.unit ) ) )
       |> don't_wait_for ;
       (*Update archive metrics*)
-      serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+      serve_metrics_server ~logger ~metric_server ~missing_blocks_width
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
       |> don't_wait_for ;

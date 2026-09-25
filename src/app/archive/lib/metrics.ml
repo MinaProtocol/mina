@@ -33,6 +33,31 @@ let time ~label ~logger f =
 
 let default_missing_blocks_width = 2000
 
+(** [time_ingest metric_server ~source f] runs [f] and records how long it
+    took in the [ingest_duration_ms] histogram, under the label [source].
+
+    [f] is the whole RPC handler, so the span measured is the one the sender
+    experiences: from the moment the archive accepts the call to the moment it
+    answers. It therefore includes any time the handler spent waiting behind
+    work the archive was already doing, which is the point -- this is the
+    number that must not move when the archive is given a background job.
+
+    [metric_server] is [None] when the archive was started without
+    [--metrics-port]. Then nothing is recorded and [f] runs unchanged. *)
+let time_ingest metric_server ~source f =
+  match metric_server with
+  | None ->
+      f ()
+  | Some metric_server ->
+      let start = Time.now () in
+      let%map x = f () in
+      let elapsed_ms = Time.Span.to_ms (Time.diff (Time.now ()) start) in
+      Mina_metrics.(
+        Archive.Ingest_duration_histogram.observe
+          (Archive.ingest_duration_ms metric_server source)
+          elapsed_ms) ;
+      x
+
 module Max_block_height = struct
   let query =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int
