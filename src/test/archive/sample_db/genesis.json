@@ -21,7 +21,7 @@
         "pk": "B62qjRMRH7VaxDymx272TmfUtbK6fFMwxvMJ46ECw55fqguPRW1hAss",
         "sk": null,
         "balance": "5.000000000",
-        "delegate": null
+        "delegate": "B62qjRMRH7VaxDymx272TmfUtbK6fFMwxvMJ46ECw55fqguPRW1hAss"
       },
       {
         "pk": "B62qojfverGhsrLGnn9x53AxqjcpvUL4RFS2mr2gtTCzh4Kjk8FiQo6",
@@ -32,7 +32,7 @@
       {
         "pk": "B62qkPiVonLqoXd8zT6pnf2GkJZUuvKXC78iJJQRouqLpRY4W2YgjPm",
         "sk": null,
-        "delegate": null,
+        "delegate": "B62qkPiVonLqoXd8zT6pnf2GkJZUuvKXC78iJJQRouqLpRY4W2YgjPm",
         "balance": "500.000000000"
       },
       {
@@ -45,7 +45,7 @@
         "pk": "B62qpZna7P4fDYRmUmPQBudMVJQZe5gHse3dRu5wjigMs9WaAUn1CA7",
         "sk": null,
         "balance": "499.000000000",
-        "delegate": null
+        "delegate": "B62qpZna7P4fDYRmUmPQBudMVJQZe5gHse3dRu5wjigMs9WaAUn1CA7"
       },
       {
         "pk": "B62qkdiWrHxva33Rsy9kEVgzCK1y92fmwnp8uzxz6LnPLJeKrv3hyby",
@@ -57,7 +57,7 @@
         "pk": "B62qnE7dRd4UPaQVvzPRCcaQdNizsjGciLN6rgukmPfaVaErRSaMVK6",
         "sk": null,
         "balance": "499.000000000",
-        "delegate": null
+        "delegate": "B62qnE7dRd4UPaQVvzPRCcaQdNizsjGciLN6rgukmPfaVaErRSaMVK6"
       }
     ]
   }

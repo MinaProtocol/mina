@@ -92,6 +92,14 @@ let test_blockchain_step () =
   let actual_digest =
     Md5_lib.to_hex (Snark_params.Tick.R1CS_constraint_system.digest cs)
   in
+  (* Always log the actual values: on failure Alcotest shows this captured
+     output, so all four values can be updated from a single run. *)
+  Printf.eprintf
+    "blockchain-step: constraints=%d public_input_size=%d \
+     auxiliary_input_size=%d digest=%s\n\
+     %!"
+    actual_constraints actual_public_input_size actual_auxiliary_input_size
+    actual_digest ;
   Alcotest.(check int)
     "blockchain-step constraint count" expected_values.constraints
     actual_constraints ;

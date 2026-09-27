@@ -23,8 +23,9 @@
 
     IMPORTANT: If these tests fail due to changed constraint counts, public
     input sizes, auxiliary input sizes, or digests, update the expected values
-    below AND the table in [transaction_snark_intf.ml] to keep the documentation
-    in sync.
+    below for every profile. The actual values are logged by each test, and
+    CI runs the devnet and mainnet profiles via
+    [buildkite/scripts/profile-dependent-tests.sh].
 
     NOTE: Expected values vary by profile (dev, devnet, lightnet, mainnet) as
     constraint counts depend on configuration parameters like ledger depth. *)
@@ -56,28 +57,28 @@ let dev_expected_values =
       ; digest = "d71089b3a1669535999e8f181cd59afc"
       }
   ; transaction_base =
-      { constraints = 12875
+      { constraints = 12879
       ; public_input_size = 300
-      ; auxiliary_input_size = 37503
-      ; digest = "740db2397b0b01806a48f061a2e2b063"
+      ; auxiliary_input_size = 37508
+      ; digest = "1dfb98ac348b112fd877a935e93de981"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 16332
+      { constraints = 16324
       ; public_input_size = 300
-      ; auxiliary_input_size = 73525
-      ; digest = "aa73b81ac2eca4d57fc889bfe562e01b"
+      ; auxiliary_input_size = 73519
+      ; digest = "d9e8966a3a605b2011f669a2d6ee4836"
       }
   ; zkapp_opt_signed =
-      { constraints = 8924
+      { constraints = 8920
       ; public_input_size = 300
-      ; auxiliary_input_size = 40635
-      ; digest = "080790458ad5287478889328c21ce774"
+      ; auxiliary_input_size = 40632
+      ; digest = "93113e36b8e9153aae70da22e957a6fd"
       }
   ; zkapp_proved =
-      { constraints = 5146
+      { constraints = 5142
       ; public_input_size = 300
-      ; auxiliary_input_size = 39201
-      ; digest = "7a16111a5abe7fb0d7c92e44b160218b"
+      ; auxiliary_input_size = 39198
+      ; digest = "f5b4de07d8b8fdd2f5ec9f730138b2aa"
       }
   }
 
@@ -89,28 +90,28 @@ let devnet_expected_values =
       ; digest = "d71089b3a1669535999e8f181cd59afc"
       }
   ; transaction_base =
-      { constraints = 15357
+      { constraints = 15361
       ; public_input_size = 300
-      ; auxiliary_input_size = 63807
-      ; digest = "3bf6bb8a97665fe7a9df6fc146e4f942"
+      ; auxiliary_input_size = 63812
+      ; digest = "d333a8775f3933ee95a8479ada9a4c6d"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 18001
+      { constraints = 17993
       ; public_input_size = 300
-      ; auxiliary_input_size = 91179
-      ; digest = "614aec09ed5e4068f46d010f0070226b"
+      ; auxiliary_input_size = 91173
+      ; digest = "0e6e81faab4ed4f4777671066d3740a3"
       }
   ; zkapp_opt_signed =
-      { constraints = 9781
+      { constraints = 9777
       ; public_input_size = 300
-      ; auxiliary_input_size = 49639
-      ; digest = "0fe3381f501f432744727c296be464b0"
+      ; auxiliary_input_size = 49636
+      ; digest = "35639f0d40887d49bdc02f995ef76f58"
       }
   ; zkapp_proved =
-      { constraints = 6003
+      { constraints = 5999
       ; public_input_size = 300
-      ; auxiliary_input_size = 48205
-      ; digest = "cad581432831f10fee99161532504937"
+      ; auxiliary_input_size = 48202
+      ; digest = "03d75c911e20c6203a3a37f54b6f3cba"
       }
   }
 
@@ -122,28 +123,28 @@ let lightnet_expected_values =
       ; digest = "d71089b3a1669535999e8f181cd59afc"
       }
   ; transaction_base =
-      { constraints = 15357
+      { constraints = 15361
       ; public_input_size = 300
-      ; auxiliary_input_size = 63807
-      ; digest = "3bf6bb8a97665fe7a9df6fc146e4f942"
+      ; auxiliary_input_size = 63812
+      ; digest = "d333a8775f3933ee95a8479ada9a4c6d"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 18001
+      { constraints = 17993
       ; public_input_size = 300
-      ; auxiliary_input_size = 91179
-      ; digest = "614aec09ed5e4068f46d010f0070226b"
+      ; auxiliary_input_size = 91173
+      ; digest = "0e6e81faab4ed4f4777671066d3740a3"
       }
   ; zkapp_opt_signed =
-      { constraints = 9781
+      { constraints = 9777
       ; public_input_size = 300
-      ; auxiliary_input_size = 49639
-      ; digest = "0fe3381f501f432744727c296be464b0"
+      ; auxiliary_input_size = 49636
+      ; digest = "35639f0d40887d49bdc02f995ef76f58"
       }
   ; zkapp_proved =
-      { constraints = 6003
+      { constraints = 5999
       ; public_input_size = 300
-      ; auxiliary_input_size = 48205
-      ; digest = "cad581432831f10fee99161532504937"
+      ; auxiliary_input_size = 48202
+      ; digest = "03d75c911e20c6203a3a37f54b6f3cba"
       }
   }
 
@@ -155,28 +156,28 @@ let mainnet_expected_values =
       ; digest = "d71089b3a1669535999e8f181cd59afc"
       }
   ; transaction_base =
-      { constraints = 15357
+      { constraints = 15361
       ; public_input_size = 300
-      ; auxiliary_input_size = 63807
-      ; digest = "d31948e661cc662675b0c079458f714a"
+      ; auxiliary_input_size = 63812
+      ; digest = "73c5b4e21f6175030826168835add14f"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 18001
+      { constraints = 17993
       ; public_input_size = 300
-      ; auxiliary_input_size = 91179
-      ; digest = "ddaa38405c20a8f7a7cf5235c1ed1713"
+      ; auxiliary_input_size = 91173
+      ; digest = "ffae4f687a4531bb0518732f3331759d"
       }
   ; zkapp_opt_signed =
-      { constraints = 9781
+      { constraints = 9777
       ; public_input_size = 300
-      ; auxiliary_input_size = 49639
-      ; digest = "d048877d85e30a1ff9ff4cbdfcc33639"
+      ; auxiliary_input_size = 49636
+      ; digest = "358da7db5ba29ce6a60661ce9b780477"
       }
   ; zkapp_proved =
-      { constraints = 6003
+      { constraints = 5999
       ; public_input_size = 300
-      ; auxiliary_input_size = 48205
-      ; digest = "2d8810bdbda316e4b1f9f41ae1b28f6c"
+      ; auxiliary_input_size = 48202
+      ; digest = "df4d8b9d39314226692d92eacd8cbe8f"
       }
   }
 
@@ -211,6 +212,13 @@ let check_circuit_stats ~name ~expected cs =
   let actual_digest =
     Md5_lib.to_hex (Snark_params.Tick.R1CS_constraint_system.digest cs)
   in
+  (* Always log the actual values: on failure Alcotest shows this captured
+     output, so all four values can be updated from a single run. *)
+  Printf.eprintf
+    "%s: constraints=%d public_input_size=%d auxiliary_input_size=%d digest=%s\n\
+     %!"
+    name actual_constraints actual_public_input_size actual_auxiliary_input_size
+    actual_digest ;
   Alcotest.(check int)
     (Printf.sprintf "%s constraint count" name)
     expected.constraints actual_constraints ;

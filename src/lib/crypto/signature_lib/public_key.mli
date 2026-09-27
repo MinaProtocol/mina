@@ -86,6 +86,8 @@ module Compressed : sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
+    val empty : var
+
     module Assert : sig
       val equal : var -> var -> unit Checked.t
     end

@@ -96,18 +96,18 @@ let expected_supply_increase = function
       Coinbase.expected_supply_increase t
 
 let public_keys (t : (_, _, _) with_forest) =
-  let account_ids =
-    match t with
-    | Command (Signed_command cmd) ->
-        Signed_command.accounts_referenced cmd
-    | Command (Zkapp_command t) ->
-        Zkapp_command.accounts_referenced t
-    | Fee_transfer ft ->
-        Fee_transfer.receivers ft
-    | Coinbase cb ->
-        Coinbase.accounts_referenced cb
-  in
-  List.map account_ids ~f:Account_id.public_key
+  match t with
+  | Command (Signed_command cmd) ->
+      (* [Signed_command.public_keys] filters the empty-pk unstaking
+         sentinel; [accounts_referenced] does not, and must not because
+         the SNARK witness needs that slot. *)
+      Signed_command.public_keys cmd
+  | Command (Zkapp_command t) ->
+      List.map (Zkapp_command.accounts_referenced t) ~f:Account_id.public_key
+  | Fee_transfer ft ->
+      List.map (Fee_transfer.receivers ft) ~f:Account_id.public_key
+  | Coinbase cb ->
+      List.map (Coinbase.accounts_referenced cb) ~f:Account_id.public_key
 
 let account_access_statuses (t : (_, _, _) with_forest)
     (status : Transaction_status.t) =

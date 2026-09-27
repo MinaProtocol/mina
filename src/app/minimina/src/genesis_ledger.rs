@@ -90,7 +90,7 @@ pub mod default {
                     pk: key_info.key_string.clone(),
                     sk: None,
                     balance: "11550000.000000000".into(),
-                    delegate: None,
+                    delegate: Some(key_info.key_string.clone()),
                     timing: None,
                 })
                 .collect();

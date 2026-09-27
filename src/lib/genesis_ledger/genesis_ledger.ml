@@ -42,7 +42,10 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
     List.map accounts ~f:(fun { pk; sk; balance; timing } ->
         let account_id = Account_id.create pk Token_id.default in
         let balance = Balance.of_mina_string_exn (Int.to_string balance) in
-        (Some sk, account_with_timing account_id balance timing) )
+        let account = account_with_timing account_id balance timing in
+        (* Built-in ledgers delegate to themselves so that the network they
+           start carries stake and can produce blocks. *)
+        (Some sk, { account with delegate = Some pk }) )
 end
 
 (** Generate a ledger using the sample keypairs from [Mina_base] with the given

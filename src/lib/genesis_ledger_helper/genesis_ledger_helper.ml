@@ -300,6 +300,29 @@ module Ledger = struct
           accounts_with_keys
     in
 
+    (* An account with no delegate has no stake. A genesis ledger in which no
+       account delegates carries no stake at all, so the network it starts
+       never produces a block. Delegates are not defaulted: an omitted
+       delegate in the config means the account does not stake. *)
+    let warn_if_no_stake accounts_with_keys =
+      let has_stake =
+        List.exists accounts_with_keys
+          ~f:(fun ((_key, account) : _ * Mina_base.Account.t) ->
+            Token_id.equal account.token_id Token_id.default
+            && Option.is_some account.delegate
+            && not
+                 (Currency.Balance.equal account.balance Currency.Balance.zero) )
+      in
+      if not has_stake then
+        [%log error]
+          "No account in the $ledger delegates to anyone, so the ledger \
+           carries no stake and the network cannot produce blocks. Set the \
+           delegate field of the staking accounts in the ledger config; an \
+           omitted delegate means the account does not stake."
+          ~metadata:[ ("ledger", `String ledger_name_prefix) ] ;
+      accounts_with_keys
+    in
+
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -339,7 +362,8 @@ module Ledger = struct
           Some
             ( lazy
               (patch_accounts_version
-                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
+                 (add_genesis_winner_account
+                    (warn_if_no_stake (Accounts.to_full accounts)) ) ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -348,7 +372,9 @@ module Ledger = struct
                   [ ("ledger", `String ledger_name_prefix)
                   ; ("ledger_name", `String name)
                   ] ;
-              Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
+              Some
+                (Lazy.map M.accounts ~f:(fun accounts ->
+                     add_genesis_winner_account (warn_if_no_stake accounts) ) )
           | None ->
               [%log trace]
                 "Could not find a built-in $ledger named $ledger_name"

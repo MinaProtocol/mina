@@ -81,7 +81,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "ledger": {
     "name": "${MINA_NETWORK}",
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "10000", "delegate": null, "sk": null },
+      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "10000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
       { "pk": "${SNARK_PRODUCER_PK}", "balance": "20000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null }
     ]
   }

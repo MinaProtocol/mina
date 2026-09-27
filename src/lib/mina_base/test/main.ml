@@ -124,6 +124,15 @@ let () =
           ; test_case "Test to_zkapp_command with hashes list." `Quick
               to_zkapp_command_with_hashes_list
           ] )
+    ; Account_access_test.
+        ( "account-access"
+        , [ test_case "Empty-key receiver of applied unstake is not accessed."
+              `Quick unstake_receiver_not_accessed
+          ; test_case "Receiver of applied delegation is accessed." `Quick
+              delegation_receiver_accessed
+          ; test_case "Fee payer is always accessed." `Quick
+              fee_payer_always_accessed
+          ] )
     ; Fee_related_test.
         ( "fee-related"
         , [ test_case "Test fee." `Quick test_fee

@@ -200,7 +200,10 @@ val token : t -> Token_id.t
 
 val amount : t -> Currency.Amount.t option
 
-(** the fee payer is always `Accessed, even for a failing transaction *)
+(** the fee payer is always `Accessed, even for a failing transaction; the
+    receiver is `Not_accessed for a failing transaction, and for an applied
+    stake delegation to the empty key (unstaking), since no account exists at
+    that key *)
 val account_access_statuses :
      t
   -> Transaction_status.t
