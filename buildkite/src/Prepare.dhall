@@ -7,6 +7,8 @@ let Cmd = ./Lib/Cmds.dhall
 
 let Command = ./Command/Base.dhall
 
+let PinGitEnv = ./Command/PinGitEnv.dhall
+
 let Docker = ./Command/Docker/Type.dhall
 
 let JobSpec = ./Pipeline/JobSpec.dhall
@@ -25,16 +27,27 @@ let scopeFilter = env:BUILDKITE_PIPELINE_SCOPE as Text ? "All"
 
 let filterMode = env:BUILDKITE_PIPELINE_FILTER_MODE as Text ? "Any"
 
+let jobName = "prepare"
+
+let stage =
+    -- What distinguishes one stage's upload of this file from another's. The
+    -- triage step's key already carries it; the pin's has to as well, because
+    -- a release pipeline uploads this file once per stage and buildkite
+    -- rejects a key it has already seen in the build.
+      "-${selection}-${tagFilter}-${scopeFilter}"
+
 let config
     : Pipeline.Config.Type
     = Pipeline.Config::{
       , spec = JobSpec::{
-        , name = "prepare"
+        , name = jobName
         , dirtyWhen = [ SelectFiles.everything ]
         }
       , steps =
-        [ Command.build
+        [ PinGitEnv.step stage
+        , Command.build
             Command.Config::{
+            , depends_on = PinGitEnv.dependsOn jobName stage
             , commands =
               [ Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}"
               , Cmd.run "export BUILDKITE_PIPELINE_JOB_SELECTION=${selection}"
@@ -45,7 +58,7 @@ let config
                   "./buildkite/scripts/pipeline/upload.sh '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}, filterMode=(./buildkite/src/Pipeline/FilterMode.dhall).Type.${filterMode} }'"
               ]
             , label = "Prepare monorepo triage"
-            , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
+            , key = "monorepo${stage}"
             , target = Size.Multi
             , docker = Some Docker::{
               , image = (./Constants/ContainerImages.dhall).toolchainBase

@@ -17,6 +17,8 @@ let Cmd = ../Lib/Cmds.dhall
 
 let Command = ../Command/Base.dhall
 
+let PinGitEnv = ../Command/PinGitEnv.dhall
+
 let ContainerImages = ../Constants/ContainerImages.dhall
 
 let FixPermissions = ../Command/FixPermissions.dhall
@@ -87,6 +89,13 @@ let promote_nightly =
                     ++  "./scripts/docker/update-gar-whitelist.sh"
                   )
 
+          let promotion =
+              -- The promoter renders one pipeline for each branch and profile
+              -- it is asked for, so a constant key would collide the moment a
+              -- build promotes more than one. The step below already carries
+              -- both; the pin carries the same.
+                "-${branch}-${profile}"
+
           let pipeline =
                 Pipeline.build
                   Pipeline.Config::{
@@ -97,8 +106,11 @@ let promote_nightly =
                     , tags = [ PipelineTag.Type.Promote ]
                     }
                   , steps =
-                    [ Command.build
+                    [ PinGitEnv.step promotion
+                    , Command.build
                         Command.Config::{
+                        , depends_on =
+                            PinGitEnv.dependsOn "PromoteNightly" promotion
                         , commands =
                               [ FixPermissions.command Architecture.Type.Amd64 ]
                             # [ buildGoBinaryCmd ]
@@ -106,7 +118,7 @@ let promote_nightly =
                             # [ publishDockersCmd ]
                             # [ updateGarWhitelistCmd ]
                         , label = "Promote Nightly (${branch}/${profile})"
-                        , key = "promote-nightly-${branch}-${profile}"
+                        , key = "promote-nightly${promotion}"
                         , target = Size.Small
                         }
                     ]

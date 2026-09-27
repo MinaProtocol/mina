@@ -102,6 +102,24 @@ if [[ -n "${GENESIS_TIMESTAMP:-}" && ! "${GENESIS_TIMESTAMP}" =~ Z$ ]]; then
   usage "GENESIS_TIMESTAMP must be in UTC format (ending with 'Z'), got: ${GENESIS_TIMESTAMP}"
 fi
 
+# Fix one git identity for this run, before the pipeline that reads it is
+# uploaded, so every job it emits agrees on one. This is what
+# Command/PinGitEnv.dhall does for the entrypoints that are pipelines; here the
+# entrypoint is this script, so it calls pin.sh itself.
+#
+# USE_ARTIFACTS_FROM_BUILDKITE_BUILD names a build whose artifacts this run
+# takes instead of making its own, and when it does, the identity of this run
+# is that build's rather than this checkout's. GITHASH_CONFIG is why that
+# matters: it names the genesis config the daemon auto-loads, so it has to name
+# the commit the binaries came from. It is spelled out rather than left to
+# pin.sh because the name is this pipeline's own; empty, and pin.sh pins this
+# checkout.
+#
+# Done here rather than further down because the value is rewritten into a
+# Dhall Optional just below and stops being a build id.
+MINA_READ_CACHE_ROOT="${USE_ARTIFACTS_FROM_BUILDKITE_BUILD:-}" \
+  ./buildkite/scripts/git-env/pin.sh
+
 # Format GENESIS_TIMESTAMP as Optional Text for Dhall
 if [[ -z "${GENESIS_TIMESTAMP:-}" ]]; then
   GENESIS_TIMESTAMP="(None Text)"
