@@ -10,7 +10,7 @@
 #   are test-only (the rosetta integration test builds its own copy via
 #   buildkite/scripts/tests/rosetta/install-cli.sh) and have no role in the production runtime.
 #################################################################################################
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+ARG image=docker.io/library/ubuntu:focal
 FROM ${image} AS rosetta-base
 ARG deb_codename=focal
 ARG apt_cache_url=""
