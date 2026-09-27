@@ -80,6 +80,11 @@ CREATE TABLE user_commands
 , hash           text                NOT NULL UNIQUE
 );
 
+-- Account lookups (e.g. Rosetta /search/transactions) filter on these columns.
+CREATE INDEX idx_user_commands_fee_payer_id ON user_commands(fee_payer_id);
+CREATE INDEX idx_user_commands_source_id    ON user_commands(source_id);
+CREATE INDEX idx_user_commands_receiver_id  ON user_commands(receiver_id);
+
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_transfer', 'coinbase');
 
 CREATE TABLE internal_commands
