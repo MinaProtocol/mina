@@ -4737,32 +4737,39 @@ module Hardfork_state = struct
          |sql} )
       ()
 
-  let insert (module Conn : CONNECTION) (t : t) =
-    Conn.exec
-      (Mina_caqti.exec_req typ
+  (* One statement, so two announcements arriving together cannot both find
+     the table empty and then collide on the primary key. The row comes back
+     only when this call wrote it. *)
+  let insert_if_absent (module Conn : CONNECTION) (t : t) =
+    Conn.find_opt
+      (Mina_caqti.find_opt_req typ Caqti_type.int
          {sql| INSERT INTO hardfork_state
                  (id, fork_state_hash, fork_blockchain_length, fork_global_slot,
                   config_json, source)
                VALUES
                  (1, ?, ?, ?, ?, ?::hardfork_source)
+               ON CONFLICT (id) DO NOTHING
+               RETURNING id
          |sql} )
       t
 
-  (** Record a fork we have been told about.
+  type outcome =
+    | Recorded
+    | Already_recorded
+        (** The heartbeat, a restarted daemon, or another daemon announcing
+            the same fork. *)
+    | Disagrees of { existing : string }
+        (** A fork is recorded at another block: two daemons disagree about
+            where the chain forked. No automatic reconciliation is correct, so
+            the caller refuses the announcement and a human looks. *)
 
-      Idempotent by design: the configuration arrives on a heartbeat, so the
-      overwhelmingly common case is that we already have this exact row and
-      there is nothing to do.
-
-      Returns an error when a fork is already recorded with a different fork
-      block. That means two daemons disagree about where the chain forked, and
-      no automatic reconciliation is correct -- the archive must stop and let a
-      human look. *)
+  (** Record a fork we have been told about. Idempotent: the configuration
+      arrives on a heartbeat, so the common case is that this exact fork is
+      already recorded. *)
   let record (module Conn : CONNECTION) ~logger (t : t) =
     let open Deferred.Result.Let_syntax in
-    match%bind load_opt (module Conn) with
-    | None ->
-        let%map () = insert (module Conn) t in
+    match%bind insert_if_absent (module Conn) t with
+    | Some (_ : int) ->
         [%log info]
           "Recorded hard fork at block $state_hash, height $height, from \
            $source"
@@ -4770,22 +4777,19 @@ module Hardfork_state = struct
             [ ("state_hash", `String t.fork_state_hash)
             ; ("height", `String (Int64.to_string t.fork_blockchain_length))
             ; ("source", `String t.source)
-            ]
-    | Some existing when String.equal existing.fork_state_hash t.fork_state_hash
-      ->
-        (* The heartbeat, or a restarted daemon. Nothing to do. *)
-        return ()
-    | Some existing ->
-        [%log error]
-          "Refusing a hard fork configuration for block $incoming: this \
-           database already records a fork at $existing. Two daemons disagree \
-           about where the chain forked; the archive will not choose between \
-           them."
-          ~metadata:
-            [ ("incoming", `String t.fork_state_hash)
-            ; ("existing", `String existing.fork_state_hash)
             ] ;
-        return ()
+        return Recorded
+    | None -> (
+        match%map load_opt (module Conn) with
+        | Some existing
+          when String.equal existing.fork_state_hash t.fork_state_hash ->
+            Already_recorded
+        | Some existing ->
+            Disagrees { existing = existing.fork_state_hash }
+        | None ->
+            (* The insert found a row that is gone again. Nothing deletes
+               from this table, so this is a database changed under us. *)
+            failwith "hardfork_state row vanished between insert and read" )
 end
 
 (** Read the fork block's identity out of a runtime configuration.
@@ -4930,11 +4934,23 @@ let record_hardfork_config ~logger ~pool ~config_json ~recorded =
           (fun conn -> Hardfork_state.record conn ~logger hardfork_state)
           pool
       with
-      | Ok () ->
+      | Ok Hardfork_state.(Recorded | Already_recorded) ->
           (* Filled after the write, so whatever watches this cannot act on a
              fork that is not yet on record. Idempotent: the configuration
              arrives on a heartbeat and this may be the tenth time. *)
           Ivar.fill_if_empty recorded ()
+      | Ok (Hardfork_state.Disagrees { existing }) ->
+          (* Refused, and not a reason to hand over: the fork on record stands,
+             and the sender must learn that this one was not accepted. *)
+          let incoming = hardfork_state.fork_state_hash in
+          [%log error]
+            "Refusing a hard fork configuration for block %s: this database \
+             already records a fork at %s. Two daemons disagree about where \
+             the chain forked; the archive will not choose between them."
+            incoming existing ;
+          failwithf
+            "refused: this archive already records a fork at %s, not at %s"
+            existing incoming ()
       | Error e ->
           let msg = Caqti_error.show e in
           (* A database that predates hardfork_state has not run upgrade.sql,
