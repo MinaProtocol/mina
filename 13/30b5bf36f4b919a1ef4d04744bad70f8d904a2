@@ -1,0 +1,4 @@
+Reconstructed-from: 084b76e72cb13df53b22b1425a4ec0d1306ce62e
+Pull-request: #18895
+Omitted-paths: src/lib/crypto/kimchi_bindings/stubs/kimchi-stubs-vendors, src/lib/crypto/proof-systems
+Omission-reasons: policy-stripped=2
