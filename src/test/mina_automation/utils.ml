@@ -118,3 +118,15 @@ let get_memory_usage_mib_of_user_process process =
     |> fun kb -> kb /. 1024.0
   in
   Deferred.return total_memory_mb
+
+(** A TCP port the OS reports free, for a process the test is about to start.
+    A fixed port can be held by something else, and a readiness probe or an
+    RPC would then reach that instead. *)
+let free_port () =
+  let server =
+    Tcp.Server.create_sock_inet ~on_handler_error:`Ignore
+      Tcp.Where_to_listen.of_port_chosen_by_os (fun _ _ -> Deferred.unit)
+  in
+  let port = Tcp.Server.listening_on server in
+  let%map () = Tcp.Server.close server in
+  port

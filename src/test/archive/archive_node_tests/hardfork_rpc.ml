@@ -3,9 +3,15 @@
 
    1. a 4.0.0 database has no hardfork_state: the announcement is refused, and
       the refusal names upgrade.sql
-   2. after upgrade.sql the fork is recorded once; a repeat changes nothing and
-      a different fork block is refused
-   3. --hardfork-handling exit stops the archive once the fork is recorded
+   2. after upgrade.sql:
+      - the client refuses a missing file, text that is not JSON and a config
+        with no fork stanza, before anything reaches the archive
+      - the archive refuses the same over the RPC, records nothing and keeps
+        running
+      - ten concurrent announcements of one fork all succeed and leave one row
+      - a repeat changes nothing, and a different fork block is refused
+   3. --hardfork-handling exit: neither an unusable config nor a different fork
+      block stops the archive; the recorded fork does
    4. --hardfork-handling migrate-exit runs upgrade.sql, then stops
 
    Run:
@@ -73,8 +79,29 @@ let log_contains ~log_file needle =
   let%map contents = Reader.file_contents log_file in
   String.is_substring contents ~substring:needle
 
+(* The RPC a daemon sends, without the client's own checks in front of it. *)
+let dispatch ~port ~config_json =
+  Mina_lib.Archive_client.dispatch_hardfork_config ~max_tries:1
+    ~logger:(Logger.null ())
+    { Cli_lib.Flag.Types.name = "--archive-address"
+    ; value = Host_and_port.create ~host:"127.0.0.1" ~port
+    }
+    ~config_json
+
+let expect_refused ~what ~needle = function
+  | Ok () ->
+      failwithf "%s was accepted" what ()
+  | Error msg ->
+      if not (String.is_substring msg ~substring:needle) then
+        failwithf "%s was refused, but not with %S: %s" what needle msg ()
+
+let still_running ~what exited =
+  if Deferred.is_determined exited then
+    failwithf "%s stopped the archive" what ()
+
 let test_case (test_data : t) =
-  let config = test_data.config in
+  let%bind port = Utils.free_port () in
+  let config = { test_data.config with server_port = port } in
   let dir = test_data.temp_dir in
   let connection = Psql.Conn_str config.postgres_uri in
   let archive_address = sprintf "127.0.0.1:%d" config.server_port in
@@ -103,6 +130,22 @@ let test_case (test_data : t) =
   let%bind fork_b =
     fork_config ~dir ~name:"fork_b" ~state_hash:"FORK_B" ~height:11
   in
+  let dispatch config_json =
+    dispatch ~port:config.server_port ~config_json
+    >>| Result.map_error ~f:Error.to_string_hum
+  in
+  let unusable =
+    [ ("text that is not JSON", "not json at all")
+    ; ("a config with no fork stanza", {json|{"proof":{}}|json})
+    ; ( "a fork stanza with missing fields"
+      , {json|{"proof":{"fork":{"state_hash":"FORK_C"}}}|json} )
+    ]
+  in
+  let%bind () = Writer.save (dir ^/ "not_json.json") ~contents:"{" in
+  let%bind () =
+    Writer.save (dir ^/ "no_fork.json") ~contents:{json|{"proof":{}}|json}
+  in
+  let rows () = sql ~connection "SELECT count(*) FROM hardfork_state" in
 
   (* 1. A 4.0.0 database was created before hardfork_state existed. *)
   let%bind _ =
@@ -130,24 +173,72 @@ let test_case (test_data : t) =
   [%test_eq: string] migration "5.0.0 applied" ;
   let log_file = dir ^/ "keep_running.log" in
   let%bind () =
-    with_archive config ~extra_args:[] ~log_file ~f:(fun _ ->
-        let%bind () = send fork_a >>| Result.ok_or_failwith in
+    with_archive config ~extra_args:[] ~log_file ~f:(fun exited ->
+        (* The client refuses before anything reaches the archive. *)
+        let%bind () =
+          send (dir ^/ "missing.json")
+          >>| expect_refused ~what:"a missing file" ~needle:"Could not read"
+        in
+        let%bind () =
+          send (dir ^/ "not_json.json")
+          >>| expect_refused ~what:"a file that is not JSON"
+                ~needle:"is not a runtime configuration"
+        in
+        let%bind () =
+          send (dir ^/ "no_fork.json")
+          >>| expect_refused ~what:"a config with no fork stanza"
+                ~needle:"has no fork stanza"
+        in
+        (* The archive refuses the same, sent straight over the RPC. *)
+        let%bind () =
+          Deferred.List.iter unusable ~f:(fun (what, config_json) ->
+              dispatch config_json
+              >>| expect_refused ~what
+                    ~needle:"unusable hard fork configuration" )
+        in
+        let%bind n = rows () in
+        [%test_eq: string] n "0" ;
+        still_running ~what:"an unusable config" exited ;
+        (* Ten daemons announce the same fork at once. *)
+        let%bind config_json = Reader.file_contents fork_a in
+        let%bind results =
+          Deferred.List.init ~how:`Parallel 10 ~f:(fun _ ->
+              dispatch config_json )
+        in
+        List.iteri results ~f:(fun i result ->
+            match result with
+            | Ok () ->
+                ()
+            | Error msg ->
+                failwithf "concurrent announcement %d was refused: %s" i msg () ) ;
+        let%bind n = rows () in
+        [%test_eq: string] n "1" ;
         let%bind hash = recorded_hash () in
         [%test_eq: string] hash "FORK_A" ;
+        (* The heartbeat: a repeat changes nothing. *)
         let%bind () = send fork_a >>| Result.ok_or_failwith in
-        let%bind rows = sql ~connection "SELECT count(*) FROM hardfork_state" in
-        [%test_eq: string] rows "1" ;
-        let%bind (_ : (unit, string) Result.t) = send fork_b in
-        let%bind hash = recorded_hash () in
-        [%test_eq: string] hash "FORK_A" ;
-        let%map logged = log_contains ~log_file "already records a fork" in
-        if not logged then failwith "the disagreeing fork block was not logged" )
+        let%bind n = rows () in
+        [%test_eq: string] n "1" ;
+        (* Two daemons disagree about the fork block. *)
+        let%bind () =
+          send fork_b
+          >>| expect_refused ~what:"a different fork block"
+                ~needle:"already records a fork"
+        in
+        let%map hash = recorded_hash () in
+        [%test_eq: string] hash "FORK_A" )
   in
 
   (* 3. exit *)
   let%bind () =
     with_archive config ~extra_args:[ "--hardfork-handling"; "exit" ]
       ~log_file:(dir ^/ "exit.log") ~f:(fun exited ->
+        (* Neither of these is a fork to hand over for. The hand-over waits
+           five seconds after the record, so give it longer than that. *)
+        let%bind (_ : (unit, string) Result.t) = dispatch "not json at all" in
+        let%bind (_ : (unit, string) Result.t) = send fork_b in
+        let%bind () = after (Time.Span.of_sec 8.) in
+        still_running ~what:"a refused announcement" exited ;
         let%bind () = send fork_a >>| Result.ok_or_failwith in
         let%map code =
           exit_code_within ~seconds:30. exited >>| Or_error.ok_exn

@@ -12,6 +12,9 @@
    alcotest
    cmdliner
    ;; mina libraries
+   cli_lib
+   logger
+   mina_lib
    mina_automation
    mina_automation.fixture
    mina_automation.runner)
