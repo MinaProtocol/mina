@@ -7,7 +7,11 @@ open Async
 
 module Config = struct
   type t =
-    { config_file : String.t; postgres_uri : String.t; server_port : int }
+    { config_file : String.t
+    ; postgres_uri : String.t
+    ; server_port : int
+    ; extra_args : String.t list
+    }
 
   let to_args t =
     [ "run"
@@ -19,14 +23,18 @@ module Config = struct
     ; string_of_int t.server_port
     ; "--log-json"
     ]
+    @ t.extra_args
 
   let create ~config_file ~postgres_uri ~server_port =
-    { config_file; postgres_uri; server_port }
+    { config_file; postgres_uri; server_port; extra_args = [] }
+
+  (** Arguments appended to [archive run], e.g. [--hardfork-handling exit]. *)
+  let with_extra_args t extra_args = { t with extra_args }
 
   let of_config_file config_file
       ?(postgres_uri = "postgres://postgres:postgres@localhost:5432/archive")
       ?(server_port = 3030) =
-    { config_file; postgres_uri; server_port }
+    { config_file; postgres_uri; server_port; extra_args = [] }
 end
 
 module Paths = struct

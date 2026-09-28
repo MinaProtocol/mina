@@ -49,4 +49,12 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Live_upgrade_archive) ) )
         ] )
+    ; ( "hardfork_rpc"
+      , [ test_case "Record the hard fork a daemon announces, then hand over"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Hardfork_rpc) ) )
+        ] )
     ]
