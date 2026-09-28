@@ -49,4 +49,14 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Live_upgrade_archive) ) )
         ] )
+    ; ( "rosetta_fork_detection"
+      , [ test_case
+            "Pre-fork Rosetta stands down once a fork is recorded and the \
+             schema moved on"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Rosetta_fork_detection) ) )
+        ] )
     ]
