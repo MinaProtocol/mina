@@ -4937,10 +4937,20 @@ let record_hardfork_config ~logger ~pool ~config_json ~recorded =
           Ivar.fill_if_empty recorded ()
       | Error e ->
           let msg = Caqti_error.show e in
+          (* A database that predates hardfork_state has not run upgrade.sql,
+             which is the one fix, so say that instead of the SQL error. *)
+          let msg =
+            if String.is_substring msg ~substring:"hardfork_state" then
+              sprintf
+                "%s (this database has no hardfork_state table: run \
+                 upgrade.sql against it before the fork)"
+                msg
+            else msg
+          in
           [%log warn]
-            "Could not record the hard fork configuration: $error. The daemon \
-             is told, so it can try again."
-            ~metadata:[ ("error", `String msg) ] ;
+            "Could not record the hard fork configuration: %s. The daemon is \
+             told, so it can try again."
+            msg ;
           failwithf "could not record the hard fork configuration: %s" msg () )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
