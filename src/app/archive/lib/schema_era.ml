@@ -38,8 +38,8 @@ let describe = function
       "no hard fork hand-over is due"
   | Differs { schema; mine } ->
       sprintf
-        "a hard fork is recorded and the schema is at protocol version %s, \
-         but this binary was built for %s"
+        "a hard fork is recorded and the schema is at protocol version %s, but \
+         this binary was built for %s"
         schema mine
   | Migration_in_progress status ->
       sprintf "a hard fork is recorded and a schema migration is in state '%s'"
