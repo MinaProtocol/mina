@@ -1,0 +1,4 @@
+Reconstructed-from: 3464c86aef047829ef05d20227b067f5a7b3e38f
+Pull-request: #19496
+Omitted-paths: dockerfiles/Dockerfile-delegation-stateless-verifier
+Omission-reasons: already-present=1
