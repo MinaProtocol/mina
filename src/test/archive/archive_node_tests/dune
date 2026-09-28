@@ -2,6 +2,9 @@
  (names archive_node_tests)
  (libraries
    ;; opam libraries
+   caqti
+   caqti-async
+   uri
    async_kernel
    core_kernel
    ppx_inline_test.config
@@ -12,6 +15,8 @@
    alcotest
    cmdliner
    ;; mina libraries
+   archive_lib
+   mina_caqti
    mina_automation
    mina_automation.fixture
    mina_automation.runner)

@@ -37,17 +37,7 @@ let test_case (test_data : t) =
       "DROP TABLE IF EXISTS hardfork_state; DROP TYPE IF EXISTS \
        hardfork_source; DROP TABLE IF EXISTS migration_history"
   in
-  (* A port the OS hands out, so the readiness probe cannot be answered by
-     something else listening on a fixed one. *)
-  let%bind port =
-    let server =
-      Tcp.Server.create_sock_inet ~on_handler_error:`Ignore
-        Tcp.Where_to_listen.of_port_chosen_by_os (fun _ _ -> Deferred.unit)
-    in
-    let port = Tcp.Server.listening_on server in
-    let%map () = Tcp.Server.close server in
-    port
-  in
+  let%bind port = Utils.free_port () in
   let%bind rosetta =
     Rosetta.start
       (Rosetta.of_config
@@ -138,3 +128,83 @@ let test_case (test_data : t) =
       if not (String.is_substring log ~substring:"Standing down") then
         failwith "rosetta exited without the stand-down line" ;
       Mina_automation_fixture.Intf.Passed )
+
+(* What the watcher reads, against the tables upgrade.sql really creates:
+   migration_history.status is an enum there, not text. No Rosetta process, so
+   each state costs one query rather than a watcher interval. *)
+module Verdicts = struct
+  type t = Mina_automation_fixture.Archive.before_bootstrap
+
+  let test_case (test_data : t) =
+    let archive_uri = test_data.config.postgres_uri in
+    let connection = Psql.Conn_str archive_uri in
+    let sql query = Psql.run_command ~connection query >>| Or_error.ok_exn in
+    let pool =
+      Mina_caqti.connect_pool ~max_size:1 (Uri.of_string archive_uri)
+      |> Result.map_error ~f:Caqti_error.show
+      |> Result.ok_or_failwith
+    in
+    let verdict () =
+      Mina_caqti.Pool.use Archive_lib.Schema_era.check pool
+      >>| Result.map_error ~f:Caqti_error.show
+      >>| Result.ok_or_failwith
+    in
+    let expect step expected =
+      let%map v = verdict () in
+      let got = Archive_lib.Schema_era.describe v in
+      if not (String.equal got (Archive_lib.Schema_era.describe expected)) then
+        failwithf "%s: got '%s'" step got ()
+    in
+    let mine = Archive_lib.Schema_era.my_protocol_version in
+    let upgrade_script =
+      Archive.Scripts.filepath `Upgrade
+      |> Option.value_exn ~message:"Failed to find upgrade script"
+    in
+    let%bind _ =
+      sql
+        "DROP TABLE IF EXISTS hardfork_state; DROP TYPE IF EXISTS \
+         hardfork_source; DROP TABLE IF EXISTS migration_history"
+    in
+    let%bind () = expect "no tables" Archive_lib.Schema_era.Serve in
+    let%bind _ = Psql.run_script ~connection upgrade_script in
+    let%bind () =
+      expect "upgraded early, no fork recorded" Archive_lib.Schema_era.Serve
+    in
+    let%bind _ =
+      sql
+        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = \
+         'hardfork_source') THEN CREATE TYPE hardfork_source AS ENUM \
+         ('daemon_config', 'fork_genesis', 'operator'); END IF; END $$; CREATE \
+         TABLE IF NOT EXISTS hardfork_state (id int PRIMARY KEY DEFAULT 1 \
+         CHECK (id = 1), fork_state_hash text NOT NULL, fork_blockchain_length \
+         bigint NOT NULL, fork_global_slot bigint NOT NULL, config_json text \
+         NOT NULL, source hardfork_source NOT NULL, announced_at timestamptz \
+         NOT NULL DEFAULT now(), finalized_at timestamptz); INSERT INTO \
+         hardfork_state (fork_state_hash, fork_blockchain_length, \
+         fork_global_slot, config_json, source) VALUES ('FORK', 10, 10, '{}', \
+         'daemon_config')"
+    in
+    let%bind () =
+      expect "fork recorded, upgraded schema"
+        (Archive_lib.Schema_era.Differs { schema = "5.0.0"; mine })
+    in
+    let set_status status =
+      sql
+        (sprintf
+           "UPDATE migration_history SET status = '%s' WHERE commit_start_at = \
+            (SELECT max(commit_start_at) FROM migration_history)"
+           status )
+    in
+    let%bind _ = set_status "starting" in
+    let%bind () =
+      expect "fork recorded, migration starting"
+        (Archive_lib.Schema_era.Migration_in_progress "starting")
+    in
+    let%bind _ = set_status "failed" in
+    let%bind () =
+      expect "fork recorded, migration failed"
+        (Archive_lib.Schema_era.Migration_in_progress "failed")
+    in
+    let%map () = Caqti_async.Pool.drain pool.Mina_caqti.Pool.pool in
+    Mina_automation_fixture.Intf.Passed
+end

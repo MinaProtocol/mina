@@ -58,5 +58,10 @@ let () =
                ( module Mina_automation_fixture.Archive
                         .Make_FixtureWithoutBootstrap
                           (Rosetta_fork_detection) ) )
+        ; test_case "What the stand-down watcher reads from the database" `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Rosetta_fork_detection.Verdicts) ) )
         ] )
     ]
