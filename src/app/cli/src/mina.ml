@@ -1,1 +1,1 @@
-let () = Mina_cli_entrypoint.linkme
+let () = Mina_cli_entrypoint.run ()

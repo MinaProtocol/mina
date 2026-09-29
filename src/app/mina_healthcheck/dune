@@ -1,7 +1,7 @@
-(executable
- (name mina_healthcheck)
- (package mina_healthcheck)
- (public_name mina-healthcheck)
+(library
+ (name mina_healthcheck_applet)
+ (public_name mina_healthcheck.applet)
+ (modules mina_healthcheck_applet)
  (libraries
   core_unix.command_unix
   ;; opam libraries
@@ -20,3 +20,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane ppx_mina)))
+
+(executable
+ (name mina_healthcheck)
+ (package mina_healthcheck)
+ (public_name mina-healthcheck)
+ (modules mina_healthcheck)
+ (libraries mina_healthcheck_applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

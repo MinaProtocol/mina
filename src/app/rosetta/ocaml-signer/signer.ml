@@ -1,6 +1,3 @@
-open Async
+(* Thin entrypoint: dispatch straight into the applet library. *)
 
-let () =
-  Command_unix.run
-    ( Command.group ~summary:"OCaml reference signer implementation for Rosetta."
-    @@ Signer_cli.commands () )
+let () = Signer_applet.run ()
