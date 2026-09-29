@@ -12,6 +12,10 @@
   ; Opam libraries
   core_kernel
   ; Mina libraries
+  ; mina_base links crypto_params, which sets the URS info from
+  ; Cache_dir.cache; the fake implementation's is empty.
+  cache_dir.fake
+  mina_base
   pickles
   pickles.backend
   pickles_types

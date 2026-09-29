@@ -35,15 +35,17 @@
  *      2 = main side-loaded step      (d1_size=16384, public=34)
  *      3 = main side-loaded wrap      (d1_size=16384, public=40)
  *    Use [tools/witness_diff.sh] to compare against PS-side dumps.
+ *  - [BIND_VK_CIRCUIT_DIR] — directory for the constraint system of
+ *    [bind_vk_step_circuit], a step circuit that binds a side-loaded
+ *    key to a digest the way a zkApp rule does.
  *)
 
 open Pickles
 open Pickles_types
 open Impls.Step
 
-let () = Backend.Tock.Keypair.set_urs_info []
-
-let () = Backend.Tick.Keypair.set_urs_info []
+(* The URS info is set by crypto_params, linked through mina_base, to
+   the empty cache list of cache_dir.fake (see dune). *)
 
 (* Currently, a circuit must have at least 1 of every type of
    constraint. Mirrors `pickles.ml:1483-1508`. *)
@@ -291,7 +293,7 @@ let dump_child_fixture () =
 
   (* (a) Side-loaded VK sanity-construct (record fields stay abstract;
      not dumped — PS reconstructs from kimchi VK + static mpv). *)
-  let _sl_vk : Side_loaded.Verification_key.t =
+  let sl_vk : Side_loaded.Verification_key.t =
     Promise.block_on_async_exn (fun () ->
         Side_loaded.Verification_key.of_compiled_promise tag )
   in
@@ -357,9 +359,36 @@ let dump_child_fixture () =
   let stmt_json = Pickles.Backend.Tick.Field.to_yojson example_input in
   write_file "app_statement.json" (Yojson.Safe.to_string stmt_json) ;
 
+  (* (f) The side-loaded key's digest → vk_digest.json, as Mina hashes a
+     zkApp's verification key. *)
+  let digest_json =
+    Pickles.Backend.Tick.Field.to_yojson
+      (Mina_base.Verification_key_wire.digest_vk sl_vk)
+  in
+  write_file "vk_digest.json" (Yojson.Safe.to_string digest_json) ;
+
   Format.printf "=== side-loaded child fixture dump DONE ===@."
 
+(* A step circuit that binds a side-loaded key to its public input: the
+   key's digest, computed as a zkApp rule computes it before
+   [Side_loaded.in_circuit], must equal the input. *)
+let bind_vk_step_circuit digest () =
+  let vk =
+    exists Side_loaded.Verification_key.typ ~compute:(fun () ->
+        Side_loaded.Verification_key.dummy )
+  in
+  Field.Assert.equal (Mina_base.Zkapp_account.Checked.digest_vk vk) digest
+
+let dump_bind_vk_circuit () =
+  match Sys.getenv_opt "BIND_VK_CIRCUIT_DIR" with
+  | None ->
+      ()
+  | Some dir ->
+      Dump_circuit_impl.dump_tick_with_labels dir "bind_vk_step_circuit"
+        bind_vk_step_circuit ~input_typ:Field.typ ~return_typ:Typ.unit
+
 let () =
+  dump_bind_vk_circuit () ;
   dump_child_fixture () ;
   let _ = Simple_chain.example1 in
   Format.printf "side-loaded main verified.@."
