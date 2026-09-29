@@ -105,7 +105,13 @@ module Step = struct
           let identifier = Key.Proving.to_string key in
           Kimchi_bindings.Protocol.Index.Fp.write_cached identifier t.index path )
     in
-    Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
+    (* The two formats never share a file: a process in one mode must not
+       overwrite, or fail to read, a key written in the other. *)
+    let file_name key =
+      if use_mmap_cache () then Key.Proving.to_string key ^ ".mmap"
+      else Key.Proving.to_string key
+    in
+    Key_cache.Sync.Disk_storable.simple file_name
       (fun ((_, header, _, cs) as key) ~path ->
         if use_mmap_cache () then read_mmap key ~path ~cs
         else read_legacy header ~path ~cs )
@@ -266,7 +272,13 @@ module Wrap = struct
           let identifier = Key.Proving.to_string key in
           Kimchi_bindings.Protocol.Index.Fq.write_cached identifier t.index path )
     in
-    Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
+    (* The two formats never share a file: a process in one mode must not
+       overwrite, or fail to read, a key written in the other. *)
+    let file_name key =
+      if use_mmap_cache () then Key.Proving.to_string key ^ ".mmap"
+      else Key.Proving.to_string key
+    in
+    Key_cache.Sync.Disk_storable.simple file_name
       (fun ((_, header, cs) as key) ~path ->
         if use_mmap_cache () then read_mmap key ~path ~cs
         else read_legacy header ~path ~cs )
