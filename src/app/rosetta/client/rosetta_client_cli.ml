@@ -112,11 +112,11 @@ let run g ~(call : MRC.Http.t -> Yojson.Safe.t Deferred.Or_error.t) =
 
 let address_flag =
   Command.Param.(
-    flag "--address" ~doc:"B62q... Account address" (required string) )
+    flag "--address" ~doc:"B62q... Account address" (required string))
 
 let address_filter_flag =
   Command.Param.(
-    flag "--address" ~doc:"B62q... Filter by account" (optional string) )
+    flag "--address" ~doc:"B62q... Filter by account" (optional string))
 
 let tx_hash_flag =
   Command.Param.(flag "--tx-hash" ~doc:"H Transaction hash" (required string))
@@ -129,19 +129,19 @@ let block_index_flag ~doc = Command.Param.(flag "--index" ~doc (optional int))
 let metadata_json_flag =
   Command.Param.(
     flag "--metadata-json" ~doc:"JSON Optional metadata object"
-      (optional string) )
+      (optional string))
 
 let operations_json_flag =
   Command.Param.(
-    flag "--operations-json" ~doc:"JSON Operations array" (required string) )
+    flag "--operations-json" ~doc:"JSON Operations array" (required string))
 
 let public_keys_json_flag =
   Command.Param.(
-    flag "--public-keys-json" ~doc:"JSON PublicKey array" (optional string) )
+    flag "--public-keys-json" ~doc:"JSON PublicKey array" (optional string))
 
 let signed_transaction_flag =
   Command.Param.(
-    flag "--signed-transaction" ~doc:"STR Signed tx blob" (required string) )
+    flag "--signed-transaction" ~doc:"STR Signed tx blob" (required string))
 
 (* ---------- Data API subcommands ---------- *)
 
