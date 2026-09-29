@@ -117,9 +117,7 @@ let publishCmd
                 , privileged = True
                 , useRoot = True
                 }
-                (     "git config --global --add safe.directory /workdir && "
-                  ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
-                  ++  "gpg --import /var/secrets/debian/key.gpg && "
+                (     "gpg --import /var/secrets/debian/key.gpg && "
                   ++  "release-manager publish"
                   ++  " --source-folder ${debsFolder}"
                   ++  " --codenames ${codenames}"
