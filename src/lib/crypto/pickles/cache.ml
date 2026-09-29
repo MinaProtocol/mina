@@ -222,10 +222,12 @@ module Wrap = struct
             let open Or_error.Let_syntax in
             let%map header_read, index =
               Snark_keys_header.read_with_header
-                ~read_data:(fun ~offset:_ path ->
-                  Binable.of_string
-                    (module Verification_key.Stable.Latest)
-                    (In_channel.read_all path) )
+                ~read_data:(fun ~offset path ->
+                  In_channel.with_file ~binary:true path ~f:(fun in_channel ->
+                      In_channel.seek in_channel (Int64.of_int offset) ;
+                      Binable.of_string
+                        (module Verification_key.Stable.Latest)
+                        (In_channel.input_all in_channel) ) )
                 path
             in
             [%test_eq: int] header.header_version header_read.header_version ;
