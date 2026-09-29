@@ -70,8 +70,7 @@ let cache_dir =
       (try Stdlib.Sys.mkdir dir 0o700 with Sys_error _ -> ()) ;
       dir
 
-let is_phase_2 =
-  Array.exists Sys.argv ~f:(fun a -> String.equal a "--phase-2")
+let is_phase_2 = Array.exists Sys.argv ~f:(fun a -> String.equal a "--phase-2")
 
 let cache_spec : Key_cache.Spec.t list =
   [ On_disk { directory = cache_dir; should_write = true } ]
@@ -81,7 +80,8 @@ let cache_spec : Key_cache.Spec.t list =
     both Step (Tick/Vesta) and Wrap (Tock/Pallas). *)
 let compile_trivial_circuit ~name =
   Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
-    ~auxiliary_typ:Typ.unit ~max_proofs_verified:(module Nat.N0)
+    ~auxiliary_typ:Typ.unit
+    ~max_proofs_verified:(module Nat.N0)
     ~cache:cache_spec ~name
     ~choices:(fun ~self:_ ->
       [ { identifier = "trivial"
@@ -120,8 +120,7 @@ let phase_run ~name =
 
 let inspect_cache_files () =
   let entries = Array.to_list (Stdlib.Sys.readdir cache_dir) in
-  Printf.eprintf "[cache-dir %s] %d entries\n%!" cache_dir
-    (List.length entries) ;
+  Printf.eprintf "[cache-dir %s] %d entries\n%!" cache_dir (List.length entries) ;
   List.iter entries ~f:(fun name ->
       let path = Filename.concat cache_dir name in
       let size =
@@ -130,14 +129,15 @@ let inspect_cache_files () =
         Stdlib.close_in ic ; n
       in
       let magic =
-        if String.is_prefix name ~prefix:"step-"
-           || String.is_prefix name ~prefix:"wrap-"
-        then
+        if
+          String.is_prefix name ~prefix:"step-"
+          || String.is_prefix name ~prefix:"wrap-"
+        then (
           let ic = Stdlib.open_in_bin path in
           let b = Bytes.create 8 in
           let n = Stdlib.input ic b 0 8 in
           Stdlib.close_in ic ;
-          if n = 8 then Some (Bytes.to_string b) else None
+          if n = 8 then Some (Bytes.to_string b) else None )
         else None
       in
       Printf.eprintf "  %s  size=%d  magic=%s\n%!" name size
@@ -159,8 +159,7 @@ let () =
     phase_run ~name:"phase-2 (read cache + prove + verify)" ;
     Printf.eprintf "\ntest_mmap_cache: phase 2 SUCCESS\n%!" )
   else (
-    Printf.eprintf "test_mmap_cache PHASE 1 (write), cache_dir=%s\n%!"
-      cache_dir ;
+    Printf.eprintf "test_mmap_cache PHASE 1 (write), cache_dir=%s\n%!" cache_dir ;
     phase_run ~name:"phase-1 (keygen + write cache)" ;
     inspect_cache_files () ;
     (* Re-exec ourselves with --phase-2 in a fresh OS process. This is the
@@ -169,8 +168,7 @@ let () =
        generator state in memory, the prove in phase 2 will fail. *)
     let cmd =
       Printf.sprintf "%s=1 %s=%s %s --phase-2" "MINA_USE_MMAP_CACHE"
-        cache_dir_env_var
-        (Filename.quote cache_dir)
+        cache_dir_env_var (Filename.quote cache_dir)
         (Filename.quote Sys.executable_name)
     in
     Printf.eprintf "\n=== re-exec'ing for phase 2 ===\n%s\n%!" cmd ;

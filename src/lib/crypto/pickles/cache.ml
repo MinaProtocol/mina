@@ -103,8 +103,7 @@ module Step = struct
     let write_mmap (key : Key.Proving.t) (t : Backend.Tick.Keypair.t) path =
       Or_error.try_with (fun () ->
           let identifier = Key.Proving.to_string key in
-          Kimchi_bindings.Protocol.Index.Fp.write_cached identifier t.index
-            path )
+          Kimchi_bindings.Protocol.Index.Fp.write_cached identifier t.index path )
     in
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun ((_, header, _, cs) as key) ~path ->
@@ -265,8 +264,7 @@ module Wrap = struct
     let write_mmap (key : Key.Proving.t) (t : Backend.Tock.Keypair.t) path =
       Or_error.try_with (fun () ->
           let identifier = Key.Proving.to_string key in
-          Kimchi_bindings.Protocol.Index.Fq.write_cached identifier t.index
-            path )
+          Kimchi_bindings.Protocol.Index.Fq.write_cached identifier t.index path )
     in
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun ((_, header, cs) as key) ~path ->
