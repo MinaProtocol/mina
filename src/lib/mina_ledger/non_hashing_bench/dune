@@ -1,0 +1,21 @@
+(executable
+ (name bench)
+ (libraries
+  core
+  core_unix.command_unix
+  core_unix.filename_unix
+  async
+  mina_base
+  mina_ledger
+  mina_transaction
+  mina_transaction_logic
+  currency
+  signature_lib
+  mina_numbers
+  genesis_constants
+  merkle_mask
+  data_hash_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_base ppx_mina)))
