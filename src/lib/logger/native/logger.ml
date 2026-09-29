@@ -188,6 +188,23 @@ module Processor = struct
 
     let create ~log_level ~config = { log_level; config }
 
+    (* the metadata interpolation left over, one "key: value" per line. Printed
+       inside the record's vertical box, so the cuts carry its indentation.
+
+       The block is introduced by its own cut rather than by one in the record's
+       format string: a cut in a vertical box always breaks, so an
+       unconditional one would end every record with no leftover metadata --
+       one with no metadata at all, or whose every field was interpolated into
+       the message -- on a newline and the box's indent. *)
+    let pp_extra ppf = function
+      | [] ->
+          ()
+      | extra ->
+          Format.fprintf ppf "@,%a"
+            (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (k, v) ->
+                 Format.fprintf ppf "%s: %s" k v ) )
+            extra
+
     let process { log_level; config } (msg : Message.t) =
       let open Message in
       if Level.compare msg.level log_level < 0 then None
@@ -204,11 +221,8 @@ module Processor = struct
         | Ok (str, extra) ->
             let msg =
               (* The previously existing \t has been changed to 2 spaces. *)
-              Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
-                Level.pp msg.level str
-                (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
-                extra
+              Format.asprintf "@[<v 2>%a [%a] %s%a@]" Time.pp msg.timestamp
+                Level.pp msg.level str pp_extra extra
             in
             Some msg
   end
