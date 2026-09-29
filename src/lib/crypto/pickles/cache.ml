@@ -171,32 +171,31 @@ module Step = struct
   let read_or_generate ~prev_challenges cache ?(s_p = storable)
       ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
     let open Impls.Step in
-    let pk =
-      lazy
-        (let%map.Promise k_p = Lazy.force k_p in
-         match
-           Common.time "step keypair read" (fun () ->
-               Key_cache.Sync.read cache s_p k_p )
-         with
-         | Ok (pk, dirty) ->
-             Common.time "step keypair create" (fun () -> (pk, dirty))
-         | Error _e ->
-             let pk, dirty =
-               match read_legacy_to_convert cache ~s_p k_p with
-               | Some legacy ->
-                   legacy
-               | None ->
-                   let _, _, _, sys = k_p in
-                   let r =
-                     Common.time "stepkeygen" (fun () ->
-                         Keypair.generate ~prev_challenges sys ~lazy_mode )
-                   in
-                   Timer.clock __LOC__ ;
-                   (Keypair.pk r, `Generated_something)
-             in
-             ignore (Key_cache.Sync.write cache s_p k_p pk : unit Or_error.t) ;
-             read_back_written cache ~s_p k_p (pk, dirty) )
+    let load_or_generate k_p =
+      match
+        Common.time "step keypair read" (fun () ->
+            Key_cache.Sync.read cache s_p k_p )
+      with
+      | Ok (pk, dirty) ->
+          Common.time "step keypair create" (fun () -> (pk, dirty))
+      | Error _e ->
+          let pk, dirty =
+            match read_legacy_to_convert cache ~s_p k_p with
+            | Some legacy ->
+                legacy
+            | None ->
+                let _, _, _, sys = k_p in
+                let r =
+                  Common.time "stepkeygen" (fun () ->
+                      Keypair.generate ~prev_challenges sys ~lazy_mode )
+                in
+                Timer.clock __LOC__ ;
+                (Keypair.pk r, `Generated_something)
+          in
+          ignore (Key_cache.Sync.write cache s_p k_p pk : unit Or_error.t) ;
+          read_back_written cache ~s_p k_p (pk, dirty)
     in
+    let pk = lazy (Promise.map (Lazy.force k_p) ~f:load_or_generate) in
     let vk =
       lazy
         (let%bind.Promise k_v = Lazy.force k_v in
@@ -207,7 +206,13 @@ module Step = struct
          | Ok (vk, _) ->
              Promise.return (vk, `Cache_hit)
          | Error _e ->
-             let%map.Promise pk, c = Lazy.force pk in
+             (* Only keep the proving key if this process already wants it;
+                otherwise, load it just long enough to derive the verification
+                key. *)
+             let%map.Promise pk, c =
+               if Lazy.is_val pk then Lazy.force pk
+               else Promise.map (Lazy.force k_p) ~f:load_or_generate
+             in
              let vk = Backend.Tick.Keypair.vk pk in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
              (vk, c) )
@@ -372,31 +377,29 @@ module Wrap = struct
       ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
     let module Vk = Verification_key in
     let open Impls.Wrap in
-    let pk =
-      lazy
-        (let%map.Promise k = Lazy.force k_p in
-         match
-           Common.time "wrap key read" (fun () ->
-               Key_cache.Sync.read cache s_p k )
-         with
-         | Ok (pk, d) ->
-             (pk, d)
-         | Error _e ->
-             let pk, dirty =
-               match read_legacy_to_convert cache ~s_p k with
-               | Some legacy ->
-                   legacy
-               | None ->
-                   let _, _, sys = k in
-                   let r =
-                     Common.time "wrapkeygen" (fun () ->
-                         Keypair.generate ~lazy_mode ~prev_challenges sys )
-                   in
-                   (Keypair.pk r, `Generated_something)
-             in
-             ignore (Key_cache.Sync.write cache s_p k pk : unit Or_error.t) ;
-             read_back_written cache ~s_p k (pk, dirty) )
+    let load_or_generate k =
+      match
+        Common.time "wrap key read" (fun () -> Key_cache.Sync.read cache s_p k)
+      with
+      | Ok (pk, d) ->
+          (pk, d)
+      | Error _e ->
+          let pk, dirty =
+            match read_legacy_to_convert cache ~s_p k with
+            | Some legacy ->
+                legacy
+            | None ->
+                let _, _, sys = k in
+                let r =
+                  Common.time "wrapkeygen" (fun () ->
+                      Keypair.generate ~lazy_mode ~prev_challenges sys )
+                in
+                (Keypair.pk r, `Generated_something)
+          in
+          ignore (Key_cache.Sync.write cache s_p k pk : unit Or_error.t) ;
+          read_back_written cache ~s_p k (pk, dirty)
     in
+    let pk = lazy (Promise.map (Lazy.force k_p) ~f:load_or_generate) in
     let vk =
       lazy
         (let%bind.Promise k_v = Lazy.force k_v in
@@ -404,7 +407,13 @@ module Wrap = struct
          | Ok (vk, d) ->
              Promise.return (vk, d)
          | Error _e ->
-             let%map.Promise pk, _dirty = Lazy.force pk in
+             (* Only keep the proving key if this process already wants it;
+                otherwise, load it just long enough to derive the verification
+                key. *)
+             let%map.Promise pk, _dirty =
+               if Lazy.is_val pk then Lazy.force pk
+               else Promise.map (Lazy.force k_p) ~f:load_or_generate
+             in
              let vk = Backend.Tock.Keypair.vk pk in
              let vk : Vk.t =
                { index = vk
@@ -416,7 +425,6 @@ module Wrap = struct
                }
              in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
-             let _vk = Key_cache.Sync.read cache s_v k_v in
              (vk, `Generated_something) )
     in
     (pk, vk)
