@@ -421,6 +421,13 @@ module Status = struct
       in
       option_entry "Catchup status" ~f:render
 
+    let scan_state_sync_status =
+      let render xs =
+        List.map xs ~f:(fun (label, n) -> ("\t" ^ label, Int.to_string n))
+        |> digest_entries ~title:""
+      in
+      option_entry "Scan state sync" ~f:render
+
     let metrics =
       let render conf =
         let fmt_field name op field = [ (name, op (Field.get field conf)) ] in
@@ -479,6 +486,9 @@ module Status = struct
     ; catchup_status :
         (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list
         option
+    ; scan_state_sync_status : (string * int) list option
+          (** how far a bootstrap's scan state sync has got, [None] when none is
+              running *)
     ; block_production_keys : string list
     ; coinbase_receiver : string option
     ; histograms : Histograms.t option
@@ -508,7 +518,8 @@ module Status = struct
       ~coinbase_receiver ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics
+      ~snark_work_fee ~addrs_and_ports ~catchup_status ~scan_state_sync_status
+      ~metrics
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

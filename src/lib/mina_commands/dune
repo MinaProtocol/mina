@@ -17,6 +17,7 @@
   mina_metrics
   mina_stdlib
   transition_frontier
+  staged_ledger
   sync_status
   pipe_lib
   perf_histograms

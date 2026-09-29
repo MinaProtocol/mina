@@ -71,7 +71,7 @@ module Root_transition = struct
     | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
 
   type 'repr t =
-    { new_root : Root_data.Limited.Stable.Latest.t
+    { new_root : Root_data.Limited.Stored.t
     ; garbage : 'repr Node_list.t
     ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
@@ -79,70 +79,55 @@ module Root_transition = struct
 
   type 'repr root_transition = 'repr t
 
+  (* Unversioned, following the root data it carries: a root transition is
+     written to the frontier's own database and handed to the archive over a
+     local pipe, never to a peer. *)
   module Lite_binable = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V5 = struct
-        type t =
-          { new_root : Root_data.Limited.Stable.V4.t
-          ; garbage : Node_list.Lite.Stable.V1.t
-          ; just_emitted_a_proof : bool
-          }
-
-        let to_latest = Fn.id
-      end
-    end]
+    type t =
+      { new_root : Root_data.Limited.Stored.t
+      ; garbage : Node_list.Lite.Stable.V1.t
+      ; just_emitted_a_proof : bool
+      }
+    [@@deriving bin_io_unversioned]
   end
 
   module Lite = struct
-    module Binable_arg = struct
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
+    module Stored = struct
+      (* [lite root_transition] carries a phantom witness that its scan state
+         is absent, which bin_prot cannot reconstruct, so it is written and
+         read through the plain record above.
 
-        module V5 = struct
-          type t = Lite_binable.Stable.V5.t
+         ppx_version guards [Binable.Of_binable] so that a wire type cannot
+         quietly change shape through a conversion. This is not a wire type —
+         hence the alias, which puts the conversion outside the check rather
+         than pretending to satisfy it. *)
+      module Binable_ = Binable
 
-          let to_latest = Fn.id
-        end
-      end]
-    end
+      type t = lite root_transition
 
-    [%%versioned_binable
-    module Stable = struct
-      module V5 = struct
-        type t = lite root_transition
+      module T_nonbinable = struct
+        type nonrec t = t
 
-        module T_nonbinable = struct
-          type nonrec t = t
+        let to_binable
+            ({ new_root
+             ; garbage
+             ; just_emitted_a_proof
+             ; old_root_scan_state = Lite
+             } :
+              t ) : Lite_binable.t =
+          { new_root; garbage; just_emitted_a_proof }
 
-          let to_binable
-              ({ new_root
-               ; garbage
-               ; just_emitted_a_proof
-               ; old_root_scan_state = Lite
-               } :
-                t ) : Binable_arg.Stable.V5.t =
-            { new_root; garbage; just_emitted_a_proof }
-
-          let of_binable
-              ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V5.t ) : t =
-            { new_root
-            ; garbage
-            ; old_root_scan_state = Lite
-            ; just_emitted_a_proof
-            }
-        end
-
-        include
-          Binable.Of_binable_without_uuid (Binable_arg.Stable.V5) (T_nonbinable)
-
-        let to_latest = Fn.id
+        let of_binable
+            ({ new_root; garbage; just_emitted_a_proof } : Lite_binable.t) : t =
+          { new_root
+          ; garbage
+          ; old_root_scan_state = Lite
+          ; just_emitted_a_proof
+          }
       end
-    end]
+
+      include Binable_.Of_binable_without_uuid (Lite_binable) (T_nonbinable)
+    end
   end
 end
 
@@ -180,7 +165,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
         `Assoc
           [ ( "new_root"
             , State_hash.to_yojson
-                (Root_data.Limited.Stable.Latest.hashes new_root).state_hash )
+                (Root_data.Limited.Stored.hashes new_root).state_hash )
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
           ]

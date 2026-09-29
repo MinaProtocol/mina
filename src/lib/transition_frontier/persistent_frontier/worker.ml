@@ -70,7 +70,7 @@ module Worker = struct
                ~f:(fun
                    { Diff.Root_transition.new_root; garbage = Lite garbage; _ }
                  ->
-                 (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+                 (Root_data.Limited.Stored.hashes new_root).state_hash
                  :: garbage )
         in
         let total_root_transition_diff =

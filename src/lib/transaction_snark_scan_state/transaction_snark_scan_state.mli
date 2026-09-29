@@ -4,16 +4,16 @@ open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 
-[%%versioned:
-module Stable : sig
-  [@@@no_toplevel_latest_type]
+(** The stored shape: what the frontier writes to disk and passes around in its
+    own diffs. Unversioned — a scan state reaches another node through the sync
+    protocol, in verified fragments, so nothing untrusted parses this. *)
+module Stored : sig
+  type t
 
-  module V3 : sig
-    type t
+  include Binable.S with type t := t
 
-    val hash : t -> Staged_ledger_hash.Aux_hash.t
-  end
-end]
+  val hash : t -> Staged_ledger_hash.Aux_hash.t
+end
 
 type t
 
@@ -240,7 +240,183 @@ val all_work_pairs :
 val write_all_proofs_to_disk :
      signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
-  -> Stable.Latest.t
+  -> Stored.t
   -> t
 
-val read_all_proofs_from_disk : t -> Stable.Latest.t
+val read_all_proofs_from_disk : t -> Stored.t
+
+(** Serving a scan state piece by piece, so that a bootstrapping node can fetch
+    it in verifiable fragments rather than as one blob. The protocol itself is
+    {!Parallel_scan_sync}; this wires it to the transaction scan state. *)
+module Sync : sig
+  (** The scan state being served, named before [Responder.t] shadows it. *)
+  type nonrec scan_state = t
+
+  module Address = Parallel_scan_sync.Address
+  module Cursors = Parallel_scan_sync.Cursors
+  module Band = Parallel_scan_sync.Band
+
+  (** The digest that names a payload: [SHA256] of the bytes on the wire, which
+      is how both payload types already hash themselves. A received payload is
+      checked with this before anything tries to parse it.
+
+      This is a payload digest, not the block's
+      [Staged_ledger_hash.Aux_hash.t] — both are SHA256, but only the latter is
+      what a manifest is checked against. *)
+  val digest_of_bytes : string -> string
+
+  (** What a syncing node fetches first: every payload named, the structure
+      holding them committed to, and nothing trusted until it reproduces the
+      block's staged ledger hash. *)
+  module Manifest : sig
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V1 : sig
+        type t
+      end
+    end]
+
+    type t = Stable.V1.t
+
+    val aux_hash : t -> Staged_ledger_hash.Aux_hash.t
+
+    (** The manifest also carries the ledger hash and pending coinbase, because
+        the block commits to those together with the aux hash as one staged
+        ledger hash — verifying only the aux hash would leave the other two for
+        a peer to lie about. *)
+    val staged_ledger_hash : t -> Staged_ledger_hash.t
+
+    val ledger_hash : t -> Ledger_hash.t
+
+    val pending_coinbase : t -> Pending_coinbase.t
+
+    (** [verify t ~expected] recomputes the commitment from the manifest alone
+        and compares it against the one in the block. *)
+    val verify : t -> expected:Staged_ledger_hash.t -> unit Or_error.t
+  end
+
+  (** What one peer asks another for. *)
+  module Query : sig
+    type t =
+      | Manifest of State_hash.t
+      | Band of
+          { scan_state : State_hash.t
+          ; tree : string
+          ; root : Address.t
+          ; height : int
+          }
+      | Payloads of { scan_state : State_hash.t; digests : string array }
+      | Protocol_states of State_hash.t
+    [@@deriving sexp]
+
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V1 : sig
+        type nonrec t = t
+      end
+    end]
+
+    (** The scan state a query is about. Every query names one, so any peer
+        holding that root can answer it. *)
+    val scan_state : t -> State_hash.t
+
+    val max_payloads_per_query : int
+  end
+
+  module Answer : sig
+    type t =
+      | Manifest of Manifest.t
+      | Band of Band.t
+      | Payloads of (string * string) array
+      | Protocol_states of Mina_state.Protocol_state.value array
+    [@@deriving sexp]
+
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V1 : sig
+        type nonrec t = t
+      end
+    end]
+  end
+
+  (** A peer's side, built once per scan state and reused across requests. *)
+  module Responder : sig
+    type t
+
+    val create :
+         scan_state
+      -> ledger_hash:Ledger_hash.t
+      -> pending_coinbase:Pending_coinbase.t
+      -> t
+
+    val manifest : t -> Manifest.t
+
+    (** The subtree rooted at [root] of the tree with digest [tree], truncated
+        to [height] levels. Keyed by digest rather than position so that a peer
+        whose forest has moved on can still serve a tree it holds. *)
+    val band : t -> tree:string -> root:Address.t -> height:int -> Band.t option
+
+    (** The [bin_prot] bytes of one payload, by digest. *)
+    val payload_bytes : t -> digest:string -> string option
+
+    (** Answer one query. *)
+    val respond : t -> Query.t -> Answer.t option
+  end
+
+  (** Where a scan state sync has got to, for [mina client status]. A sync runs
+      inside the bootstrap controller, which has no transition frontier to hang
+      progress off the way catchup does, so the controller publishes here and
+      the daemon's status reads it. *)
+  module Progress : sig
+    type t =
+      { bands_outstanding : int; payloads_received : int; payloads_known : int }
+
+    (** [None] clears it, and means no sync is running. *)
+    val report : t option -> unit
+
+    val get : unit -> t option
+
+    (** As [(label, count)] pairs, the shape the daemon status renders. *)
+    val to_entries : t -> (string * int) list
+  end
+
+  (** A syncing node's side: accumulates verified fragments and assembles a
+      scan state once they are all in. *)
+  module Builder : sig
+    type t
+
+    (** [create manifest ~expected ~band_height] checks [manifest] against the
+        staged ledger hash in the block and opens a builder on it. This is the
+        only point at which the chain is consulted; every later fragment is
+        checked against something established here. *)
+    val create :
+         Manifest.t
+      -> state_hash:State_hash.t
+      -> expected:Staged_ledger_hash.t
+      -> band_height:int
+      -> t Or_error.t
+
+    (** What to ask peers for next, in the form that goes on the wire. Bands
+        come before payloads, because bands are what name payloads. *)
+    val queries : t -> Query.t list
+
+    (** Take an answer together with the query that asked for it; the pairing
+        is what says which tree a band belongs to. *)
+    val add_answer : t -> query:Query.t -> Answer.t -> unit Or_error.t
+
+    val outstanding : t -> [ `Bands of int ] * [ `Payloads of int ]
+
+    (** A snapshot for the daemon status. *)
+    val progress : t -> Progress.t
+
+    (** Assemble the serialised scan state, ready for
+        {!write_all_proofs_to_disk}. Fails while anything is outstanding. *)
+    val finish : t -> Stored.t Or_error.t
+  end
+end

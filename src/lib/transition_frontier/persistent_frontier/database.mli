@@ -87,7 +87,7 @@ val add :
 
 val move_root :
      old_root_hash:State_hash.t
-  -> new_root:Root_data.Limited.Stable.Latest.t
+  -> new_root:Root_data.Limited.Stored.t
   -> garbage:State_hash.t list
   -> batch_t
   -> unit
@@ -108,7 +108,7 @@ val get_arcs :
 
 val get_root :
      t
-  -> ( Root_data.Minimal.Stable.Latest.t
+  -> ( Root_data.Minimal.Stored.t
      , [> `Not_found of [> `Root_hash | `Root_common ] ] )
      Result.t
 
