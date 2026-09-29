@@ -3,7 +3,8 @@
   test_fix_domains
   pickles_test_optional_custom_gates
   lookup_range_check
-  test_mmap_cache)
+  test_mmap_cache
+  test_mmap_cache_mixed)
  (libraries
   ;; opam libraries
   alcotest
