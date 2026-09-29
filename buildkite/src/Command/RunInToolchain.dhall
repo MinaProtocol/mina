@@ -81,7 +81,8 @@ let runInToolchain
     =     \(c : Config.Type)
       ->    submodulesInit c.submodules
           # binfmtSetup c.arch
-          # [ Cmd.run "./buildkite/scripts/docker/load_from_cache.sh ${c.image}"
+          # [ Cmd.run
+                "./buildkite/scripts/docker/load_from_cache.sh ${c.image} || docker pull ${c.image}"
             , FixPermissions.command c.arch
             ]
           # [ Cmd.runInDocker
