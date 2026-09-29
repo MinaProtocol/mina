@@ -42,7 +42,7 @@ let main ~genesis_constants ~constraint_constants conf_dir : unit Deferred.t =
   print_heap_usage "Pending_coinbase.t" (pending_coinbase ~constraint_constants) ;
   print_heap_usage "Staged_ledger_diff.t (payments)" staged_ledger_diff ;
   print_heap_usage "Parallel_scan.Base.t (coinbase)"
-    scan_state_base_node_coinbase ;
+    (scan_state_base_node_coinbase ~constraint_constants) ;
   print_heap_usage "Parallel_scan.Base.t (payment)"
     (scan_state_base_node_payment ~constraint_constants) ;
   let scan_state_base_node_zkapp =
