@@ -42,15 +42,14 @@ open Pickles_types
 open Impls.Step
 
 let () = Backend.Tock.Keypair.set_urs_info []
+
 let () = Backend.Tick.Keypair.set_urs_info []
 
 (* Currently, a circuit must have at least 1 of every type of
    constraint. Mirrors `pickles.ml:1483-1508`. *)
 let dummy_constraints () =
   Impl.(
-    let x =
-      exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
-    in
+    let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
     let g =
       exists Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
           Backend.Tick.Inner_curve.(to_affine_exn one) )
@@ -151,17 +150,14 @@ module Simple_chain = struct
                       exists Field.typ ~request:(fun () -> Prev_input)
                     in
                     let proof =
-                      exists (Typ.prover_value ()) ~request:(fun () ->
-                          Proof )
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof)
                     in
                     let vk =
                       exists (Typ.prover_value ()) ~request:(fun () ->
                           Verifier_index )
                     in
                     as_prover (fun () ->
-                        let vk =
-                          As_prover.read (Typ.prover_value ()) vk
-                        in
+                        let vk = As_prover.read (Typ.prover_value ()) vk in
                         Side_loaded.in_prover side_loaded_tag vk ) ;
                     let vk =
                       exists Side_loaded.Verification_key.typ
@@ -192,7 +188,8 @@ module Simple_chain = struct
       Common.time "b1" (fun () ->
           Promise.block_on_async_exn (fun () ->
               let%bind.Promise vk =
-                Side_loaded.Verification_key.of_compiled_promise No_recursion.tag
+                Side_loaded.Verification_key.of_compiled_promise
+                  No_recursion.tag
               in
               step
                 ~handler:
@@ -275,7 +272,8 @@ let dump_child_fixture () =
   let out_dir_opt = Sys.getenv_opt "SIDELOAD_FIXTURE_DIR" in
   Format.printf "=== side-loaded child fixture dump ===@." ;
   ( match out_dir_opt with
-  | Some d -> Format.printf "  output_dir = %s@." d
+  | Some d ->
+      Format.printf "  output_dir = %s@." d
   | None ->
       Format.printf
         "  SIDELOAD_FIXTURE_DIR not set — running in inspection-only mode@." ) ;
@@ -286,7 +284,9 @@ let dump_child_fixture () =
         let path = d ^ "/" ^ rel in
         Out_channel.write_all path ~data ;
         Format.printf "  wrote %s (%d bytes)@." rel (String.length data)
-    | None -> Format.printf "  [skip] would write %s (%d bytes)@." rel (String.length data)
+    | None ->
+        Format.printf "  [skip] would write %s (%d bytes)@." rel
+          (String.length data)
   in
 
   (* (a) Side-loaded VK sanity-construct (record fields stay abstract;
@@ -331,15 +331,13 @@ let dump_child_fixture () =
          b0_inner.statement.proof_state.messages_for_next_wrap_proof
            .old_bulletproof_challenges )
   in
-  let kimchi_proof =
-    Pickles.Wrap_wire_proof.to_kimchi_proof b0_inner.proof
-  in
+  let kimchi_proof = Pickles.Wrap_wire_proof.to_kimchi_proof b0_inner.proof in
   let with_pe : Pickles.Backend.Tock.Proof.with_public_evals =
     { proof = kimchi_proof; public_evals = None }
   in
   let backend_proof =
-    Pickles.Backend.Tock.Proof.to_backend_with_public_evals'
-      chal_polys_padded [||] with_pe
+    Pickles.Backend.Tock.Proof.to_backend_with_public_evals' chal_polys_padded
+      [||] with_pe
   in
   let proof_json =
     Kimchi_bindings.Protocol.Proof.Fq.to_serde_json backend_proof
