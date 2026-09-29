@@ -47,19 +47,19 @@
       "opam": 3
     },
     "exe:app/delegation_verify:delegation_verify": {
-      "libs": 199,
+      "libs": 198,
       "opam": 50
     },
     "exe:app/disk_caching_stats:disk_caching_stats": {
-      "libs": 207,
+      "libs": 206,
       "opam": 53
     },
     "exe:app/dump_blocks:dump_blocks": {
-      "libs": 170,
+      "libs": 169,
       "opam": 46
     },
     "exe:app/dump_slot_ledger:dump_slot_ledger": {
-      "libs": 180,
+      "libs": 179,
       "opam": 51
     },
     "exe:app/extract_blocks:extract_blocks": {
@@ -67,7 +67,7 @@
       "opam": 51
     },
     "exe:app/generate_keypair:generate_keypair": {
-      "libs": 180,
+      "libs": 179,
       "opam": 49
     },
     "exe:app/graphql_schema_dump:graphql_schema_dump": {
@@ -75,16 +75,20 @@
       "opam": 60
     },
     "exe:app/heap_usage:heap_usage": {
-      "libs": 207,
+      "libs": 206,
       "opam": 53
     },
     "exe:app/ledger_export_bench:ledger_export_benchmark": {
-      "libs": 153,
+      "libs": 152,
       "opam": 44
     },
     "exe:app/logproc:logproc": {
       "libs": 5,
       "opam": 15
+    },
+    "exe:app/mina_archive_healthcheck:mina_archive_healthcheck": {
+      "libs": 106,
+      "opam": 35
     },
     "exe:app/mina_graphql_client:mina_graphql_client_app": {
       "libs": 235,
@@ -95,7 +99,7 @@
       "opam": 60
     },
     "exe:app/missing_blocks_auditor:missing_blocks_auditor": {
-      "libs": 105,
+      "libs": 106,
       "opam": 36
     },
     "exe:app/reformat:reformat": {
@@ -109,6 +113,14 @@
     "exe:app/rocksdb-scanner:rocksdb_scanner": {
       "libs": 6,
       "opam": 12
+    },
+    "exe:app/rosetta/client:rosetta_client_cli": {
+      "libs": 4,
+      "opam": 11
+    },
+    "exe:app/rosetta/healthcheck:rosetta_healthcheck": {
+      "libs": 4,
+      "opam": 11
     },
     "exe:app/rosetta/ocaml-signer:signer": {
       "libs": 206,
@@ -143,7 +155,7 @@
       "opam": 61
     },
     "exe:app/validate_keypair:validate_keypair": {
-      "libs": 180,
+      "libs": 179,
       "opam": 49
     },
     "exe:app/zkapp_limits:zkapp_limits": {
@@ -159,7 +171,7 @@
       "opam": 39
     },
     "exe:lib/consensus:proof_of_stake_fuzzer": {
-      "libs": 162,
+      "libs": 161,
       "opam": 45
     },
     "exe:lib/crypto/crypto_params/gen:gen": {
@@ -189,6 +201,10 @@
     "exe:lib/generated_graphql_queries/gen:gen": {
       "libs": 104,
       "opam": 31
+    },
+    "exe:lib/mina_caqti/test/pg_memory:main": {
+      "libs": 105,
+      "opam": 36
     },
     "exe:lib/mina_metrics/js_test:mina_metrics_js_test": {
       "libs": 7,

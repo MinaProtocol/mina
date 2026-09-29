@@ -41,8 +41,8 @@ let rec walk ~roundtrip ~baseline ~path ~rebuild json =
           let replace x =
             rebuild
               (`Assoc
-                 (List.map fields ~f:(fun (k, v) ->
-                      if String.equal k key then (k, x) else (k, v) ) ) )
+                (List.map fields ~f:(fun (k, v) ->
+                     if String.equal k key then (k, x) else (k, v) ) ) )
           in
           let path = child path key in
           if Option.equal Yojson.Safe.equal (roundtrip (replace probe)) baseline
@@ -71,7 +71,7 @@ let model ~label ~of_yojson ~to_yojson s =
          bare ": " reads as truncated output. *)
       Or_error.errorf "%s: does not match the Rosetta schema%s" label
         ( if String.is_empty (String.strip message) then ""
-          else ": " ^ String.strip message )
+        else ": " ^ String.strip message )
   | Ok value -> (
       let roundtrip json =
         Result.ok (of_yojson json) |> Option.map ~f:to_yojson

@@ -92,7 +92,7 @@ let expected client =
 let json_flag =
   Command.Param.(
     flag "--json" ~aliases:[ "-j" ] ~doc:" Output as JSON instead of text"
-      no_arg )
+      no_arg)
 
 let max_age_flag =
   Command.Param.(
@@ -100,7 +100,7 @@ let max_age_flag =
       ~doc:
         (sprintf "SECONDS Maximum acceptable age of current tip (default: %d)"
            default_max_age )
-      (optional_with_default default_max_age int) )
+      (optional_with_default default_max_age int))
   |> seconds_at_least ~name:"--max-age" ~minimum:0
 
 (* [wait]'s bound on the whole polling loop, as opposed to [--timeout]
@@ -111,14 +111,14 @@ let deadline_flag =
       ~doc:
         (sprintf "SECONDS Max seconds to keep polling (default: %d)"
            default_deadline )
-      (optional_with_default default_deadline int) )
+      (optional_with_default default_deadline int))
   |> seconds_at_least ~name:"--deadline" ~minimum:1
 
 let interval_flag =
   Command.Param.(
     flag "--interval" ~aliases:[ "-i" ]
       ~doc:(sprintf "SECONDS Polling interval (default: %d)" default_interval)
-      (optional_with_default default_interval int) )
+      (optional_with_default default_interval int))
   |> seconds_at_least ~name:"--interval" ~minimum:1
 
 (* ---------- Output ---------- *)
@@ -158,13 +158,13 @@ let setup_logging ~json =
   Logger.Consumer_registry.register ~id:"rosetta-healthcheck"
     ~processor:
       ( if json then Logger.Processor.raw ~log_level:Logger.Level.Info ()
-        else
-          Logger.Processor.pretty ~log_level:Logger.Level.Info
-            ~config:
-              { Interpolator_lib.Interpolator.mode = Inline
-              ; max_interpolation_length = 4096
-              ; pretty_print = false
-              } )
+      else
+        Logger.Processor.pretty ~log_level:Logger.Level.Info
+          ~config:
+            { Interpolator_lib.Interpolator.mode = Inline
+            ; max_interpolation_length = 4096
+            ; pretty_print = false
+            } )
     ~transport:(Logger.Transport.raw Stdlib.prerr_endline)
     ()
 
@@ -312,13 +312,10 @@ let wait_command =
        setup_logging ~json ;
        let blockchain, network = expected client in
        let start = Time.now () in
-       let deadline =
-         Time.add start (Time.Span.of_int_sec deadline_secs)
-       in
+       let deadline = Time.add start (Time.Span.of_int_sec deadline_secs) in
        let timed_out () = Time.( >= ) (Time.now ()) deadline in
        let elapsed () =
-         Float.to_int
-           (Time.Span.to_sec (Time.diff (Time.now ()) start))
+         Float.to_int (Time.Span.to_sec (Time.diff (Time.now ()) start))
        in
        let rec loop () =
          let%bind result =

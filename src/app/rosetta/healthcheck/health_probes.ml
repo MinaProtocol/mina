@@ -13,9 +13,7 @@ type readiness = { ready : bool; tip : tip option; problems : string list }
 (* Age of a millisecond timestamp, floored at 0: a server whose clock
    runs ahead of ours reports a fresh tip, not a negative age. *)
 let age_seconds_from_timestamp_ms ts =
-  let now_ms =
-    Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
-  in
+  let now_ms = Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms in
   Int64.max 0L (Int64.of_float ((now_ms -. Int64.to_float ts) /. 1000.))
 
 let describe (network_identifier : RM.Network_identifier.t) =
