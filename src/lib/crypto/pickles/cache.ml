@@ -10,16 +10,15 @@ let should_dump_circuit_data () =
 
 (* The mmap-backed proving-key cache trades a MessagePack deserialization
    step for a POD file format that can be loaded in a single [mmap(2)]
-   syscall and ~one memcpy per field element. Enabled via the
-   [MINA_USE_MMAP_CACHE] environment variable during rollout; once we flip
-   the default, the old MessagePack path remains as a fallback until it is
-   retired. *)
+   syscall and ~one memcpy per field element. It is on by default; setting the
+   [MINA_USE_MMAP_CACHE] environment variable to [0], [false] or [no] selects
+   the old MessagePack path instead. *)
 let use_mmap_cache () =
   match Sys.getenv_opt "MINA_USE_MMAP_CACHE" with
-  | Some "true" | Some "1" | Some "yes" ->
-      true
-  | _ ->
+  | Some "false" | Some "0" | Some "no" ->
       false
+  | _ ->
+      true
 
 module Step = struct
   module Key = struct
