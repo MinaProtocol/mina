@@ -325,19 +325,23 @@ let appsVariant
             }
             spec.buildFlags
 
-let profileTents
+let tents
     : PackagingSpec.Type -> Text
     =
-      -- The mina-<network>-generic tents this job's own artifacts call for.
-      --
-      -- Both tents used to be appended to EVERY packaging job. Two jobs of one
-      -- codename then built the same two packages and wrote them into the same
-      -- cache directory at the same time, and a codename with no mainnet job
-      -- still shipped mina-mainnet-generic, whose dependency
-      -- mina-mainnet-profile that codename never builds -- an uninstallable
-      -- package. A tent now goes with the profile it names.
+      -- profileTents plus the mina-<network> tents. The latter are left out of
+      -- instrumented builds: the tent carries no suffix, so both jobs of one
+      -- codename would write the same .deb into one cache directory.
           \(spec : PackagingSpec.Type)
-      ->  Text/concatSep " " (Artifact.profileTents spec.artifacts)
+      ->  let networkTents =
+                merge
+                  { None = Artifact.networkTents spec.artifacts
+                  , Instrumented = [] : List Text
+                  }
+                  spec.buildFlags
+
+          in  Text/concatSep
+                " "
+                (Artifact.profileTents spec.artifacts # networkTents)
 
 let build_artifacts
     : PackagingSpec.Type -> Command.Type
@@ -387,8 +391,7 @@ let build_artifacts
                           # spec.extraBuildEnvs
                           # DebianVersions.overrideEnvs
                         )
-                        "${spec.buildScript} ${debianTokens} ${profileTents
-                                                                 spec}"
+                        "${spec.buildScript} ${debianTokens} ${tents spec}"
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"
@@ -539,9 +542,7 @@ let build_debian
       ->  Command.build
             Command.Config::{
             , commands =
-                  buildDebianFromApps
-                    spec
-                    "${debianTokens spec} ${profileTents spec}"
+                  buildDebianFromApps spec "${debianTokens spec} ${tents spec}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
