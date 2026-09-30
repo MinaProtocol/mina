@@ -53,6 +53,12 @@ nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "dun
   nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 wait
 
+# The portable tree the Debian packages and docker images are built from. Nearly
+# free once #devnet is built -- it only copies and wraps -- but its dependency
+# resolution fails closed, so building it here is what catches a library that
+# stopped resolving inside the bundle.
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#mina-portable-devnet" --no-link
+
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
   cat <<EOF> $HOME/.aws/credentials
