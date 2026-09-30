@@ -129,12 +129,14 @@ module Side_loaded : sig
     -> ('var, 'value, 'n1, Nat.N8.n) Tag.t
 
   val verify_promise :
-       typ:('var, 'value) Impls.Step.Typ.t
+       ?num_chunks:int
+    -> typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> unit Or_error.t Promise.t
 
   val verify :
-       typ:('var, 'value) Impls.Step.Typ.t
+       ?num_chunks:int
+    -> typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> unit Or_error.t Deferred.t
 

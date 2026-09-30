@@ -6,6 +6,10 @@ val num_chunks_by_default : int
 (** The number of rows required for zero knowledge in circuits with one single chunk *)
 val zk_rows_by_default : int
 
+(** [zk_rows_for_num_chunks num_chunks] computes the number of rows required
+    for zero knowledge in circuits with [num_chunks] chunks. *)
+val zk_rows_for_num_chunks : int -> int
+
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Pickles_types.Plonk_types.Shifts.t
