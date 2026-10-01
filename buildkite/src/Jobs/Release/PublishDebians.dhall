@@ -41,7 +41,7 @@ in  Pipeline.build
         [ PublishDebians.step
             PublishDebians.Spec::{
             , codenames = [ DebianVersions.DebVersion.Bookworm ]
-            , debianRepo = DebianRepo.Type.Unstable
+            , debianRepo = DebianRepo.Type.O1Test
             , label = "Publish: debians"
             , key = "publish-debians"
             }

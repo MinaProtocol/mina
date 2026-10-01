@@ -74,6 +74,7 @@ let PackagingSpec =
           , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
+          , generic : Bool
           , suffix : Optional Text
           , if_ : Optional B/If
           , includeIf : List Expr.Type
@@ -97,6 +98,7 @@ let PackagingSpec =
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , docker_repo = DockerRepo.Type.InternalEurope
+          , generic = False
           , if_ = None B/If
           , includeIf = [] : List Expr.Type
           , excludeIf = [] : List Expr.Type
@@ -200,23 +202,26 @@ let primaryNetwork
             Network.Type.Devnet
             (List/head Network.Type (Artifact.networks spec.artifacts))
 
-let labelSuffix
+let networkSegment
     : PackagingSpec.Type -> Text
     =
-      -- The network is named here, and not only in the name of the job, because
-      -- one codename has a devnet packaging step AND a mainnet one. Without it
-      -- both read "Debian: Build Bookworm" and the two look like the same work
-      -- done twice, which is what they are not: they build different packages.
-      --
-      -- Network.capitalName and not Network.namePrefixSegment, which is empty
-      -- for devnet: a label that says nothing is what is being fixed.
+      -- What a packaging job builds: Devnet, Mainnet or Generic (the
+      -- network-less packages). Named in both the job name and the label.
           \(spec : PackagingSpec.Type)
-      ->  "${Network.capitalName
-               ( primaryNetwork spec
-               )} ${DebianVersions.capitalName
-                      spec.debVersion} ${BuildFlags.toSuffixUppercase
-                                           spec.buildFlags}${Arch.labelSuffix
-                                                               spec.arch}"
+      ->        if spec.generic
+
+          then  "Generic"
+
+          else  Network.capitalName (primaryNetwork spec)
+
+let labelSuffix
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
+      ->  "${networkSegment
+               spec} ${DebianVersions.capitalName
+                         spec.debVersion} ${BuildFlags.toSuffixUppercase
+                                              spec.buildFlags}${Arch.labelSuffix
+                                                                  spec.arch}"
 
 let baseNameSuffix
     : PackagingSpec.Type -> Text
@@ -228,8 +233,7 @@ let baseNameSuffix
 let nameSuffix
     : PackagingSpec.Type -> Text
     =     \(spec : PackagingSpec.Type)
-      ->  "${Network.namePrefixSegment (primaryNetwork spec)}${baseNameSuffix
-                                                                 spec}"
+      ->  "${networkSegment spec}${baseNameSuffix spec}"
 
 let selfName
     : PackagingSpec.Type -> Text
@@ -238,6 +242,20 @@ let selfName
 let genericBuildName
     : PackagingSpec.Type -> Text
     = \(spec : PackagingSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
+
+let genericPackagingName
+    : PackagingSpec.Type -> Text
+    =
+      -- The job that builds the network-less packages of a codename:
+      -- mina-generic, mina-archive-generic, mina-rosetta-generic and the
+      -- tools. Every image of that codename installs some of them, whatever
+      -- network it is for, so they belong to one job rather than to whichever
+      -- network happened to also build them.
+      --
+      -- Not genericBuildName, which has no Generic segment and names the APP
+      -- build.
+          \(spec : PackagingSpec.Type)
+      ->  "${spec.prefix}Generic${baseNameSuffix spec}"
 
 let DockerService =
       { service : Docker.Type, network : Network.Type, profile : Profiles.Type }
@@ -307,19 +325,23 @@ let appsVariant
             }
             spec.buildFlags
 
-let profileTents
+let tents
     : PackagingSpec.Type -> Text
     =
-      -- The mina-<network>-generic tents this job's own artifacts call for.
-      --
-      -- Both tents used to be appended to EVERY packaging job. Two jobs of one
-      -- codename then built the same two packages and wrote them into the same
-      -- cache directory at the same time, and a codename with no mainnet job
-      -- still shipped mina-mainnet-generic, whose dependency
-      -- mina-mainnet-profile that codename never builds -- an uninstallable
-      -- package. A tent now goes with the profile it names.
+      -- profileTents plus the mina-<network> tents. The latter are left out of
+      -- instrumented builds: the tent carries no suffix, so both jobs of one
+      -- codename would write the same .deb into one cache directory.
           \(spec : PackagingSpec.Type)
-      ->  Text/concatSep " " (Artifact.profileTents spec.artifacts)
+      ->  let networkTents =
+                merge
+                  { None = Artifact.networkTents spec.artifacts
+                  , Instrumented = [] : List Text
+                  }
+                  spec.buildFlags
+
+          in  Text/concatSep
+                " "
+                (Artifact.profileTents spec.artifacts # networkTents)
 
 let build_artifacts
     : PackagingSpec.Type -> Command.Type
@@ -369,8 +391,7 @@ let build_artifacts
                           # spec.extraBuildEnvs
                           # DebianVersions.overrideEnvs
                         )
-                        "${spec.buildScript} ${debianTokens} ${profileTents
-                                                                 spec}"
+                        "${spec.buildScript} ${debianTokens} ${tents spec}"
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"
@@ -408,6 +429,7 @@ let commonBuildEnvs =
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                 , "MINA_DEB_RELEASE=${DebianChannel.effective spec.channel}"
+                , "MINA_APPS_CACHE_ROOT"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
@@ -490,22 +512,44 @@ let buildDebianFromApps
                               spec} ./buildkite/scripts/debian/build-from-cache.sh ${treeVariant
                                                                                        spec} ${tokens}"
 
+let appsFromAnotherBuild
+    : Optional Text
+    =
+      -- Set when MINA_APPS_CACHE_ROOT names an earlier build, which is what a
+      -- packaging-only pipeline does. See restore_build_tree.sh.
+      Some env:MINA_APPS_CACHE_ROOT as Text ? None Text
+
+let dependsOnApps
+    : PackagingSpec.Type -> List Command.TaggedKey.Type
+    =
+      -- Nothing to wait for when the apps came from an earlier build.
+      --
+      -- The dependency names a job by key, and a packaging-only pipeline does
+      -- not select the app build at all, so the key is absent and Buildkite
+      -- leaves every packaging step in waiting_failed: no job runs, no job
+      -- fails, and the build reports failure with nothing in it to look at.
+          \(spec : PackagingSpec.Type)
+      ->  Prelude.Optional.fold
+            Text
+            appsFromAnotherBuild
+            (List Command.TaggedKey.Type)
+            (\(_ : Text) -> [] : List Command.TaggedKey.Type)
+            [ { name = appsJobName spec, key = "build-apps" } ]
+
 let build_debian
     : PackagingSpec.Type -> Command.Type
     =     \(spec : PackagingSpec.Type)
       ->  Command.build
             Command.Config::{
             , commands =
-                  buildDebianFromApps
-                    spec
-                    "${debianTokens spec} ${profileTents spec}"
+                  buildDebianFromApps spec "${debianTokens spec} ${tents spec}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , depends_on = [ { name = appsJobName spec, key = "build-apps" } ]
+            , depends_on = dependsOnApps spec
             , target = Size.Multi
             , if_ = spec.if_
             , retries =
@@ -541,16 +585,15 @@ let docker_step
                 -- that asks for mainnet alone does not run the other job at
                 -- all, so the package would simply not exist.
                 --
-                -- The network decides it, because dhall cannot compare the two
-                -- job names: Network.namePrefixSegment is empty for devnet, so
-                -- the devnet job IS the network-less one and needs nothing
-                -- added.
-                merge
-                  { Devnet = [] : List Command.TaggedKey.Type
-                  , Mainnet =
-                    [ { name = genericBuildName spec, key = "build-deb-pkg" } ]
-                  }
-                  (primaryNetwork spec)
+                -- The Generic job itself needs nothing added.
+                      if spec.generic
+
+                then  [] : List Command.TaggedKey.Type
+
+                else  [ { name = genericPackagingName spec
+                        , key = "build-deb-pkg"
+                        }
+                      ]
 
           let deps
               : List Command.TaggedKey.Type
@@ -575,14 +618,18 @@ let docker_step
                 Some (BaseImage.imageFor spec.debVersion spec.arch)
 
           let dependsOnGeneric =
-                  deps
-                # [ { name = genericBuildName spec
-                    , key =
-                        "${Docker.lowerName
-                             Docker.Type.DaemonGeneric}-${Network.lowerName
-                                                            genericNetwork}-docker-image"
-                    }
-                  ]
+                      if spec.generic
+
+                then  deps
+
+                else    deps
+                      # [ { name = genericPackagingName spec
+                          , key =
+                              "${Docker.lowerName
+                                   Docker.Type.DaemonGeneric}-${Network.lowerName
+                                                                  genericNetwork}-docker-image"
+                          }
+                        ]
 
           let size = Size.XLarge
 
@@ -797,7 +844,8 @@ let docker_commands
                         (     s
                           //  { deb_release =
                                   DebianChannel.effective spec.channel
-                              , docker_repo = spec.docker_repo
+                              , docker_repo =
+                                  DockerRepo.effective spec.docker_repo
                               }
                         )
                 )
@@ -811,7 +859,7 @@ let pipelineBuilder
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
             , path = "Release"
-            , name = "${spec.prefix}${nameSuffix spec}"
+            , name = selfName spec
             , tags = spec.tags
             , scope = spec.scope
             , includeIf = spec.includeIf
@@ -856,7 +904,7 @@ let packagePipeline
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.packageDirtyWhen
             , path = "Release"
-            , name = "${spec.prefix}${nameSuffix spec}"
+            , name = selfName spec
             , tags = spec.tags
             , scope = spec.scope
             , includeIf = spec.includeIf

@@ -1,4 +1,5 @@
--- Installs and upgrades the mainnet .debs built by MinaArtifactMainnetBookworm,
+-- Installs and upgrades the mainnet .debs built by MinaArtifactMainnetBookworm
+-- and MinaArtifactGenericBookworm,
 -- so it belongs to the stage that builds them.
 --
 -- Hence the Packaging tag rather than Long: the nightly's LongAndVeryLong stage
@@ -34,16 +35,12 @@ let Size = ../../Command/Size.dhall
 let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOnMainnet =
-        DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{
-          , deb_version = DebianVersions.DebVersion.Bookworm
-          , network = Network.Type.Mainnet
-          , profile = Profiles.Type.Mainnet
-          }
-      # DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{
-          , deb_version = DebianVersions.DebVersion.Bookworm
-          }
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{
+        , deb_version = DebianVersions.DebVersion.Bookworm
+        , network = Network.Type.Mainnet
+        , profile = Profiles.Type.Mainnet
+        }
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")

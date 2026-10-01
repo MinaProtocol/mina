@@ -54,15 +54,24 @@ let DepsSpec =
       }
 
 let dependsOn =
+    -- The network job and the Generic one: the network-less packages
+    -- (mina-generic, *-generic, tools) are built by MinaArtifactGeneric*, and
+    -- every consumer installs from the same codename cache directory.
           \(spec : DepsSpec.Type)
-      ->  let name =
-                "${spec.prefix}${Network.namePrefixSegment
-                                   spec.network}${capitalName
-                                                    spec.deb_version}${BuildFlags.toSuffixUppercase
-                                                                         spec.build_flag}${Arch.nameSuffix
-                                                                                             spec.arch}"
+      ->  let suffix =
+                "${capitalName
+                     spec.deb_version}${BuildFlags.toSuffixUppercase
+                                          spec.build_flag}${Arch.nameSuffix
+                                                              spec.arch}"
 
-          in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
+          let key = "${spec.step}-deb-pkg"
+
+          in  [ { name =
+                    "${spec.prefix}${Network.capitalName spec.network}${suffix}"
+                , key = key
+                }
+              , { name = "${spec.prefix}Generic${suffix}", key = key }
+              ]
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
@@ -126,7 +135,7 @@ let packageDirtyWhen =
     -- selected by its own dirty-when would not be left with a dangling
     -- dependency on a packaging job that had not been selected. monorepo.sh
     -- resolves dependencies itself now (phase 2): selecting DebianUpgradeTest
-    -- pulls MinaArtifactBookworm in regardless of this list, so listing the
+    -- pulls MinaArtifactDevnetBookworm and MinaArtifactGenericBookworm in regardless of this list, so listing the
     -- tests here only made packaging run on changes it does not depend on.
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"

@@ -295,6 +295,51 @@ let profileTents =
           \(artifacts : List Artifact)
       ->  List/concatMap Artifact Text profileTentTokens artifacts
 
+let networkTents =
+    -- The mina-<network> tent (daemon_<network> build token): an empty
+    -- metapackage depending on mina-<network>-generic and mina-<network>-config,
+    -- so `apt-get install mina-<network>` keeps working. It goes with the Daemon
+    -- artifact, whose job also builds the config.
+          \(artifacts : List Artifact)
+      ->  List/concatMap
+            Artifact
+            Text
+            (     \(artifact : Artifact)
+              ->  merge
+                    { Daemon =
+                            \(a : { network : Network.Type })
+                        ->  [ "daemon_${Network.lowerName a.network}" ]
+                    , DaemonGeneric = [] : List Text
+                    , DaemonProfiled =
+                        \(a : { profile : Profiles.Type }) -> [] : List Text
+                    , DaemonLegacyHardfork =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , DaemonAutoHardfork =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , DaemonPrefork =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , DaemonPostfork =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , CreatePreforkGenesis =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , DaemonStorageToolbox = [] : List Text
+                    , LogProc = [] : List Text
+                    , ArchiveGeneric = [] : List Text
+                    , Archive =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , RosettaGeneric = [] : List Text
+                    , Rosetta =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , TestExecutive = [] : List Text
+                    , TxTools = [] : List Text
+                    , FunctionalTestSuite = [] : List Text
+                    , DelegationVerifier = [] : List Text
+                    , Toolchain = [] : List Text
+                    }
+                    artifact
+            )
+            artifacts
+
 let networkOrdinal = \(n : Network.Type) -> merge { Devnet = 0, Mainnet = 1 } n
 
 let networks =
@@ -345,4 +390,5 @@ in  { Type = Artifact
     , toDebianToken = toDebianToken
     , networks = networks
     , profileTents = profileTents
+    , networkTents = networkTents
     }
