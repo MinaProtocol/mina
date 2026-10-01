@@ -5,6 +5,7 @@
 * [Serialized SRS](types_and_structures/serialized_srs.md)
 * [Block structure](types_and_structures/block.md)
 * [Consensus](consensus/README.md)
+* [Tokens](tokens/README.md)
 
 # Ledger specifications
 

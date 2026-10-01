@@ -3,6 +3,18 @@ set -oe pipefail -x
 
 function cleanup
 {
+  # Dump each swarm service's logs (incl. the seed daemon container) before the
+  # stack is removed, so CI can see why a node failed to initialise. Files match
+  # the <test>*.local.test.log artifact glob.
+  if [[ -n "${TEST_NAME:-}" ]]; then
+    for stack in $(docker stack ls --format "{{.Name}}"); do
+      for svc in $(docker stack services "$stack" --format "{{.Name}}" 2>/dev/null); do
+        echo "Dumping service logs for $svc"
+        docker service logs --raw "$svc" \
+          >"${TEST_NAME}-${svc}.local.test.log" 2>&1 || true
+      done
+    done
+  fi
   remove_active_stacks() {
       for stack in $(docker stack ls --format "{{.Name}}"); do
           echo "Removing stack: $stack"
@@ -30,8 +42,14 @@ MINA_DOCKER_NAME="mina-daemon"
 MINA_ARCHIVE_DOCKER_NAME="mina-archive"
 
 
-MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:$MINA_DOCKER_TAG-devnet-generic"
-ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:$MINA_DOCKER_TAG-devnet"
+# Use the short-hash "HASHTAG" image names — that is what the
+# IntegrationTestDockerImages job builds and saves to the Hetzner CI cache
+# (<githash>-<codename>-<network>[-generic]). The images are built --load-only
+# (never pushed to a registry), so the swarm must deploy the exact tag we load
+# from the cache; pointing test_executive at the full version tag would fail
+# because that tag exists neither locally nor in the registry.
+MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:${GITHASH}-${MINA_DEB_CODENAME}-devnet-generic"
+ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:${GITHASH}-${MINA_DEB_CODENAME}-devnet"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -40,10 +58,72 @@ fi
 
 git config --global --add safe.directory /workdir
 
-source buildkite/scripts/debian/update.sh --verbose
+# Free docker disk before loading the (~GB-scale) daemon/archive images.
+# Without this the agent can run out of space during `docker load`, which
+# takes the docker daemon down mid-test ("Cannot connect to the Docker
+# daemon"). THRESHOLD=0 forces the prune; the script is concurrency-safe
+# (dangling/unused only, keeps tagged images for co-located jobs).
+DISK_PRUNE_THRESHOLD=0 ./buildkite/scripts/docker/disk-cleanup.sh
 
-source buildkite/scripts/debian/install.sh "mina-test-executive"
+# Load the daemon/archive images from the shared Hetzner CI cache instead of
+# pulling them from the registry, keeping the integration tests off the docker
+# registry / GAR path. On a cache miss the deploy would fail (the images are
+# never pushed), which is the intended signal that the build job did not run.
+./buildkite/scripts/docker/load_from_cache.sh "$MINA_IMAGE" \
+  || echo "cache miss for $MINA_IMAGE"
+./buildkite/scripts/docker/load_from_cache.sh "$ARCHIVE_IMAGE" \
+  || echo "cache miss for $ARCHIVE_IMAGE"
 
+# Restore mina-test-executive and mina-logproc bare from the apps cache. Their
+# .deb comes from the packaging job, which the nightly no longer runs.
+#
+# The bare binary carries no apt metadata, so nothing honours the package's
+# Depends. mina-test-executive declares "mina-logproc, python3, docker-ce,
+# libpq5" (scripts/debian/builder-helpers.sh, TEST_EXECUTIVE_DEPS): the agent
+# already provides python3 and docker-ce, mina-logproc is restored below, but
+# libpq5 is not on the agent, so test_executive aborts at start with
+#   error while loading shared libraries: libpq.so.5
+# Install it here, the same way block-race-test.sh provisions its own python3.
+SUDO=""
+if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+fi
+if ! { command -v ldconfig >/dev/null && ldconfig -p | grep -q "libpq\.so\.5"; }; then
+  export DEBIAN_FRONTEND=noninteractive
+  $SUDO apt-get update -qq
+  $SUDO apt-get install -y --no-install-recommends libpq5
+fi
+
+./buildkite/scripts/apps/restore_app.sh test_executive.exe mina-test-executive
+./buildkite/scripts/apps/restore_app.sh logproc.exe mina-logproc
+
+# Snapshot each swarm service's container log to a file while the test runs, so
+# a daemon that never finishes initialising still leaves an artifact.
+#
+# set +x, and no command substitution: this script runs with xtrace, which
+# prints the whole expansion, so holding the log in a variable re-dumped every
+# service's (growing) log on every pass. That is what pushed the long nightly
+# integration tests past buildkite's 1 GiB job-log limit and got them cancelled.
+# Temp name + mv keeps the last snapshot of a service that has gone away; the
+# temp name must not match the *.local.test.log artifact glob.
+( set +x
+  while true; do
+    for stack in $(docker stack ls --format "{{.Name}}" 2>/dev/null); do
+      for svc in $(docker stack services "$stack" --format "{{.Name}}" 2>/dev/null)
+      do
+        snapshot="${TEST_NAME}-${svc}.service-log.partial"
+        if docker service logs --raw "$svc" > "$snapshot" 2>/dev/null \
+           && [ -s "$snapshot" ]; then
+          mv "$snapshot" "${TEST_NAME}-${svc}.local.test.log"
+        else
+          rm -f "$snapshot"
+        fi
+      done
+    done
+    sleep 20
+  done ) &
+
+export MINA_PROFILE="devnet"
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \

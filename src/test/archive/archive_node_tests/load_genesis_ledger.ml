@@ -27,8 +27,43 @@ let test_case (test_data : t) =
   in
   let logger = Logger.create () in
   let log_file = test_data.temp_dir ^/ "archive.load_genesis_ledger.log" in
+  (* Sanity: before the archive process has started, [db-ready] should
+     already pass.  The fixture creates an empty random archive DB with
+     the schema loaded, so [SELECT COALESCE(MAX(height), 0) FROM blocks]
+     is queryable even before the archive process bootstraps genesis. *)
+  let%bind () =
+    match%map
+      Archive_healthcheck.db_ready ~postgres_uri:config.postgres_uri ()
+    with
+    | Ok () ->
+        ()
+    | Error e ->
+        failwithf
+          "Archive_healthcheck.db_ready failed against a schema-only archive \
+           DB before Archive.start; expected the healthcheck to verify schema \
+           reachability independently of block ingestion: %s"
+          (Error.to_string_hum e) ()
+  in
   let%bind process = Archive.of_config config |> Archive.start in
   Archive.Process.start_logging process ~log_file ;
+  (* Bootstrap is in progress: the daemon is loading the schema and
+     genesis ledger.  Wait until [db-ready] passes — this is the
+     "after bootstrap → true" half of the assertion above, and also
+     gates the rest of this test on a working archive process. *)
+  let%bind () =
+    match%map
+      Archive_healthcheck.wait_db_ready ~postgres_uri:config.postgres_uri
+        ~timeout:120 ()
+    with
+    | Ok () ->
+        ()
+    | Error e ->
+        failwithf
+          "Healthcheck.wait_db_ready timed out after Archive.start; the \
+           archive process did not initialize its DB schema within the \
+           expected window: %s"
+          (Error.to_string_hum e) ()
+  in
 
   let sleep_duration = Time.Span.of_sec 10.0 in
 

@@ -16,6 +16,7 @@
   async_unix
   async.async_command
   ;; local libraries
+  archive_health_queries
   logger
   mina_stdlib
   mina_caqti)

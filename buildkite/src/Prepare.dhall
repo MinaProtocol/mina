@@ -1,5 +1,12 @@
 -- Autogenerates any pre-reqs for monorepo triage execution
 -- Keep these rules lean! They have to run unconditionally.
+--
+-- validate-release-env.sh runs first and costs nothing when the release
+-- variables are unset, which is every pipeline but the release ones. It is
+-- here rather than in a release pipeline's own steps because the value it
+-- checks is read while the pipeline below is being rendered: by the time a
+-- release job could check it, the wrong registry is already baked into every
+-- docker step.
 
 let SelectFiles = ./Lib/SelectFiles.dhall
 
@@ -36,7 +43,8 @@ let config
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}"
+              [ Cmd.run "./buildkite/scripts/pipeline/validate-release-env.sh"
+              , Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}"
               , Cmd.run "export BUILDKITE_PIPELINE_JOB_SELECTION=${selection}"
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER=${tagFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_SCOPE=${scopeFilter}"

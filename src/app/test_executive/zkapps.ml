@@ -977,7 +977,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
              archive_node
          in
-         check_replayer_logs ~logger logs )
+         let%bind n = check_replayer_logs ~logger logs in
+         let ns = network_state t in
+         let expected = ns.blocks_generated in
+         if n < expected - 3 || n > expected + 3 then
+           Malleable_error.hard_error_string
+             (sprintf
+                "Replayer replayed %d blocks, expected %d (network \
+                 blocks_generated ±3)"
+                n expected )
+         else (
+           if n <> expected then
+             [%log warn]
+               "Replayer block count %d differs from network blocks_generated \
+                %d (diff: %d)"
+               n expected (n - expected) ;
+           Malleable_error.return () ) )
     in
     let open Deferred.Let_syntax in
     match%bind replayer_result with

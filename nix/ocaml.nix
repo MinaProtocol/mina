@@ -130,6 +130,7 @@ let
   allDeps = dune-nix.allDeps info;
   commonOverrides = {
     DUNE_PROFILE = "dev";
+    MINA_PROFILE = "dev";
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
@@ -147,6 +148,7 @@ let
     commit = inputs.self.sourceInfo.rev or "<dirty>";
     commitShort = builtins.substring 0 8 commit;
     cmdLineTest = ''
+      export MINA_PROFILE=dev
       mina --version
       mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
       chmod +x tests.exe
@@ -446,6 +448,23 @@ let
 
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
 
+      mina-graphql-client-dev = self.mina-dev.overrideAttrs (s: {
+        pname = "mina-graphql-client";
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build --display=short src/app/mina_graphql_client/mina_graphql_client_app.exe
+        '';
+
+        installPhase = ''
+          mkdir -p $out/bin
+          cp _build/default/src/app/mina_graphql_client/mina_graphql_client_app.exe $out/bin/mina-graphql-client
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/mina-graphql-client
+        '';
+      });
+
+      mina-graphql-client = wrapMina self.mina-graphql-client-dev { };
+
       mainnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
@@ -473,6 +492,7 @@ let
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          MINA_PROFILE = "dev";
         };
         extraInputs = [ pkgs.ephemeralpg ];
       } ''

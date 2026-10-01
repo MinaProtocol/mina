@@ -439,13 +439,13 @@ def generate_ledger(generate_remainder,
             )
             break
     print()
-    # TODO: dynamic num_accounts
     # Write ledger and annotated ledger to disk
+    num_accounts = len(ledger)
     out_genesis_ledger_file = str(out_genesis_ledger_file)
     with open(out_genesis_ledger_file, 'w') as outfile:
         ledger_wrapper = {
             "name": "release",
-            "num_accounts": 250,
+            "num_accounts": num_accounts,
             "accounts": ledger
         }
         json.dump(ledger_wrapper, outfile, indent=1)
@@ -455,7 +455,7 @@ def generate_ledger(generate_remainder,
     with open(out_annotated_ledger_file, 'w') as outfile:
         annotated_ledger_wrapper = {
             "name": "annotated_release",
-            "num_accounts": 250,
+            "num_accounts": num_accounts,
             "accounts": ledger
         }
         json.dump(annotated_ledger_wrapper, outfile, indent=1)

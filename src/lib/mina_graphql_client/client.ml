@@ -5,9 +5,20 @@ open Mina_transaction
 
 let default_node_password = "naughty blue worm"
 
-(** this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
+(** Repeatedly attempt to connect to a node's GraphQL endpoint, giving up
+    after [num_tries] failures.
+
+    [deadline], if set, is an absolute wall-clock time after which the
+    function exits early without further retries; the per-retry sleep
+    is also bounded by the remaining time, so the call returns before
+    the deadline regardless of how many retries are left.  Without this
+    bound, a [num_tries=10, retry_delay_sec=30] default would make any
+    caller wait up to 5 minutes against an unreachable daemon — which
+    silently broke [mina-healthcheck wait --timeout 30] (took 300s
+    instead of 30s) before this parameter was added. *)
 let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
-    ?(initial_delay_sec = 0.) ~logger ~node_uri ~query_name query_obj =
+    ?(initial_delay_sec = 0.) ?deadline ~logger ~node_uri ~query_name query_obj
+    =
   let open Deferred.Let_syntax in
   let metadata =
     [ ("query", `String query_name)
@@ -20,8 +31,28 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     "Attempting to send GraphQL request \"$query_obj\" to \"$uri\" after \
      $init_delay sec"
     ~metadata ;
+  let past_deadline () =
+    match deadline with None -> false | Some d -> Time.( >= ) (Time.now ()) d
+  in
+  let bounded_sleep span =
+    match deadline with
+    | None ->
+        span
+    | Some d ->
+        let remaining = Time.diff d (Time.now ()) in
+        if Time.Span.( <= ) remaining Time.Span.zero then Time.Span.zero
+        else Time.Span.min span remaining
+  in
+  let deadline_failure_msg () =
+    sprintf
+      "GraphQL \"%s\" to \"%s\" request hit caller's deadline before succeeding"
+      query_name (Uri.to_string node_uri)
+  in
   let rec retry n =
-    if n <= 0 then (
+    if past_deadline () then (
+      [%log error] "$query to $uri exhausted caller's deadline" ~metadata ;
+      Deferred.Or_error.error_string (deadline_failure_msg ()) )
+    else if n <= 0 then (
       [%log error]
         "GraphQL request \"$query\" to \"$uri\" failed too many times" ~metadata ;
       Deferred.Or_error.errorf
@@ -41,8 +72,22 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
               ( metadata
               @ [ ("error", `String err_string); ("num_tries", `Int (n - 1)) ]
               ) ;
-          let%bind () = after (Time.Span.of_sec retry_delay_sec) in
-          retry (n - 1)
+          (* Skip the retry sleep when this was the last attempt — otherwise
+             a [num_tries=1] caller burns [retry_delay_sec] (~30s by default)
+             waiting for a retry that will never happen.  This matters for
+             the one-shot CLI subcommands, which set [num_tries:1] precisely
+             to fail fast against an unreachable daemon. *)
+          if n - 1 <= 0 then
+            Deferred.Or_error.errorf
+              "GraphQL \"%s\" to \"%s\" request failed too many times: %s"
+              query_name (Uri.to_string node_uri) err_string
+          else if past_deadline () then
+            Deferred.Or_error.error_string (deadline_failure_msg ())
+          else
+            let%bind () =
+              after (bounded_sleep (Time.Span.of_sec retry_delay_sec))
+            in
+            retry (n - 1)
       | Error (`Graphql_error err_string) ->
           [%log error]
             "GraphQL request \"$query\" to \"$uri\" returned an error: \
@@ -50,7 +95,7 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
             ~metadata:(metadata @ [ ("error", `String err_string) ]) ;
           Deferred.Or_error.error_string err_string
   in
-  let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+  let%bind () = after (bounded_sleep (Time.Span.of_sec initial_delay_sec)) in
   retry num_tries
 
 let get_peer_id ~logger node_uri =
@@ -76,6 +121,85 @@ let get_peer_id ~logger node_uri =
     self_id
     (String.concat ~sep:" " peer_ids) ;
   (self_id, peer_ids)
+
+let get_network_id ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting network ID from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Query_network_id.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_network_id"
+      query_obj
+  in
+  let res = query_result_obj.networkID in
+  [%log info] "network_id, result of graphql query = %s" res ;
+  res
+
+let get_fork_config ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting fork_config from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Genesis_ledger_export.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_fork_config"
+      query_obj
+  in
+  (* fork_config is declared as a JSON scalar; return it as Yojson.Safe.t *)
+  (query_result_obj.fork_config :> Yojson.Safe.t)
+
+(** Submit an arbitrary GraphQL document (no typed parsing).
+
+    Returns the raw JSON response body as [Yojson.Safe.t] on success. Treats
+    HTTP non-2xx and responses containing an [errors] field as errors so
+    callers (and `set -e` bash) can detect GraphQL failures. *)
+let send_raw_query ~logger node_uri ~query =
+  let open Deferred.Let_syntax in
+  [%log info] "Sending raw GraphQL query"
+    ~metadata:
+      [ ("node_uri", `String (Uri.to_string node_uri))
+      ; ("query", `String query)
+      ] ;
+  let body_string =
+    Yojson.Safe.to_string (`Assoc [ ("query", `String query) ])
+  in
+  let headers =
+    Cohttp.Header.of_list
+      [ ("Accept", "application/json"); ("Content-Type", "application/json") ]
+  in
+  match%bind
+    Deferred.Or_error.try_with ~extract_exn:true (fun () ->
+        Cohttp_async.Client.post ~headers
+          ~body:(Cohttp_async.Body.of_string body_string)
+          node_uri )
+  with
+  | Error e ->
+      Deferred.return (Error e)
+  | Ok (response, body) ->
+      let%bind body_str = Cohttp_async.Body.to_string body in
+      let status_code =
+        Cohttp.Code.code_of_status (Cohttp_async.Response.status response)
+      in
+      if status_code < 200 || status_code >= 300 then
+        Deferred.Or_error.errorf "Status code %d -- %s" status_code body_str
+      else
+        let parsed =
+          try Ok (Yojson.Safe.from_string body_str)
+          with exn ->
+            Or_error.errorf "Failed to parse response as JSON: %s -- body: %s"
+              (Exn.to_string exn) body_str
+        in
+        Deferred.return
+          (Or_error.bind parsed ~f:(fun json ->
+               match json with
+               | `Assoc kvs when List.Assoc.mem kvs ~equal:String.equal "errors"
+                 ->
+                   let errors =
+                     List.Assoc.find_exn kvs ~equal:String.equal "errors"
+                   in
+                   Or_error.errorf "GraphQL errors: %s"
+                     (Yojson.Safe.to_string errors)
+               | _ ->
+                   Ok json ) )
 
 let get_global_slot_since_hard_fork ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
@@ -167,6 +291,7 @@ let get_account_data ~logger node_uri ~account_id =
                   "the nonce from get_balance is None, which should be \
                    impossible"
                 acc.nonce
+          ; inferred_nonce = acc.inferredNonce
           ; total_balance = acc.balance.total
           ; delegate = acc.delegate
           ; liquid_balance_opt = acc.balance.liquid
@@ -852,3 +977,89 @@ let get_detailed_best_chain ?max_length ~logger node_uri =
                ; slot_since_genesis =
                    block.protocolState.consensusState.slotSinceGenesis
                } )
+
+(** Convert the graphql_ppx sync status variant to [Sync_status.t]. *)
+let parse_sync_status = function
+  | `SYNCED ->
+      `Synced
+  | `BOOTSTRAP ->
+      `Bootstrap
+  | `CATCHUP ->
+      `Catchup
+  | `CONNECTING ->
+      `Connecting
+  | `LISTENING ->
+      `Listening
+  | `OFFLINE ->
+      `Offline
+
+(** Get the node's sync status. *)
+let get_sync_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting sync status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Sync_status.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ?num_tries ?retry_delay_sec ?deadline ~logger ~node_uri
+      ~query_name:"sync_status" query_obj
+  in
+  parse_sync_status result.syncStatus
+
+(** Get comprehensive daemon status including sync state, chain heights,
+    uptime, commit, and connected peers. *)
+let get_daemon_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting daemon status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Daemon_status.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ?num_tries ?retry_delay_sec ?deadline ~logger ~node_uri
+      ~query_name:"daemon_status" query_obj
+  in
+  let ds = result.daemonStatus in
+  let peers =
+    ds.peers |> Array.to_list
+    |> List.map ~f:(fun (p : Queries.Daemon_status.t_daemonStatus_peers) ->
+           { Types.peer_id = p.peerId; host = p.host; port = p.libp2pPort } )
+  in
+  Types.
+    { sync_status = parse_sync_status ds.syncStatus
+    ; blockchain_length = ds.blockchainLength
+    ; highest_block_length_received = Some ds.highestBlockLengthReceived
+    ; uptime_secs = Some ds.uptimeSecs
+    ; state_hash = ds.stateHash
+    ; commit_id = Some ds.commitId
+    ; peer_count = List.length peers
+    ; peers
+    }
+
+(** Check readiness: synced, peer count above threshold, chain caught up. *)
+let get_readiness ?num_tries ?retry_delay_sec ?deadline ~logger node_uri
+    ~min_peers =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Checking readiness"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Daemon_readiness.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ?num_tries ?retry_delay_sec ?deadline ~logger ~node_uri
+      ~query_name:"daemon_readiness" query_obj
+  in
+  let ds = result.daemonStatus in
+  let sync_status = parse_sync_status ds.syncStatus in
+  let peer_count = Array.length ds.peers in
+  let is_synced = Sync_status.equal sync_status `Synced in
+  let has_peers = peer_count >= min_peers in
+  let chain_ok =
+    match ds.blockchainLength with
+    | Some cl ->
+        cl = ds.highestBlockLengthReceived
+    | None ->
+        false
+  in
+  Types.
+    { ready = is_synced && has_peers && chain_ok
+    ; sync_status
+    ; peer_count
+    ; blockchain_length = ds.blockchainLength
+    ; highest_block_length_received = Some ds.highestBlockLengthReceived
+    }

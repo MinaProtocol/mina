@@ -10,9 +10,9 @@
 # trust store failed with "Certificate verification failed" instead of saying
 # what was really wrong.
 #
-# This script replaces both buckets with a throwaway MinIO container:
+# This script replaces both buckets with a throwaway SeaweedFS S3 container:
 #
-#   - MinIO speaks the S3 API, so deb-s3 drives it unchanged. Our deb-s3 fork
+#   - SeaweedFS speaks the S3 API, so deb-s3 drives it unchanged. Our deb-s3 fork
 #     already accepts --endpoint and --force-path-style; the release scripts
 #     pass them when DEB_S3_ENDPOINT is set (scripts/debian/deb-s3-common.sh).
 #   - The repository is served over plain HTTP on a private docker network, so
@@ -33,11 +33,11 @@
 
 MOCK_REPO_CONTAINER="mina-release-mock-repo-$$"
 MOCK_REPO_NETWORK="mina-release-mock-net-$$"
-# quay.io, not Docker Hub: MinIO no longer publishes a publicly pullable
-# minio/minio there, so an agent without Docker Hub credentials fails with
-# "pull access denied ... may require 'docker login'". The tag is pinned so
-# that a MinIO release cannot change the tests underneath us.
-MOCK_REPO_IMAGE="${MOCK_REPO_IMAGE:-quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z}"
+# SeaweedFS, not MinIO: MinIO withdrew its public images (Docker Hub in
+# September 2026, then anonymous pulls from quay.io), so an agent without
+# credentials can no longer pull them. The image is pinned by tag and digest so
+# that a SeaweedFS release cannot change the tests underneath us.
+MOCK_REPO_IMAGE="${MOCK_REPO_IMAGE:-chrislusf/seaweedfs:4.00@sha256:dcbccdc9f33689d43ca3d1fb73d2baa319f8307c59d7923191b993ddc85ba6f8}"
 MOCK_REPO_ACCESS_KEY="minioadmin"
 MOCK_REPO_SECRET_KEY="minioadmin"
 
@@ -186,7 +186,7 @@ mock_repo_start() {
     MOCK_REPO_REGION="${TEST_REGION:-us-west-2}"
     MOCK_REPO_WORK_DIR=$(mktemp -d -t mock-repo.XXXXXX)
 
-    echo "[mock-repo] starting MinIO container ${MOCK_REPO_CONTAINER}"
+    echo "[mock-repo] starting SeaweedFS container ${MOCK_REPO_CONTAINER}"
     docker network create "${MOCK_REPO_NETWORK}" > /dev/null
 
     # Publish on an ephemeral loopback port so that parallel agents on the same
@@ -194,13 +194,11 @@ mock_repo_start() {
     docker run -d \
         --name "${MOCK_REPO_CONTAINER}" \
         --network "${MOCK_REPO_NETWORK}" \
-        -p 127.0.0.1::9000 \
-        -e "MINIO_ROOT_USER=${MOCK_REPO_ACCESS_KEY}" \
-        -e "MINIO_ROOT_PASSWORD=${MOCK_REPO_SECRET_KEY}" \
-        "${MOCK_REPO_IMAGE}" server /data > /dev/null
+        -p 127.0.0.1::8333 \
+        "${MOCK_REPO_IMAGE}" server -s3 > /dev/null
 
     local __host_port
-    __host_port=$(docker port "${MOCK_REPO_CONTAINER}" 9000/tcp | head -1 | sed 's/.*://')
+    __host_port=$(docker port "${MOCK_REPO_CONTAINER}" 8333/tcp | head -1 | sed 's/.*://')
 
     # Two views of the same server. The test scripts run on the agent and reach
     # it through the published port; the verification containers are siblings on
@@ -208,22 +206,22 @@ mock_repo_start() {
     MOCK_REPO_ENDPOINT="http://127.0.0.1:${__host_port}"
     # Read by lib.sh to build the repository URLs.
     # shellcheck disable=SC2034
-    MOCK_REPO_INTERNAL_ENDPOINT="http://${MOCK_REPO_CONTAINER}:9000"
+    MOCK_REPO_INTERNAL_ENDPOINT="http://${MOCK_REPO_CONTAINER}:8333"
 
     local __waited=0
-    until curl -sf "${MOCK_REPO_ENDPOINT}/minio/health/live" > /dev/null; do
-        if [[ ${__waited} -ge 60 ]]; then
-            echo "[mock-repo] MinIO did not become healthy within 60s" >&2
+    until curl -sf "${MOCK_REPO_ENDPOINT}/healthz" > /dev/null; do
+        if [[ ${__waited} -ge 120 ]]; then
+            echo "[mock-repo] SeaweedFS did not become healthy within 120s" >&2
             docker logs "${MOCK_REPO_CONTAINER}" >&2 || true
             return 1
         fi
         sleep 1
         __waited=$((__waited + 1))
     done
-    echo "[mock-repo] MinIO healthy at ${MOCK_REPO_ENDPOINT}"
+    echo "[mock-repo] SeaweedFS healthy at ${MOCK_REPO_ENDPOINT}"
 
-    # MinIO checks signatures, so credentials must be set even though the read
-    # side is anonymous.
+    # The S3 clients sign their requests, so credentials must be set even though
+    # the server runs without authentication and the read side is anonymous.
     export AWS_ACCESS_KEY_ID="${MOCK_REPO_ACCESS_KEY}"
     export AWS_SECRET_ACCESS_KEY="${MOCK_REPO_SECRET_KEY}"
     export AWS_DEFAULT_REGION="${MOCK_REPO_REGION}"

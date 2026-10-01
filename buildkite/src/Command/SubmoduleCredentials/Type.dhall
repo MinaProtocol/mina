@@ -5,6 +5,11 @@
 -- organization. Buildkite agent 3.133.0 and later refuse that variable when a
 -- pipeline sets it directly.
 --
+-- The plugin writes the same rule into GIT_CONFIG_PARAMETERS, which git reads
+-- in every process that inherits it. That covers a git command that the job
+-- runs after the checkout, also one inside a container, because the Docker
+-- plugin passes GIT_CONFIG_PARAMETERS through by default.
+--
 -- The plugin holds no token. It reads one from the variable named by token-env.
 --
 -- See https://github.com/MinaProtocol/submodule-credentials-buildkite-plugin
