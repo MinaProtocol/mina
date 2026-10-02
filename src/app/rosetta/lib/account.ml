@@ -138,9 +138,85 @@ module Sql = struct
       ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       ~initial_minimum_balance
 
+  (* The genesis ledger's accounts, which no block ever touched.
+
+     Without these an account that has not moved since its era's genesis
+     appears in no accounts_accessed row, the block lookup misses, and the
+     balance reads as zero. They live in their own table because they are
+     initial conditions rather than block effects. *)
+  module Genesis_account = struct
+    type t =
+      { genesis_height : int64
+      ; balance : int64
+      ; nonce : int64
+      ; timing : Archive_lib.Processor.Timing_info.t option
+      }
+
+    (* Ordered by genesis_height DESC so that on a chain with several forks the
+       most recent era at or below the requested height wins. *)
+    let query =
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string string int64)
+        Caqti_type.(
+          t2 (t3 int64 int64 int64)
+            (t2
+               (t3 (option string) (option int64) (option string))
+               (t2 (option int64) (option string)) ))
+        {sql|
+          SELECT genesis_height, balance::bigint, nonce,
+                 initial_minimum_balance, cliff_time, cliff_amount,
+                 vesting_period, vesting_increment
+          FROM genesis_accounts
+          WHERE public_key = $1
+            AND token = $2
+            AND genesis_height <= $3
+          ORDER BY genesis_height DESC
+          LIMIT 1
+        |sql}
+
+    let run (module Conn : Mina_caqti.CONNECTION) ~requested_block_height
+        ~address ~token_id =
+      let open Deferred.Result.Let_syntax in
+      let%map row_opt =
+        Conn.find_opt query (address, token_id, requested_block_height)
+      in
+      Option.map row_opt
+        ~f:(fun
+             ( (genesis_height, balance, nonce)
+             , ( (initial_minimum_balance, cliff_time, cliff_amount)
+               , (vesting_period, vesting_increment) ) )
+           ->
+          let timing =
+            match
+              ( initial_minimum_balance
+              , cliff_time
+              , cliff_amount
+              , vesting_period
+              , vesting_increment )
+            with
+            | ( Some initial_minimum_balance
+              , Some cliff_time
+              , Some cliff_amount
+              , Some vesting_period
+              , Some vesting_increment ) ->
+                Some
+                  { Archive_lib.Processor.Timing_info.account_identifier_id = 0
+                  ; initial_minimum_balance
+                  ; cliff_time
+                  ; cliff_amount
+                  ; vesting_period
+                  ; vesting_increment
+                  }
+            | _ ->
+                (* Untimed: the whole balance is liquid. *)
+                None
+          in
+          { genesis_height; balance; nonce; timing } )
+  end
+
   let find_current_balance (module Conn : Mina_caqti.CONNECTION)
       ~requested_block_global_slot_since_genesis ~last_relevant_command_info
-      ?timing_id () =
+      ?timing_id ?timing_info () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
     let ( _
@@ -150,11 +226,15 @@ module Sql = struct
       last_relevant_command_info
     in
     let%bind timing_info_opt =
-      match timing_id with
-      | Some timing_id ->
+      (* [timing_info] is supplied directly by the genesis-ledger path, whose
+         schedule is stored flat rather than behind a timing_info row. *)
+      match (timing_info, timing_id) with
+      | Some _, _ ->
+          return timing_info
+      | None, Some timing_id ->
           Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
           |> Errors.Lift.sql ~context:"Finding timing info"
-      | None ->
+      | None, None ->
           return None
     in
     let end_slot =
@@ -231,18 +311,63 @@ module Sql = struct
       ; hash = requested_block_hash
       }
     in
+    (* The genesis ledger is the other place an account's state can come from,
+       and it is the only one for an account untouched since its era began. *)
+    let%bind genesis_account_opt =
+      Genesis_account.run
+        (module Conn)
+        ~requested_block_height ~address ~token_id
+      |> Errors.Lift.sql ~context:"Finding the account in a genesis ledger"
+    in
     let%bind balance_info, nonce =
-      match last_relevant_command_info_opt with
-      | None ->
-          (* account doesn' exist yet at the request block, return zero balance *)
-          let nonce = Unsigned.UInt64.of_int 0 in
-          Deferred.Result.return
-            ({ Balance_info.liquid_balance = 0L; total_balance = 0L }, nonce)
-      | Some (last_relevant_command_info, timing_id) ->
+      (* Both sources answer the same question -- the most recent known state at
+         or below the requested height -- so the later one wins. On a chain with
+         several forks a newer era's genesis can legitimately supersede an older
+         block, which is why this compares heights instead of preferring one
+         source outright. *)
+      let from_blocks_height =
+        Option.map last_relevant_command_info_opt
+          ~f:(fun ((height, _, _, _), _) -> height)
+      in
+      let genesis_height =
+        Option.map genesis_account_opt ~f:(fun g ->
+            g.Genesis_account.genesis_height )
+      in
+      let use_genesis =
+        match (from_blocks_height, genesis_height) with
+        | None, Some _ ->
+            true
+        | Some block_height, Some genesis_height ->
+            Int64.( > ) genesis_height block_height
+        | _, None ->
+            false
+      in
+      match
+        (use_genesis, genesis_account_opt, last_relevant_command_info_opt)
+      with
+      | true, Some genesis_account, _ ->
+          find_current_balance
+            (module Conn)
+            ~requested_block_global_slot_since_genesis
+            ~last_relevant_command_info:
+              ( genesis_account.Genesis_account.genesis_height
+              , requested_block_global_slot_since_genesis
+              , genesis_account.balance
+              , genesis_account.nonce )
+            ?timing_info:genesis_account.timing ()
+      | _, _, Some (last_relevant_command_info, timing_id) ->
           find_current_balance
             (module Conn)
             ~requested_block_global_slot_since_genesis
             ~last_relevant_command_info ~timing_id ()
+      | _ ->
+          (* Neither source knows this account at this height, so it genuinely
+             did not exist yet. This zero is now an answer rather than a gap:
+             before the genesis ledger was consulted, the same zero was also
+             returned for accounts that existed and simply had not moved. *)
+          let nonce = Unsigned.UInt64.of_int 0 in
+          Deferred.Result.return
+            ({ Balance_info.liquid_balance = 0L; total_balance = 0L }, nonce)
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
