@@ -1,0 +1,13 @@
+(executable
+ (package archive_dispatch)
+ (name archive_dispatch)
+ (public_name archive_dispatch)
+ ; Deliberately minimal. This program chooses between two protocol versions and
+ ; so must not be compiled against either: nothing from src/lib belongs here,
+ ; and the dependency list is what enforces that. postgresql is the synchronous
+ ; binding, chosen so there is no async scheduler to tear down before exec.
+ (libraries core core_unix core_unix.sys_unix postgresql)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))
