@@ -21,6 +21,8 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
+            , Artifacts.Type.ArchivePrefork { network = Network.Type.Mainnet }
+            , Artifacts.Type.RosettaPrefork { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonAutoHardfork
                 { network = Network.Type.Mainnet }

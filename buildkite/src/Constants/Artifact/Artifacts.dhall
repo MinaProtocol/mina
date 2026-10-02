@@ -18,6 +18,8 @@ let Artifact
       | DaemonLegacyHardfork : { network : Network.Type }
       | DaemonAutoHardfork : { network : Network.Type }
       | DaemonPrefork : { network : Network.Type }
+      | ArchivePrefork : { network : Network.Type }
+      | RosettaPrefork : { network : Network.Type }
       | DaemonPostfork : { network : Network.Type }
       | CreatePreforkGenesis : { network : Network.Type }
       | DaemonStorageToolbox
@@ -46,6 +48,10 @@ let capitalName =
                 \(a : { network : Network.Type }) -> "DaemonAutoHardfork"
             , DaemonPrefork =
                 \(a : { network : Network.Type }) -> "DaemonPrefork"
+            , ArchivePrefork =
+                \(a : { network : Network.Type }) -> "ArchivePrefork"
+            , RosettaPrefork =
+                \(a : { network : Network.Type }) -> "RosettaPrefork"
             , DaemonPostfork =
                 \(a : { network : Network.Type }) -> "DaemonPostfork"
             , CreatePreforkGenesis =
@@ -77,6 +83,10 @@ let lowerName =
                 \(a : { network : Network.Type }) -> "daemonAutoHardfork"
             , DaemonPrefork =
                 \(a : { network : Network.Type }) -> "daemonPrefork"
+            , ArchivePrefork =
+                \(a : { network : Network.Type }) -> "archivePrefork"
+            , RosettaPrefork =
+                \(a : { network : Network.Type }) -> "rosettaPrefork"
             , DaemonPostfork =
                 \(a : { network : Network.Type }) -> "daemonPostfork"
             , CreatePreforkGenesis =
@@ -104,6 +114,8 @@ let isNetworked =
             , DaemonLegacyHardfork = \(a : { network : Network.Type }) -> True
             , DaemonAutoHardfork = \(a : { network : Network.Type }) -> True
             , DaemonPrefork = \(a : { network : Network.Type }) -> True
+            , ArchivePrefork = \(a : { network : Network.Type }) -> True
+            , RosettaPrefork = \(a : { network : Network.Type }) -> True
             , DaemonPostfork = \(a : { network : Network.Type }) -> True
             , CreatePreforkGenesis = \(a : { network : Network.Type }) -> True
             , DaemonStorageToolbox = False
@@ -132,6 +144,10 @@ let network =
             , DaemonAutoHardfork =
                 \(a : { network : Network.Type }) -> Some a.network
             , DaemonPrefork =
+                \(a : { network : Network.Type }) -> Some a.network
+            , ArchivePrefork =
+                \(a : { network : Network.Type }) -> Some a.network
+            , RosettaPrefork =
                 \(a : { network : Network.Type }) -> Some a.network
             , DaemonPostfork =
                 \(a : { network : Network.Type }) -> Some a.network
@@ -174,6 +190,12 @@ let profile =
             , DaemonPrefork =
                     \(a : { network : Network.Type })
                 ->  Profiles.fromNetwork a.network
+            , ArchivePrefork =
+                    \(a : { network : Network.Type })
+                ->  Profiles.fromNetwork a.network
+            , RosettaPrefork =
+                    \(a : { network : Network.Type })
+                ->  Profiles.fromNetwork a.network
             , DaemonPostfork =
                     \(a : { network : Network.Type })
                 ->  Profiles.fromNetwork a.network
@@ -213,6 +235,10 @@ let toDebian =
                 \(a : { network : Network.Type }) -> Debian.Type.DaemonAutomode
             , DaemonPrefork =
                 \(a : { network : Network.Type }) -> Debian.Type.DaemonPrefork
+            , ArchivePrefork =
+                \(a : { network : Network.Type }) -> Debian.Type.ArchivePrefork
+            , RosettaPrefork =
+                \(a : { network : Network.Type }) -> Debian.Type.RosettaPrefork
             , DaemonPostfork =
                 \(a : { network : Network.Type }) -> Debian.Type.DaemonPostfork
             , CreatePreforkGenesis =
@@ -273,6 +299,10 @@ let profileTentTokens =
                 \(a : { network : Network.Type }) -> [] : List Text
             , DaemonPrefork =
                 \(a : { network : Network.Type }) -> [] : List Text
+            , ArchivePrefork =
+                \(a : { network : Network.Type }) -> [] : List Text
+            , RosettaPrefork =
+                \(a : { network : Network.Type }) -> [] : List Text
             , DaemonPostfork =
                 \(a : { network : Network.Type }) -> [] : List Text
             , CreatePreforkGenesis =
@@ -317,6 +347,10 @@ let networkTents =
                     , DaemonAutoHardfork =
                         \(a : { network : Network.Type }) -> [] : List Text
                     , DaemonPrefork =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , ArchivePrefork =
+                        \(a : { network : Network.Type }) -> [] : List Text
+                    , RosettaPrefork =
                         \(a : { network : Network.Type }) -> [] : List Text
                     , DaemonPostfork =
                         \(a : { network : Network.Type }) -> [] : List Text

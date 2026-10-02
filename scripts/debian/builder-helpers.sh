@@ -492,6 +492,24 @@ build_functional_test_suite_deb() {
 #
 # Rosetta API implementation
 #
+# Copies the Rosetta binaries into a directory: /usr/local/bin for the generic
+# package, /usr/lib/mina/<codename> for a hard fork runtime.
+copy_common_rosetta_apps() {
+  local dest="${1}"
+
+  mkdir -p "${dest}"
+
+  cp ./default/src/app/rosetta/rosetta.exe "${dest}/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer.exe \
+    "${dest}/mina-ocaml-signer"
+  cp ./default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
+    "${dest}/rosetta-healthcheck"
+  cp ./default/src/app/rosetta/client/rosetta_client_cli.exe \
+    "${dest}/rosetta-client"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
+    "${dest}/mina-rosetta-indexer-test"
+}
+
 build_rosetta_generic_deb() {
 
   echo "--- Building rosetta generic deb"
@@ -501,18 +519,7 @@ build_rosetta_generic_deb() {
   create_control_file "${package_name}" "${SHARED_DEPS}" \
     'Mina Protocol Rosetta Generic' "${SUGGESTED_DEPS}"
 
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-
-  # Copy rosetta-based Binaries
-  cp "./default/src/app/rosetta/rosetta.exe" \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp "./default/src/app/rosetta/ocaml-signer/signer.exe" \
-    "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
-  cp ./default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
-    "${BUILDDIR}/usr/local/bin/rosetta-healthcheck"
-  cp ./default/src/app/rosetta/client/rosetta_client_cli.exe \
-    "${BUILDDIR}/usr/local/bin/rosetta-client"
+  copy_common_rosetta_apps "${BUILDDIR}/usr/local/bin"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
 
@@ -522,8 +529,6 @@ build_rosetta_generic_deb() {
     "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros \
     "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
 
   build_deb "${package_name}"
 }
@@ -707,6 +712,46 @@ build_daemon_prefork_deb() {
     "Mina Protocol Client and Daemon for prefork under network ${network}" "${SUGGESTED_DEPS}"
 
   copy_common_daemon_apps "$automode_current_dir"
+
+  build_deb "${package_name}"
+}
+
+#
+# Builds mina-archive-NETWORK-prefork-POSTFORK_CODENAME and
+# mina-rosetta-NETWORK-prefork-POSTFORK_CODENAME
+#
+# The pre-fork archive and Rosetta runtimes under
+# /usr/lib/mina/${CURRENT_CODENAME}, as the daemon prefork package does. Built on
+# the pre-fork branch; the automode build pulls them from the legacy cache.
+#
+build_archive_prefork_deb() {
+
+  local network="$1"
+  local automode_current_dir="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
+  local package_name="mina-archive-${network}-prefork-${POSTFORK_CODENAME}"
+
+  echo "--- Building archive prefork deb for ${network}:"
+
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}" \
+    "Mina Archive Node and tools for the pre-fork era of ${network}"
+
+  copy_common_archive_apps "$automode_current_dir"
+
+  build_deb "${package_name}"
+}
+
+build_rosetta_prefork_deb() {
+
+  local network="$1"
+  local automode_current_dir="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
+  local package_name="mina-rosetta-${network}-prefork-${POSTFORK_CODENAME}"
+
+  echo "--- Building rosetta prefork deb for ${network}:"
+
+  create_control_file "${package_name}" "${SHARED_DEPS}" \
+    "Mina Rosetta API for the pre-fork era of ${network}" "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_apps "$automode_current_dir"
 
   build_deb "${package_name}"
 }
@@ -1091,32 +1136,38 @@ build_daemon_hardfork_config_deb() {
 # Sets up archive daemon, archive blocks tool, extract blocks tool,
 # missing blocks utilities, replayer, and SQL migration scripts.
 #
+# Copies the archive binaries into a directory: /usr/local/bin for the generic
+# package, /usr/lib/mina/<codename> for a hard fork runtime. Every one links
+# archive_lib, so a fork needs a second copy of all of them.
+copy_common_archive_apps() {
+  local dest="${1}"
+
+  mkdir -p "${dest}"
+
+  cp ./default/src/app/archive/archive.exe "${dest}/mina-archive"
+  cp ./default/src/app/archive_blocks/archive_blocks.exe \
+    "${dest}/mina-archive-blocks"
+  cp ./default/src/app/extract_blocks/extract_blocks.exe \
+    "${dest}/mina-extract-blocks"
+  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+    "${dest}/mina-archive-hardfork-toolbox"
+  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+    "${dest}/mina-missing-blocks-auditor"
+  cp ./default/src/app/replayer/replayer.exe "${dest}/mina-replayer"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
+    "${dest}/mina-dump-slot-ledger"
+  cp ./default/src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
+    "${dest}/mina-archive-healthcheck"
+}
+
 copy_common_archive_configs() {
   local ARCHIVE_DEB="${1}"
 
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  cp ./default/src/app/archive/archive.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive"
-  cp ./default/src/app/archive_blocks/archive_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
-  cp ./default/src/app/extract_blocks/extract_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
+  copy_common_archive_apps "${BUILDDIR}/usr/local/bin"
 
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/missing-blocks-guardian.sh \
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
-
-  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
-  cp ./default/src/app/replayer/replayer.exe \
-    "${BUILDDIR}/usr/local/bin/mina-replayer"
-  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
-  cp ./default/src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-healthcheck"
 
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 

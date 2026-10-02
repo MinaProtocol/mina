@@ -703,6 +703,33 @@ test_build_daemon_devnet_prefork_deb() {
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 }
 
+test_build_archive_prefork_deb() {
+    safe_build build_archive_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    # The pre-fork runtime directory, never the PATH.
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-replayer"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive-hardfork-toolbox"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+
+    # The SQL belongs to the post-fork side, which runs the upgrade.
+    assert_file_not_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_build_rosetta_prefork_deb() {
+    safe_build build_rosetta_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-ocaml-signer"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta"
+}
+
 ################################################################################
 # Tests: Postfork packages
 ################################################################################
@@ -1308,6 +1335,8 @@ main() {
     # Prefork packages
     run_test test_build_daemon_mainnet_prefork_deb
     run_test test_build_daemon_devnet_prefork_deb
+    run_test test_build_archive_prefork_deb
+    run_test test_build_rosetta_prefork_deb
     run_test test_build_prefork_devnet_genesis_ledger_deb
     run_test test_build_prefork_mainnet_genesis_ledger_deb
 
