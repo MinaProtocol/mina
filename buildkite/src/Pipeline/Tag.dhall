@@ -37,6 +37,7 @@ let Tag
       | Mesa
       | Packaging
       | Publish
+      | Generic
       >
 
 let capitalName =
@@ -71,6 +72,7 @@ let capitalName =
             , Mesa = "Mesa"
             , Packaging = "Packaging"
             , Publish = "Publish"
+            , Generic = "Generic"
             }
             tag
 
@@ -106,6 +108,7 @@ let lowerName =
             , Mesa = "mesa"
             , Packaging = "packaging"
             , Publish = "publish"
+            , Generic = "generic"
             }
             tag
 
