@@ -97,7 +97,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drops hardfork_state.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drops hardfork_state and genesis_accounts.',
             'starting'::migration_status
         );
     ELSIF
@@ -116,9 +116,12 @@ END$$;
 
 -- 2a. Remove what the upgrade added for the automatic hard fork hand-over.
 --
--- The row describes a fork a 4.0.0 archive has no use for. The daemon sends
--- its configuration again once the archive is upgraded.
+-- Unlike the changes above, this one is not lossy in the way that matters: the
+-- rows describe a fork a 4.0.0 archive has no use for. The daemon sends
+-- its configuration again when the archive is upgraded, and the genesis
+-- accounts are read again from the genesis ledger.
 
+DROP TABLE IF EXISTS genesis_accounts;
 DROP TABLE IF EXISTS hardfork_state;
 DROP TYPE  IF EXISTS hardfork_source;
 

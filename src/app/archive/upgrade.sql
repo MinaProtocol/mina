@@ -2,8 +2,8 @@
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
 -- + record status in migration_history
 --
--- Adds hardfork_state, where the archive records the hard fork a daemon
--- announces. Add further changes here as they land, and bump
+-- Adds the tables the automatic hard fork hand-over keeps: hardfork_state and
+-- genesis_accounts. Add further changes here as they land, and bump
 -- archive.migration_version below.
 -- =============================================================================
 
@@ -98,7 +98,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Adds hardfork_state.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Adds hardfork_state and genesis_accounts.',
             'starting'::migration_status
         );
     ELSIF
@@ -122,12 +122,9 @@ END$$;
 
 -- 2a. `hardfork_state`: what the archive knows about the fork it is passing
 -- through. Created here as well as in create_schema.sql, because a database
--- built before this version never ran the latter. At most one row can ever
--- exist: several archive processes may share one database and must not be
+-- upgraded from the pre-fork schema never ran the latter. At most one row can
+-- ever exist: several archive processes may share one database and must not be
 -- able to hold different opinions about the fork.
---
--- Run this script before the fork: the pre-fork archive records the
--- announcement into this table.
 
 DO $$
 BEGIN
@@ -146,6 +143,30 @@ CREATE TABLE IF NOT EXISTS hardfork_state (
     announced_at            timestamptz      NOT NULL DEFAULT now(),
     finalized_at            timestamptz
 );
+
+-- 2b. `genesis_accounts`: the state every account was in when an era's genesis
+-- ledger was established. Not block effects, so not in accounts_accessed.
+-- Append only and keyed by the height the ledger takes effect at: a database
+-- spans every era it has lived through, and a balance query at a pre-fork
+-- height still needs the earlier era's genesis balance for an account that was
+-- untouched throughout it.
+
+CREATE TABLE IF NOT EXISTS genesis_accounts (
+    genesis_height           bigint  NOT NULL,
+    public_key               text    NOT NULL,
+    token                    text    NOT NULL,
+    balance                  text    NOT NULL,
+    nonce                    bigint  NOT NULL,
+    initial_minimum_balance  text,
+    cliff_time               bigint,
+    cliff_amount             text,
+    vesting_period           bigint,
+    vesting_increment        text,
+    PRIMARY KEY (genesis_height, public_key, token)
+);
+
+CREATE INDEX IF NOT EXISTS idx_genesis_accounts_lookup
+  ON genesis_accounts(public_key, token, genesis_height DESC);
 
 -- 3. Update schema_history
 
