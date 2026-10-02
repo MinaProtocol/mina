@@ -5150,7 +5150,9 @@ module Fork_genesis_block = struct
             match%map
               Monitor.try_with_join_or_error ~here:[%here] (fun () ->
                   Genesis_ledger_helper.init_from_config_file ~logger
-                    ~proof_level:Genesis_constants.Compiled.proof_level
+                    ~proof_level:
+                      (let (module G) = Genesis_constants.profiled () in
+                       G.proof_level )
                     ~genesis_constants ~constraint_constants runtime_config
                     ~cli_proof_level:None )
             with
