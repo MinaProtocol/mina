@@ -61,7 +61,11 @@ let with_archive (config : Archive.Config.t) ~extra_args ~log_file ~f =
             : [ `Ok | `No_such_process ] ) ;
         exited >>| ignore ) )
     (fun () ->
-      let%bind () = Archive.wait_until_ready ~log_file >>| Or_error.ok_exn in
+      let%bind () =
+        Archive_healthcheck.wait_db_and_server_ready
+          ~postgres_uri:config.postgres_uri ~server_port:config.server_port ()
+        >>| Or_error.ok_exn
+      in
       f exited )
 
 let exit_code_within ~seconds exited =
