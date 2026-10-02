@@ -53,8 +53,18 @@ let effective
       -- job declares.
       \(declared : Repo) -> Prelude.Optional.default Repo declared envOverride
 
+let hashTag
+    : Repo -> Bool
+    =
+      -- Whether a push also adds the short hash tag (<hash>-<codename>-...).
+      -- Internal registries keep it: CI and tests look images up by it. The
+      -- public registry gets only the version tag users are told to pull.
+          \(repo : Repo)
+      ->  merge { Internal = True, InternalEurope = True, Public = False } repo
+
 in  { Type = Repo
     , show = show
+    , hashTag = hashTag
     , envOverride = envOverride
     , effective = effective
     }
