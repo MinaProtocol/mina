@@ -365,6 +365,7 @@ MOCKEXE
     create_mock_exe "default/src/app/archive_blocks/archive_blocks.exe"
     create_mock_exe "default/src/app/extract_blocks/extract_blocks.exe"
     create_mock_exe "default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe"
+    create_mock_exe "default/src/app/archive_dispatch/archive_dispatch.exe"
     create_mock_exe "default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe"
     create_mock_exe "default/src/app/replayer/replayer.exe"
     create_mock_exe "default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe"
@@ -701,6 +702,116 @@ test_build_daemon_devnet_prefork_deb() {
     # Binaries in alternate directory
     assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/berkeley"
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+test_build_archive_prefork_deb() {
+    safe_build build_archive_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    # The pre-fork runtime directory, never the PATH.
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-replayer"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive-hardfork-toolbox"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+
+    # The SQL belongs to the post-fork side, which runs the upgrade.
+    assert_file_not_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_build_rosetta_prefork_deb() {
+    safe_build build_rosetta_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-ocaml-signer"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta"
+}
+
+test_build_archive_postfork_deb() {
+    safe_build build_archive_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+
+    # psql applies the schema upgrade; the generic binaries need a profile.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "postgresql-client"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-profile"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-archive-generic"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/mesa/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/mesa/mina-replayer"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive-dispatch"
+    assert_file_captured "$CAPTURED_FILES" "etc/default/mina-archive-dispatch"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_archive_dispatch_settings_are_strict_key_value() {
+    safe_build build_archive_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    local settings="${CAPTURE_DIR}/last_build/etc/default/mina-archive-dispatch"
+    if [[ ! -f "$settings" ]]; then
+        log_fail "dispatcher settings file not produced"
+        return
+    fi
+    local content
+    content=$(cat "$settings")
+
+    assert_contains "names the pre-fork runtime" "$content" "PREFORK_RUNTIME=berkeley"
+    assert_contains "names the post-fork runtime" "$content" "POSTFORK_RUNTIME=mesa"
+    assert_contains "pre-fork protocol version" "$content" "PREFORK_PROTOCOL_VERSION=4.0.0"
+    assert_contains "post-fork protocol version" "$content" "POSTFORK_PROTOCOL_VERSION=5.0.0"
+
+    # Parsed by the dispatcher, not sourced: nothing only a shell understands.
+    if grep -qE '^\s*(export|source|\.)\s' "$settings"; then
+        log_fail "settings use shell syntax the dispatcher does not parse"
+    else
+        log_pass
+    fi
+    if grep -qE '[$][(]|[`]' "$settings"; then
+        log_fail "settings contain command substitution"
+    else
+        log_pass
+    fi
+}
+
+test_build_archive_automode_deb() {
+    safe_build build_archive_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-devnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-archive-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-archive-devnet"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+}
+
+test_build_rosetta_postfork_deb() {
+    safe_build build_rosetta_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/mesa/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/rosetta/rosetta-cli-config/config.json"
+
+    # The archive postfork package owns the dispatcher.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-devnet-postfork-mesa"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive-dispatch"
+    assert_file_not_captured "$CAPTURED_FILES" "etc/default/mina-archive-dispatch"
+}
+
+test_build_rosetta_automode_deb() {
+    safe_build build_rosetta_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-devnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-rosetta-devnet"
 }
 
 ################################################################################
@@ -1308,6 +1419,13 @@ main() {
     # Prefork packages
     run_test test_build_daemon_mainnet_prefork_deb
     run_test test_build_daemon_devnet_prefork_deb
+    run_test test_build_archive_prefork_deb
+    run_test test_build_rosetta_prefork_deb
+    run_test test_build_archive_postfork_deb
+    run_test test_archive_dispatch_settings_are_strict_key_value
+    run_test test_build_archive_automode_deb
+    run_test test_build_rosetta_postfork_deb
+    run_test test_build_rosetta_automode_deb
     run_test test_build_prefork_devnet_genesis_ledger_deb
     run_test test_build_prefork_mainnet_genesis_ledger_deb
 

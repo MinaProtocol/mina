@@ -80,6 +80,18 @@ resolve_deb_output() {
     daemon_devnet_postfork)  echo "mina-devnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
     daemon_mainnet_automode) echo "mina-mainnet-automode" ;;
     daemon_devnet_automode)  echo "mina-devnet-automode" ;;
+    archive_mainnet_prefork) echo "mina-archive-mainnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
+    archive_devnet_prefork)  echo "mina-archive-devnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
+    rosetta_mainnet_prefork) echo "mina-rosetta-mainnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
+    rosetta_devnet_prefork)  echo "mina-rosetta-devnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
+    archive_mainnet_postfork) echo "mina-archive-mainnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
+    archive_devnet_postfork)  echo "mina-archive-devnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
+    rosetta_mainnet_postfork) echo "mina-rosetta-mainnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
+    rosetta_devnet_postfork)  echo "mina-rosetta-devnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
+    archive_mainnet_automode) echo "mina-archive-mainnet-automode" ;;
+    archive_devnet_automode)  echo "mina-archive-devnet-automode" ;;
+    rosetta_mainnet_automode) echo "mina-rosetta-mainnet-automode" ;;
+    rosetta_devnet_automode)  echo "mina-rosetta-devnet-automode" ;;
 
     # Profile packages
     profile_mainnet) echo "mina-mainnet-profile" ;;
@@ -117,6 +129,12 @@ resolve_and_build_package() {
 
   if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet)$ ]]; then
     "build_${BASH_REMATCH[1]}_deb" "${BASH_REMATCH[2]}"
+    return
+  fi
+
+  # Archive and Rosetta runtimes for a hard fork, as the daemon has.
+  if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet)_(prefork|postfork|automode)$ ]]; then
+    "build_${BASH_REMATCH[1]}_${BASH_REMATCH[3]}_deb" "${BASH_REMATCH[2]}"
     return
   fi
 

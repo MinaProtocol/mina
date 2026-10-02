@@ -1,0 +1,69 @@
+#################################################################################################
+# The "mina-rosetta-auto-hardfork" stage
+# - Continues from the rosetta-base image, like stages/rosetta/2-mina-rosetta.
+# - Installs both runtimes of the daemon, the archive and Rosetta: the POSTFORK packages at
+#   deb_version and the PREFORK ones at deb_legacy_version. The daemon commands route through
+#   mina-dispatch, the archive and Rosetta commands through mina-archive-dispatch.
+# - The image runs its own postgres (docker-start.sh), so the archive dispatcher is pointed at
+#   that database. Change PGCONN in /etc/default/mina-archive-dispatch together with
+#   POSTGRES_USERNAME / POSTGRES_DBNAME if you override those.
+#################################################################################################
+FROM rosetta-base AS mina-rosetta-auto-hardfork
+
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM.
+ARG deb_codename=focal
+ARG deb_version
+ARG deb_release=unstable
+ARG network=mainnet
+ARG deb_legacy_version
+ARG deb_profile
+
+ARG MINA_DAEMON_PORT=8302
+ARG MINA_CONFIG_DIR=/data/.mina-config
+
+# Installed from the local build context (_debs, which also holds the
+# legacy-root prefork debs). No apt repo resolves the mina closure, so every
+# package is requested explicitly.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+    && chmod +x /usr/local/bin/install-mina-debs.sh \
+    && /usr/local/bin/install-mina-debs.sh \
+         "mina-${network}-postfork-mesa=$deb_version" \
+         "mina-logproc=$deb_version" \
+         "mina-${network}-config=$deb_version" \
+         "mina-${deb_profile}-profile=$deb_version" \
+         "mina-archive-${network}-postfork-mesa=$deb_version" \
+         "mina-rosetta-${network}-postfork-mesa=$deb_version"
+
+RUN echo "Installing the pre-fork runtimes at version $deb_legacy_version" \
+    && /usr/local/bin/install-mina-debs.sh \
+         "mina-${network}-prefork-mesa=$deb_legacy_version" \
+         "mina-archive-${network}-prefork-mesa=$deb_legacy_version" \
+         "mina-rosetta-${network}-prefork-mesa=$deb_legacy_version"
+
+# The database docker-start.sh creates by default.
+RUN sed -i 's|^PGCONN=.*|PGCONN=postgres://pguser:pguser@127.0.0.1:5432/archive|' \
+      /etc/default/mina-archive-dispatch
+
+# --- Set up postgres
+USER postgres
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
+    && echo "$POSTGRES_VERSION" "$(psql -V)" \
+    && echo "host all  all    0.0.0.0/0  md5" >> "/etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf" \
+    && pg_dropcluster --stop "${POSTGRES_VERSION}" main
+# Run as root so it can create /data/postgresql
+USER root
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
+    && pg_createcluster --start -d /data/postgresql --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf "${POSTGRES_VERSION}" main
+
+# --- Container workdir, ports, entrypoint, etc.
+WORKDIR /etc/mina/rosetta/scripts
+
+EXPOSE 3087
+EXPOSE $MINA_DAEMON_PORT
+
+ENTRYPOINT ["bash", "./docker-start.sh"]
