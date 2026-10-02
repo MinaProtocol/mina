@@ -179,6 +179,16 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
         "Enable safe mode, meaning only data safe to expose to public would be \
          routed. And any mutation should be banned."
       no_arg
+  and watch_schema_era =
+    flag "--watch-schema-era" ~aliases:[ "watch-schema-era" ]
+      ~doc:
+        "Stand down when the archive schema moves to a protocol version this \
+         binary was not built for, so that the runtime matching it can take \
+         over. Off by default: a deployment that will never pass through a \
+         hard fork should not pay for one. The archive automode package \
+         supplies this flag, because installing it is the statement that this \
+         deployment might."
+      no_arg
   and signature_kind =
     Option.value_map signature_kind ~default:Cli_lib.Flag.signature_kind
       ~f:Command.Param.return
@@ -217,6 +227,16 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
             Deferred.Result.return pool)
     in
     don't_wait_for (pg_log_data ~logger ~pool) ;
+    if watch_schema_era then
+      don't_wait_for
+        (let open Deferred.Let_syntax in
+        match%bind Lazy.force pool with
+        | Error _ ->
+            (* The pool reports its own failure; nothing to add, and without a
+               database this process has larger problems than the schema era. *)
+            Deferred.unit
+        | Ok pool ->
+            Archive_lib.Schema_era.watch ~logger ~pool ()) ;
     let%bind server =
       Cohttp_async.Server.create_expert ~max_connections:128
         ~on_handler_error:
