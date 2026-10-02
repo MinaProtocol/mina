@@ -100,7 +100,7 @@ echo "=== 2. the schema upgrade"
 # already at 4.0.0/0.0.6 and the script takes its reapply path. That is what
 # creates hardfork_state, which the released 0.0.6 did not have.
 psql -q -v ON_ERROR_STOP=1 "$PG_CONN" \
-  -f src/app/archive/upgrade_to_mesa.sql > "$WORK/upgrade.log" 2>&1 \
+  -f src/app/archive/upgrade.sql > "$WORK/upgrade.log" 2>&1 \
   || { echo "the schema upgrade failed:"; tail -20 "$WORK/upgrade.log"; exit 1; }
 
 HAVE_TABLE=$(q "SELECT to_regclass('hardfork_state') IS NOT NULL;")
