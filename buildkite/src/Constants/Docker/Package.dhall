@@ -14,6 +14,8 @@ let Package =
       | Daemon : { network : Network.Type }
       | DaemonLegacyHardfork : { network : Network.Type }
       | DaemonAutoHardfork : { network : Network.Type }
+      | ArchiveAutoHardfork : { network : Network.Type }
+      | RosettaAutoHardfork : { network : Network.Type }
       | Archive : { network : Network.Type }
       | RosettaGeneric
       | Rosetta : { network : Network.Type }
@@ -34,6 +36,10 @@ let capitalName =
                 \(args : { network : Network.Type }) -> "DaemonLegacyHardfork"
             , DaemonAutoHardfork =
                 \(args : { network : Network.Type }) -> "DaemonAutoHardfork"
+            , ArchiveAutoHardfork =
+                \(args : { network : Network.Type }) -> "ArchiveAutoHardfork"
+            , RosettaAutoHardfork =
+                \(args : { network : Network.Type }) -> "RosettaAutoHardfork"
             , Archive = \(args : { network : Network.Type }) -> "Archive"
             , RosettaGeneric = "RosettaGeneric"
             , Rosetta = \(args : { network : Network.Type }) -> "Rosetta"
@@ -55,6 +61,10 @@ let lowerName =
                 \(args : { network : Network.Type }) -> "daemon_hardfork"
             , DaemonAutoHardfork =
                 \(args : { network : Network.Type }) -> "daemon_auto_hardfork"
+            , ArchiveAutoHardfork =
+                \(args : { network : Network.Type }) -> "archive_auto_hardfork"
+            , RosettaAutoHardfork =
+                \(args : { network : Network.Type }) -> "rosetta_auto_hardfork"
             , Archive = \(args : { network : Network.Type }) -> "archive"
             , RosettaGeneric = "rosetta_profile"
             , Rosetta = \(args : { network : Network.Type }) -> "rosetta_config"
@@ -74,6 +84,8 @@ let isEssential =
             , DaemonLegacyHardfork =
                 \(args : { network : Network.Type }) -> True
             , DaemonAutoHardfork = \(args : { network : Network.Type }) -> True
+            , ArchiveAutoHardfork = \(args : { network : Network.Type }) -> True
+            , RosettaAutoHardfork = \(args : { network : Network.Type }) -> True
             , Archive = \(args : { network : Network.Type }) -> True
             , RosettaGeneric = True
             , Rosetta = \(args : { network : Network.Type }) -> True
@@ -93,6 +105,10 @@ let isGeneric =
             , DaemonLegacyHardfork =
                 \(args : { network : Network.Type }) -> False
             , DaemonAutoHardfork = \(args : { network : Network.Type }) -> False
+            , ArchiveAutoHardfork =
+                \(args : { network : Network.Type }) -> False
+            , RosettaAutoHardfork =
+                \(args : { network : Network.Type }) -> False
             , Archive = \(args : { network : Network.Type }) -> False
             , RosettaGeneric = True
             , Rosetta = \(args : { network : Network.Type }) -> False
@@ -112,6 +128,8 @@ let isNetworked =
             , DaemonLegacyHardfork =
                 \(args : { network : Network.Type }) -> True
             , DaemonAutoHardfork = \(args : { network : Network.Type }) -> True
+            , ArchiveAutoHardfork = \(args : { network : Network.Type }) -> True
+            , RosettaAutoHardfork = \(args : { network : Network.Type }) -> True
             , Archive = \(args : { network : Network.Type }) -> True
             , RosettaGeneric = False
             , Rosetta = \(args : { network : Network.Type }) -> True
@@ -131,6 +149,10 @@ let isProfiled =
             , DaemonLegacyHardfork =
                 \(args : { network : Network.Type }) -> False
             , DaemonAutoHardfork = \(args : { network : Network.Type }) -> False
+            , ArchiveAutoHardfork =
+                \(args : { network : Network.Type }) -> False
+            , RosettaAutoHardfork =
+                \(args : { network : Network.Type }) -> False
             , Archive = \(args : { network : Network.Type }) -> False
             , RosettaGeneric = False
             , Rosetta = \(args : { network : Network.Type }) -> False
@@ -155,6 +177,12 @@ let serviceName =
             , DaemonAutoHardfork =
                     \(args : { network : Network.Type })
                 ->  "mina-daemon-auto-hardfork"
+            , ArchiveAutoHardfork =
+                    \(args : { network : Network.Type })
+                ->  "mina-archive-auto-hardfork"
+            , RosettaAutoHardfork =
+                    \(args : { network : Network.Type })
+                ->  "mina-rosetta-auto-hardfork"
             , Archive = \(args : { network : Network.Type }) -> "mina-archive"
             , RosettaGeneric = "mina-rosetta"
             , Rosetta =
@@ -180,6 +208,12 @@ let dockerName =
             , DaemonAutoHardfork =
                     \(args : { network : Network.Type })
                 ->  "mina-daemon-auto-hardfork"
+            , ArchiveAutoHardfork =
+                    \(args : { network : Network.Type })
+                ->  "mina-archive-auto-hardfork"
+            , RosettaAutoHardfork =
+                    \(args : { network : Network.Type })
+                ->  "mina-rosetta-auto-hardfork"
             , Archive = \(args : { network : Network.Type }) -> "mina-archive"
             , RosettaGeneric = "mina-rosetta"
             , Rosetta = \(args : { network : Network.Type }) -> "mina-rosetta"

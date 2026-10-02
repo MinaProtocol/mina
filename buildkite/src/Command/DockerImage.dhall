@@ -174,6 +174,10 @@ let generateStep =
                       \(args : { network : Network.Type }) -> ""
                   , DaemonAutoHardfork =
                       \(args : { network : Network.Type }) -> ""
+                  , ArchiveAutoHardfork =
+                      \(args : { network : Network.Type }) -> ""
+                  , RosettaAutoHardfork =
+                      \(args : { network : Network.Type }) -> ""
                   , Archive = \(args : { network : Network.Type }) -> ""
                   , RosettaGeneric = ""
                   , Rosetta =
