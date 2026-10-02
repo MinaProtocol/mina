@@ -50,8 +50,8 @@ let command_run =
          ~doc:
            "PATH The script --hardfork-handling migrate-exit runs against this \
             archive's database before it stops (default \
-            /etc/mina/archive/upgrade_to_mesa.sql)"
-         (optional_with_default "/etc/mina/archive/upgrade_to_mesa.sql" string)
+            /etc/mina/archive/upgrade.sql)"
+         (optional_with_default "/etc/mina/archive/upgrade.sql" string)
      and delete_older_than =
        flag "--delete-older-than" ~aliases:[ "-delete-older-than" ]
          (optional int)

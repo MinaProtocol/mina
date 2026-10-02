@@ -2,7 +2,8 @@
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
 -- + record status in migration_history
 --
--- 5.0.0 needs no schema change yet. Add them here as they land, and bump
+-- Adds hardfork_state, where the archive records the hard fork a daemon
+-- announces. Add further changes here as they land, and bump
 -- archive.migration_version below.
 -- =============================================================================
 
@@ -22,7 +23,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '5.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.1';
+SET archive.migration_version = '0.0.2';
 
 -- TODO: put below in a common script
 
@@ -97,7 +98,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. No schema change.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Adds hardfork_state.',
             'starting'::migration_status
         );
     ELSIF
@@ -119,7 +120,34 @@ BEGIN
     END IF;
 END$$;
 
--- 2. Update schema_history
+-- 2a. `hardfork_state`: what the archive knows about the fork it is passing
+-- through. Created here as well as in create_schema.sql, because a database
+-- built before this version never ran the latter. At most one row can ever
+-- exist: several archive processes may share one database and must not be
+-- able to hold different opinions about the fork.
+--
+-- Run this script before the fork: the pre-fork archive records the
+-- announcement into this table.
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'hardfork_source') THEN
+        CREATE TYPE hardfork_source AS ENUM ('daemon_config', 'fork_genesis', 'operator');
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS hardfork_state (
+    id                      int              PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    fork_state_hash         text             NOT NULL,
+    fork_blockchain_length  bigint           NOT NULL,
+    fork_global_slot        bigint           NOT NULL,
+    config_json             text             NOT NULL,
+    source                  hardfork_source  NOT NULL,
+    announced_at            timestamptz      NOT NULL DEFAULT now(),
+    finalized_at            timestamptz
+);
+
+-- 3. Update schema_history
 
 DO $$
 BEGIN
