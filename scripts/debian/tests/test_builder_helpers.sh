@@ -904,6 +904,8 @@ test_build_daemon_devnet_generic_deb() {
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    # The daemon downloads ledger tarballs with curl.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "curl"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     # The plain generic already carries the mina-generic name, so it needs no
     # Provides (only the flavored variants provide the virtual name).
@@ -931,6 +933,8 @@ test_build_daemon_mainnet_generic_deb() {
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    # The daemon downloads ledger tarballs with curl.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "curl"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     # The generic package is network-agnostic: it carries no network-specific
     # Replaces/Breaks (it neither replaces nor conflicts with mina-<network> or
@@ -1217,8 +1221,8 @@ test_build_archive_devnet_suffix_naming() {
 
 # Noble codename dep strings (mirrors the 'noble' case in builder-helpers.sh)
 NOBLE_SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
-NOBLE_DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
-NOBLE_ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+NOBLE_DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc, curl"
+NOBLE_ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2, curl"
 
 test_codename_noble_deps() {
     # Save current deps
@@ -1251,6 +1255,7 @@ test_codename_noble_archive_deps() {
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "curl"
 
     ARCHIVE_DEPS="${saved_archive}"
 }
