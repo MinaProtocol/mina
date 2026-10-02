@@ -68,6 +68,54 @@ let wait_for_best_tip ~logger ~slot_tx_end mina =
             let%map () = after (Time.Span.of_sec 15.0) in
             `Repeat () ) )
 
+(** Send a hard fork runtime configuration to the archive process, if one is
+    configured. Best effort: a failure is logged and swallowed, because the
+    caller either repeats the send or is about to exit for reasons unrelated to
+    the archive. *)
+let send_hardfork_config_to_archive ~logger ~archive_location ~config_json =
+  match archive_location with
+  | None ->
+      Deferred.unit
+  | Some archive_location -> (
+      match%map
+        Mina_lib.Archive_client.dispatch_hardfork_config ~logger
+          archive_location ~config_json
+      with
+      | Ok () ->
+          [%log info] "Auto HF: sent hard fork configuration to the archive"
+      | Error e ->
+          [%log warn]
+            "Auto HF: could not send hard fork configuration to the archive: \
+             $error"
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ] )
+
+(** Re-send this daemon's own hard fork configuration to the archive on a slow
+    cadence, for as long as the daemon runs.
+
+    The configuration is the only message the archive hand-over needs, so a
+    single lost delivery would leave the archive with no record of the fork.
+    Repeating it costs about a kilobyte an hour and additionally heals an
+    archive restored from a backup taken before the fork. *)
+let start_hardfork_config_heartbeat ~logger ?(interval = Time.Span.of_hr 1.)
+    mina =
+  let config = Mina_lib.config mina in
+  let runtime_config = config.precomputed_values.runtime_config in
+  match Runtime_config.fork runtime_config with
+  | None ->
+      (* Not a forked network: nothing for the archive to be told about. *)
+      Deferred.unit
+  | Some _ ->
+      let config_json =
+        Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_string
+      in
+      Deferred.repeat_until_finished () (fun () ->
+          let%bind () =
+            send_hardfork_config_to_archive ~logger
+              ~archive_location:config.archive_process_location ~config_json
+          in
+          let%map () = after interval in
+          `Repeat () )
+
 let start_auto_hardfork_config_generation ~logger mina =
   let open Deferred.Let_syntax in
   let config = Mina_lib.config mina in
@@ -129,6 +177,28 @@ let start_auto_hardfork_config_generation ~logger mina =
               [%log info]
                 "Auto HF: successfully generated hardfork config, shutting \
                  down daemon" ;
+              (* Hand the generated configuration to the archive before we go.
+                 It is the only message the archive's hand-over needs: its
+                 [fork] stanza identifies the fork block, and its ledger
+                 hashes locate and verify the genesis ledger. We are about to
+                 exit, so this is one shot -- the post-fork daemon's heartbeat
+                 is what covers a loss here. *)
+              let%bind () =
+                match%bind
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      Reader.file_contents (config_dir ^/ "daemon.json") )
+                with
+                | Ok config_json ->
+                    send_hardfork_config_to_archive ~logger
+                      ~archive_location:config.archive_process_location
+                      ~config_json
+                | Error e ->
+                    [%log error]
+                      "Auto HF: generated a hardfork config but could not read \
+                       it back to send to the archive: $error"
+                      ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                    Deferred.unit
+              in
               (* Shutdown like Stop_daemon *)
               Scheduler.yield () >>= fun () -> exit 0
           | Error e ->
