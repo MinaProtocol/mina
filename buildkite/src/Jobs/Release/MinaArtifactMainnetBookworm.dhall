@@ -20,8 +20,16 @@ in  Pipeline.build
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
             , Artifacts.Type.DaemonAutoHardfork
                 { network = Network.Type.Mainnet }
+            , Artifacts.Type.ArchiveAutoHardfork
+                { network = Network.Type.Mainnet }
+            , Artifacts.Type.RosettaAutoHardfork
+                { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
+            , Artifacts.Type.ArchivePrefork { network = Network.Type.Mainnet }
+            , Artifacts.Type.RosettaPrefork { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
+            , Artifacts.Type.ArchivePostfork { network = Network.Type.Mainnet }
+            , Artifacts.Type.RosettaPostfork { network = Network.Type.Mainnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Mainnet }
             , Artifacts.Type.Archive { network = Network.Type.Mainnet }

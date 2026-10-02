@@ -73,16 +73,32 @@ let sets
         , description = "rosetta: profiled and configured"
         }
       , { name = "automode"
-        , dockers = [ "daemon_auto_hardfork-*-docker-image" ]
-        , debians = [ "daemon_*_automode", "daemon_*_postfork" ]
+        , dockers =
+          [ "daemon_auto_hardfork-*-docker-image"
+          , "archive_auto_hardfork-*-docker-image"
+          , "rosetta_auto_hardfork-*-docker-image"
+          ]
+        , debians =
+          [ "daemon_*_automode"
+          , "daemon_*_postfork"
+          , "archive_*_automode"
+          , "archive_*_postfork"
+          , "rosetta_*_automode"
+          , "rosetta_*_postfork"
+          ]
         , description =
-            "the automatic hardfork: the auto-hardfork image, and the automode and postfork packages"
+            "the automatic hardfork: the auto-hardfork images, and the automode and postfork packages of the daemon, archive and rosetta"
         }
       , { name = "prefork"
         , dockers = [] : List Text
-        , debians = [ "daemon_*_prefork", "prefork_*_genesis_ledger" ]
+        , debians =
+          [ "daemon_*_prefork"
+          , "archive_*_prefork"
+          , "rosetta_*_prefork"
+          , "prefork_*_genesis_ledger"
+          ]
         , description =
-            "what is built FOR the next hardfork: the prefork daemon and its genesis ledger. Packages only, no image"
+            "what is built FOR the next hardfork: the prefork daemon, archive and rosetta, and the genesis ledger. Packages only, no image"
         }
       , { name = "logproc"
         , dockers = [] : List Text

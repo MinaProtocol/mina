@@ -359,6 +359,35 @@ case "${SERVICE}" in
         cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
+    mina-archive-auto-hardfork)
+        # Installs the profile package of its network.
+        NEEDS_DEB_PROFILE=1
+        if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
+          echo "Legacy version is not set for mina-archive-auto-hardfork."
+          echo "Please provide the --deb-legacy-version argument."
+          exit 1
+        fi
+        # Staged build: shared base-deps + the archive auto-hardfork stage
+        # (postfork archive at deb_version + prefork archive at deb_legacy_version).
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-archive-auto-hardfork.XXXXXX)
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/archive/3-auto-hardfork
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-archive-auto-hardfork}"
+        ;;
+    mina-rosetta-auto-hardfork)
+        NEEDS_DEB_PROFILE=1
+        if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
+          echo "Legacy version is not set for mina-rosetta-auto-hardfork."
+          echo "Please provide the --deb-legacy-version argument."
+          exit 1
+        fi
+        # Staged build: rosetta's own base + the rosetta auto-hardfork stage
+        # (postfork runtimes at deb_version + prefork runtimes at deb_legacy_version).
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-rosetta-auto-hardfork.XXXXXX)
+        cat dockerfiles/stages/rosetta/1-base-deps dockerfiles/stages/rosetta/3-auto-hardfork > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-rosetta-auto-hardfork}"
+        ;;
     mina-rosetta)
         NEEDS_DEB_PROFILE=1
         # Staged build: rosetta's own heavy base + mina-rosetta stage.

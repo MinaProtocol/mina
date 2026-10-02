@@ -13,8 +13,14 @@ let Package
       | DaemonConfig
       | DaemonHardforkConfig
       | DaemonAutomode
+      | ArchiveAutomode
+      | RosettaAutomode
       | DaemonPostfork
+      | ArchivePostfork
+      | RosettaPostfork
       | DaemonPrefork
+      | ArchivePrefork
+      | RosettaPrefork
       | DaemonStorageToolbox
       | PreforkGenesisLedger
       | Archive
@@ -34,8 +40,14 @@ let All =
       , Package.DaemonConfig
       , Package.DaemonHardforkConfig
       , Package.DaemonAutomode
+      , Package.ArchiveAutomode
+      , Package.RosettaAutomode
       , Package.DaemonPostfork
+      , Package.ArchivePostfork
+      , Package.RosettaPostfork
       , Package.DaemonPrefork
+      , Package.ArchivePrefork
+      , Package.RosettaPrefork
       , Package.DaemonStorageToolbox
       , Package.PreforkGenesisLedger
       , Package.Archive
@@ -63,8 +75,14 @@ let AuxiliaryPackages =
       [ Package.Profile
       , Package.DaemonHardforkConfig
       , Package.DaemonAutomode
+      , Package.ArchiveAutomode
+      , Package.RosettaAutomode
       , Package.DaemonPostfork
+      , Package.ArchivePostfork
+      , Package.RosettaPostfork
       , Package.DaemonPrefork
+      , Package.ArchivePrefork
+      , Package.RosettaPrefork
       , Package.DaemonStorageToolbox
       , Package.PreforkGenesisLedger
       , Package.TestExecutive
@@ -81,8 +99,14 @@ let index =
             , DaemonConfig = 2
             , DaemonHardforkConfig = 3
             , DaemonAutomode = 4
+            , ArchiveAutomode = 22
+            , RosettaAutomode = 23
             , DaemonPostfork = 5
+            , ArchivePostfork = 20
+            , RosettaPostfork = 21
             , DaemonPrefork = 6
+            , ArchivePrefork = 18
+            , RosettaPrefork = 19
             , DaemonStorageToolbox = 7
             , PreforkGenesisLedger = 8
             , Archive = 9
@@ -105,8 +129,14 @@ let isNetworked =
             , DaemonConfig = True
             , DaemonHardforkConfig = True
             , DaemonAutomode = True
+            , ArchiveAutomode = True
+            , RosettaAutomode = True
             , DaemonPostfork = True
+            , ArchivePostfork = True
+            , RosettaPostfork = True
             , DaemonPrefork = True
+            , ArchivePrefork = True
+            , RosettaPrefork = True
             , DaemonStorageToolbox = False
             , PreforkGenesisLedger = True
             , Archive = True
@@ -129,8 +159,14 @@ let capitalName =
             , DaemonConfig = "DaemonConfig"
             , DaemonHardforkConfig = "DaemonHardforkConfig"
             , DaemonAutomode = "DaemonAutomode"
+            , ArchiveAutomode = "ArchiveAutomode"
+            , RosettaAutomode = "RosettaAutomode"
             , DaemonPostfork = "DaemonPostfork"
+            , ArchivePostfork = "ArchivePostfork"
+            , RosettaPostfork = "RosettaPostfork"
             , DaemonPrefork = "DaemonPrefork"
+            , ArchivePrefork = "ArchivePrefork"
+            , RosettaPrefork = "RosettaPrefork"
             , DaemonStorageToolbox = "DaemonStorageToolbox"
             , PreforkGenesisLedger = "PreforkGenesisLedger"
             , Archive = "Archive"
@@ -153,8 +189,14 @@ let lowerName =
             , DaemonConfig = "daemon_config"
             , DaemonHardforkConfig = "daemon_hardfork_config"
             , DaemonAutomode = "daemon_automode"
+            , ArchiveAutomode = "archive_automode"
+            , RosettaAutomode = "rosetta_automode"
             , DaemonPostfork = "daemon_postfork"
+            , ArchivePostfork = "archive_postfork"
+            , RosettaPostfork = "rosetta_postfork"
             , DaemonPrefork = "daemon_prefork"
+            , ArchivePrefork = "archive_prefork"
+            , RosettaPrefork = "rosetta_prefork"
             , DaemonStorageToolbox = "daemon_storage_toolbox"
             , PreforkGenesisLedger = "prefork_genesis_ledger"
             , Archive = "archive"
@@ -180,8 +222,14 @@ let buildToken =
             , DaemonHardforkConfig =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutomode = "daemon_${Network.lowerName network}_automode"
+            , ArchiveAutomode = "archive_${Network.lowerName network}_automode"
+            , RosettaAutomode = "rosetta_${Network.lowerName network}_automode"
             , DaemonPostfork = "daemon_${Network.lowerName network}_postfork"
+            , ArchivePostfork = "archive_${Network.lowerName network}_postfork"
+            , RosettaPostfork = "rosetta_${Network.lowerName network}_postfork"
             , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
+            , ArchivePrefork = "archive_${Network.lowerName network}_prefork"
+            , RosettaPrefork = "rosetta_${Network.lowerName network}_prefork"
             , DaemonStorageToolbox = "daemon_storage_toolbox"
             , PreforkGenesisLedger =
                 "prefork_${Network.lowerName network}_genesis_ledger"
@@ -220,8 +268,20 @@ let aptName =
             , DaemonConfig = "mina-${Network.lowerName network}-config"
             , DaemonHardforkConfig = "mina-${Network.lowerName network}-config"
             , DaemonAutomode = "mina-${Network.lowerName network}-automode"
+            , ArchiveAutomode =
+                "mina-archive-${Network.lowerName network}-automode"
+            , RosettaAutomode =
+                "mina-rosetta-${Network.lowerName network}-automode"
             , DaemonPostfork = "mina-${Network.lowerName network}-postfork-mesa"
+            , ArchivePostfork =
+                "mina-archive-${Network.lowerName network}-postfork-mesa"
+            , RosettaPostfork =
+                "mina-rosetta-${Network.lowerName network}-postfork-mesa"
             , DaemonPrefork = "mina-${Network.lowerName network}-prefork-mesa"
+            , ArchivePrefork =
+                "mina-archive-${Network.lowerName network}-prefork-mesa"
+            , RosettaPrefork =
+                "mina-rosetta-${Network.lowerName network}-prefork-mesa"
             , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
             , PreforkGenesisLedger =
                 "mina-create-${Network.lowerName

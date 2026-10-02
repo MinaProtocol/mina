@@ -289,8 +289,20 @@ let expandDockerServices =
                         \(_ : { network : Network.Type })
                     ->  [ mk (Docker.Type.DaemonAutoHardfork { network = net })
                         ]
+                , ArchiveAutoHardfork =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk (Docker.Type.ArchiveAutoHardfork { network = net })
+                        ]
+                , RosettaAutoHardfork =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk (Docker.Type.RosettaAutoHardfork { network = net })
+                        ]
                 , DaemonPrefork = \(_ : { network : Network.Type }) -> none
+                , ArchivePrefork = \(_ : { network : Network.Type }) -> none
+                , RosettaPrefork = \(_ : { network : Network.Type }) -> none
                 , DaemonPostfork = \(_ : { network : Network.Type }) -> none
+                , ArchivePostfork = \(_ : { network : Network.Type }) -> none
+                , RosettaPostfork = \(_ : { network : Network.Type }) -> none
                 , CreatePreforkGenesis =
                     \(_ : { network : Network.Type }) -> none
                 , DaemonStorageToolbox = none
@@ -659,6 +671,43 @@ let docker_step
                                 { network = network }
                           , network = network
                           , base_image = baseImage
+                          , deb_codename = spec.debVersion
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , docker_publish = spec.docker_publish
+                          , deb_legacy_version = spec.deb_legacy_version
+                          , size = size
+                          }
+                        ]
+                , ArchiveAutoHardfork =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps =
+                              withDocker
+                                (Docker.Type.Archive { network = network })
+                          , service =
+                              Docker.Type.ArchiveAutoHardfork
+                                { network = network }
+                          , network = network
+                          , base_image = baseImage
+                          , deb_codename = spec.debVersion
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , docker_publish = spec.docker_publish
+                          , deb_legacy_version = spec.deb_legacy_version
+                          , size = size
+                          }
+                        ]
+                , RosettaAutoHardfork =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps =
+                              withDocker
+                                (Docker.Type.Rosetta { network = network })
+                          , service =
+                              Docker.Type.RosettaAutoHardfork
+                                { network = network }
+                          , network = network
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags

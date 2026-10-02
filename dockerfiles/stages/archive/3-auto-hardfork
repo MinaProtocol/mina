@@ -1,0 +1,66 @@
+#################################################################################################
+# The "mina-archive-auto-hardfork" stage
+# - Continues from the shared base-deps image, like stages/archive/2-mina-archive.
+# - Installs the POSTFORK archive package (mina-archive-${network}-postfork-mesa) at deb_version and
+#   the PREFORK one at deb_legacy_version, so one image serves either side of the fork. The
+#   postfork package brings mina-archive-dispatch, which chooses the runtime from the archive
+#   database (migration_history and hardfork_state).
+# - The dispatcher has no default database: mount /etc/default/mina-archive-dispatch with PGCONN
+#   set, or point MINA_ARCHIVE_DISPATCH_CONFIG at such a file. Without it, it refuses and says why.
+#################################################################################################
+FROM base-deps AS mina-archive-auto-hardfork
+
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM.
+ARG deb_version
+ARG deb_codename=bullseye
+ARG deb_release=unstable
+ARG network=mainnet
+ARG deb_legacy_version
+ARG deb_profile
+
+ENV MINA_DEB=mina-archive-${network}-postfork-mesa
+ENV MINA_LEGACY_DEB=mina-archive-${network}-prefork-mesa
+# The per-network config package carries the runtime config and genesis ledger
+# tarballs, as in the plain archive image.
+ENV MINA_CONFIG_DEB=mina-${network}-config
+
+ENV DEBIAN_FRONTEND noninteractive
+RUN echo "Building image with version $deb_codename $deb_release $deb_version"
+
+COPY scripts/archive-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Re-establish the apt sources before this stage's first apt-get update; see
+# stages/archive/2-mina-archive.
+ARG apt_cache_url=""
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
+
+RUN apt-get update --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends \
+        postgresql \
+        postgresql-contrib \
+        apt-utils \
+        man \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
+
+# Both packages are installed from the local build context (_debs, which also
+# holds the legacy-root prefork debs). No apt repo resolves the mina closure, so
+# the profile and config packages are requested explicitly.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+  && /usr/local/bin/install-mina-debs.sh \
+       "${MINA_DEB}=$deb_version" \
+       "mina-${deb_profile}-profile=$deb_version" \
+       "${MINA_CONFIG_DEB}=$deb_version"
+
+RUN echo "Installing the pre-fork archive at version $deb_legacy_version" \
+  && /usr/local/bin/install-mina-debs.sh \
+       "${MINA_LEGACY_DEB}=$deb_legacy_version"
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

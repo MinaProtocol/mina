@@ -24,7 +24,11 @@ in  Pipeline.build
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Lightnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Devnet }
+            , Artifacts.Type.ArchivePrefork { network = Network.Type.Devnet }
+            , Artifacts.Type.RosettaPrefork { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Devnet }
+            , Artifacts.Type.ArchivePostfork { network = Network.Type.Devnet }
+            , Artifacts.Type.RosettaPostfork { network = Network.Type.Devnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Devnet }
             , Artifacts.Type.Archive { network = Network.Type.Devnet }
