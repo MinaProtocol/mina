@@ -42,7 +42,7 @@
   mina_stdlib
   mina_stdlib_unix
   snark_profiler_lib
-  archive_lib
+  archive_rpc
   mina_wire_types
   perf_histograms
   one_or_two
