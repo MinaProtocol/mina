@@ -91,7 +91,7 @@ case "$BENCHMARK" in
   zkapp)         BARE_EXE=zkapp_limits.exe;            BARE_AS=mina-zkapp-limits ;;
   ledger-export) BARE_EXE=ledger_export_benchmark.exe; BARE_AS=mina-ledger-export-benchmark ;;
   snark)         BARE_EXE=mina.exe;                    BARE_AS=mina ;;
-  archive)       BARE_NONE=true ;;
+  archive|ledger-apply) BARE_NONE=true ;;
   *)             BARE_EXE="" ;;
 esac
 
@@ -104,7 +104,7 @@ INSTALLED_BARE=false
 if [[ "$BARE_NONE" == true ]]; then
   git config --global --add safe.directory /workdir
   source buildkite/scripts/export-git-env-vars.sh
-  echo "archive bench is parse-only (--no-run); skipping binary and .deb install"
+  echo "$BENCHMARK bench is parse-only; skipping binary and .deb install"
   INSTALLED_BARE=true
 elif [[ -n "$BARE_EXE" ]]; then
   git config --global --add safe.directory /workdir
