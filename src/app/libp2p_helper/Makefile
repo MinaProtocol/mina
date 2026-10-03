@@ -9,7 +9,7 @@ endif
 	make -C ../../libp2p_ipc libp2p_ipc.capnp.go
 
 libp2p_helper: ../../libp2p_ipc/libp2p_ipc.capnp.go
-	$(WRAPAPP) ../../../scripts/build-go-helper.sh libp2p_helper
+	../../../scripts/build-go-helper.sh libp2p_helper
 
 test: ../../libp2p_ipc/libp2p_ipc.capnp.go
 	cd src/libp2p_helper \
