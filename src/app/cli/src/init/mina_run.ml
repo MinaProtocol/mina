@@ -96,10 +96,8 @@ let send_hardfork_config_to_archive ~logger ~archive_location ~config_json =
     single lost delivery would leave the archive with no record of the fork.
     Repeating it costs about a kilobyte an hour and additionally heals an
     archive restored from a backup taken before the fork. *)
-let start_hardfork_config_heartbeat ~logger ?(interval = Time.Span.of_hr 1.)
-    mina =
-  let config = Mina_lib.config mina in
-  let runtime_config = config.precomputed_values.runtime_config in
+let hardfork_config_heartbeat ~logger ?(interval = Time.Span.of_hr 1.)
+    ?(stop = Deferred.never ()) ~archive_location runtime_config =
   match Runtime_config.fork runtime_config with
   | None ->
       (* Not a forked network: nothing for the archive to be told about. *)
@@ -109,12 +107,20 @@ let start_hardfork_config_heartbeat ~logger ?(interval = Time.Span.of_hr 1.)
         Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_string
       in
       Deferred.repeat_until_finished () (fun () ->
-          let%bind () =
-            send_hardfork_config_to_archive ~logger
-              ~archive_location:config.archive_process_location ~config_json
-          in
-          let%map () = after interval in
-          `Repeat () )
+          if Deferred.is_determined stop then return (`Finished ())
+          else
+            let%bind () =
+              send_hardfork_config_to_archive ~logger ~archive_location
+                ~config_json
+            in
+            let%map () = Deferred.any [ after interval; stop ] in
+            `Repeat () )
+
+let start_hardfork_config_heartbeat ~logger ?interval mina =
+  let config = Mina_lib.config mina in
+  hardfork_config_heartbeat ~logger ?interval
+    ~archive_location:config.archive_process_location
+    config.precomputed_values.runtime_config
 
 let start_auto_hardfork_config_generation ~logger mina =
   let open Deferred.Let_syntax in

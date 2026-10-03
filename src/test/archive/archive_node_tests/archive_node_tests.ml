@@ -57,4 +57,5 @@ let () =
                         .Make_FixtureWithoutBootstrap
                           (Hardfork_rpc) ) )
         ] )
+    ; ("daemon_hardfork_rpc", Daemon_hardfork_rpc.tests)
     ]

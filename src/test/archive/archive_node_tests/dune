@@ -11,7 +11,11 @@
    stdio
    alcotest
    cmdliner
+   yojson
    ;; mina libraries
+   archive_lib
+   init
+   mina_runtime_config
    cli_lib
    logger
    mina_lib
