@@ -1046,15 +1046,40 @@ module Mutations = struct
     let scheduler_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
       Uuid.Table.create ()
 
+    (* The accounts of each createAccounts job, so that a repeated request with
+       the handle of a running job can return them again. *)
+    let created_accounts_tbl : Keypair.t list Uuid.Table.t =
+      Uuid.Table.create ()
+
+    (* A caller may choose the handle (a UUID) of a scheduler, so that it can
+       record the handle before the request and find the scheduler again after
+       a lost response. A request with the handle of a running scheduler starts
+       nothing and returns that handle again. *)
+    let handle_of_arg = function
+      | None ->
+          Ok (Uuid.create_random Random.State.default)
+      | Some handle -> (
+          try Ok (Uuid.of_string handle)
+          with _ ->
+            Error (sprintf "Invalid handle %s: expected a UUID" handle) )
+
+    let handle_arg =
+      Arg.arg "handle" ~typ:Arg.string
+        ~doc:
+          "Handle (a UUID) for the scheduler; a random one when omitted. A \
+           request with the handle of a running scheduler starts nothing and \
+           returns that handle"
+
     let schedule_payments =
       io_field "schedulePayments"
         ~args:
           Arg.
             [ arg "input" ~doc:"Payments details"
                 ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
+            ; handle_arg
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input handle ->
           return
           @@ O1trace.sync_thread "itn_schedule_payments"
           @@ fun () ->
@@ -1064,185 +1089,189 @@ module Mutations = struct
           let%bind.Result () =
             Result.ok_if_true with_seq_no ~error:"Missing sequence information"
           in
-          let%bind.Result payment_details =
-            Result.map_error
-              ~f:(sprintf "Invalid input to payment scheduler: %s")
-              input
-          in
-          let max_memo_len = Signed_command_memo.max_input_length in
-          let%bind.Result () =
-            Result.ok_if_true ~error:"Empty list of senders"
-            @@ not
-            @@ List.is_empty payment_details.senders
-          in
-          let%bind.Result () =
-            (* TODO subtract expected length of suffix from the memo prefix length check *)
-            Result.ok_if_true
-              ~error:
-                (sprintf "Memo too long, limited to %d characters" max_memo_len)
-              (String.length payment_details.memo_prefix <= max_memo_len)
-          in
-          let%bind.Result () =
-            let open Currency.Fee in
-            Result.ok_if_true ~error:"Maximum fee less than minimum fee"
-              (payment_details.max_fee >= payment_details.min_fee)
-          in
-          let logger = Mina_lib.top_level_logger mina in
-          let senders = payment_details.senders |> Array.of_list in
-          let num_senders = Array.length senders in
-          let sources =
-            Array.map senders ~f:(fun sender ->
+          let%bind.Result uuid = handle_of_arg handle in
+          if Uuid.Table.mem scheduler_tbl uuid then Ok (Uuid.to_string uuid)
+          else
+            let%bind.Result payment_details =
+              Result.map_error
+                ~f:(sprintf "Invalid input to payment scheduler: %s")
+                input
+            in
+            let max_memo_len = Signed_command_memo.max_input_length in
+            let%bind.Result () =
+              Result.ok_if_true ~error:"Empty list of senders"
+              @@ not
+              @@ List.is_empty payment_details.senders
+            in
+            let%bind.Result () =
+              (* TODO subtract expected length of suffix from the memo prefix length check *)
+              Result.ok_if_true
+                ~error:
+                  (sprintf "Memo too long, limited to %d characters"
+                     max_memo_len )
+                (String.length payment_details.memo_prefix <= max_memo_len)
+            in
+            let%bind.Result () =
+              let open Currency.Fee in
+              Result.ok_if_true ~error:"Maximum fee less than minimum fee"
+                (payment_details.max_fee >= payment_details.min_fee)
+            in
+            let logger = Mina_lib.top_level_logger mina in
+            let senders = payment_details.senders |> Array.of_list in
+            let num_senders = Array.length senders in
+            let sources =
+              Array.map senders ~f:(fun sender ->
+                  Signature_lib.Public_key.of_private_key_exn sender
+                  |> Signature_lib.Public_key.compress )
+            in
+            let%bind.Result ledger, _tip =
+              Result.of_option ~error:"Could not get best tip ledger"
+                (Utils.get_ledger_and_breadcrumb mina)
+            in
+            let nonce_opts =
+              Array.map sources ~f:(fun source ->
+                  let open Option.Let_syntax in
+                  let acct_id = Account_id.create source Token_id.default in
+                  let%bind loc = Ledger.location_of_account ledger acct_id in
+                  let%map { nonce; _ } = Ledger.get ledger loc in
+                  nonce )
+              |> Array.zip_exn sources
+            in
+            let missing_nonces =
+              Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
+                  Option.is_none nonce_opt )
+            in
+            let%bind.Result () =
+              if Array.is_empty missing_nonces then Ok ()
+              else
+                let missing_nonce_pks =
+                  Array.to_list missing_nonces
+                  |> List.map ~f:(fun (source, _nonce_opt) ->
+                         Signature_lib.Public_key.Compressed.to_yojson source
+                         |> Yojson.Safe.to_string )
+                in
+                Error
+                  (sprintf "Could not get nonces for accounts: %s"
+                     (String.concat ~sep:"," missing_nonce_pks) )
+            in
+            let nonces =
+              Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
+                  Option.value_exn nonce_opt )
+            in
+            let ivar = Ivar.create () in
+            ( match Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar with
+            | `Ok ->
+                ()
+            | `Duplicate ->
+                failwith "Unexpected duplicate scheduled payments handle" ) ;
+            let wait_span = 1. /. payment_details.tps |> Time.Span.of_sec in
+            let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
+            let duration_span =
+              Time.Span.of_min (Float.of_int payment_details.duration_min)
+            in
+            let tm_start = Time.now () in
+            let tm_end = Time.add tm_start duration_span in
+            let send_payments counter =
+              let ndx = counter mod num_senders in
+              O1trace.thread "itn_send_scheduled_payments"
+              @@ fun () ->
+              let sender = senders.(ndx) in
+              let source_pk =
                 Signature_lib.Public_key.of_private_key_exn sender
-                |> Signature_lib.Public_key.compress )
-          in
-          let%bind.Result ledger, _tip =
-            Result.of_option ~error:"Could not get best tip ledger"
-              (Utils.get_ledger_and_breadcrumb mina)
-          in
-          let nonce_opts =
-            Array.map sources ~f:(fun source ->
-                let open Option.Let_syntax in
-                let acct_id = Account_id.create source Token_id.default in
-                let%bind loc = Ledger.location_of_account ledger acct_id in
-                let%map { nonce; _ } = Ledger.get ledger loc in
-                nonce )
-            |> Array.zip_exn sources
-          in
-          let missing_nonces =
-            Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
-                Option.is_none nonce_opt )
-          in
-          let%bind.Result () =
-            if Array.is_empty missing_nonces then Ok ()
-            else
-              let missing_nonce_pks =
-                Array.to_list missing_nonces
-                |> List.map ~f:(fun (source, _nonce_opt) ->
-                       Signature_lib.Public_key.Compressed.to_yojson source
-                       |> Yojson.Safe.to_string )
+                |> Signature_lib.Public_key.compress
               in
-              Error
-                (sprintf "Could not get nonces for accounts: %s"
-                   (String.concat ~sep:"," missing_nonce_pks) )
-          in
-          let nonces =
-            Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
-                Option.value_exn nonce_opt )
-          in
-          let uuid = Uuid.create_random Random.State.default in
-          let ivar = Ivar.create () in
-          ( match Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar with
-          | `Ok ->
-              ()
-          | `Duplicate ->
-              failwith "Unexpected duplicate scheduled payments handle" ) ;
-          let wait_span = 1. /. payment_details.tps |> Time.Span.of_sec in
-          let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
-          let duration_span =
-            Time.Span.of_min (Float.of_int payment_details.duration_min)
-          in
-          let tm_start = Time.now () in
-          let tm_end = Time.add tm_start duration_span in
-          let send_payments counter =
-            let ndx = counter mod num_senders in
-            O1trace.thread "itn_send_scheduled_payments"
-            @@ fun () ->
-            let sender = senders.(ndx) in
-            let source_pk =
-              Signature_lib.Public_key.of_private_key_exn sender
-              |> Signature_lib.Public_key.compress
-            in
-            let receiver_pk = payment_details.receiver in
-            let fee =
-              Quickcheck.random_value ~seed:`Nondeterministic
-              @@ Currency.Fee.gen_incl payment_details.min_fee
-                   payment_details.max_fee
-            in
-            let body =
-              Signed_command_payload.Body.Payment
-                { receiver_pk; amount = payment_details.amount }
-            in
-            let valid_until = None in
-            let nonce = nonces.(ndx) in
-            let memo = sprintf "%s-%d" payment_details.memo_prefix counter in
-            let payload =
-              Signed_command_payload.create ~fee ~fee_payer_pk:source_pk ~nonce
-                ~valid_until
-                ~memo:(Signed_command_memo.create_from_string_exn memo)
-                ~body
-            in
-            let signature_kind = Mina_lib.signature_kind mina in
-            let signature =
-              Ok (Signed_command.sign_payload ~signature_kind sender payload)
-            in
-            [%log info]
-              "Payment scheduler with handle %s is sending a payment from \
-               sender %s"
-              (Uuid.to_string uuid)
-              ( Signature_lib.Public_key.Compressed.to_yojson source_pk
-              |> Yojson.Safe.to_string )
-              ~metadata:
-                [ ( "receiver"
-                  , Signature_lib.Public_key.Compressed.to_yojson receiver_pk )
-                ; ("nonce", Account.Nonce.to_yojson nonce)
-                ; ("fee", Currency.Fee.to_yojson fee)
-                ; ("amount", Currency.Amount.to_yojson payment_details.amount)
-                ; ("memo", `String memo)
-                ] ;
-            let fee = Currency.Fee.to_uint64 fee in
-            match%map
-              send_signed_user_command ~mina ~genesis_constants
-                ~nonce_opt:(Some nonce) ~signer:source_pk ~memo:(Some memo) ~fee
-                ~fee_payer_pk:source_pk ~valid_until ~body ~signature
-            with
-            | Ok _cmd_with_status ->
-                (* next nonce for this sender *)
-                nonces.(ndx) <- Account.Nonce.succ nonce
-            | Error err ->
-                [%log error]
-                  "Payment scheduler with handle %s got error when sending \
-                   payment from sender %s"
-                  (Uuid.to_string uuid)
-                  ( Signature_lib.Public_key.Compressed.to_yojson source_pk
-                  |> Yojson.Safe.to_string )
-                  ~metadata:[ ("error", `String err) ]
-          in
-          let rec go counter tm_next =
-            let open Time in
-            if now () >= tm_end then (
-              [%log info] "Scheduled payments with handle %s has expired"
-                (Uuid.to_string uuid) ;
-              Uuid.Table.remove scheduler_tbl uuid ;
-              Deferred.unit )
-            else if Ivar.is_full ivar then (
-              [%log info] "Stopping scheduled payments with handle %s"
-                (Uuid.to_string uuid) ;
-              Uuid.Table.remove scheduler_tbl uuid ;
-              Deferred.unit )
-            else
-              let%bind () = send_payments counter in
-              let%bind () = Async_unix.at tm_next in
-              let next_tm_next = add tm_next wait_span in
-              let now = now () in
-              let next_tm_next =
-                if next_tm_next <= now then
-                  (* This is done to ensure there is no effect of transactions coming out one by one,
-                     let there be some pause under any cricumstances *)
-                  let span = diff now next_tm_next |> Span.to_ms in
-                  let additive =
-                    wait_span_ms - (int_of_float span % wait_span_ms)
-                    |> float_of_int |> Span.of_ms
-                  in
-                  add now additive
-                else next_tm_next
+              let receiver_pk = payment_details.receiver in
+              let fee =
+                Quickcheck.random_value ~seed:`Nondeterministic
+                @@ Currency.Fee.gen_incl payment_details.min_fee
+                     payment_details.max_fee
               in
-              go (counter + 1) next_tm_next
-          in
-          [%log info] "Starting payment scheduler with handle %s"
-            (Uuid.to_string uuid) ;
-          let tm_next = Time.add tm_start wait_span in
-          don't_wait_for @@ go 0 tm_next ;
-          Ok (Uuid.to_string uuid) )
+              let body =
+                Signed_command_payload.Body.Payment
+                  { receiver_pk; amount = payment_details.amount }
+              in
+              let valid_until = None in
+              let nonce = nonces.(ndx) in
+              let memo = sprintf "%s-%d" payment_details.memo_prefix counter in
+              let payload =
+                Signed_command_payload.create ~fee ~fee_payer_pk:source_pk
+                  ~nonce ~valid_until
+                  ~memo:(Signed_command_memo.create_from_string_exn memo)
+                  ~body
+              in
+              let signature_kind = Mina_lib.signature_kind mina in
+              let signature =
+                Ok (Signed_command.sign_payload ~signature_kind sender payload)
+              in
+              [%log info]
+                "Payment scheduler with handle %s is sending a payment from \
+                 sender %s"
+                (Uuid.to_string uuid)
+                ( Signature_lib.Public_key.Compressed.to_yojson source_pk
+                |> Yojson.Safe.to_string )
+                ~metadata:
+                  [ ( "receiver"
+                    , Signature_lib.Public_key.Compressed.to_yojson receiver_pk
+                    )
+                  ; ("nonce", Account.Nonce.to_yojson nonce)
+                  ; ("fee", Currency.Fee.to_yojson fee)
+                  ; ("amount", Currency.Amount.to_yojson payment_details.amount)
+                  ; ("memo", `String memo)
+                  ] ;
+              let fee = Currency.Fee.to_uint64 fee in
+              match%map
+                send_signed_user_command ~mina ~genesis_constants
+                  ~nonce_opt:(Some nonce) ~signer:source_pk ~memo:(Some memo)
+                  ~fee ~fee_payer_pk:source_pk ~valid_until ~body ~signature
+              with
+              | Ok _cmd_with_status ->
+                  (* next nonce for this sender *)
+                  nonces.(ndx) <- Account.Nonce.succ nonce
+              | Error err ->
+                  [%log error]
+                    "Payment scheduler with handle %s got error when sending \
+                     payment from sender %s"
+                    (Uuid.to_string uuid)
+                    ( Signature_lib.Public_key.Compressed.to_yojson source_pk
+                    |> Yojson.Safe.to_string )
+                    ~metadata:[ ("error", `String err) ]
+            in
+            let rec go counter tm_next =
+              let open Time in
+              if now () >= tm_end then (
+                [%log info] "Scheduled payments with handle %s has expired"
+                  (Uuid.to_string uuid) ;
+                Uuid.Table.remove scheduler_tbl uuid ;
+                Deferred.unit )
+              else if Ivar.is_full ivar then (
+                [%log info] "Stopping scheduled payments with handle %s"
+                  (Uuid.to_string uuid) ;
+                Uuid.Table.remove scheduler_tbl uuid ;
+                Deferred.unit )
+              else
+                let%bind () = send_payments counter in
+                let%bind () = Async_unix.at tm_next in
+                let next_tm_next = add tm_next wait_span in
+                let now = now () in
+                let next_tm_next =
+                  if next_tm_next <= now then
+                    (* This is done to ensure there is no effect of transactions coming out one by one,
+                       let there be some pause under any cricumstances *)
+                    let span = diff now next_tm_next |> Span.to_ms in
+                    let additive =
+                      wait_span_ms - (int_of_float span % wait_span_ms)
+                      |> float_of_int |> Span.of_ms
+                    in
+                    add now additive
+                  else next_tm_next
+                in
+                go (counter + 1) next_tm_next
+            in
+            [%log info] "Starting payment scheduler with handle %s"
+              (Uuid.to_string uuid) ;
+            let tm_next = Time.add tm_start wait_span in
+            don't_wait_for @@ go 0 tm_next ;
+            Ok (Uuid.to_string uuid) )
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -1250,136 +1279,405 @@ module Mutations = struct
           Arg.
             [ arg "input" ~doc:"Zkapp commands details"
                 ~typ:(non_null Types.Input.Itn.ZkappCommandsDetails.arg_typ)
+            ; handle_arg
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input handle ->
           if not with_seq_no then return @@ Error "Missing sequence information"
           else
             return
             @@ O1trace.sync_thread "itn_schedule_zkapp_commands"
             @@ fun () ->
-            let%bind.Result zkapp_command_details =
-              Result.map_error
-                ~f:(sprintf "Invalid input to zkapp command scheduler: %s")
-                input
-            in
-            let logger = Mina_lib.top_level_logger mina in
-            [%log debug]
-              ~metadata:
-                [ ( "no_precondition"
-                  , `Bool zkapp_command_details.no_precondition )
-                ]
-              "Received request to start the zkapp command scheduler" ;
-            let%bind.Result () =
-              if List.is_empty zkapp_command_details.fee_payers then
-                Error "Empty list of fee payers"
-              else Ok ()
-            in
-            let uuid = Uuid.create_random Random.State.default in
-            let stop_signal = Ivar.create () in
-            let%bind.Result () =
-              match
-                Uuid.Table.add scheduler_tbl ~key:uuid ~data:stop_signal
-              with
-              | `Ok ->
-                  Ok ()
-              | `Duplicate ->
-                  Result.Error
-                    "Unexpected duplicate scheduled zkApp commands handle"
-            in
-            let%bind.Result ledger =
-              match Utils.get_ledger_and_breadcrumb mina with
-              | None ->
-                  Error "Could not get best tip ledger"
-              | Some (ledger, _best_tip) ->
-                  Ok ledger
-            in
-            let wait_span =
-              1. /. zkapp_command_details.tps |> Time.Span.of_sec
-            in
-            let duration_span =
-              Time.Span.of_min (Float.of_int zkapp_command_details.duration_min)
-            in
-            let tm_start = Time.now () in
-            let tm_end = Time.add tm_start duration_span in
-            [%log info] "Starting zkApp scheduler with handle %s"
-              (Uuid.to_string uuid) ;
-            let { Precomputed_values.constraint_constants
-                ; genesis_constants
-                ; _
-                } =
-              (Mina_lib.config mina).precomputed_values
-            in
-            let zkapp_account_keypairs =
-              List.init zkapp_command_details.num_zkapps_to_deploy ~f:(fun _ ->
-                  Signature_lib.Keypair.create () )
-            in
-            let unused_keypairs =
-              List.init (20 + zkapp_command_details.num_new_accounts)
-                ~f:(fun _ -> Signature_lib.Keypair.create ())
-            in
-            let fee_payer_keypairs =
-              List.map zkapp_command_details.fee_payers
-                ~f:Signature_lib.Keypair.of_private_key_exn
-            in
-            let fee_payer_ids =
-              List.map fee_payer_keypairs ~f:(fun kp ->
-                  Account_id.of_public_key kp.public_key )
-            in
-            let zkapp_account_ids =
-              List.map zkapp_account_keypairs ~f:(fun kp ->
-                  Account_id.of_public_key kp.public_key )
-            in
-            let fee_payer_array = Array.of_list fee_payer_keypairs in
-            let%bind.Result _ =
-              Result.try_with (fun () ->
-                  Array.map fee_payer_array ~f:(fun fee_payer_keypair ->
-                      Utils.account_of_kp fee_payer_keypair ledger ) )
-              |> Result.map_error ~f:(const "fee payer not in the ledger")
-            in
-            let keymap =
-              List.map
-                (zkapp_account_keypairs @ fee_payer_keypairs @ unused_keypairs)
-                ~f:(fun { public_key; private_key } ->
-                  (Public_key.compress public_key, private_key) )
-              |> Public_key.Compressed.Map.of_alist_exn
-            in
-            let unused_pks =
-              List.map unused_keypairs ~f:(fun { public_key; _ } ->
-                  Public_key.compress public_key )
-              |> Public_key.Compressed.Hash_set.of_list
-            in
-            let deploy_zkapps_do () =
-              Itn_zkapps.wait_until_zkapps_deployed ~scheduler_tbl ~mina ~ledger
-                ~deployment_fee:zkapp_command_details.deployment_fee
-                ~max_cost:zkapp_command_details.max_cost
-                ~init_balance:zkapp_command_details.init_balance
-                ~fee_payer_array ~constraint_constants zkapp_account_keypairs
-                ~logger ~uuid ~stop_signal ~stop_time:tm_end
-                ~memo_prefix:zkapp_command_details.memo_prefix ~wait_span
-            in
-            upon (deploy_zkapps_do ()) (function
-              | None ->
-                  ()
-              | Some ledger ->
-                  let account_state_tbl =
-                    let get_account ids role =
-                      List.map ids ~f:(fun id ->
-                          (id, (Utils.account_of_id id ledger, role)) )
+            let%bind.Result uuid = handle_of_arg handle in
+            if Uuid.Table.mem scheduler_tbl uuid then Ok (Uuid.to_string uuid)
+            else
+              let%bind.Result zkapp_command_details =
+                Result.map_error
+                  ~f:(sprintf "Invalid input to zkapp command scheduler: %s")
+                  input
+              in
+              let logger = Mina_lib.top_level_logger mina in
+              [%log debug]
+                ~metadata:
+                  [ ( "no_precondition"
+                    , `Bool zkapp_command_details.no_precondition )
+                  ]
+                "Received request to start the zkapp command scheduler" ;
+              let%bind.Result () =
+                if List.is_empty zkapp_command_details.fee_payers then
+                  Error "Empty list of fee payers"
+                else Ok ()
+              in
+              let stop_signal = Ivar.create () in
+              let%bind.Result () =
+                match
+                  Uuid.Table.add scheduler_tbl ~key:uuid ~data:stop_signal
+                with
+                | `Ok ->
+                    Ok ()
+                | `Duplicate ->
+                    Result.Error
+                      "Unexpected duplicate scheduled zkApp commands handle"
+              in
+              let%bind.Result ledger =
+                match Utils.get_ledger_and_breadcrumb mina with
+                | None ->
+                    Error "Could not get best tip ledger"
+                | Some (ledger, _best_tip) ->
+                    Ok ledger
+              in
+              let wait_span =
+                1. /. zkapp_command_details.tps |> Time.Span.of_sec
+              in
+              let duration_span =
+                Time.Span.of_min
+                  (Float.of_int zkapp_command_details.duration_min)
+              in
+              let tm_start = Time.now () in
+              let tm_end = Time.add tm_start duration_span in
+              [%log info] "Starting zkApp scheduler with handle %s"
+                (Uuid.to_string uuid) ;
+              let { Precomputed_values.constraint_constants
+                  ; genesis_constants
+                  ; _
+                  } =
+                (Mina_lib.config mina).precomputed_values
+              in
+              let zkapp_account_keypairs =
+                List.init zkapp_command_details.num_zkapps_to_deploy
+                  ~f:(fun _ -> Signature_lib.Keypair.create ())
+              in
+              let unused_keypairs =
+                List.init (20 + zkapp_command_details.num_new_accounts)
+                  ~f:(fun _ -> Signature_lib.Keypair.create ())
+              in
+              let fee_payer_keypairs =
+                List.map zkapp_command_details.fee_payers
+                  ~f:Signature_lib.Keypair.of_private_key_exn
+              in
+              let fee_payer_ids =
+                List.map fee_payer_keypairs ~f:(fun kp ->
+                    Account_id.of_public_key kp.public_key )
+              in
+              let zkapp_account_ids =
+                List.map zkapp_account_keypairs ~f:(fun kp ->
+                    Account_id.of_public_key kp.public_key )
+              in
+              let fee_payer_array = Array.of_list fee_payer_keypairs in
+              let%bind.Result _ =
+                Result.try_with (fun () ->
+                    Array.map fee_payer_array ~f:(fun fee_payer_keypair ->
+                        Utils.account_of_kp fee_payer_keypair ledger ) )
+                |> Result.map_error ~f:(const "fee payer not in the ledger")
+              in
+              let keymap =
+                List.map
+                  (zkapp_account_keypairs @ fee_payer_keypairs @ unused_keypairs)
+                  ~f:(fun { public_key; private_key } ->
+                    (Public_key.compress public_key, private_key) )
+                |> Public_key.Compressed.Map.of_alist_exn
+              in
+              let unused_pks =
+                List.map unused_keypairs ~f:(fun { public_key; _ } ->
+                    Public_key.compress public_key )
+                |> Public_key.Compressed.Hash_set.of_list
+              in
+              let deploy_zkapps_do () =
+                Itn_zkapps.wait_until_zkapps_deployed ~scheduler_tbl ~mina
+                  ~ledger ~deployment_fee:zkapp_command_details.deployment_fee
+                  ~max_cost:zkapp_command_details.max_cost
+                  ~init_balance:zkapp_command_details.init_balance
+                  ~fee_payer_array ~constraint_constants zkapp_account_keypairs
+                  ~logger ~uuid ~stop_signal ~stop_time:tm_end
+                  ~memo_prefix:zkapp_command_details.memo_prefix ~wait_span
+              in
+              upon (deploy_zkapps_do ()) (function
+                | None ->
+                    ()
+                | Some ledger ->
+                    let account_state_tbl =
+                      let get_account ids role =
+                        List.map ids ~f:(fun id ->
+                            (id, (Utils.account_of_id id ledger, role)) )
+                      in
+                      Account_id.Table.of_alist_exn
+                        ( get_account fee_payer_ids `Fee_payer
+                        @ get_account zkapp_account_ids `Ordinary_participant )
                     in
-                    Account_id.Table.of_alist_exn
-                      ( get_account fee_payer_ids `Fee_payer
-                      @ get_account zkapp_account_ids `Ordinary_participant )
-                  in
-                  let tm_next = Time.add (Time.now ()) wait_span in
-                  don't_wait_for
-                  @@ Itn_zkapps.send_zkapps ~genesis_constants
-                       ~constraint_constants ~fee_payer_array ~scheduler_tbl
-                       ~uuid ~keymap ~unused_pks ~stop_signal ~mina
-                       ~zkapp_command_details ~wait_span ~logger ~tm_end
-                       ~account_state_tbl tm_next
-                       (List.length zkapp_account_keypairs) ) ;
-            Ok (Uuid.to_string uuid) )
+                    let tm_next = Time.add (Time.now ()) wait_span in
+                    don't_wait_for
+                    @@ Itn_zkapps.send_zkapps ~genesis_constants
+                         ~constraint_constants ~fee_payer_array ~scheduler_tbl
+                         ~uuid ~keymap ~unused_pks ~stop_signal ~mina
+                         ~zkapp_command_details ~wait_span ~logger ~tm_end
+                         ~account_state_tbl tm_next
+                         (List.length zkapp_account_keypairs) ) ;
+              Ok (Uuid.to_string uuid) )
+
+    (* Fund the zkApp commands of createAccounts in batches; after each batch,
+       wait until its accounts are in the best tip ledger, as
+       `mina advanced itn-create-accounts` does. *)
+    let fund_accounts ~mina ~logger ~uuid ~stop_signal ~poll_span batches =
+      let account_exists pk =
+        match Utils.get_ledger_and_breadcrumb mina with
+        | None ->
+            false
+        | Some (ledger, _) ->
+            Option.is_some
+              (Ledger.location_of_account ledger
+                 (Account_id.create pk Token_id.default) )
+      in
+      let wait_timeout = Time.Span.of_min 30. in
+      let rec wait_for pks deadline =
+        if Ivar.is_full stop_signal then return `Stopped
+        else if List.for_all pks ~f:account_exists then return `Done
+        else if Time.(now () >= deadline) then return `Timeout
+        else
+          let%bind () = after poll_span in
+          wait_for pks deadline
+      in
+      let rec run = function
+        | [] ->
+            [%log info] "Funded the new accounts of handle %s"
+              (Uuid.to_string uuid) ;
+            Deferred.unit
+        | _ :: _ when Ivar.is_full stop_signal ->
+            [%log info] "Stopping account creation with handle %s"
+              (Uuid.to_string uuid) ;
+            Deferred.unit
+        | batch :: rest -> (
+            let%bind sent =
+              Deferred.List.fold batch ~init:(Ok ()) ~f:(fun acc zkapp ->
+                  match acc with
+                  | Error _ ->
+                      return acc
+                  | Ok () -> (
+                      match%map
+                        Zkapps.send_zkapp_command mina
+                          (Zkapp_command.read_all_proofs_from_disk zkapp)
+                      with
+                      | Ok _ ->
+                          Ok ()
+                      | Error err ->
+                          Error err ) )
+            in
+            match sent with
+            | Error err ->
+                [%log error]
+                  "Account creation with handle %s could not send a zkApp \
+                   command"
+                  (Uuid.to_string uuid)
+                  ~metadata:[ ("error", `String err) ] ;
+                Deferred.unit
+            | Ok () -> (
+                let pks =
+                  List.concat_map batch ~f:(fun (zkapp : Zkapp_command.t) ->
+                      Zkapp_command.Call_forest.to_list zkapp.account_updates
+                      |> List.map ~f:(fun (update : Account_update.t) ->
+                             update.body.public_key ) )
+                in
+                match%bind
+                  wait_for pks (Time.add (Time.now ()) wait_timeout)
+                with
+                | `Done ->
+                    run rest
+                | `Stopped ->
+                    [%log info] "Stopping account creation with handle %s"
+                      (Uuid.to_string uuid) ;
+                    Deferred.unit
+                | `Timeout ->
+                    [%log error]
+                      "Account creation with handle %s: the new accounts did \
+                       not appear in the best tip ledger in time"
+                      (Uuid.to_string uuid) ;
+                    Deferred.unit ) )
+      in
+      let%map () = run batches in
+      Uuid.Table.remove scheduler_tbl uuid
+
+    let create_accounts =
+      io_field "createAccounts"
+        ~doc:
+          "Create and fund new accounts with zkApp commands from a fee payer. \
+           The keys are returned at once; the funding runs in the background \
+           under the returned handle (listed by scheduledTransactions until it \
+           ends), in batches that each wait for their accounts to appear in \
+           the best tip ledger. A request with the handle of a running job \
+           returns that job's accounts again."
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Fee payer and amounts"
+                ~typ:(non_null Types.Input.Itn.CreateAccountsDetails.arg_typ)
+            ; handle_arg
+            ]
+        ~typ:(non_null Types.Itn.created_accounts)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input handle ->
+          return
+          @@ O1trace.sync_thread "itn_create_accounts"
+          @@ fun () ->
+          let%bind.Result () =
+            Result.ok_if_true with_seq_no ~error:"Missing sequence information"
+          in
+          let%bind.Result uuid = handle_of_arg handle in
+          match
+            ( Uuid.Table.mem scheduler_tbl uuid
+            , Uuid.Table.find created_accounts_tbl uuid )
+          with
+          | true, Some keypairs ->
+              Ok (Uuid.to_string uuid, keypairs)
+          | true, None ->
+              Error
+                (sprintf "Handle %s belongs to another scheduler"
+                   (Uuid.to_string uuid) )
+          | false, _ ->
+              let%bind.Result { fee_payer; num_accounts; fee; amount } =
+                Result.map_error
+                  ~f:(sprintf "Invalid input to createAccounts: %s")
+                  input
+              in
+              let { Precomputed_values.genesis_constants
+                  ; constraint_constants
+                  ; _
+                  } =
+                (Mina_lib.config mina).precomputed_values
+              in
+              let logger = Mina_lib.top_level_logger mina in
+              let%bind.Result () =
+                Result.ok_if_true (num_accounts > 0)
+                  ~error:"numAccounts must be positive"
+              in
+              let%bind.Result () =
+                Result.ok_if_true
+                  Currency.Fee.(
+                    fee >= genesis_constants.minimum_user_command_fee)
+                  ~error:
+                    (sprintf "Fee is below the minimum of %s nanomina"
+                       (Currency.Fee.to_string
+                          genesis_constants.minimum_user_command_fee ) )
+              in
+              let fee_payer_keypair = Keypair.of_private_key_exn fee_payer in
+              let fee_payer_id =
+                Account_id.of_public_key fee_payer_keypair.public_key
+              in
+              let%bind.Result ledger, _tip =
+                Result.of_option ~error:"Could not get best tip ledger"
+                  (Utils.get_ledger_and_breadcrumb mina)
+              in
+              let%bind.Result fee_payer_account =
+                Result.of_option
+                  ~error:"Fee payer account not found in the best tip ledger"
+                  Option.(
+                    Ledger.location_of_account ledger fee_payer_id
+                    >>= Ledger.get ledger)
+              in
+              let%bind.Result initial_nonce =
+                Result.of_option ~error:"Could not get the fee payer nonce"
+                  ( Mina_lib.get_inferred_nonce_from_transaction_pool_and_ledger
+                      mina fee_payer_id
+                  |> Participating_state.active |> Option.join )
+              in
+              (* 30 receiving account updates, one sender, one fee payer *)
+              let keys_per_zkapp = 30 in
+              let zkapps_per_batch = 10 in
+              let fee_int = Currency.Fee.to_nanomina_int fee in
+              let amount_int = Currency.Amount.to_nanomina_int amount in
+              let account_creation_fee_int =
+                Currency.Fee.to_nanomina_int
+                  constraint_constants.account_creation_fee
+              in
+              let keypairs =
+                List.init num_accounts ~f:(fun _ -> Keypair.create ())
+              in
+              let keypair_chunks =
+                List.chunks_of keypairs ~length:keys_per_zkapp
+              in
+              let num_chunks = List.length keypair_chunks in
+              let%bind.Result () =
+                Result.ok_if_true
+                  ( amount_int + (num_chunks * fee_int)
+                  <= Currency.Balance.to_nanomina_int fee_payer_account.balance
+                  )
+                  ~error:
+                    "Amount plus fees is greater than the fee payer balance"
+              in
+              let amount_per_key = amount_int / num_accounts in
+              let%bind.Result () =
+                Result.ok_if_true
+                  (amount_per_key > account_creation_fee_int)
+                  ~error:
+                    (sprintf
+                       "Amount is too small: each new account needs more than \
+                        the account creation fee of %d nanomina"
+                       account_creation_fee_int )
+              in
+              let chunk_amounts =
+                Array.of_list_map keypair_chunks ~f:(fun chunk ->
+                    List.length chunk * amount_per_key )
+              in
+              (* Give the remainder of the division to the first chunks. *)
+              let remainder =
+                amount_int - Array.fold chunk_amounts ~init:0 ~f:( + )
+              in
+              for i = 0 to remainder - 1 do
+                chunk_amounts.(i mod num_chunks) <-
+                  chunk_amounts.(i mod num_chunks) + 1
+              done ;
+              let zkapps =
+                List.mapi keypair_chunks ~f:(fun i chunk ->
+                    let num_updates = List.length chunk in
+                    let chunk_amount = chunk_amounts.(i) in
+                    let amount_per_update =
+                      (chunk_amount / num_updates) - account_creation_fee_int
+                    in
+                    let update_rem = chunk_amount mod num_updates in
+                    let receivers =
+                      List.mapi chunk ~f:(fun j (kp : Keypair.t) ->
+                          ( Public_key.compress kp.public_key
+                          , Currency.Amount.of_nanomina_int_exn
+                              ( if j < update_rem then amount_per_update + 1
+                              else amount_per_update ) ) )
+                    in
+                    let nonce =
+                      Account.Nonce.add initial_nonce (Account.Nonce.of_int i)
+                    in
+                    let spec :
+                        Transaction_snark.For_tests.Multiple_transfers_spec.t =
+                      { fee
+                      ; sender = (fee_payer_keypair, nonce)
+                      ; fee_payer = None
+                      ; receivers
+                      ; amount =
+                          Currency.Amount.of_nanomina_int_exn chunk_amount
+                      ; zkapp_account_keypairs = []
+                      ; memo =
+                          Signed_command_memo.create_from_string_exn
+                            (sprintf "ITN account funder, chunk %d" i)
+                      ; new_zkapp_account = false
+                      ; snapp_update = Account_update.Update.dummy
+                      ; actions = []
+                      ; events = []
+                      ; call_data = Snark_params.Tick.Field.zero
+                      ; preconditions = Some Account_update.Preconditions.accept
+                      }
+                    in
+                    Transaction_snark.For_tests.multiple_transfers
+                      ~constraint_constants spec )
+              in
+              let stop_signal = Ivar.create () in
+              Uuid.Table.set scheduler_tbl ~key:uuid ~data:stop_signal ;
+              Uuid.Table.set created_accounts_tbl ~key:uuid ~data:keypairs ;
+              [%log info] "Starting account creation with handle %s"
+                (Uuid.to_string uuid)
+                ~metadata:[ ("num_accounts", `Int num_accounts) ] ;
+              let poll_span =
+                Time.Span.of_ms
+                  ( Float.of_int constraint_constants.block_window_duration_ms
+                  /. 3.0 )
+              in
+              don't_wait_for
+                (fund_accounts ~mina ~logger ~uuid ~stop_signal ~poll_span
+                   (List.chunks_of zkapps ~length:zkapps_per_batch) ) ;
+              Ok (Uuid.to_string uuid, keypairs) )
 
     let stop_scheduled_transactions =
       io_field "stopScheduledTransactions"
@@ -1652,6 +1950,7 @@ module Mutations = struct
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
+      ; create_accounts
       ; stop_scheduled_transactions
       ; update_gating
       ; flush_internal_logs
@@ -2923,7 +3222,24 @@ module Queries = struct
           if not with_seq_no then Error "Missing sequence information"
           else Ok (Itn_logger.get_logs start_log_id) )
 
-    let commands = [ auth; slots_won; internal_logs ]
+    let scheduled_transactions =
+      io_field "scheduledTransactions"
+        ~typ:(non_null (list (non_null string)))
+        ~args:Arg.[]
+        ~doc:
+          "Handles of the running schedulers: scheduled payments, scheduled \
+           zkApp commands and account creation"
+        ~resolve:(fun { ctx = with_seq_no, _mina; _ } () ->
+          Io.return
+          @@
+          if not with_seq_no then Error "Missing sequence information"
+          else
+            Ok
+              ( Uuid.Table.keys Mutations.Itn.scheduler_tbl
+              |> List.map ~f:Uuid.to_string
+              |> List.sort ~compare:String.compare ) )
+
+    let commands = [ auth; slots_won; internal_logs; scheduled_transactions ]
   end
 end
 
