@@ -10,7 +10,7 @@ val dispatch_precomputed_block :
 val dispatch_extensional_block :
      ?max_tries:int
   -> Host_and_port.t Cli_lib.Flag.Types.with_name
-  -> Archive_lib.Extensional.Block.t
+  -> Archive_rpc.Extensional.Block.t
   -> unit Async.Deferred.Or_error.t
 
 val run :

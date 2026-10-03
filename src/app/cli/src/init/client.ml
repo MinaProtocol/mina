@@ -2104,7 +2104,7 @@ let archive_blocks =
                  send_precomputed_block precomputed_block
                else if extensional_flag then
                  let%bind extensional_block =
-                   Archive_lib.Extensional.Block.of_yojson block_json
+                   Archive_rpc.Extensional.Block.of_yojson block_json
                    |> Result.map_error ~f:(fun err ->
                           Error.tag_arg (Error.of_string err)
                             "Could not parse JSON as an extensional block from \
