@@ -2707,15 +2707,15 @@ module Input = struct
   end
 
   module ExtensionalBlock = struct
-    type input = Archive_lib.Extensional.Block.t
+    type input = Archive_rpc.Extensional.Block.t
 
     let arg_typ =
       scalar "ExtensionalBlock" ~doc:"Block encoded in extensional block format"
         ~coerce:(fun json ->
           let json = Utils.to_yojson json in
-          Archive_lib.Extensional.Block.of_yojson json )
+          Archive_rpc.Extensional.Block.of_yojson json )
         ~to_json:(fun (x : input) ->
-          Yojson.Safe.to_basic @@ Archive_lib.Extensional.Block.to_yojson x )
+          Yojson.Safe.to_basic @@ Archive_rpc.Extensional.Block.to_yojson x )
   end
 
   module type Numeric_type = sig

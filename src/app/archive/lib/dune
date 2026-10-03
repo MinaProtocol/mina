@@ -25,6 +25,7 @@
   uri
   ;;local libraries
   archive_health_queries
+  archive_rpc
   block_time
   mina_stdlib
   child_processes

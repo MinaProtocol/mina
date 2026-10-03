@@ -1,0 +1,46 @@
+;; The daemon <-> archive wire protocol: the RPCs and the types they carry.
+;; Kept apart from archive_lib so the daemon does not link the archive's
+;; database code (caqti, postgres) to talk to it.
+
+(library
+ (name archive_rpc)
+ (public_name archive_rpc)
+ (libraries
+  ;;opam libraries
+  async
+  async.async_rpc
+  async_kernel
+  async_rpc_kernel
+  base.caml
+  bin_prot.shape
+  core
+  core_kernel
+  ppx_deriving_yojson.runtime
+  ppx_version.runtime
+  sexplib0
+  ;;local libraries
+  block_time
+  consensus.vrf
+  currency
+  data_hash_lib
+  logger
+  mina_base
+  mina_block
+  mina_ledger
+  mina_numbers
+  mina_state
+  mina_stdlib
+  mina_transaction
+  mina_wire_types
+  precomputed_values
+  protocol_version
+  signature_lib
+  staged_ledger
+  transition_frontier
+  transition_frontier_base
+  unsigned_extended
+  with_hash)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson)))

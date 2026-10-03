@@ -20,7 +20,7 @@ let dispatch ?(max_tries = 5) ~logger
               [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
-        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
+        Daemon_rpcs.Client.dispatch Archive_rpc.Rpc.t diff
           archive_location.value
       with
       | Ok () ->
@@ -61,10 +61,10 @@ let make_dispatch_block rpc ?(max_tries = 5)
   go max_tries []
 
 let dispatch_precomputed_block =
-  make_dispatch_block Archive_lib.Rpc.precomputed_block
+  make_dispatch_block Archive_rpc.Rpc.precomputed_block
 
 let dispatch_extensional_block =
-  make_dispatch_block Archive_lib.Rpc.extensional_block
+  make_dispatch_block Archive_rpc.Rpc.extensional_block
 
 let transfer
     (breadcrumb_reader :
@@ -96,7 +96,7 @@ let run ~logger ~precomputed_values
           Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
               let start = Time.now () in
               let diff =
-                Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
+                Archive_rpc.Diff.Builder.breadcrumb_added ~precomputed_values
                   ~logger breadcrumb
               in
               let diff_time = Time.now () in

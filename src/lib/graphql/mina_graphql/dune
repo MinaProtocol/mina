@@ -3,7 +3,7 @@
  (public_name mina_graphql)
  (libraries
   ;; opam libraries
-  archive_lib
+  archive_rpc
   integers
   bignum
   async_kernel
