@@ -62,6 +62,8 @@ module Limited : sig
              State_hash.With_state_hashes.Stable.V1.t
              list
         -> t
+
+      val transition : t -> Mina_block.Validated.Stable.V2.t
     end
   end]
 
@@ -87,6 +89,8 @@ module Limited : sig
     -> t
 
   val common : t -> Common.t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
@@ -138,6 +142,12 @@ module Minimal : sig
     -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+  val write_all_proofs_to_disk :
+       proof_cache_db:Proof_cache_tag.cache_db
+    -> signature_kind:Mina_signature_kind.t
+    -> Stable.Latest.t
+    -> t
 end
 
 type t =
