@@ -6,7 +6,7 @@
 # - This stage is published to docker.io as the `mina-base` reference image and is compared
 #   byte-for-byte against the CI cache (see buildkite/scripts/docker/verify-toolchain-cache.sh).
 #################################################################################################
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
+ARG image=docker.io/library/debian:bullseye-slim
 
 FROM ${image} AS base-deps
 

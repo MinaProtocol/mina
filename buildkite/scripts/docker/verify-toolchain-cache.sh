@@ -3,9 +3,10 @@
 # Nightly validation that long-lived docker images cached on the Hetzner
 # storagebox are byte-for-byte equivalent to the same images on docker.io.
 #
-# By default this validates the mina-toolchain image, but it is generic over the
-# SERVICE env var: set SERVICE=mina-base to validate the shared common base layer
-# instead (the only other artifact we host on docker.io directly for reference).
+# By default this validates every cached mina-toolchain image, but callers may
+# pass IMAGE_REFS to validate only the image refs that are still in use. It is
+# generic over the SERVICE env var for callers that pass tags instead of refs:
+# set SERVICE=mina-base to validate the shared common base layer instead.
 #
 # These images are produced infrequently and are the artifacts we host on
 # docker.io directly. Build jobs save a copy of the freshly-built image to the
@@ -24,20 +25,68 @@ CACHE_ROOT="${CACHE_ROOT:-/var/storagebox/docker-cache}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-docker.io/minaprotocol}"
 SERVICE="${SERVICE:-mina-toolchain}"
 CACHE_DIR="${CACHE_ROOT}/${SERVICE}"
+IMAGE_REFS="${IMAGE_REFS:-}"
+TAGS="${TAGS:-}"
 
 mismatched=()
 missing_remote=()
+checks=()
 
-if [[ ! -d "$CACHE_DIR" ]]; then
-  echo "Cache directory ${CACHE_DIR} does not exist; nothing to validate."
-  exit 0
-fi
+function add_check() {
+  local remote_ref="$1"
+  local cache_file="$2"
+  local tag="$3"
+  checks+=("${remote_ref}|${cache_file}|${tag}")
+}
 
-shopt -s nullglob
-files=("$CACHE_DIR"/*.tar.zst)
-if (( ${#files[@]} == 0 )); then
-  echo "No cached ${SERVICE} images found in ${CACHE_DIR}."
-  exit 0
+function add_ref_check() {
+  local ref="$1"
+  local repo tag service cache_file
+
+  if [[ "$ref" != *:* ]]; then
+    echo "ERROR: image ref '${ref}' has no tag; expected <registry>/<service>:<tag>" >&2
+    exit 1
+  fi
+
+  repo="${ref%:*}"
+  tag="${ref##*:}"
+  service="${repo##*/}"
+  cache_file="${CACHE_ROOT}/${service}/${tag}.tar.zst"
+
+  add_check "$ref" "$cache_file" "$tag"
+}
+
+function add_tag_check() {
+  local tag="$1"
+  add_check "${DOCKER_REGISTRY}/${SERVICE}:${tag}" "${CACHE_DIR}/${tag}.tar.zst" "$tag"
+}
+
+if [[ -n "$IMAGE_REFS" ]]; then
+  for ref in $IMAGE_REFS; do
+    add_ref_check "$ref"
+  done
+elif [[ -n "$TAGS" ]]; then
+  for tag in $TAGS; do
+    add_tag_check "$tag"
+  done
+else
+  if [[ ! -d "$CACHE_DIR" ]]; then
+    echo "Cache directory ${CACHE_DIR} does not exist; nothing to validate."
+    exit 0
+  fi
+
+  shopt -s nullglob
+  files=("$CACHE_DIR"/*.tar.zst)
+  if (( ${#files[@]} == 0 )); then
+    echo "No cached ${SERVICE} images found in ${CACHE_DIR}."
+    exit 0
+  fi
+
+  for cached_file in "${files[@]}"; do
+    base="$(basename "$cached_file")"
+    tag="${base%.tar.zst}"
+    add_tag_check "$tag"
+  done
 fi
 
 # Returns the image ID (sha256:...) loaded from a zstd-compressed docker save tar.
@@ -56,10 +105,8 @@ function load_cached_image_id() {
   docker image inspect --format '{{.Id}}' "$image_id" 2>/dev/null
 }
 
-for cached_file in "${files[@]}"; do
-  base="$(basename "$cached_file")"
-  tag="${base%.tar.zst}"
-  remote_ref="${DOCKER_REGISTRY}/${SERVICE}:${tag}"
+for check in "${checks[@]}"; do
+  IFS='|' read -r remote_ref cached_file tag <<< "$check"
 
   echo "==> Verifying ${remote_ref} against ${cached_file}"
 
@@ -70,7 +117,10 @@ for cached_file in "${files[@]}"; do
   fi
   remote_id="$(docker image inspect --format '{{.Id}}' "$remote_ref")"
 
-  if ! cached_id="$(load_cached_image_id "$cached_file")"; then
+  if [[ ! -f "$cached_file" ]]; then
+    echo "MISSING ${cached_file}; will populate it from ${remote_ref}"
+    cached_id=""
+  elif ! cached_id="$(load_cached_image_id "$cached_file")"; then
     echo "WARNING: could not derive image id from ${cached_file}; treating as mismatch"
     cached_id=""
   fi
@@ -87,6 +137,7 @@ for cached_file in "${files[@]}"; do
   # `docker load`, which reassigns the local tag to the cached image's
   # content. Using $remote_id pins to the docker.io image inspected
   # before the load, regardless of the current local tag state.
+  mkdir -p "$(dirname "$cached_file")"
   tmp="$(mktemp "${cached_file}.new.XXXXXX")"
   if docker save "$remote_id" | zstd -T0 -3 > "$tmp"; then
     mv -f "$tmp" "$cached_file"
@@ -99,7 +150,7 @@ for cached_file in "${files[@]}"; do
 done
 
 echo
-echo "Summary: validated ${#files[@]} cached image(s); replaced ${#mismatched[@]}; ${#missing_remote[@]} not on docker.io."
+echo "Summary: validated ${#checks[@]} cached image(s); replaced ${#mismatched[@]}; ${#missing_remote[@]} not on docker.io."
 if (( ${#mismatched[@]} > 0 )); then
   printf 'Replaced from docker.io:\n'
   printf ' - %s\n' "${mismatched[@]}"

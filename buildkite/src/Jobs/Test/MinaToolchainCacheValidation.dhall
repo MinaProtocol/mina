@@ -16,11 +16,17 @@ let DockerLogin = ../../Command/DockerLogin/Type.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
+let imageRefs =
+      "${ContainerImages.minaToolchainBookworm.amd64} ${ContainerImages.minaToolchainBullseye.amd64} ${ContainerImages.minaToolchainJammy.amd64} ${ContainerImages.minaToolchainNoble.amd64}"
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.exactly "buildkite/scripts/docker/verify-toolchain-cache" "sh"
+          , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
           , S.exactly
               "buildkite/src/Jobs/Test/MinaToolchainCacheValidation"
               "dhall"
@@ -39,7 +45,9 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./buildkite/scripts/docker/verify-toolchain-cache.sh" ]
+              [ Cmd.run
+                  "IMAGE_REFS='${imageRefs}' ./buildkite/scripts/docker/verify-toolchain-cache.sh"
+              ]
             , label = "Verify mina-toolchain Hetzner cache matches docker.io"
             , key = "verify-toolchain-cache"
             , target = Size.Large
