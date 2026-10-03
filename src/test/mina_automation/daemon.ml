@@ -88,6 +88,24 @@ module Client = struct
   let advanced_constraint_system_digests t =
     Executor.run t.executor ~args:[ "advanced"; "constraint-system-digests" ] ()
 
+  (** [advanced_send_hardfork_config t ~config_file ~archive_address] sends a
+    hard fork runtime configuration to an archive, as a daemon does when it
+    generates one. Returns the whole output: a refusal is an answer the caller
+    inspects, and its reason is on stderr. *)
+  let advanced_send_hardfork_config t ~config_file ~archive_address =
+    let%bind _, process =
+      Executor.run_in_background t.executor
+        ~args:
+          [ "advanced"
+          ; "send-hardfork-config"
+          ; config_file
+          ; "--archive-address"
+          ; archive_address
+          ]
+        ()
+    in
+    Process.collect_output_and_wait process
+
   let advanced_runtime_config t ~rest_port =
     Executor.run t.executor
       ~args:
