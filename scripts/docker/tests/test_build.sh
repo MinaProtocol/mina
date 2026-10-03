@@ -176,6 +176,11 @@ if [[ "${1:-}" == "manifest" ]]; then
     [[ -n "${STUB_TAG_IN_REGISTRY:-}" ]] && exit 0
     exit 1
 fi
+# "docker image inspect --format {{.Id}}" gives the local image ID.
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" && "${3:-}" == "--format" ]]; then
+    echo "sha256:stub"
+    exit 0
+fi
 exit 0
 STUB
     chmod +x "${STUB_DIR}/docker"
@@ -285,6 +290,22 @@ test_load_only_does_not_push() {
     assert_has_line "buildx still loads" "$args" "--load"
     assert_not_called "no push" "${args}.calls" "^push "
     assert_not_called "no registry tag" "${args}.calls" "^buildx imagetools"
+}
+
+# --image-ref-file records the ID of the built image: a tag in a daemon shared
+# with concurrent jobs can be re-pointed by another build of it.
+test_image_ref_file_holds_the_image_id() {
+    local args="${STUB_DIR}/ref.args"
+    local ref="${STUB_DIR}/image-id"
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --load-only \
+        --image-ref-file "$ref"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the ID is read from the built tag" "${args}.calls" \
+        "^image inspect --format \{\{\.Id\}\} testreg/mina-daemon:3\.1\.0$"
+    assert_eq "the file holds the ID" "sha256:stub" "$(cat "$ref")"
 }
 
 # A tag that is already published is not overwritten. The check runs before the
@@ -727,6 +748,7 @@ main() {
     run_test test_push_is_a_separate_docker_call
     run_test test_no_hash_tag_pushes_only_the_version_tag
     run_test test_load_only_does_not_push
+    run_test test_image_ref_file_holds_the_image_id
     run_test test_published_tag_is_not_overwritten
     run_test test_force_overwrite_pushes_over_a_published_tag
     run_test test_load_only_ignores_the_published_tag

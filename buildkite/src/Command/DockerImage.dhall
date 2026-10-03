@@ -184,24 +184,21 @@ let generateStep =
                   }
                   spec.service
 
+          let imageRefFile = "docker-image-id"
+
+          let verifies =
+                    spec.verify
+                &&  DockerPublish.shouldPublish spec.docker_publish spec.service
+
           let maybeVerify =
-                      if     spec.verify
-                         &&  DockerPublish.shouldPublish
-                               spec.docker_publish
-                               spec.service
+                      if verifies
 
                 then      " && "
                       ++  VerifyDockers.verify
                             VerifyDockers.Spec::{
-                            , artifacts = [ spec.service ]
-                            , networks = [ spec.network ]
-                            , version = spec.deb_version
-                            , codenames = [ spec.deb_codename ]
-                            , profile = spec.deb_profile
-                            , buildFlag = spec.build_flags
-                            , archs = [ spec.arch ]
-                            , repo = spec.docker_repo
-                            , generic = spec.generic
+                            , service = spec.service
+                            , arch = spec.arch
+                            , imageRefFile = imageRefFile
                             }
 
                 else  ""
@@ -289,6 +286,12 @@ let generateStep =
                 ++  customSuffix
                 ++  imageNameArg
                 ++  maybeSaveToCacheArg
+                ++  (       if verifies
+
+                      then  " --image-ref-file ${imageRefFile}"
+
+                      else  ""
+                    )
 
           let commands =
                 [ Cmd.run
