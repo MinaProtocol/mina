@@ -262,6 +262,20 @@ test_push_is_a_separate_docker_call() {
         "^buildx imagetools create"
 }
 
+# A public registry gets only the version tag. The local hash tag stays: the CI
+# cache and --load-only consumers look the image up by it.
+test_no_hash_tag_pushes_only_the_version_tag() {
+    local args="${STUB_DIR}/nohash.args"
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --no-hash-tag
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "push" "${args}.calls" "^push testreg/mina-daemon:3\.1\.0$"
+    assert_not_called "no registry hash tag" "${args}.calls" "^buildx imagetools"
+    assert_has_line "local hash tag still set" "$args" "testreg/mina-daemon:abcdefg-bullseye"
+}
+
 test_load_only_does_not_push() {
     local args="${STUB_DIR}/load.args"
     run_build "$args" \
@@ -711,6 +725,7 @@ main() {
     # Behaviour
     run_test test_daemon_command
     run_test test_push_is_a_separate_docker_call
+    run_test test_no_hash_tag_pushes_only_the_version_tag
     run_test test_load_only_does_not_push
     run_test test_published_tag_is_not_overwritten
     run_test test_force_overwrite_pushes_over_a_published_tag
