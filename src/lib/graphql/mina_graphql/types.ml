@@ -3349,6 +3349,7 @@ module Input = struct
         ; balance_change_range :
             Mina_generators.Zkapp_command_generators.balance_change_range_t
         ; max_account_updates : int option
+        ; non_default_token : bool
         }
 
       let arg_typ : ((input, string) result option, input option) arg_typ =
@@ -3359,7 +3360,7 @@ module Input = struct
                        min_balance_change max_balance_change
                        min_new_zkapp_balance max_new_zkapp_balance init_balance
                        min_fee max_fee deployment_fee account_queue_size
-                       max_cost max_account_updates ->
+                       max_cost max_account_updates non_default_token ->
             Result.return
               { fee_payers
               ; num_zkapps_to_deploy
@@ -3375,6 +3376,7 @@ module Input = struct
               ; account_queue_size
               ; max_cost
               ; max_account_updates
+              ; non_default_token
               ; balance_change_range =
                   { min_balance_change
                   ; max_balance_change
@@ -3390,7 +3392,7 @@ module Input = struct
               t.balance_change_range.min_new_zkapp_balance
               t.balance_change_range.max_new_zkapp_balance t.init_balance
               t.min_fee t.max_fee t.deployment_fee t.account_queue_size
-              t.max_cost t.max_account_updates )
+              t.max_cost t.max_account_updates (Some t.non_default_token) )
           ~fields:
             Arg.
               [ arg "feePayers"
@@ -3443,6 +3445,14 @@ module Input = struct
                      will have (2*maxAccountUpdates+2) account updates \
                      (including balancing and fee payer)"
                   ~typ:int
+              ; arg' "nonDefaultToken"
+                  ~doc:
+                    "When true, generated (non-max-cost) zkApp commands \
+                     initialize a custom, non-default token and transact in it \
+                     instead of the default MINA token. Defaults to false, in \
+                     which case the default token is used. Has no effect when \
+                     maxCost is set."
+                  ~typ:bool ~default:false
               ]
     end
 
