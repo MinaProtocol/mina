@@ -51,6 +51,7 @@ function usage() {
   echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
+  echo "      --image-ref-file      (Optional) Write the local image ID (sha256:...) of the built image to this file"
   echo "      --no-hash-tag         Push only the version tag; do not add the short hash tag in the registry"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
@@ -83,6 +84,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --no-hash-tag) PUSH_HASH_TAG=0 ;;
   --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --save-to-ci-cache) export SAVE_TO_CI_CACHE_ROOT="$2"; shift;;
+  --image-ref-file) IMAGE_REF_FILE="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --custom-suffix) export CUSTOM_SUFFIX="$2"; shift;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
@@ -485,6 +487,12 @@ docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG
 # the image up by it. Also set by buildx above, and re-asserted here because the
 # local image store is not stable on agents shared between concurrent jobs.
 docker tag "$TAG" "$HASHTAG"
+
+# The ID, not a tag: a tag in a daemon shared with concurrent jobs can be
+# re-pointed by another build of the same tag.
+if [[ -n "${IMAGE_REF_FILE:-}" ]]; then
+  docker image inspect --format '{{.Id}}' "$TAG" > "$IMAGE_REF_FILE"
+fi
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
