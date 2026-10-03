@@ -1,0 +1,12 @@
+opam-version: "1.2"
+version: "0.1"
+build: [
+  ["dune" "build" "--only" "src" "--root" "." "-j" jobs "@install"]
+]
+
+depends: [
+  "caqti"
+  "caqti-async"
+  "caqti-driver-postgresql"
+]
+
