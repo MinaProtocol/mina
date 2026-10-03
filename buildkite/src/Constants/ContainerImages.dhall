@@ -27,8 +27,7 @@
 --       A stale or unpublished hash is not fatal -- scripts/docker/build.sh falls back to
 --       inlining the base-deps fragment when the image is not available locally -- so the
 --       only cost of forgetting the bump is losing the reuse.
-{ toolchainBase =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
+{ toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
     { amd64 = "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
     , arm64 =
@@ -52,10 +51,8 @@
 , minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
 , minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
 , minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
-, postgres =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
-, xrefcheck =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
+, postgres = "docker.io/library/postgres:12.4-alpine"
+, xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
 , minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }
