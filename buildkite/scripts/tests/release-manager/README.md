@@ -4,7 +4,7 @@ This directory contains automated tests for the Mina Protocol release manager (`
 
 ## Overview
 
-The release manager test suite verifies that the release manager script and its helper scripts function correctly for publishing and promoting Debian packages and Docker images. The tests run against a test Debian repository to ensure safe testing without affecting production repositories.
+The release manager test suite verifies that the release manager script and its helper scripts function correctly for publishing and promoting Debian packages. The tests run against a test Debian repository to ensure safe testing without affecting production repositories.
 
 ## Test Script
 
@@ -30,10 +30,8 @@ cases pin the docker image name: that artifact publishes as
 `mina-daemon-auto-hardfork:<version>-<codename>-<network>` tag appears in the
 publish and promote output.
 
-**Non-dry-run Tests (Actual operations that make changes):**
-7. **Manager Promote - Unsigned (Real)**: Actually promotes packages in unsigned test repository with verification
-8. **Manager Promote - Signed (Real)**: Actually promotes packages in signed test repository with GPG signing and verification
-9. **Docker Promote to GCP**: Pulls Docker image from Docker Hub (`minaprotocol/mina-daemon:3.3.0-8c0c2e6-bookworm-mainnet-arm64`) and pushes to GCP Artifact Registry (`europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-daemon:random-tag`)
+Docker promote and verify are tested in mina-release-toolkit
+(`release-manager docker`), against `registry:2` containers.
 
 ### Test Configuration
 
@@ -75,19 +73,9 @@ needs no `ca-certificates` and, for an unsigned repository, contacts the Debian
 archive not at all. See `scripts/debian/verify-inside-docker/setup.sh`, which
 now installs only the packages the repository URL actually requires.
 
-**Docker Configuration:**
-- **Source Registry**: Docker Hub (`minaprotocol`)
-- **Source Image**: `mina-daemon`
-- **Source Tag**: `3.3.0-8c0c2e6-bookworm-mainnet-arm64` (always exists)
-- **Target Registry**: GCP Artifact Registry (`europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo`)
-- **Target Image**: `mina-daemon`
-- **Target Tag**: Uses random suffix `test-<timestamp>-<random>`
-
 **Version Naming:**
 - Promote operations use random suffixes: `test-<timestamp>-<random>`
 - This ensures each test run creates unique versions without conflicts
-- Real (non-dry-run) promotions add `-real` or `-signed-real` to the suffix
-
 ### Test Packages and Images
 
 **Debian Packages:**
@@ -110,17 +98,6 @@ fixture ships a stub `mina` binary that reports a commit hash and a matching
 The limit of the approach: the fixtures declare no dependencies, so the tests do
 not exercise dependency resolution or any real Mina binary. They test the
 release manager, not the packages.
-
-**Docker Images:**
-
-The test suite uses the following Docker image for promotion tests:
-
-- **Source**: `minaprotocol/mina-daemon:3.3.0-8c0c2e6-bookworm-mainnet-arm64` (Docker Hub)
-  - This is a publicly available image that always exists
-  - Architecture: arm64
-  - Platform: linux/arm64
-
-This image will be pulled from Docker Hub and promoted to the GCP Artifact Registry test repository with a random tag.
 
 ## Running Tests Locally
 
@@ -156,36 +133,6 @@ Before running the tests, ensure you have the following installed:
    **No AWS credentials are needed.** `mock_repo_start` sets its own against
    MinIO. **No production signing key is needed** either: the signed repository
    is signed with a key generated for the run and deleted afterwards.
-
-5. **Docker Hub / Google Cloud SDK** (optional, for the Docker promotion test
-   only - it is the one test that still uses real registries):
-   ```bash
-   # Install Docker
-   # On Ubuntu/Debian:
-   sudo apt-get update && sudo apt-get install docker.io
-
-   # On macOS:
-   brew install docker
-
-   # Verify Docker is running
-   docker --version
-   docker ps
-   ```
-
-6. **Google Cloud SDK** (optional, for GCP Artifact Registry tests):
-   ```bash
-   # Install gcloud SDK
-   curl https://sdk.cloud.google.com | bash
-   exec -l $SHELL
-
-   # Authenticate
-   gcloud auth login
-
-   # Configure Docker for GCP Artifact Registry
-   gcloud auth configure-docker europe-west3-docker.pkg.dev
-   ```
-
-   Note: Docker promotion tests will be skipped if Docker or gcloud are not available or not authenticated.
 
 ### Running the Tests
 
@@ -224,34 +171,10 @@ Example:
 [INFO] ✅ TEST PASSED: Manager publish command (signed, dry-run)
 
 [INFO] =========================================
-[INFO] STARTING NON-DRY-RUN TESTS
-[INFO] These tests will make actual changes!
-[INFO] =========================================
-
-[WARN] This test will actually promote packages to the test repository
-[INFO] Using random target version: 3.3.0-alpha1-test-1736789012-12345-real
-[INFO] ✓ Promoted package verified in repository
-[INFO] ✅ TEST PASSED: Manager promote command (unsigned, real)
-
-[WARN] This test will actually promote packages to the signed test repository
-[INFO] ✓ Promoted package verified in signed repository
-[INFO] ✅ TEST PASSED: Manager promote command (signed, real)
-
-[WARN] This test will actually pull and push Docker images
-[INFO] Source: minaprotocol/mina-daemon:3.3.0-8c0c2e6-bookworm-mainnet-arm64
-[INFO] Target: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-daemon:test-1736789012-12345
-[INFO] Pulling source image from Docker Hub...
-[INFO] Tagging image for GCP Artifact Registry...
-[INFO] Pushing image to GCP Artifact Registry...
-[INFO] ✓ Docker image successfully promoted to GCP Artifact Registry
-[INFO] ✓ Image verified in GCP Artifact Registry
-[INFO] ✅ TEST PASSED: Docker promote to GCP Artifact Registry
-
-[INFO] =========================================
 [INFO] TEST SUMMARY
 [INFO] =========================================
-[INFO] Total tests:  9
-[INFO] Passed:       9
+[INFO] Total tests:  6
+[INFO] Passed:       6
 [INFO] Failed:       0
 [INFO] =========================================
 [INFO] 🎉 All tests passed!
@@ -292,9 +215,6 @@ variables the release scripts read:
 `DEB_S3_ENDPOINT` is honoured by `scripts/debian/deb-s3-common.sh`, which both
 `manager.sh` and `scripts/debian/publish.sh` source. It is the only hook the
 production code needed for this; when it is unset, behaviour is unchanged.
-
-The Docker promotion test still needs a Docker Hub pull and a `gcloud`
-authentication, and skips itself when they are absent.
 
 ## Test Repository Setup
 
@@ -399,18 +319,9 @@ The test suite is designed with safety in mind:
    test cannot be broken by one.
    - `test-packages` for unsigned packages (in the mock)
    - `signed-test-packages` for signed packages (in the mock)
-   - `europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo` for Docker
-     images - this one **is** a real registry, used by the Docker promotion
-     test only
 2. **Random Suffixes**: All promote operations use unique random suffixes to avoid conflicts
-3. **Dry-run Tests First**: Tests run dry-run operations before non-dry-run ones
-4. **Graceful Skipping**: Tests automatically skip if required tools are not available:
-   - Docker tests skip if Docker is not installed
-   - GCP tests skip if gcloud is not authenticated
-5. **Isolated Environment**: Uses temporary directory for test artifacts
-6. **Cleanup**: Automatic cleanup of temporary files and Docker images on exit
-7. **Verification**: Non-dry-run tests verify promoted packages actually exist after promotion
-8. **Clear Warnings**: Tests that make actual changes display prominent warnings
+3. **Isolated Environment**: Uses temporary directory for test artifacts
+4. **Cleanup**: Automatic cleanup of temporary files on exit
 
 ## Troubleshooting
 
@@ -445,27 +356,9 @@ The test suite is designed with safety in mind:
    - Solution: Ensure you're running the test from the repository root or the script can find the manager
    - Check path: `buildkite/scripts/release/manager.sh`
 
-5. **"Docker not found" or Docker tests skipped**:
-   - Solution: Install Docker and ensure it's running
-   - Check: `docker --version && docker ps`
-
-6. **"GCloud not authenticated" or GCP tests skipped**:
-   - Solution: Authenticate with gcloud and configure Docker
-   - Run: `gcloud auth login && gcloud auth configure-docker europe-west3-docker.pkg.dev`
-
-7. **"GPG signing key not found" or signed tests skipped**:
+6. **"GPG signing key not found" or signed tests skipped**:
    - Solution: Import the Debian signing key
    - Run: `gcloud secrets versions access latest --secret="o1labsDebianRepoKey" | gpg --import`
-
-8. **Docker pull/push failures**:
-   - Solution: Check Docker Hub and GCP Artifact Registry access
-   - Verify: Can you manually pull `docker pull minaprotocol/mina-daemon:3.3.0-8c0c2e6-bookworm-mainnet-arm64`
-   - Verify: Are you authenticated to GCP Artifact Registry?
-
-9. **Non-dry-run test failures**:
-   - Check AWS credentials have write permissions to test buckets
-   - Check GPG key is correctly imported for signed operations
-   - Check network connectivity to S3 and Docker registries
 
 ### Debug Mode
 
@@ -480,36 +373,27 @@ bash -x ./buildkite/scripts/tests/release-manager-test.sh
 
 Potential enhancements for the test suite:
 
-1. ✅ **Full Integration Tests**: Tests that actually publish/promote (IMPLEMENTED)
-   - Non-dry-run Debian promote tests for unsigned and signed repositories
-   - Docker promotion test from Docker Hub to GCP Artifact Registry
-2. ✅ **Docker Tests**: Add tests for Docker image publishing and promotion (IMPLEMENTED)
-   - Docker promotion test pulls from Docker Hub and pushes to GCP Artifact Registry
-3. **Multi-architecture Tests**: Test additional architectures
-   - Currently tests amd64 for Debian packages and arm64 for Docker images
+1. **Multi-architecture Tests**: Test additional architectures
+   - Currently tests amd64 and arm64 Debian packages
    - Could add more comprehensive multi-arch testing
-4. **End-to-End Verification**: After promote/publish, verify packages are actually installable
+2. **End-to-End Verification**: After promote/publish, verify packages are actually installable
    - Use Docker containers to test apt-get install
-   - Verify Docker images can actually run
-5. **Performance Tests**: Measure and track performance of operations
+3. **Performance Tests**: Measure and track performance of operations
    - Track time taken for promote/publish operations
    - Monitor package size and upload speeds
-6. **Rollback Tests**: Test rollback and recovery scenarios
+4. **Rollback Tests**: Test rollback and recovery scenarios
    - Test removing promoted packages
    - Test re-promoting with different versions
-7. **Concurrent Operation Tests**: Test behavior with concurrent publish/promote operations
+5. **Concurrent Operation Tests**: Test behavior with concurrent publish/promote operations
    - Ensure locking mechanisms work correctly
-8. **Manager Script Docker Tests**: Use the manager.sh script for Docker operations
-   - Currently using direct docker commands
-   - Could test manager.sh Docker promotion features
-9. **Multiple Codename Tests**: Test promotion across different Debian codenames
+6. **Multiple Codename Tests**: Test promotion across different Debian codenames
    - Currently focused on bookworm
    - Could test focal, noble, jammy, bullseye. The mock makes this cheap: the
      codename is only a path inside MinIO, and the verification container image
      follows from it.
-10. **Dependency resolution**: The fixture packages declare no dependencies, so
-    nothing tests that a published package can actually be satisfied. A fixture
-    with a `Depends:` line on a real distribution package would cover it.
+7. **Dependency resolution**: The fixture packages declare no dependencies, so
+   nothing tests that a published package can actually be satisfied. A fixture
+   with a `Depends:` line on a real distribution package would cover it.
 
 ## Contributing
 
