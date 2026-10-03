@@ -18,6 +18,7 @@
   core_kernel
   sexplib0
   cohttp-async
+  cohttp
   async_unix
   base.base_internalhash_types
   ppx_hash.runtime-lib

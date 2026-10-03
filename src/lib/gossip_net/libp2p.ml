@@ -70,10 +70,35 @@ end
 
 let rpc_transport_proto = "coda/rpcs/0.0.1"
 
-let download_seed_peer_list uri =
-  let%bind _resp, body = Cohttp_async.Client.get uri in
-  let%map contents = Cohttp_async.Body.to_string body in
-  Mina_net2.Multiaddr.of_file_contents contents
+(* A failed download is not fatal: the node keeps the peers it was given
+   directly, and the "no peers" check later stops it if none are left. *)
+let download_seed_peer_list ~logger uri =
+  let failed reason =
+    [%log warn] "Could not download the seed peer list from $url: $reason"
+      ~metadata:
+        [ ("url", `String (Uri.to_string uri)); ("reason", `String reason) ] ;
+    []
+  in
+  match%map
+    Monitor.try_with ~here:[%here] ~rest:`Log (fun () ->
+        let%bind resp, body = Cohttp_async.Client.get uri in
+        let%map contents = Cohttp_async.Body.to_string body in
+        (resp.status, contents) )
+  with
+  | Ok (`OK, contents) ->
+      Mina_net2.Multiaddr.of_file_contents contents
+  | Ok (status, _) ->
+      failed (Cohttp.Code.string_of_status status)
+  | Error exn ->
+      failed (Exn.to_string exn)
+
+let%test_unit "an unreachable seed peer list yields no peers" =
+  let peers =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        download_seed_peer_list ~logger:(Logger.null ())
+          (Uri.of_string "http://127.0.0.1:1/peers.txt") )
+  in
+  assert (List.is_empty peers)
 
 type publish_functions =
   { publish_v0 : Message.msg -> unit Deferred.t
@@ -240,7 +265,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         | None ->
             Deferred.return []
         | Some u ->
-            download_seed_peer_list u
+            download_seed_peer_list ~logger:config.logger u
       in
       let fail err =
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
