@@ -125,8 +125,8 @@ module Request_cache = struct
 
   (* A repeat miss means the SQL was cached but the types did not unify, i.e.
      the call site builds its [Caqti_type.t] per call (an inline [t2]/[t3] or
-     [custom] mints a fresh identity every time) and so can never share. Those
-     still leak; the count is the regression signal. *)
+     [custom] mints a fresh identity every time) and so can never share. Such
+     a request is built [transient]; the count is the regression signal. *)
   let repeat_misses : int String.Table.t = String.Table.create ()
 
   let capped = ref false
@@ -145,11 +145,31 @@ module Request_cache = struct
     Hashtbl.length one + Hashtbl.length zero_or_one + Hashtbl.length many
     + Hashtbl.length zero
 
+  (* Query ids of requests that could not be shared. Each one is prepared for
+     a single use and deallocated by the connection right after it runs, so
+     it does not stay on the connection. Not [~oneshot:true]: Caqti 2.0.1's
+     unprepared path does not send the parameter types, so a parameter with
+     no type context in the SQL fails with "could not determine data type of
+     parameter". An id leaves the set when released, so the set stays small. *)
+  let transient : Int.Hash_set.t = Int.Hash_set.create ()
+
+  let make_transient req =
+    Option.iter (Caqti_request.query_id req) ~f:(Hash_set.add transient) ;
+    req
+
+  let take_transient req =
+    match Caqti_request.query_id req with
+    | Some id when Hash_set.mem transient id ->
+        Hash_set.remove transient id ;
+        true
+    | _ ->
+        false
+
   let note_repeat_miss sql =
     Hashtbl.update repeat_misses sql ~f:(function None -> 1 | Some n -> n + 1)
 
-  (* [true] once the cache is full: new SQL is then built [~oneshot:true],
-     which is slower but registers nothing, so the failure mode is lost
+  (* [true] once the cache is full: new SQL is then built [transient], which
+     is slower but leaves nothing behind, so the failure mode is lost
      throughput rather than unbounded memory. *)
   let room_for sql =
     if entries () < max_entries then true
@@ -157,9 +177,10 @@ module Request_cache = struct
       if not !capped then (
         capped := true ;
         eprintf
-          "mina_caqti: request cache reached %d entries; further queries run \
-           un-prepared. A query whose SQL text varies per call has reached the \
-           memoised path and should pass ~oneshot:true. First offender: %s\n\
+          "mina_caqti: request cache reached %d entries; further queries are \
+           prepared per call and released. A query whose SQL text varies per \
+           call has reached the memoised path and should pass ~oneshot:true. \
+           First offender: %s\n\
            %!"
           max_entries (String.prefix sql 200) ) ;
       false )
@@ -364,12 +385,15 @@ let find_req :
         | Some Caqti_type.Equal, Some Caqti_type.Equal ->
             incr hits ; req
         | _ ->
-            note_repeat_miss s ; build () )
+            note_repeat_miss s ;
+            make_transient (build ()) )
     | None ->
         incr first_builds ;
-        let req = build () in
-        if room_for s then Hashtbl.set one ~key:s ~data:(E (t, u, req)) ;
-        req
+        if room_for s then (
+          let req = build () in
+          Hashtbl.set one ~key:s ~data:(E (t, u, req)) ;
+          req )
+        else make_transient (build ())
 
 let find_opt_req :
     type a b.
@@ -389,12 +413,15 @@ let find_opt_req :
         | Some Caqti_type.Equal, Some Caqti_type.Equal ->
             incr hits ; req
         | _ ->
-            note_repeat_miss s ; build () )
+            note_repeat_miss s ;
+            make_transient (build ()) )
     | None ->
         incr first_builds ;
-        let req = build () in
-        if room_for s then Hashtbl.set zero_or_one ~key:s ~data:(E (t, u, req)) ;
-        req
+        if room_for s then (
+          let req = build () in
+          Hashtbl.set zero_or_one ~key:s ~data:(E (t, u, req)) ;
+          req )
+        else make_transient (build ())
 
 let collect_req :
     type a b.
@@ -414,12 +441,15 @@ let collect_req :
         | Some Caqti_type.Equal, Some Caqti_type.Equal ->
             incr hits ; req
         | _ ->
-            note_repeat_miss s ; build () )
+            note_repeat_miss s ;
+            make_transient (build ()) )
     | None ->
         incr first_builds ;
-        let req = build () in
-        if room_for s then Hashtbl.set many ~key:s ~data:(E (t, u, req)) ;
-        req
+        if room_for s then (
+          let req = build () in
+          Hashtbl.set many ~key:s ~data:(E (t, u, req)) ;
+          req )
+        else make_transient (build ())
 
 let exec_req :
     type a.
@@ -438,13 +468,15 @@ let exec_req :
         | Some Caqti_type.Equal, Some Caqti_type.Equal ->
             incr hits ; req
         | _ ->
-            note_repeat_miss s ; build () )
+            note_repeat_miss s ;
+            make_transient (build ()) )
     | None ->
         incr first_builds ;
-        let req = build () in
-        if room_for s then
+        if room_for s then (
+          let req = build () in
           Hashtbl.set zero ~key:s ~data:(E (t, Caqti_type.unit, req)) ;
-        req
+          req )
+        else make_transient (build ())
 
 (* A request built by this module.
 
@@ -514,6 +546,24 @@ module Wrap
     end) : CONNECTION = struct
   include Conn
   include Arg
+
+  (* Deallocate a [transient] request once it has run. A failed deallocate
+     leaves one statement behind and does not change the query's result. *)
+  let release req result =
+    if Request_cache.take_transient req then
+      let%map (_ : (unit, _) Result.t) = Conn.deallocate req in
+      result
+    else return result
+
+  let find req param = Conn.find req param >>= release req
+
+  let find_opt req param = Conn.find_opt req param >>= release req
+
+  let collect_list req param = Conn.collect_list req param >>= release req
+
+  let fold req f param acc = Conn.fold req f param acc >>= release req
+
+  let exec req param = Conn.exec req param >>= release req
 end
 
 let wrap_conn (module Conn : Caqti_async.CONNECTION) ~source =

@@ -110,7 +110,7 @@ end
 
     [repeat_misses] is the number to watch: a query whose SQL was cached but
     whose types did not unify, which means the call site builds its
-    [Caqti_type.t] per call and so prepares a fresh statement every time.
+    [Caqti_type.t] per call, so every call prepares and releases a statement.
     [capped] means the cache stopped growing (see {!Req}) because some query's
     SQL text varies per call. Both should be zero/false. *)
 module Request_cache : sig
