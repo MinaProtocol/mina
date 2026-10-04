@@ -155,7 +155,7 @@ module Test_values = struct
           Result.return (pk, token_id) )
         ~decode:(fun (pk, token_id) ->
           Result.return (`Pk pk, `Token_id token_id) )
-        Caqti_type.(t2 string string)
+        Mina_caqti.Typ.(t2 string string)
 
     let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
@@ -509,7 +509,7 @@ module Account_identifier = struct
         with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
             Conn.collect_list
               (Mina_caqti.collect_req Caqti_type.unit
-                 Caqti_type.(t2 string string)
+                 Mina_caqti.Typ.(t2 string string)
                  query )
               () )
       in

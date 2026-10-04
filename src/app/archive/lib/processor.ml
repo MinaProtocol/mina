@@ -2263,7 +2263,7 @@ module Fee_transfer = struct
       in
       Ok { kind; receiver_id; fee; hash }
     in
-    let rep = Caqti_type.(t4 string int int64 string) in
+    let rep = Mina_caqti.Typ.(t4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
@@ -2308,7 +2308,7 @@ module Coinbase = struct
     let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(t4 string int int64 string) in
+    let rep = Mina_caqti.Typ.(t4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
@@ -3588,7 +3588,7 @@ module Block = struct
             (* SQL embeds the values being looked up, so it differs per
                call and must not be memoised *)
             (Mina_caqti.collect_req ~oneshot:true Caqti_type.unit
-               Caqti_type.(t2 typ int)
+               Mina_caqti.Typ.(t2 typ int)
                query )
             ()
         in

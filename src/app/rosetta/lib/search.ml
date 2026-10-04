@@ -495,7 +495,9 @@ module Sql = struct
           input.operator
       in
       let query =
-        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
+        Mina_caqti.collect_req Params.typ
+          Mina_caqti.Typ.(t2 int64 typ)
+          query_string
       in
       [%log debug] "Running SQL query $query"
         ~metadata:
@@ -771,7 +773,7 @@ module Sql = struct
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query =
-        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+        Mina_caqti.collect_req Params.typ Mina_caqti.Typ.(t2 int64 typ)
         @@ query_string ~offset ~limit input.filter.op_type input.operator
       in
       [%log debug] "Running SQL query $query"
@@ -948,7 +950,7 @@ module Sql = struct
           ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
           ~op_type_filters operator
       in
-      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+      Mina_caqti.collect_req Params.typ Mina_caqti.Typ.(t2 int64 typ)
       @@ query_string ~offset ~limit ~filters
 
     let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =

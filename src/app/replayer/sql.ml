@@ -20,7 +20,7 @@ module Block_info = struct
   (* find all blocks, working back from block with given state hash *)
   let query =
     Mina_caqti.collect_req
-      Caqti_type.(t2 string int64)
+      Mina_caqti.Typ.(t2 string int64)
       typ
       {sql| WITH RECURSIVE chain AS (
               SELECT id,parent_id,global_slot_since_genesis,global_slot_since_hard_fork,state_hash,ledger_hash, snarked_ledger_hash_id FROM blocks b                                                                                                                                                           WHERE b.state_hash = $1
@@ -203,7 +203,7 @@ end
 module User_command_ids = struct
   let query =
     Mina_caqti.collect_req
-      Caqti_type.(t2 string int64)
+      Mina_caqti.Typ.(t2 string int64)
       Caqti_type.int
       (find_command_ids_query "user")
 
@@ -276,7 +276,7 @@ end
 module Zkapp_command_ids = struct
   let query =
     Mina_caqti.collect_req
-      Caqti_type.(t2 string int64)
+      Mina_caqti.Typ.(t2 string int64)
       Caqti_type.int
       (find_command_ids_query "zkapp")
 
@@ -328,7 +328,7 @@ end
 module Internal_command_ids = struct
   let query =
     Mina_caqti.collect_req
-      Caqti_type.(t2 string int64)
+      Mina_caqti.Typ.(t2 string int64)
       Caqti_type.int
       (find_command_ids_query "internal")
 
@@ -358,7 +358,7 @@ module Internal_command = struct
   *)
   let query =
     Mina_caqti.collect_req
-      Caqti_type.(t2 int64 int)
+      Mina_caqti.Typ.(t2 int64 int)
       typ
       {sql| SELECT command_type,receiver_id,fee,
                    b.id,b.height,b.global_slot_since_genesis,
@@ -414,7 +414,7 @@ module Epoch_data = struct
     let decode (epoch_ledger_hash, epoch_data_seed) =
       Ok { epoch_ledger_hash; epoch_data_seed }
     in
-    let rep = Caqti_type.(t2 string string) in
+    let rep = Mina_caqti.Typ.(t2 string string) in
     Caqti_type.custom ~encode ~decode rep
 
   let query_epoch_data =
