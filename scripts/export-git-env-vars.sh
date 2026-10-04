@@ -8,7 +8,7 @@ set -euo pipefail
 # reached this script through buildkite/scripts/export-git-env-vars.sh, which
 # sets it first, so nothing ever ran into it until a script sourced this one
 # directly.
-MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-bullseye}
+MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-bookworm}
 
 # If enabled, keep my tags intact, it won't run git fetch --prune
 KEEP_MY_TAGS_INTACT=${KEEP_MY_TAGS_INTACT:-1}
@@ -75,5 +75,5 @@ export GITBRANCH
 export MINA_DEB_VERSION
 export MINA_DOCKER_TAG
 export THIS_COMMIT_TAG
-export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bookworm}
+export MINA_DEB_CODENAME
 export REPO_ROOT
