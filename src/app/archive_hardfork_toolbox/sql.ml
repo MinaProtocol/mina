@@ -256,7 +256,7 @@ let blocks_to_orphan (module Conn : CONNECTION) ~canonical_block_ids
     Mina_caqti.collect_req
       Caqti_type.(
         t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
-          (option int64) )
+          (option int64))
       Caqti_type.(t3 int64 string string)
       {%string|
         SELECT height, state_hash, chain_status::text
@@ -294,7 +294,7 @@ let conversion_summary_counts (module Conn : CONNECTION) ~canonical_block_ids
     Mina_caqti.find_req
       Caqti_type.(
         t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
-          (option int64) )
+          (option int64))
       Caqti_type.(t4 int int int int)
       {%string|
         SELECT
@@ -346,7 +346,7 @@ let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
     Mina_caqti.exec_req
       Caqti_type.(
         t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
-          (option int64) )
+          (option int64))
       {%string|
         UPDATE blocks
         SET chain_status = CASE

@@ -269,7 +269,8 @@ module Typ = struct
 
   let triples : triple list ref = ref []
 
-  let t3 : type a b c.
+  let t3 :
+      type a b c.
          a Caqti_type.t
       -> b Caqti_type.t
       -> c Caqti_type.t
@@ -303,7 +304,8 @@ module Typ = struct
 
   let quads : quad list ref = ref []
 
-  let t4 : type a b c d.
+  let t4 :
+      type a b c d.
          a Caqti_type.t
       -> b Caqti_type.t
       -> c Caqti_type.t
@@ -344,7 +346,8 @@ end
    [Caqti_request.t]'s multiplicity parameter is constrained, which a locally
    abstract type cannot carry, so the lookup is written out once per
    multiplicity rather than shared. *)
-let find_req : type a b.
+let find_req :
+    type a b.
        ?oneshot:bool
     -> a Caqti_type.t
     -> b Caqti_type.t
@@ -368,7 +371,8 @@ let find_req : type a b.
         if room_for s then Hashtbl.set one ~key:s ~data:(E (t, u, req)) ;
         req
 
-let find_opt_req : type a b.
+let find_opt_req :
+    type a b.
        ?oneshot:bool
     -> a Caqti_type.t
     -> b Caqti_type.t
@@ -392,7 +396,8 @@ let find_opt_req : type a b.
         if room_for s then Hashtbl.set zero_or_one ~key:s ~data:(E (t, u, req)) ;
         req
 
-let collect_req : type a b.
+let collect_req :
+    type a b.
        ?oneshot:bool
     -> a Caqti_type.t
     -> b Caqti_type.t
@@ -416,7 +421,8 @@ let collect_req : type a b.
         if room_for s then Hashtbl.set many ~key:s ~data:(E (t, u, req)) ;
         req
 
-let exec_req : type a.
+let exec_req :
+    type a.
        ?oneshot:bool
     -> a Caqti_type.t
     -> string
