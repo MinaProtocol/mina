@@ -93,6 +93,11 @@ end
 type result =
   { name : string
   ; prepared_final : int
+  ; prepared_growth : int
+        (* rise in the count over the second half of the calls: a request
+           that is shared or [~oneshot] stops adding statements after its
+           first call, so anything above zero here is the leak *)
+  ; calls_per_s : float
   ; per_call : float
   ; backend_kib_final : int option
         (* [None] on servers without [pg_backend_memory_contexts] (<PG14) *)
@@ -344,6 +349,60 @@ let upsert_scenario ~shape_idx =
         >>| ignore )
   }
 
+(* A call site that builds its row type per call. [Caqti_type.custom] gets a
+   fresh identity every time, so a cache keyed by SQL text finds the entry but
+   cannot prove the types equal; whatever request it falls back to must not be
+   prepared. *)
+let fresh_type_scenario =
+  let name = "select_insert_into_cols_fresh_type" in
+  { name
+  ; describe = "k text; row type built per call with Caqti_type.custom"
+  ; setup =
+      (fun ~table ->
+        sprintf
+          "CREATE TABLE %s (id serial PRIMARY KEY, k text UNIQUE NOT NULL)"
+          table )
+  ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
+  ; step =
+      (fun ~table conn i ->
+        let typ =
+          Caqti_type.custom Caqti_type.string
+            ~encode:(fun s -> Ok s)
+            ~decode:(fun s -> Ok s)
+        in
+        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+          ~table_name:table
+          ~cols:([ "k" ], typ)
+          conn (sprintf "k-%d" i)
+        >>| Mina_caqti.ok_exn ~ctx:name
+        >>| ignore )
+  }
+
+(* SQL text that differs on every call, through a helper that is not meant to
+   see such text. The comment changes the text without changing the query.
+   Every call is a new key, so a cache with a size limit fills up during this
+   run; past that point the requests must not be prepared either. Run last,
+   because a full cache changes the behaviour of every scenario after it. *)
+let distinct_sql_scenario =
+  let name = "select_insert_into_cols_distinct_sql" in
+  { name
+  ; describe = "k text; SQL text differs per call"
+  ; setup =
+      (fun ~table ->
+        sprintf
+          "CREATE TABLE %s (id serial PRIMARY KEY, k text UNIQUE NOT NULL)"
+          table )
+  ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
+  ; step =
+      (fun ~table conn i ->
+        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+          ~table_name:(sprintf "%s /* %d */" table i)
+          ~cols:([ "k" ], Caqti_type.string)
+          conn (sprintf "k-%d" i)
+        >>| Mina_caqti.ok_exn ~ctx:name
+        >>| ignore )
+  }
+
 let scenarios ~shapes : scenario list =
   List.concat_map
     (List.range 0 (Int.max 1 shapes))
@@ -352,6 +411,7 @@ let scenarios ~shapes : scenario list =
       ; insert_multi_scenario ~shape_idx
       ; upsert_scenario ~shape_idx
       ] )
+  @ [ fresh_type_scenario; distinct_sql_scenario ]
 
 (* A UUID table name per run: the benchmark only ever drops what it created in
    this process, and a collision surfaces as a failed CREATE rather than as
@@ -385,13 +445,22 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
     (prepared, bytes)
   in
   let%bind prepared0, _ = sample_and_print 0 in
+  let midpoint = iterations / 2 in
+  let prepared_mid = ref prepared0 in
+  let elapsed = ref Time_ns.Span.zero in
   let%bind final_prepared, final_bytes =
     Deferred.List.fold
       (List.range 1 (iterations + 1))
       ~init:(prepared0, None)
       ~f:(fun acc i ->
+        let started = Time_ns.now () in
         let%bind () = s.step ~table conn i in
-        if i % sample_every = 0 || i = iterations then sample_and_print i
+        (elapsed :=
+           Time_ns.Span.(!elapsed + Time_ns.diff (Time_ns.now ()) started) ) ;
+        if i % sample_every = 0 || i = iterations || i = midpoint then (
+          let%map ((prepared, _) as sample) = sample_and_print i in
+          if i = midpoint then prepared_mid := prepared ;
+          sample )
         else return acc )
   in
   let%bind () =
@@ -400,14 +469,22 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   in
   let per_call = Float.of_int final_prepared /. Float.of_int iterations in
   let backend_kib_final = Option.map final_bytes ~f:(fun b -> b / 1024) in
+  let prepared_growth = final_prepared - !prepared_mid in
+  (* sampling is outside the timed region, so this is the helper alone *)
+  let calls_per_s =
+    Float.of_int iterations /. Float.max 1e-9 (Time_ns.Span.to_sec !elapsed)
+  in
   printf
     "   RESULT scenario=%s iterations=%d prepared_final=%d \
-     prepared_per_call=%.3f backend_KiB_final=%s\n"
-    s.name iterations final_prepared per_call
+     prepared_per_call=%.3f prepared_growth=%d calls_per_s=%.1f \
+     backend_KiB_final=%s\n"
+    s.name iterations final_prepared per_call prepared_growth calls_per_s
     (Option.value_map backend_kib_final ~default:"n/a" ~f:Int.to_string) ;
   let%map () = C.disconnect () in
   { name = s.name
   ; prepared_final = final_prepared
+  ; prepared_growth
+  ; calls_per_s
   ; per_call
   ; backend_kib_final
   ; iterations
@@ -433,6 +510,8 @@ let influx_lines ~measurement ~tags (results : result list) =
       let fields =
         [ sprintf "prepared_final=%di" r.prepared_final
         ; sprintf "prepared_per_call=%.6f" r.per_call
+        ; sprintf "prepared_growth=%di" r.prepared_growth
+        ; sprintf "calls_per_s=%.3f" r.calls_per_s
         ; sprintf "iterations=%di" r.iterations
         ]
         @ Option.value_map r.backend_kib_final ~default:[] ~f:(fun kib ->
@@ -444,7 +523,7 @@ let influx_lines ~measurement ~tags (results : result list) =
         ts_ns )
 
 let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
-    ~influxdb_file ~measurement ~tags () =
+    ~assert_no_growth ~influxdb_file ~measurement ~tags () =
   printf "mina_caqti postgres memory-usage benchmark\n" ;
   printf "uri=%s iterations=%d sample_every=%d shapes=%d\n" (Uri.to_string uri)
     iterations sample_every shapes ;
@@ -454,8 +533,9 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
   in
   printf "\n== summary ==\n" ;
   List.iter results ~f:(fun r ->
-      printf "   %-32s prepared_final=%-8d per_call=%.3f\n" r.name
-        r.prepared_final r.per_call ) ;
+      printf
+        "   %-38s prepared_final=%-8d per_call=%.3f growth=%-6d calls/s=%.1f\n"
+        r.name r.prepared_final r.per_call r.prepared_growth r.calls_per_s ) ;
   let lines = influx_lines ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
@@ -479,8 +559,20 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
           (List.length offenders) limit ;
         List.iter offenders ~f:(fun r ->
             eprintf "   %s: prepared_final=%d\n" r.name r.prepared_final ) ;
-        Core.exit 1 )
+        Shutdown.shutdown 1 )
       else printf "\nOK: all scenarios <= --assert-max-prepared=%d\n" limit ) ;
+  ( if assert_no_growth then
+    let offenders = List.filter results ~f:(fun r -> r.prepared_growth > 0) in
+    if not (List.is_empty offenders) then (
+      eprintf
+        "\n\
+         FAIL: %d scenario(s) kept preparing statements over the second half \
+         of their calls (memory leak):\n"
+        (List.length offenders) ;
+      List.iter offenders ~f:(fun r ->
+          eprintf "   %s: +%d prepared\n" r.name r.prepared_growth ) ;
+      Shutdown.shutdown 1 )
+    else printf "\nOK: no scenario grew its prepared-statement count\n" ) ;
   return ()
 
 let () =
@@ -505,6 +597,11 @@ let () =
      and assert_max_prepared =
        flag "--assert-max-prepared" (optional int)
          ~doc:"K fail if any scenario's final prepared count exceeds K"
+     and assert_no_growth =
+       flag "--assert-no-growth" no_arg
+         ~doc:
+           " fail if any scenario's prepared count rises over the second half \
+            of its calls"
      and influxdb_file =
        flag "--influxdb-file" (optional string)
          ~doc:"PATH write InfluxDB line protocol (one point per scenario) here"
@@ -566,5 +663,6 @@ let () =
              @ opt_tag "network" network
            in
            main ~uri:(Uri.of_string u) ~iterations ~sample_every ~shapes
-             ~assert_max_prepared ~influxdb_file ~measurement ~tags () )
+             ~assert_max_prepared ~assert_no_growth ~influxdb_file ~measurement
+             ~tags () )
   |> Command_unix.run
