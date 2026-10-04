@@ -1,6 +1,6 @@
 (* pg_memory/main.ml -- postgres memory-usage benchmark for Mina_caqti.
 
-   Several helpers in {!Mina_caqti} build a fresh [Caqti_request.t] on every
+   Several helpers in {!Mina_caqti} build a fresh request on every
    call (the SQL text is derived from runtime [~table_name]/[~cols] arguments).
    Caqti keys its per-connection prepared-statement cache by request-object
    identity, so a fresh request per call makes the PostgreSQL backend register
@@ -42,8 +42,7 @@ open Async
 
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
-let exec_oneshot sql =
-  Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) ~oneshot:true sql
+let exec_oneshot sql = Mina_caqti.exec_req ~oneshot:true Caqti_type.unit sql
 
 (* Both signals in one round trip. [sum] is deliberately NOT coalesced: a NULL
    means "nothing to measure" and stays distinguishable from a genuine zero.
@@ -52,16 +51,16 @@ let exec_oneshot sql =
    as a secondary, corroborating signal to the deterministic prepared-statement
    count. *)
 let sample_req =
-  Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.(t2 int (option int)))
-    ~oneshot:true
+  Mina_caqti.find_req ~oneshot:true Caqti_type.unit
+    Caqti_type.(t2 int (option int))
     "SELECT (SELECT count(*)::int FROM pg_prepared_statements), (SELECT \
      sum(total_bytes)::bigint FROM pg_backend_memory_contexts)"
 
 (* [pg_backend_memory_contexts] only exists on PostgreSQL 14+; on older servers
    the query above fails to parse, and this is all we can measure. *)
 let prepared_only_req =
-  Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.int)
-    ~oneshot:true "SELECT count(*)::int FROM pg_prepared_statements"
+  Mina_caqti.find_req ~oneshot:true Caqti_type.unit Caqti_type.int
+    "SELECT count(*)::int FROM pg_prepared_statements"
 
 module Sampler = struct
   (* Whether the backend-memory view exists is discovered by using it, not by
@@ -119,8 +118,10 @@ type scenario =
 
    A shape is a list of columns, each with a generated name and a generated
    type (text or int). The heterogeneous row value is packed into a nested
-   [Caqti_type.t2] product built at runtime and hidden behind an existential,
-   so the same code drives helpers over tables of any generated width.
+   [Mina_caqti.Typ.t2] product built at runtime and hidden behind an
+   existential, so the same code drives helpers over tables of any generated
+   width. [Typ] interns products, so the per-call type is the same object on
+   every call, as it is at the archive's call sites.
 
    [insert_multi_into_col] renders its values into the SQL text as
    single-quoted literals without escaping, so generated tokens stay
@@ -190,7 +191,7 @@ let rec pack_row = function
   | cell :: rest ->
       let (Pack (t, v)) = pack_cell cell in
       let (Pack (t', v')) = pack_row rest in
-      Pack (Caqti_type.t2 t t', (v, v'))
+      Pack (Mina_caqti.Typ.t2 t t', (v, v'))
 
 (* calls that must never collide with an earlier call's row get the iteration
    index stamped into their first cell; shapes generate the first column as
