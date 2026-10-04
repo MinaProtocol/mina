@@ -115,7 +115,7 @@ module TestDb = struct
   let insert_protocol_versions conn_str db_name versions =
     let query =
       Mina_caqti.exec_req
-        Caqti_type.(t3 int int int)
+        Mina_caqti.Typ.(t3 int int int)
         {sql|
           INSERT INTO protocol_versions
             (transaction, network, patch)
@@ -147,7 +147,7 @@ module TestDb = struct
             in
             let query =
               (Mina_caqti.exec_req
-                 Caqti_type.(
+                 Mina_caqti.Typ.(
                    t3
                      (t4 int string (option int) string)
                      (t4 int int int int) string) )
@@ -173,7 +173,7 @@ module TestDb = struct
 
   let get_all_blocks conn_str db_name =
     let query =
-      (Mina_caqti.collect_req Caqti_type.unit Caqti_type.(t2 string string))
+      (Mina_caqti.collect_req Caqti_type.unit Mina_caqti.Typ.(t2 string string))
         {sql|
           SELECT state_hash, chain_status
           FROM blocks
