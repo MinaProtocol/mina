@@ -295,17 +295,22 @@ resolve_transitive_deps() {
 # find_closest_ancestor - Find the closest mainline branch ancestor
 # Uses global variable MAINLINE_BRANCHES (array of branch names)
 # Returns: name of the closest ancestor branch
+#
+# Ties are common: after a forward merge master's tip is also on compatible and
+# develop, so all three are 0 commits away. The branch this build is for wins a
+# tie (the PR's base branch, else the built branch), so a master nightly is
+# judged as master. Otherwise later branches in MAINLINE_BRANCHES win.
 find_closest_ancestor() {
   CURRENT_COMMIT=$(git rev-parse HEAD)
+  local preferred="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-${BUILDKITE_BRANCH:-}}"
   closest_branch=""
   min_distance=""
   for branch in "${MAINLINE_BRANCHES[@]}"; do
     ancestor=$(git merge-base "$CURRENT_COMMIT" "origin/$branch")
     distance=$(git rev-list --count "${ancestor}..${CURRENT_COMMIT}")
     echo "Branch $branch: $distance commits from current commit ($CURRENT_COMMIT) via ancestor $ancestor" >&2
-    # Use <= so that branches later in MAINLINE_BRANCHES array win ties
-    # This makes the order in --mainline-branches meaningful for priority
-    if [[ -z "$min_distance" || $distance -le $min_distance ]]; then
+    if [[ -z "$min_distance" || $distance -lt $min_distance ]] ||
+       [[ $distance -eq $min_distance && "$closest_branch" != "$preferred" ]]; then
       min_distance=$distance
       closest_branch=$branch
     fi
