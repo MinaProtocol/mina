@@ -112,6 +112,44 @@ source_monorepo_functions() {
   source "$SCRIPT_DIR/monorepo_lib.sh"
 }
 
+# find_closest_ancestor in a throwaway repo: master's commit is also the tip of
+# compatible and develop (the state after a forward merge), and develop has one
+# commit more.
+test_find_closest_ancestor() {
+  local repo="$TEST_DIR/ancestry"
+  git init -q "$repo"
+  (
+    cd "$repo"
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m base
+    git update-ref refs/remotes/origin/master HEAD
+    git update-ref refs/remotes/origin/compatible HEAD
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m develop-only
+    git update-ref refs/remotes/origin/develop HEAD
+    git update-ref refs/remotes/origin/mesa HEAD~1
+    git checkout -q --detach HEAD~1
+  )
+
+  local MAINLINE_BRANCHES=(master compatible mesa develop)
+  closest() {
+    (cd "$repo" && BUILDKITE_BRANCH="$1" BUILDKITE_PULL_REQUEST_BASE_BRANCH="$2" \
+      find_closest_ancestor 2>/dev/null)
+  }
+
+  assert_equals "master" "$(closest master "")" \
+    "find_closest_ancestor: a master build wins the tie"
+  assert_equals "compatible" "$(closest compatible "")" \
+    "find_closest_ancestor: a compatible build wins the tie"
+  assert_equals "compatible" "$(closest my-feature compatible)" \
+    "find_closest_ancestor: a PR's base branch wins the tie"
+  # develop contains this commit, so it ties too, and it is listed last.
+  assert_equals "develop" "$(closest my-feature "")" \
+    "find_closest_ancestor: with no preference the last tied branch wins"
+
+  (cd "$repo" && git checkout -q --detach origin/develop)
+  assert_equals "develop" "$(closest master "")" \
+    "find_closest_ancestor: a strictly closer branch beats the preference"
+}
+
 # Test: has_matching_tags with filter_any mode
 test_has_matching_tags_any() {
   echo -e "\n${YELLOW}Testing: has_matching_tags (any mode)${NC}"
@@ -902,6 +940,7 @@ main() {
   test_check_include_if_multiple_none_match
   test_check_include_if_exact_case
   test_check_include_if_skip_non_ancestor
+  test_find_closest_ancestor
 
   # Run integration tests
   test_integration_full_selection
