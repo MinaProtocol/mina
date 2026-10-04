@@ -974,7 +974,7 @@ let upsert_into_cols_returning ~(on_conflict : string)
     ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
     (value : 'cols) =
   Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ( find_req (snd cols) (snd returning)
     @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
          ?tannot ~cols:(fst cols) () )
     value
