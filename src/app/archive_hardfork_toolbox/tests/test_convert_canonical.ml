@@ -933,4 +933,13 @@ let () =
               Thread_safe.block_on_async_exn test_summary_counts
               |> Or_error.ok_exn )
         ] )
+      (* runs last: by now every toolbox query has run more than once *)
+    ; ( "request_cache"
+      , [ ( "every query shares its request"
+          , `Quick
+          , fun () ->
+              Alcotest.(check (list (pair int string)))
+                "queries whose types are built per call" []
+                (Mina_caqti.Request_cache.repeat_miss_report ()) )
+        ] )
     ]
