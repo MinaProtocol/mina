@@ -251,6 +251,16 @@ module T = struct
       =
     Scan_state.all_work_pairs t.scan_state ~get_state
 
+  module Available_job = Scan_state.Available_job
+
+  let all_work_jobs t = Scan_state.all_work_jobs t.scan_state
+
+  let single_spec_of_job = Scan_state.single_spec_of_job
+
+  let statement_of_job = Scan_state.statement_of_job
+
+  let job_transaction = Scan_state.job_transaction
+
   let all_work_statements_exn t =
     Scan_state.all_work_statements_exn t.scan_state
 

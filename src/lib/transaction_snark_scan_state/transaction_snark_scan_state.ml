@@ -731,6 +731,14 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         (Ledger_proof.Cached.statement p2)
       |> Result.ok
 
+(* The transaction of a base job, for log summaries — read from the job's
+   [transaction_with_status]. [None] for merge jobs, which have no transaction. *)
+let job_transaction : job -> Mina_transaction.Transaction.t option = function
+  | Base { transaction_with_status; _ } ->
+      Some (With_status.data transaction_with_status)
+  | Merge _ ->
+      None
+
 let create ~work_delay ~transaction_capacity_log_2 : t =
   let k = Int.pow 2 transaction_capacity_log_2 in
   { scan_state = Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
@@ -1366,6 +1374,14 @@ let single_spec_one_or_twos_rev_of_job_list ~get_state jobs =
         One_or_two.Or_error.map ~f:(single_spec_of_job ~get_state) pair
       in
       spec :: acc' )
+
+(* The pending work as raw jobs, grouped into proof bundles. Work selection (and
+   the snark pool) deal only in each job's statement (via [statement_of_job]);
+   the proving spec — which carries the transaction witness — is a separate,
+   prove-time concern built per job with [single_spec_of_job]. Same
+   grouping/order as [all_work_pairs], so the two line up by statement. *)
+let all_work_jobs t : Available_job.t One_or_two.t list =
+  List.concat_map (all_jobs t) ~f:One_or_two.group_list
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
