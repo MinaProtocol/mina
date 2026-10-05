@@ -12,7 +12,7 @@ This repository is set up for coding agents:
 - `AGENTS.md` is a symlink to this file, so agents that look for that filename read the same guidance.
 - `.mcp.json` connects a clone to the Mina MCP server ([`@o1-labs/mina-mcp-server`](https://github.com/MinaProtocol/mina-mcp-server)) in live devnet mode: account, block, transaction, zkApp event and Rosetta queries against a public network, with no local infrastructure.
 - `.agents/skills/` holds repo-specific skills, symlinked to `.claude/skills`:
-  - `mina-changelog` - write a `changes/<PR>.md` entry that passes the `Lint: Changelog` job
+  - `mina-changelog` - write a `changes/<PR>.md` release-note entry for a PR
   - `mina-ci-commands` - choose and post the right `!ci-*` PR comment
 - Module-level `CLAUDE.md` files cover subsystems that are easy to misread: the pipe primitives in `src/lib/concurrency/pipe_lib/`, plus `interruptible/`, `promise/`, `run_in_thread/` and `src/lib/o1trace/`.
 - [`mina-agent`](https://github.com/o1-labs/mina-agent) is an optional harness for this monorepo. Builds, type-checks and tests go through an MCP server that runs dune in the right switch; the dependency graph is derived from the dune files; the toolchain and build configuration are not directly editable. It installs outside the checkout and writes nothing into this repo, so plain `claude` sessions are unaffected.
