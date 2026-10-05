@@ -27,7 +27,7 @@
 # Exits 0 if all shape digests are identical, 1 on any difference (with a
 # report of added/removed/changed types), 2 on usage/build errors.
 #
-# Related CI tooling (not reusable locally): scripts/version-linter.py and
+# Related CI tooling (not reusable locally): scripts/lint/version-linter.py and
 # buildkite/scripts/dump-mina-type-shapes.sh, which compare dumps uploaded
 # to gs://mina-type-shapes per commit.
 

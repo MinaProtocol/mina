@@ -3,7 +3,7 @@
 set -eo pipefail
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/../.."
 
 # Don't do anything if we're in a nix shell
 [[ "$IN_NIX_SHELL$CI$BUILDKITE" == "" ]] || exit 0

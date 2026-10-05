@@ -258,7 +258,7 @@ install_mina_service() {
 
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
   sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${seed_list_url}%" \
-    ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+    ../scripts/debian/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 }
 
 # Copies common daemon binaries only to debian package
