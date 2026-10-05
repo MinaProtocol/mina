@@ -534,8 +534,11 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
@@ -569,8 +572,11 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
@@ -620,7 +626,7 @@ let cancel_transaction_graphql =
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
-         printf "Fee to cancel transaction is %s coda.\n"
+         printf "Fee to cancel transaction is %s mina.\n"
            (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
@@ -698,7 +704,7 @@ module Export_logs = struct
   let export_locally =
     let run ~tarfile ~conf_dir =
       let open Mina_lib in
-      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      let conf_dir = Conf_dir.compute_conf_dir_exn conf_dir in
       fun () ->
         match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
         | Ok result ->
@@ -770,8 +776,8 @@ let export_ledger =
     Command.Param.(
       flag "--state-hash" ~aliases:[ "state-hash" ]
         ~doc:
-          "STATE-HASH State hash, if printing a staged ledger (default: state \
-           hash for the best tip)"
+          "STATE-HASH State hash, if printing a staged ledger or snarked \
+           ledger (default: state hash for the best tip)"
         (optional string))
   in
   let ledger_kind =
@@ -816,8 +822,6 @@ let export_ledger =
                let state_hash =
                  Option.map ~f:State_hash.of_base58_check_exn state_hash
                in
-               printf
-                 "Generating snarked ledger(this may take a few seconds)...\n" ;
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
                  state_hash port
            | "staking-epoch-ledger" ->
@@ -846,13 +850,13 @@ let hash_ledger =
            (required string))
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
        let process_accounts accounts =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-             ~depth:constraint_constants.ledger_depth accounts
+             ~logger:(Logger.create ()) ~depth:constraint_constants.ledger_depth
+             ~genesis_backing_type:Stable_db accounts
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
@@ -949,23 +953,23 @@ let currency_in_ledger =
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (Command.Param.return (fun () ->
-         let signature_kind = Mina_signature_kind.t_DEPRECATED in
-         let constraint_constants =
-           Genesis_constants.Compiled.constraint_constants
-         in
-         let proof_level = Genesis_constants.Compiled.proof_level in
-         let all =
-           Transaction_snark.constraint_system_digests ~signature_kind
-             ~constraint_constants ()
-           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ~proof_level ~constraint_constants ()
-         in
-         let all =
-           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-         in
-         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-         Deferred.unit ) )
+    (let open Command.Let_syntax in
+    let%map signature_kind = Cli_lib.Flag.signature_kind in
+    fun () ->
+      let (module G) = Genesis_constants.profiled () in
+      let constraint_constants = G.constraint_constants in
+      let proof_level = G.proof_level in
+      let all =
+        Transaction_snark.constraint_system_digests ~signature_kind
+          ~constraint_constants ()
+        @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+            ~proof_level ~constraint_constants ()
+      in
+      let all =
+        List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+      in
+      List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+      Deferred.unit)
 
 let snark_job_list =
   let open Deferred.Let_syntax in
@@ -1358,7 +1362,7 @@ let import_key =
            | Ok res ->
                Deferred.return (print_result res)
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn None in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Importing to local directory %s%s\n"
@@ -1530,7 +1534,7 @@ let list_accounts =
            | Ok () ->
                Deferred.unit
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn None in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Listing from local directory %s%s\n"
@@ -1823,9 +1827,10 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  let proof_level = G.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -1843,7 +1848,7 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let%map ({ consensus_constants; _ } as precomputed_values) =
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
            >>| Option.value
                  ~default:
@@ -2144,8 +2149,7 @@ let receipt_chain_hash =
          ~doc:
            "NN For a zkApp, 0 for fee payer or 1-based index of account update"
          (optional string)
-     in
-     let signature_kind = Mina_signature_kind.t_DEPRECATED in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
@@ -2176,45 +2180,6 @@ let receipt_chain_hash =
                account_update_index receipt_elt previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash) )
-
-let chain_id_inputs =
-  let open Deferred.Let_syntax in
-  Command.async ~summary:"Print the inputs that yield the current chain id"
-    (Cli_lib.Background_daemon.rpc_init (Command.Param.all_unit [])
-       ~f:(fun port () ->
-         let open Daemon_rpcs in
-         match%map Client.dispatch Chain_id_inputs.rpc () port with
-         | Ok
-             ( genesis_state_hash
-             , genesis_constants
-             , snark_keys
-             , protocol_transaction_version
-             , protocol_network_version ) ->
-             let open Format in
-             printf
-               "@[<v>Genesis state hash: %s@,\
-                @[<v 2>Genesis_constants:@,\
-                Protocol:          %a@,\
-                Txn pool max size: %d@,\
-                Num accounts:      %a@,\
-                @]@,\
-                @[<v 2>Snark keys:@,\
-                %a@]@,\
-                Protocol transaction version: %u@,\
-                Protocol network version: %u@]@."
-               (State_hash.to_base58_check genesis_state_hash)
-               Yojson.Safe.pp
-               (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
-               genesis_constants.txpool_max_size
-               (pp_print_option
-                  ~none:(fun ppf () -> pp_print_string ppf "None")
-                  pp_print_int )
-               genesis_constants.num_accounts
-               (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
-               snark_keys protocol_transaction_version protocol_network_version
-         | Error err ->
-             Format.eprintf "Could not get chain id inputs: %s@."
-               (Error.to_string_hum err) ) )
 
 let hash_transaction =
   let open Command.Let_syntax in
@@ -2285,6 +2250,42 @@ let thread_graph =
                "@[<v>Failed to retrieve runtime configuration. Error:@,%s@]@."
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
+             exit 1 ) )
+
+let generate_hardfork_config =
+  let open Command.Param in
+  let hardfork_config_dir_flag =
+    flag "--hardfork-config-dir"
+      ~doc:
+        "DIR Directory to generate hardfork configuration, relative to the \
+         daemon working directory"
+      (required string)
+  in
+  let generate_fork_validation =
+    flag "--generate-fork-validation"
+      ~doc:
+        "BOOL whether generating the fork validation folder. Defaults to true"
+      (optional_with_default true bool)
+  in
+  let args =
+    Command.Param.map2 hardfork_config_dir_flag generate_fork_validation
+      ~f:(fun config_dir generate_fork_validation ->
+        Daemon_rpcs.Generate_hardfork_config.
+          { config_dir; generate_fork_validation } )
+  in
+
+  Command.async ~summary:"Generate reference hardfork configuration"
+    (Cli_lib.Background_daemon.rpc_init args ~f:(fun port args ->
+         match%bind
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Generate_hardfork_config.rpc args port
+         with
+         | Ok () ->
+             printf "Hardfork configuration successfully generated\n" ;
+             exit 0
+         | Error e ->
+             eprintf "Failed to generate hard fork config: %s\n"
+               (Error.to_string_hum e) ;
              exit 1 ) )
 
 let signature_kind =
@@ -2366,18 +2367,22 @@ let test_ledger_application =
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
-     let constraint_constants =
-       Genesis_constants.Compiled.constraint_constants
-     in
-     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-     Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
+
+     let (module G) = Genesis_constants.profiled () in
+
+     let constraint_constants = G.constraint_constants in
+     let genesis_constants = G.genesis_constants in
+     Test_ledger_application.test ~privkey_path
+       ~ledger_path:(ledger_path, Stable_db) ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing
        ~transfer_parties_get_actions_events num_txs ~constraint_constants
        ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
-  let compile_config = Mina_compile_config.Compiled.t in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2400,10 +2405,10 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
-    in
+
+    let (module G) = Genesis_constants.profiled () in
+    let genesis_constants = G.genesis_constants in
+    let constraint_constants = G.constraint_constants in
     Cli_lib.Background_daemon.rpc_init args
       ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
 
@@ -2525,14 +2530,16 @@ let advanced ~itn_features =
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
-    ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
+    ; ("generate-hardfork-config", generate_hardfork_config)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.command)
+          ] )
     ]
   in
   let cmds =

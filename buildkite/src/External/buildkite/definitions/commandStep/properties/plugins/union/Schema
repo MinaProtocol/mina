@@ -1,0 +1,1 @@
+\(var2 : Type) -> List { mapKey: Text, mapValue: var2 }

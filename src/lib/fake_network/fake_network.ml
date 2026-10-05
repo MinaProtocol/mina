@@ -81,6 +81,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let consensus_local_state = consensus_local_state
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end )
   in
   let config rpc_mocks peer =
@@ -230,15 +232,15 @@ module Generator = struct
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
-    let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~context:(module Context)
-        ~genesis_ledger
+        ~genesis_ledger:precomputed_values.genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:
           precomputed_values.protocol_state_with_hashes.hash.state_hash
+        ~epoch_ledger_backing_type:Stable_db
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values ~verifier
@@ -273,15 +275,15 @@ module Generator = struct
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
-    let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~context:(module Context)
-        ~genesis_ledger
+        ~genesis_ledger:precomputed_values.genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:
           precomputed_values.protocol_state_with_hashes.hash.state_hash
+        ~epoch_ledger_backing_type:Stable_db
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values

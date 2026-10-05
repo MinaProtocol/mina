@@ -50,9 +50,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Transaction_witness.Stable.V2.t
+      ( Transaction_witness.Stable.V3.t
       , Ledger_proof.Stable.V2.t )
       Poly.Stable.V2.t
     [@@deriving sexp, yojson]
@@ -70,9 +70,3 @@ type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
   Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-
-let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-    Stable.Latest.t -> t =
-  Poly.map
-    ~f_witness:(Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
-    ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)

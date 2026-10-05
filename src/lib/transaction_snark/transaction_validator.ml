@@ -23,20 +23,21 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
             .status )
         (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc) )
 
-let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view l t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view
+    ~signature_kind l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
       within_mask l ~f:(fun l' ->
           Ledger.apply_transactions ~signature_kind ~constraint_constants
             ~global_slot ~txn_state_view l' t ) )
 
-let apply_transactions ~constraint_constants ~global_slot ~txn_state_view l txn
-    =
-  apply_transactions' l ~constraint_constants ~global_slot ~txn_state_view txn
+let apply_transactions ~constraint_constants ~global_slot ~txn_state_view
+    ~signature_kind l txn =
+  apply_transactions' l ~constraint_constants ~global_slot ~txn_state_view
+    ~signature_kind txn
 
 let apply_transaction_first_pass ~constraint_constants ~global_slot
-    ~txn_state_view l txn : Ledger.Transaction_partially_applied.t Or_error.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~txn_state_view ~signature_kind l txn :
+    Ledger.Transaction_partially_applied.t Or_error.t =
   O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
       within_mask l ~f:(fun l' ->
           Ledger.apply_transaction_first_pass ~signature_kind l'

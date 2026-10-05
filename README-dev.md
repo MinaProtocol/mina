@@ -150,7 +150,7 @@ A number of C libraries are expected to be available in the system and are also 
 If you use vim, add this snippet in your `.vimrc` file to use Merlin. (Note:Be sure to change the HOME directory to match yours.)
 
 ```bash
-let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.0/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.2/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -262,16 +262,21 @@ make build
 Prerequisites: 
 
 - debian package previously built
-- aptly app
+- dpkg-dev (provides dpkg-scanpackages; pre-installed in the mina-toolchain image)
 
 Steps:
 
-1. Start local debian repository
+1. Stage the locally-built debians into the docker build context
+
+scripts/docker/build.sh stages any .deb files found in the docker build context
+(the dockerfiles/ directory) into dockerfiles/_debs and generates an apt index
+there with dpkg-scanpackages, which the Dockerfiles install from. Copy your
+locally-built debians into the context:
 ```
-./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
+cp _build/*.deb dockerfiles/
 ```
 
-IMPORTANT: debians should be placed in _build folder
+IMPORTANT: debians should be placed in the _build folder first
 
 2. Build docker:
 ```
@@ -301,10 +306,10 @@ We use the [Dune](https://github.com/ocaml/dune/) build system for OCaml code.
 
 OCaml dependencies live in the [`opam.export`](./opam.export) file. This file is machine generated and must not be modified.
 
-To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). The following commands assume that the version of the OCaml compiler used in the codebase is 4.14.0:
+To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). The following commands assume that the version of the OCaml compiler used in the codebase is 4.14.2:
 
 ```shell
-opam switch create mina_fresh 4.14.0
+opam switch create mina_fresh 4.14.2
 opam switch import opam.export
 ```
 
@@ -331,7 +336,11 @@ the submodule's repository, it is automatically re-pinned in CI.
 
 If you add a new package in the Mina repository or as a submodule, you must do all of the following:
 
-2. Update [`dockerfiles/stages/`](dockerfiles/stages) with the required packages
+2. Update [`dockerfiles/toolchain/`](dockerfiles/toolchain) with the required packages
+
+## Tests
+
+For a comprehensive guide on all kinds of tests in the codebase and how to run them, see [docs/tests.md](docs/tests.md).
 
 ## Common Dune tasks
 

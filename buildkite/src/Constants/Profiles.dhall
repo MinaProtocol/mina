@@ -36,14 +36,7 @@ let duneProfile =
 
 let fromNetwork =
           \(network : Network.Type)
-      ->  merge
-            { Devnet = Profile.Devnet
-            , Mainnet = Profile.Mainnet
-            , Berkeley = Profile.Devnet
-            , DevnetLegacy = Profile.Devnet
-            , MainnetLegacy = Profile.Mainnet
-            }
-            network
+      ->  merge { Devnet = Profile.Devnet, Mainnet = Profile.Mainnet } network
 
 let toSuffixUppercase =
           \(profile : Profile)
@@ -68,10 +61,26 @@ let toSuffixLowercase =
 let toLabelSegment =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
+            { Devnet = "-devnet"
             , Mainnet = "-mainnet"
             , Lightnet = "-lightnet"
             , Dev = "-dev"
+            }
+            profile
+
+let toExtraLabelSegment =
+          \(profile : Profile)
+      ->  merge
+            { Devnet = "", Mainnet = "", Lightnet = "-lightnet", Dev = "-dev" }
+            profile
+
+let profileName =
+          \(profile : Profile)
+      ->  merge
+            { Devnet = "mina-devnet-profile"
+            , Mainnet = "mina-mainnet-profile"
+            , Lightnet = "mina-lightnet"
+            , Dev = "mina-dev"
             }
             profile
 
@@ -83,4 +92,6 @@ in  { Type = Profile
     , fromNetwork = fromNetwork
     , toSuffixLowercase = toSuffixLowercase
     , toLabelSegment = toLabelSegment
+    , toExtraLabelSegment = toExtraLabelSegment
+    , profileName = profileName
     }

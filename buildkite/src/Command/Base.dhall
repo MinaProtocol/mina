@@ -43,12 +43,15 @@ let DockerLogin = ./DockerLogin/Type.dhall
 
 let Summon = ./Summon/Type.dhall
 
+let SubmoduleCredentials = ./SubmoduleCredentials/Type.dhall
+
 let Size = ./Size.dhall
 
 let Plugins =
       < Docker : Docker.Type
       | DockerLogin : DockerLogin.Type
       | Summon : Summon.Type
+      | SubmoduleCredentials : SubmoduleCredentials.Type
       >
 
 let B/Command = B.definitions/commandStep/Type Text Text Plugins Plugins
@@ -102,7 +105,7 @@ let Config =
           , flake_retry_limit : Optional Natural
           , soft_fail : Optional B/SoftFail
           , skip : Optional B/Skip
-          , if : Optional B/If
+          , if_ : Optional B/If
           , timeout_in_minutes : Optional Integer
           }
       , default =
@@ -116,7 +119,7 @@ let Config =
           , flake_retry_limit = Some 0
           , soft_fail = None B/SoftFail
           , skip = None B/Skip
-          , if = None B/If
+          , if_ = None B/If
           , timeout_in_minutes = None Integer
           }
       }
@@ -124,14 +127,14 @@ let Config =
 let targetToAgent =
           \(target : Size)
       ->  merge
-            { XLarge = toMap { size = "generic" }
-            , Large = toMap { size = "generic" }
-            , Medium = toMap { size = "generic" }
-            , Small = toMap { size = "generic" }
-            , Integration = toMap { size = "integration" }
-            , QA = toMap { size = "qa" }
-            , Perf = toMap { size = "performance" }
-            , Multi = toMap { size = "generic-multi" }
+            { XLarge = toMap { generic = "true" }
+            , Large = toMap { generic = "true" }
+            , Medium = toMap { generic = "true" }
+            , Small = toMap { generic = "true" }
+            , Integration = toMap { integration = "true" }
+            , QA = toMap { qa = "true" }
+            , Perf = toMap { performance = "true" }
+            , Multi = toMap { generic_multi = "true" }
             }
             target
 
@@ -244,7 +247,7 @@ let build
               }
           , soft_fail = c.soft_fail
           , skip = c.skip
-          , if = c.if
+          , `if` = c.if_
           , plugins =
               let dockerPart =
                     Optional/toList
@@ -289,10 +292,22 @@ let build
                           c.summon
                       )
 
+              let submoduleCredentialsPart =
+                    [ toMap
+                        { `MinaProtocol/submodule-credentials#v1.1.0` =
+                            Plugins.SubmoduleCredentials
+                              SubmoduleCredentials::{=}
+                        }
+                    ]
+
               let allPlugins =
                     List/concat
                       (Map.Entry Text Plugins)
-                      (dockerPart # summonPart # dockerLoginPart)
+                      (   submoduleCredentialsPart
+                        # dockerPart
+                        # summonPart
+                        # dockerLoginPart
+                      )
 
               in        if Prelude.List.null (Map.Entry Text Plugins) allPlugins
 

@@ -1,0 +1,14 @@
+{
+  "network_name": "integration-test",
+  "gsheet_id": "",
+  "analyzer_output_gsheet_id": "",
+  "delegation_whitelist_list": "Form Responses 1",
+  "delegation_whitelist_column": "E",
+  "aws": {
+    "account_id": "",
+    "bucket_name_suffix": "",
+    "region": "",
+    "access_key_id": "",
+    "secret_access_key": ""
+  }
+}

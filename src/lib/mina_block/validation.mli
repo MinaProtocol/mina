@@ -81,6 +81,27 @@ val skip_time_received_validation :
      , 'f )
      with_header
 
+val validate_genesis_protocol_state_block :
+     genesis_state_hash:State_hash.t
+  -> ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
+  -> ( ( 'a
+       , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
+       , 'b
+       , 'c
+       , 'd
+       , 'e
+       , 'f )
+       with_block
+     , [> `Invalid_genesis_protocol_state ] )
+     Result.t
+
 val validate_genesis_protocol_state :
      genesis_state_hash:State_hash.t
   -> ( 'a
@@ -262,7 +283,8 @@ val skip_delta_block_chain_validation :
 val validate_frontier_dependencies :
      to_header:('a -> Header.t)
   -> context:(module CONTEXT)
-  -> root_block:Block.with_hash
+  -> root_consensus_state:
+       Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
   -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
   -> ('a, State_hash.State_hashes.t) With_hash.t
      * ( 'b
@@ -357,6 +379,7 @@ val validate_staged_ledger_diff :
            , 'f )
            with_block ]
        * [ `Staged_ledger of Staged_ledger.t ]
+       * [ `Accounts_created of Account_id.t list ]
      , [> `Staged_ledger_application_failed of
           Staged_ledger.Staged_ledger_error.t
        | `Invalid_body_reference

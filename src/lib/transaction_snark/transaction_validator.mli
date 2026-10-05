@@ -13,6 +13,7 @@ val apply_transactions :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> signature_kind:Mina_signature_kind.t
   -> Mina_ledger.Ledger.t
   -> Transaction.t list
   -> Mina_transaction_logic.Transaction_applied.t list Or_error.t
@@ -21,6 +22,7 @@ val apply_transaction_first_pass :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> signature_kind:Mina_signature_kind.t
   -> Mina_ledger.Ledger.t
   -> Transaction.t
   -> Mina_ledger.Ledger.Transaction_partially_applied.t Or_error.t

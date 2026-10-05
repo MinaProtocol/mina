@@ -1,0 +1,35 @@
+(test
+ (name stop_slot_test)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core_kernel
+  integers
+  yojson
+  ;; local libraries
+  block_time
+  consensus
+  genesis_constants
+  genesis_ledger_helper
+  logger
+  mina_numbers
+  runtime_config)
+ (deps devnet.json mainnet.json)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+; The test asserts against the configs that actually ship, rather than copies
+; that could drift from them.
+(rule
+ (targets devnet.json)
+ (deps %{workspace_root}/genesis_ledgers/devnet.json)
+ (action
+  (copy %{deps} %{targets})))
+
+(rule
+ (targets mainnet.json)
+ (deps %{workspace_root}/genesis_ledgers/mainnet.json)
+ (action
+  (copy %{deps} %{targets})))

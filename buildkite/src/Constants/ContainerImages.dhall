@@ -1,18 +1,64 @@
 -- TODO: Automatically push, tag, and update images #4862
--- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
+-- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBookworm
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
-{ toolchainBase = "codaprotocol/ci-toolchain-base:v3"
+-- NOTE: minaReleaseToolkit bundles the deb-toolkit binary and is published by
+--       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
+--       (not a moving tag like :latest) for reproducible CI; bump it
+--       deliberately when a newer toolkit is wanted.
+-- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
+--       built from THIS branch: develop's pins carry v0.14 and will not build
+--       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
+--       it produced (all five images land on one sha). Do not reach for an
+--       older toolchain sha instead: 3-toolchain curls mina-bench-upload by
+--       version string with no checksum, so an image's behaviour depends on the
+--       date it was built, and rebuilding is the only fix.
+-- NOTE: mina-toolchain and mina-base are published by DIFFERENT pipelines and
+--       their hashes move independently. mina-toolchain comes from
+--       mina-toolchains-build; mina-base from mina-docker-base-build
+--       (!ci-docker-base-me). Bumping one is never a reason to bump the other.
+-- NOTE: minaBase is the default base image, set to minaBaseBookworm.
+-- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
+--       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
+--       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
+--       builds load them from the CI cache and build FROM them instead of re-running the
+--       base-deps stage. Re-publish with !ci-docker-base-me (pipeline
+--       mina-docker-base-build), then bump the short hash here to the one it produced.
+--       A stale or unpublished hash is not fatal -- scripts/docker/build.sh falls back to
+--       inlining the base-deps fragment when the image is not available locally -- so the
+--       only cost of forgetting the bump is losing the reuse.
+-- NOTE: postgres is the server every archive job runs against, via RunWithPostgres
+-- NOTE: postgres 17 matches the version the published archive dumps are produced by,
+--       so a production dump restores into CI, and it carries
+--       pg_backend_memory_contexts (PostgreSQL 14+) which the memory benchmarks read
+-- NOTE: postgres comes from Docker Hub because euro-docker-repo has no 14+ tag;
+--       mirror one and repoint the constant if Docker Hub pull limits start to bite
+{ toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:809e6b4af19a962a6a158b835007e24c45118d0d3da59a8b8013094c774f8279"
-, minaToolchainBullseye =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:7a9cd3e3eeb30ef2a7cad1737bcf7382c425275dc7664c86c9714ab4fe7bd091"
-, minaToolchainNoble =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:56455a3fa1a3b575b511e89aba88f7f8374ecc7b20ca04f26e035b17b63356e9"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
+    , arm64 =
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
+    }
+, minaToolchainBullseye.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:e1cea26-bullseye-devnet"
+, minaToolchainNoble.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:e1cea26-noble-devnet"
+, minaToolchainJammy.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:e1cea26-jammy-devnet"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:7a9cd3e3eeb30ef2a7cad1737bcf7382c425275dc7664c86c9714ab4fe7bd091"
-, postgres = "postgres:12.4-alpine"
-, xrefcheck =
-    "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
+    "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
+, minaBaseBookworm =
+    { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
+    , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
+    }
+, minaBaseBullseye.amd64 =
+    "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
+, minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-focal-devnet"
+, minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
+, minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
+, minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
+, postgres = "docker.io/library/postgres:17-alpine"
+, xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }

@@ -1,0 +1,344 @@
+// Workflow used to create new accounts
+create_account(1){
+  create{
+    key = generate_key({"curve_type": "pallas"});
+    account = derive({
+      "network_identifier": {{network}},
+      "public_key": {{key.public_key}}
+    });
+
+    // If the account is not saved, the key will be lost!
+    save_account({
+      "account_identifier": {{account.account_identifier}},
+      "keypair": {{key}}
+    });
+  }
+}
+
+// Workflow used to generate payment transactions
+payment(10){
+  payment_dry_run{
+    payment_dry_run.network = {{network}};
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    max_fee = "40000000000"; // no less than 10 MINA + 1 MINA (account creation fee)
+    max_recipient_value = "10000000000"; // 10 MINA
+    min_required_value = {{max_recipient_value}} + {{max_fee}};
+    
+    sender = find_balance({
+      "minimum_balance":{
+        "value": {{min_required_value}},
+        "currency": {{currency}}
+      }
+    });
+
+    recipient_amount = random_number({"minimum": "1", "maximum": {{max_recipient_value}}});
+    print_message({"recipient_amount":{{recipient_amount}}});
+
+    recipient = find_balance({
+      "not_account_identifier":[{{sender.account_identifier}}],
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+
+    sender_amount = 0 - {{recipient_amount}};
+    sender_fee = 0 - {{max_fee}};    
+
+    // The valid_until field must be provided explicitely until the
+    // default value is fixed
+    // See https://github.com/coinbase/rosetta-sdk-go/pull/457
+    payment_dry_run.preprocess_metadata={"valid_until": "4294967295"};
+    payment_dry_run.confirmation_depth = "1";
+    payment_dry_run.dry_run = true;
+    payment_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+
+    print_message("done payment dry run");
+  },
+  payment{
+    // Use fixed competitive fee instead of unreliable suggested_fee
+    // 10 MINA = 10000000000 nanomina
+    fixed_fee = "10000000000";
+    print_message({"using_fixed_fee":{{fixed_fee}}});
+
+    sender_fee = 0 - {{fixed_fee}};
+
+    payment.preprocess_metadata={"valid_until": "4294967295"};
+    payment.network = {{payment_dry_run.network}};
+    payment.confirmation_depth = {{payment_dry_run.confirmation_depth}};
+    payment.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  }
+}
+
+// Workflow used to generate delegation transactions
+delegation(10){
+  delegation_dry_run{
+    delegation_dry_run.network = {{network}};
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    max_fee = "20000000000";
+
+    sender = find_balance({
+      "minimum_balance":{
+        "value": {{max_fee}},
+        "currency": {{currency}}
+      }
+    });
+
+    recipient = find_balance({
+      "not_account_identifier":[
+        {{sender.account_identifier}}
+      ],
+      "minimum_balance":{
+        "value": "1",
+        "currency": {{currency}}
+      }
+    });
+
+    sender_fee = 0 - {{max_fee}};
+
+    delegation_dry_run.preprocess_metadata={"valid_until": "4294967295"};
+    delegation_dry_run.confirmation_depth = "1";
+    delegation_dry_run.dry_run = true;
+    delegation_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"delegate_change",
+        "account":{{sender.account_identifier}},
+        "metadata": {
+            "delegate_change_target": {{recipient.account_identifier.address}}
+        }
+      }
+    ];
+
+    print_message("done delegation dry run");
+  },
+  delegation{
+    // Use fixed competitive fee instead of unreliable suggested_fee
+    // 20 MINA = 20000000000 nanomina (same as max_fee in dry run)
+    fixed_fee = "20000000000";
+    print_message({"using_fixed_fee":{{fixed_fee}}});
+
+    sender_fee = 0 - {{fixed_fee}};
+
+    delegation.preprocess_metadata={"valid_until": "4294967295"};
+    delegation.network = {{delegation_dry_run.network}};
+    delegation.confirmation_depth = {{delegation_dry_run.confirmation_depth}};
+    delegation.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"delegate_change",
+        "account":{{sender.account_identifier}},
+        "metadata": {
+            "delegate_change_target": {{recipient.account_identifier.address}}
+        }
+      }
+    ];
+  }
+}
+
+// Workflow used to create new accounts
+return_funds(10){
+  payment_dry_run{
+    payment_dry_run.network = {{network}};
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    max_fee = "2000000000";
+    min_value = {{max_fee}} + 2;
+
+    recipient_account_identifier = {
+      "address": PLACEHOLDER_PREFUNDED_ADDRESS,
+      "metadata": {
+        "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+      }
+    };
+    
+    sender = find_balance({
+      "not_account_identifier":[{{recipient_account_identifier}}],
+      "minimum_balance":{
+        "value": {{min_value}},
+        "currency": {{currency}}
+      }
+    });
+
+    // We send the maximum amount available to the recipient. Don't worry
+    // we will modify this after the dry run to make sure we don't overpay.
+    recipient_amount = {{sender.balance.value}} - {{max_fee}};
+    print_message({
+      "recipient_amount":{{recipient_amount}}
+    });
+
+    sender_amount = 0 - {{recipient_amount}};
+    sender_fee = 0 - {{max_fee}};
+
+    payment_dry_run.preprocess_metadata={"valid_until": "4294967295"};
+    payment_dry_run.confirmation_depth = "1";
+    payment_dry_run.dry_run = true;
+    payment_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient_account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  },
+  payment{
+    // Use fixed competitive fee instead of unreliable suggested_fee
+    // 2 MINA = 2000000000 nanomina (same as max_fee in dry run)
+    fixed_fee = "2000000000";
+    print_message({"using_fixed_fee":{{fixed_fee}}});
+
+    sender_fee = 0 - {{fixed_fee}};
+    recipient_amount = {{sender.balance.value}} - {{fixed_fee}};
+    assert({{recipient_amount}});
+    sender_amount = 0 - {{recipient_amount}};
+
+    payment.preprocess_metadata={"valid_until": "4294967295"};
+    payment.network = {{payment_dry_run.network}};
+    payment.confirmation_depth = {{payment_dry_run.confirmation_depth}};
+    payment.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient_account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  }
+}

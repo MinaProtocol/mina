@@ -1,0 +1,18 @@
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Network = ../../Constants/Network.dhall
+
+let ChainIdTest = ../../Command/ChainIdTest.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
+
+let scopes = [ PipelineScope.Type.PullRequest ]
+
+let network = Network.Type.Devnet
+
+let deps = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
+
+let expectedChainId =
+      "8c6312664c60ecc4c0c695e69f6301692c0b20f354b55e08e69a289f3d373e50"
+
+in  ChainIdTest.makeTest "ChainIdTestDevnet" scopes deps network expectedChainId

@@ -1,0 +1,31 @@
+(tests
+ (names
+   abstract_test
+   argument_test
+   custom_error_test
+   directives_test
+   error_test
+   introspection_test
+   schema_test
+   variable_test)
+ (modules
+   abstract_test
+   argument_test
+   custom_error_test
+   directives_test
+   error_test
+   introspection_test
+   schema_test
+   variable_test)
+ (libraries
+   alcotest
+   core
+   graphql
+   graphql_parser
+   graphql_wrapper
+   ocaml_graphql_server_tests
+   yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

@@ -1,6 +1,6 @@
 let LedgerApply = ../../Command/Bench/LedgerApply.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
@@ -10,6 +10,6 @@ in  Pipeline.build
           , name = "LedgerApplyStable"
           , label = "Ledger Apply"
           , key = "ledger-apply"
-          , mode = PipelineMode.Type.Stable
+          , scope = PipelineScope.AllButPullRequest
           }
       )

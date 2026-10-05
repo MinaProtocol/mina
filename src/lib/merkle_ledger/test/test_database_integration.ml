@@ -15,19 +15,19 @@ module Depth = struct
   let depth = 4
 end
 
-module Location = Merkle_ledger.Location.T
+module Location = Merkle_ledger.Location
 
 module Location_binable = struct
   module Arg = struct
     type t = Location.t =
-      | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+      | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
       | Account of Location.Addr.Stable.Latest.t
       | Hash of Location.Addr.Stable.Latest.t
     [@@deriving bin_io_unversioned, hash, sexp, compare]
   end
 
   type t = Arg.t =
-    | Generic of Merkle_ledger.Location.Bigstring.t
+    | Generic of Mina_stdlib.Bigstring.t
     | Account of Location.Addr.t
     | Hash of Location.Addr.t
   [@@deriving hash, sexp, compare]
@@ -40,7 +40,6 @@ module Inputs = struct
   module Location = Location
   module Location_binable = Location_binable
   module Kvdb = In_memory_kvdb
-  module Storage_locations = Storage_locations
 end
 
 module DB = Database.Make (Inputs)

@@ -44,7 +44,8 @@
   logger
   mina_base.import
   staged_ledger_diff
-  mina_stdlib_unix)
+  mina_stdlib_unix
+  cli_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

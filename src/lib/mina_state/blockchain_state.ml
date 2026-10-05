@@ -201,8 +201,11 @@ let display
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
   ; ledger_proof_statement = Snarked_ledger_state.display ledger_proof_statement
   ; timestamp =
-      Time.to_string_trimmed ~zone:Time.Zone.utc
-        (Block_time.to_time_exn timestamp)
+      ( match Block_time.to_time_exn timestamp with
+      | t ->
+          Time.to_string_trimmed ~zone:Time.Zone.utc t
+      | exception _ ->
+          Block_time.to_string_exn timestamp )
   ; body_reference =
       Visualization.display_prefix_of_string
       @@ Consensus.Body_reference.to_hex body_reference

@@ -1,5 +1,5 @@
 (tests
- (names test_consensus_vrf)
+ (names test_consensus_vrf test_encoding_regression)
  (libraries alcotest consensus_vrf core_kernel signature_lib snark_params)
  (instrumentation
   (backend bisect_ppx))

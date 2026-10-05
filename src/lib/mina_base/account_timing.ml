@@ -307,3 +307,216 @@ let if_ b ~(then_ : var) ~(else_ : var) =
 let deriver obj =
   let open Fields_derivers_zkapps in
   iso_record ~to_record ~of_record As_record.deriver obj
+
+(** A module defining the vesting parameter update procedure from the slot
+    reduction MIP. See
+    https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0006-slot-reduction-90s.md.
+    To summarize, this vesting parameter update is intended to be applied as an
+    edit to the ledgers during a hard fork that reduces the slot time by half.
+    The update only applies to accounts that are actively vesting at the time of
+    the hard fork; these are accounts that either have not reached their cliff
+    time yet, or have reached their cliff time but still have a positive minimum
+    balance. The update procedure does the best it can to adjust the account
+    timing information so that actively vesting accounts will still unlock funds
+    at the same system times as they would have had the hard fork not occurred.
+    It will do this perfectly for any account with a "reasonable" vesting
+    schedule, i.e., one that will finish before half the remaining life of the
+    chain (at the time of the hard fork) has elapsed.
+
+    An important note on the parameters: the slot at which the hard fork occurs
+    is called [hardfork_slot] below. This slot is the global slot since genesis
+    that is set in the genesis constants of the new (post hard fork) chain. It
+    is not the global slot of the hard fork block, nor the [slot_tx_end], nor
+    the [slot_chain_end]. The update procedure also assumes that the genesis
+    timestamp of the new chain is set to be equal to the timestamp of the
+    [hardfork_slot] {i relative to the old (pre hard fork) chain}. This
+    simplifies the equations.
+*)
+module Slot_reduction_update = struct
+  open Unsigned
+
+  (** A form of [As_record.t] where all the fields are lifted to
+      the same [UInt64.t] type, so the arithmetic in the vesting update
+      equations becomes simpler. *)
+  type t =
+    ( unit
+    , Unsigned_extended.UInt64.t
+    , Unsigned_extended.UInt64.t
+    , Unsigned_extended.UInt64.t
+    , Unsigned_extended.UInt64.t )
+    As_record.t
+  [@@deriving equal, sexp_of]
+
+  let clamp_uint64_to_uint32 x =
+    UInt64.(
+      if compare x (of_uint32 UInt32.max_int) <= 0 then to_uint32 x
+      else UInt32.max_int)
+
+  let of_record (t : as_record) : t =
+    { is_timed = ()
+    ; initial_minimum_balance = t.initial_minimum_balance |> Balance.to_uint64
+    ; cliff_time =
+        t.cliff_time |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
+    ; cliff_amount = t.cliff_amount |> Amount.to_uint64
+    ; vesting_period =
+        t.vesting_period |> Global_slot_span.to_uint32 |> UInt64.of_uint32
+    ; vesting_increment = t.vesting_increment |> Amount.to_uint64
+    }
+
+  (** Convert to a regular [as_record] by clamping all the values
+      that might be out of range, as specified in the MIP *)
+  let to_record (t : t) : as_record =
+    { is_timed = true
+    ; initial_minimum_balance = t.initial_minimum_balance |> Balance.of_uint64
+    ; cliff_time =
+        t.cliff_time |> clamp_uint64_to_uint32
+        |> Global_slot_since_genesis.of_uint32
+    ; cliff_amount = t.cliff_amount |> Amount.of_uint64
+    ; vesting_period =
+        t.vesting_period |> clamp_uint64_to_uint32 |> Global_slot_span.of_uint32
+    ; vesting_increment = t.vesting_increment |> Amount.of_uint64
+    }
+
+  (** Calculate the total number of iterations needed for this account to vest
+      completely, beyond the initial cliff unlock. This is [None] (undefined) if
+      the vesting increment is zero and the cliff amount is smaller than the
+      initial minimum balance. *)
+  let vesting_iterations (t : t) : UInt64.t option =
+    UInt64.(
+      if compare t.initial_minimum_balance t.cliff_amount <= 0 then
+        (* Account will complete vesting instantly at the cliff *)
+        Some zero
+      else if equal t.vesting_increment zero then
+        (* Number of iterations is undefined - account is permanently stuck with
+           a minimum balance *)
+        None
+      else
+        let balance_to_unlock =
+          Infix.(t.initial_minimum_balance - t.cliff_amount)
+        in
+        let full_increment_iterations =
+          Infix.(balance_to_unlock / t.vesting_increment)
+        in
+        if equal Infix.(balance_to_unlock mod t.vesting_increment) zero then
+          (* The account unlocks an equal amount of funds during each iteration *)
+          Some full_increment_iterations
+        else
+          (* The account needs one more iteration to unlock the last little bit
+             of funds. Note: if this happens, then full_increment_iterations
+             will necessarily be well below UInt64.max_int, because division by
+             t.vesting_increment will have decreased balance_to_unlock by a
+             factor of at least two. *)
+          Some Infix.(full_increment_iterations + one))
+
+  (** True if an account has started vesting but the slot at which it completes
+     vesting is still in the future *)
+  let is_partially_vested ~global_slot (t : t) =
+    let global_slot =
+      global_slot |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
+    in
+    match vesting_iterations t with
+    | None ->
+        false
+    | Some iterations ->
+        UInt64.(
+          compare global_slot t.cliff_time >= 0
+          && compare iterations
+               Infix.((global_slot - t.cliff_time) / t.vesting_period)
+             > 0)
+
+  (** True if an account has not started vesting *)
+  let not_yet_vesting ~global_slot (t : t) =
+    let global_slot =
+      global_slot |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
+    in
+    UInt64.compare global_slot t.cliff_time < 0
+
+  (** True if an account is actively vesting, as defined by the slot reduction
+      MIP. Note that this is (almost) equivalent to the minimum balance of the
+      account being positive at [global_slot].
+
+      One subtlety: this is not equivalent to the statement "the account
+      unlocked funds at [global_slot]". Once an account has a minimum balance of
+      zero, it is no longer considered to be participating in the vesting
+      system. In particular, at the [final_vesting_slot] of the timing the
+      account will have unlocked funds, and yet it will not be actively vesting
+      at that slot. (Unlocking funds happens between slots, so to speak).
+
+      Second subtlety: this isn't exactly equivalent to the minimum balance of
+      an account being positive. If an account has zero [vesting_increment] and
+      didn't vest completely at [cliff_time], then it will be stuck with a
+      permanent positive minimum balance. Such accounts are not actively
+      vesting. See [vesting_iterations]. *)
+  let is_actively_vesting ~global_slot (t : t) =
+    not_yet_vesting ~global_slot t || is_partially_vested ~global_slot t
+
+  (** Hardfork adjustment assuming that t is actively vesting *)
+  let actively_vesting_hardfork_adjustment ~hardfork_slot (t : t) =
+    let hardfork_slot =
+      hardfork_slot |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
+    in
+    UInt64.(
+      if compare hardfork_slot t.cliff_time < 0 then
+        (* t has not started vesting *)
+        { t with
+          cliff_time =
+            (* global_slot and cliff_time are in the uint32 range, so this will
+               not wrap *)
+            Infix.(hardfork_slot + ((t.cliff_time - hardfork_slot) * of_int 2))
+        ; vesting_period =
+            (* vesting period is in the uint32 range, so this will not wrap *)
+            Infix.(of_int 2 * t.vesting_period)
+        }
+      else
+        (* t is partially but not fully vested *)
+        { t with
+          initial_minimum_balance =
+            (let balance_after_cliff =
+               assert (compare t.initial_minimum_balance t.cliff_amount > 0) ;
+               Infix.(t.initial_minimum_balance - t.cliff_amount)
+             in
+             let elapsed_vesting_periods =
+               assert (compare t.vesting_period zero > 0) ;
+               Infix.((hardfork_slot - t.cliff_time) / t.vesting_period)
+             in
+             let incremental_unlocked_balance =
+               assert (
+                 equal elapsed_vesting_periods zero
+                 || compare t.vesting_increment
+                      (div max_int elapsed_vesting_periods)
+                    <= 0 ) ;
+               Infix.(t.vesting_increment * elapsed_vesting_periods)
+             in
+             assert (
+               compare balance_after_cliff incremental_unlocked_balance >= 0 ) ;
+             Infix.(balance_after_cliff - incremental_unlocked_balance) )
+        ; cliff_time =
+            (* All the times and spans are in the uint32 range, so none of this
+               will overflow *)
+            Infix.(
+              hardfork_slot
+              + of_int 2
+                * ( t.vesting_period
+                  - ((hardfork_slot - t.cliff_time) mod t.vesting_period) ))
+        ; cliff_amount = t.vesting_increment
+        ; vesting_period =
+            (* vesting_period is in the uint32 range, so this will not wrap *)
+            Infix.(of_int 2 * t.vesting_period)
+        })
+
+  (** Apply the hardfork adjustment to the given timing, doing nothing if it is
+      not actively vesting *)
+  let hardfork_adjustment ~hardfork_slot (t : t) =
+    if is_actively_vesting ~global_slot:hardfork_slot t then
+      actively_vesting_hardfork_adjustment ~hardfork_slot t
+    else t
+end
+
+(** Apply the slot reduction update to the [as_record] timing. This does nothing
+    if the account is not actively vesting at [hardfork_slot]. See the
+    [Slot_reduction_update] module documentation for general usage notes. *)
+let slot_reduction_update ~hardfork_slot (t : as_record) =
+  if t.is_timed then
+    Slot_reduction_update.(
+      t |> of_record |> hardfork_adjustment ~hardfork_slot |> to_record)
+  else t

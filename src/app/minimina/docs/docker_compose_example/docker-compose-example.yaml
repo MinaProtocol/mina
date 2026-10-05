@@ -1,0 +1,159 @@
+version: '3.8'
+
+x-defaults: &default-attributes
+  volumes:
+    - ~/.minimina/default:/local-network
+    - config-directory:/config-directory
+  environment:
+    MINA_PRIVKEY_PASS: 'naughty blue worm'
+    MINA_LIBP2P_PASS: 'naughty blue worm'
+
+volumes:
+  config-directory:
+  postgres-data:
+  archive-data:
+  
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - 6451:5432
+
+  mina-archive:
+    image: gcr.io/o1labs-192920/mina-archive:2.0.0rampup3-bfd1009-buster
+    container_name: mina-archive
+    command: >
+      mina-archive run 
+      --postgres-uri postgres://postgres:postgres@postgres:5432/archive 
+      --server-port 3086
+    volumes:
+      - archive-data:/data
+    ports:
+      - '3086:3086'
+    depends_on:
+      - postgres
+
+  mina-seed-1:
+    <<: *default-attributes
+    network_mode: "host"
+    entrypoint: ["mina"]
+    container_name: mina-seed-1
+    image: gcr.io/o1labs-192920/mina-daemon:2.0.0rampup3-bfd1009-buster-berkeley
+    command: >
+      daemon
+      -client-port 3100
+      -rest-port 3101
+      -insecure-rest-server
+      -external-port 3102
+      -metrics-port 3103
+      -libp2p-metrics-port 3104
+      -config-file /local-network/genesis_ledger.json
+      -log-json
+      -log-level Trace
+      -file-log-level Trace
+      -seed
+      -libp2p-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
+      -config-directory /config-directory/mina-seed-1 
+      -archive-address 3086
+
+  mina-bp-1:
+    <<: *default-attributes
+    network_mode: "host"
+    entrypoint: ["mina"]
+    container_name: mina-bp-1
+    image: gcr.io/o1labs-192920/mina-daemon:2.0.0rampup3-bfd1009-buster-berkeley
+    command: >
+      daemon
+      -client-port 4000
+      -rest-port 4001
+      -insecure-rest-server
+      -external-port 4002
+      -metrics-port 4003
+      -libp2p-metrics-port 4004
+      -config-file /local-network/genesis_ledger.json
+      -log-json
+      -log-level Trace
+      -file-log-level Trace
+      -peer /ip4/127.0.0.1/tcp/3102/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
+      -block-producer-key /local-network/block_producer_keys/mina-bp-1
+      -libp2p-keypair /local-network/libp2p_keys/mina-bp-1
+      -config-directory /config-directory/mina-bp-1 
+      -archive-address 3086
+    depends_on:
+      - mina-seed-1
+
+  mina-bp-2:
+    <<: *default-attributes
+    network_mode: "host"
+    entrypoint: ["mina"]
+    container_name: mina-bp-2
+    image: gcr.io/o1labs-192920/mina-daemon:2.0.0rampup3-bfd1009-buster-berkeley
+    command: >
+      daemon
+      -client-port 4005
+      -rest-port 4006
+      -insecure-rest-server
+      -external-port 4007
+      -metrics-port 4008
+      -libp2p-metrics-port 4009
+      -config-file /local-network/genesis_ledger.json
+      -log-json
+      -log-level Trace
+      -file-log-level Trace
+      -peer /ip4/127.0.0.1/tcp/3102/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
+      -block-producer-key /local-network/block_producer_keys/mina-bp-2
+      -libp2p-keypair /local-network/libp2p_keys/mina-bp-2
+      -config-directory /config-directory/mina-bp-2
+      -archive-address 3086
+    depends_on:
+      - mina-seed-1
+
+  mina-snark-coordinator:
+    <<: *default-attributes
+    network_mode: "host"
+    entrypoint: ["mina"]
+    container_name: mina-snark-coordinator
+    image: gcr.io/o1labs-192920/mina-daemon:2.0.0rampup3-bfd1009-buster-berkeley
+    command: >
+      daemon
+      -client-port 7000
+      -rest-port 7001
+      -insecure-rest-server
+      -external-port 7002
+      -metrics-port 7003
+      -libp2p-metrics-port 7004
+      -config-file /local-network/genesis_ledger.json
+      -log-json
+      -log-level Trace
+      -file-log-level Trace
+      -peer /ip4/127.0.0.1/tcp/3102/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
+      -libp2p-keypair CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk+nO9hW3wne6Ky2Om+fetaH3917/iEHnt+UQzH4A=,CAESIAvm5PpzvYVt8J3uistjpvn3rWh9/de/4hB57flEMx+A,12D3KooWAcprha9pvfdwz52F4RuBYjr2HenzLRNt4W9zWXugN1Z9
+      -snark-worker-fee 0.001
+      -run-snark-coordinator B62qr7sNVUKoK4wSTvZCYTUdeM2RgbNDbFYk5EVv3sFmdeYqPyT4skQ
+      -work-selection seq
+      -config-directory /config-directory/mina-snark-coordinator
+      -archive-address 3086
+    depends_on:
+      - mina-seed-1
+
+  mina-snark-worker-1:
+    <<: *default-attributes
+    network_mode: "host"
+    entrypoint: ["mina"]
+    container_name: mina-snark-worker-1
+    image: gcr.io/o1labs-192920/mina-daemon:2.0.0rampup3-bfd1009-buster-berkeley
+    command: >
+      internal snark-worker
+      -proof-level none
+      -shutdown-on-disconnect false
+      -daemon-address localhost:7000
+      -config-directory /config-directory/snark_workers/mina-snark-worker-1
+    depends_on:
+      - mina-snark-coordinator
+
+

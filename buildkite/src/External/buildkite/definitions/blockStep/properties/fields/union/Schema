@@ -1,0 +1,17 @@
+{ Type = { default : Optional (./properties/default/Type0 ) 
+, hint : Optional (./properties/hint/Type0 ) 
+, key : Optional (./properties/key/Type0 ) 
+, multiple : Optional (./properties/multiple/Type ) 
+, options : Optional (./properties/options/Type0 ) 
+, required : Optional (./properties/required/Type0 ) 
+, select : Optional (./properties/select/Type ) 
+} 
+, default = { default = None ((./properties/default/Type0 )) 
+, hint = None ((./properties/hint/Type0 )) 
+, key = None ((./properties/key/Type0 )) 
+, multiple = None ((./properties/multiple/Type )) 
+, options = None ((./properties/options/Type0 )) 
+, required = None ((./properties/required/Type0 )) 
+, select = None ((./properties/select/Type )) 
+} 
+}

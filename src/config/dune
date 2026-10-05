@@ -1,7 +1,0 @@
-(rule
- (targets config.mlh)
- (mode fallback)
- (deps
-  (source_tree .))
- (action
-  (copy %{profile}.mlh config.mlh)))

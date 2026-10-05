@@ -603,9 +603,16 @@ let%test_module "random set test" =
 
     let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
-    let apply_diff resource_pool work
-        ?(proof = One_or_two.map ~f:mk_dummy_proof)
-        ?(sender = Envelope.Sender.Local) fee =
+    let apply_diff resource_pool work ?proof ?(sender = Envelope.Sender.Local)
+        (fee : Fee_with_prover.t) =
+      let proof =
+        match proof with
+        | Some f ->
+            f
+        | None ->
+            One_or_two.map ~f:(fun statement ->
+                mk_dummy_proof ~statement ~fee:fee.fee ~prover:fee.prover )
+      in
       let diff =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, { Priced_proof.Stable.Latest.proof = proof work; fee })
@@ -791,17 +798,21 @@ let%test_module "random set test" =
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
               ~block_window_duration
           in
+          let fee =
+            { Fee_with_prover.fee = Currency.Fee.zero
+            ; prover = Signature_lib.Public_key.Compressed.empty
+            }
+          in
           let priced_proof =
             { Priced_proof.proof =
                 `One
                   (Ledger_proof.For_tests.Cached.mk_dummy_proof
-                     (Quickcheck.random_value
-                        ~seed:(`Deterministic "test proof")
-                        Transaction_snark.Statement.gen ) )
-            ; fee =
-                { fee = Currency.Fee.zero
-                ; prover = Signature_lib.Public_key.Compressed.empty
-                }
+                     ~statement:
+                       (Quickcheck.random_value
+                          ~seed:(`Deterministic "test proof")
+                          Transaction_snark.Statement.gen )
+                     ~fee:fee.fee ~prover:fee.prover )
+            ; fee
             }
           in
           let command =
@@ -844,15 +855,22 @@ let%test_module "random set test" =
             |> Sequence.to_list
           in
           let per_reader = work_count / 2 in
+          let fee_ : Fee_with_prover.t =
+            { Fee_with_prover.fee = Currency.Fee.zero
+            ; prover = Signature_lib.Public_key.Compressed.empty
+            }
+          in
           let create_work work =
             Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               ( work
               , Priced_proof.
-                  { proof = One_or_two.map ~f:mk_dummy_proof work
-                  ; fee =
-                      { fee = Currency.Fee.zero
-                      ; prover = Signature_lib.Public_key.Compressed.empty
-                      }
+                  { proof =
+                      One_or_two.map
+                        ~f:(fun statement ->
+                          mk_dummy_proof ~statement ~fee:fee_.fee
+                            ~prover:fee_.prover )
+                        work
+                  ; fee = fee_
                   } )
           in
           let verify_unsolved_work () =
@@ -987,7 +1005,12 @@ let%test_module "random set test" =
           in
           check_work ~got:rebroadcastable1 ~expected:[] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
-          let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
+          let proof2 =
+            One_or_two.map
+              ~f:(fun statement ->
+                mk_dummy_proof ~statement ~fee:fee2.fee ~prover:fee2.prover )
+              stmt2
+          in
           ignore
             ( ok_exn res2
               : [ `Accept | `Reject ]
@@ -1001,7 +1024,12 @@ let%test_module "random set test" =
             ~expected:
               [ Add_solved_work (stmt2, { proof = proof2; fee = fee2 }) ] ;
           let%bind res3 = apply_diff resource_pool stmt3 fee3 in
-          let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
+          let proof3 =
+            One_or_two.map
+              ~f:(fun statement ->
+                mk_dummy_proof ~statement ~fee:fee3.fee ~prover:fee3.prover )
+              stmt3
+          in
           ignore
             ( ok_exn res3
               : [ `Accept | `Reject ]
@@ -1029,7 +1057,12 @@ let%test_module "random set test" =
               ; Add_solved_work (stmt3, { proof = proof3; fee = fee3 })
               ] ;
           let%bind res6 = apply_diff resource_pool stmt4 fee4 in
-          let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
+          let proof4 =
+            One_or_two.map
+              ~f:(fun statement ->
+                mk_dummy_proof ~statement ~fee:fee4.fee ~prover:fee4.prover )
+              stmt4
+          in
           ignore
             ( ok_exn res6
               : [ `Accept | `Reject ]

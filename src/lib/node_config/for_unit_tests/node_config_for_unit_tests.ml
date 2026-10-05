@@ -24,12 +24,7 @@ let (sub_windows_per_window : int) = (3 : int)
 
 let (grace_period_slots : int) = (180 : int)
 
-let (scan_state_with_tps_goal : bool) = (false : bool)
-
 let (scan_state_transaction_capacity_log_2 : int) = (3 : int)
-
-let scan_state_transaction_capacity_log_2 =
-  Some scan_state_transaction_capacity_log_2
 
 let (scan_state_work_delay : int) = (2 : int)
 
@@ -57,11 +52,11 @@ let compaction_interval = None
 
 let (network : string) = ("testnet" : string)
 
+let (profile : string) = ("dev" : string)
+
 let (vrf_poll_interval : int) = (0 : int)
 
 let zkapp_cmd_limit = None
-
-let scan_state_tps_goal_x10 : int option = None
 
 let sync_ledger_max_subtree_depth = 4
 

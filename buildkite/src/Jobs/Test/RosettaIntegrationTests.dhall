@@ -12,26 +12,44 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
-let network = Network.Type.Berkeley
+let network = Network.Type.Devnet
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
+      , S.exactly "buildkite/scripts/debian/install" "sh"
+      , S.exactly "buildkite/scripts/debian/restore-or-install" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/apps")
+      , S.strictlyStart (S.contains "scripts/debian")
       ]
 
-let rosettaDocker =
-      Artifacts.fullDockerTag
-        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+let bareBinaries =
+          "mina.exe:mina"
+      ++  ",archive.exe:mina-archive"
+      ++  ",rosetta.exe:mina-rosetta"
+      ++  ",signer.exe:mina-ocaml-signer"
+      ++  ",zkapp_test_transaction.exe:mina-zkapp-test-transaction"
+      ++  ",indexer_test.exe:mina-rosetta-indexer-test"
+      ++  ",rosetta_healthcheck.exe:rosetta-healthcheck"
+      ++  ",libp2p_helper:libp2p_helper"
+
+let envExports =
+      [ "MINA_NETWORK_DEB=${Network.lowerName network}"
+      , "MINA_DEB_CODENAME=bookworm"
+      , "MINA_PROFILE=${Network.lowerName network}"
+      , "APPS_BARE_BINARIES=${bareBinaries}"
+      ]
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -43,32 +61,32 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Rosetta
           ]
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
-                  "./src/test/archive/sample_db/archive_db.sql"
-                  rosettaDocker
-                  "./buildkite/scripts/rosetta-indexer-test.sh"
-              , Cmd.runInDocker
-                  Cmd.Docker::{ image = rosettaDocker }
-                  "buildkite/scripts/rosetta-integration-tests-fast.sh"
-              ]
-            , label = "Rosetta integration tests Bullseye"
-            , key = "rosetta-integration-tests-bullseye"
+                  [ Cmd.run
+                      "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                  ]
+                # RunInToolchain.runInToolchain
+                    RunInToolchain.Config::{
+                    , image = ContainerImages.minaToolchainBookworm.amd64
+                    , environment = envExports
+                    , innerScript =
+                        "buildkite/scripts/tests/rosetta/integration-tests.sh"
+                    }
+            , label = "Rosetta integration tests Bookworm"
+            , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
+            , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
-                Dockers.dependsOn
-                  Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.Rosetta
+                DebianVersions.appDependsOn
+                  DebianVersions.DepsSpec::{
                   , network = network
+                  , profile = Profiles.Type.Devnet
                   }
             }
         ]

@@ -1,0 +1,11 @@
+{ Type = { hint : Optional (./properties/hint/Type ) 
+, label : Optional (./properties/label/Type ) 
+, required : Optional (./properties/required/Type ) 
+, value : Optional (./properties/value/Type ) 
+} 
+, default = { hint = None ((./properties/hint/Type )) 
+, label = None ((./properties/label/Type )) 
+, required = None ((./properties/required/Type )) 
+, value = None ((./properties/value/Type )) 
+} 
+}

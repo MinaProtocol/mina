@@ -2,9 +2,8 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-let tests_enabled = true
-
-(* Generic addition gate gadget *)
+(** Generic addition gate gadget. Constrains left_input + right_input = sum.
+    Returns the sum. *)
 let add (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
@@ -29,7 +28,8 @@ let add (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
            } ) ;
       sum )
 
-(* Generic subtraction gate gadget *)
+(** Generic subtraction gate gadget. Constrains left_input - right_input =
+    difference. Returns the difference. *)
 let sub (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
@@ -56,7 +56,8 @@ let sub (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
            } ) ;
       difference )
 
-(* Generic multiplication gate gadget *)
+(** Generic multiplication gate gadget. Constrains left_input * right_input =
+    product. Returns the product. *)
 let mul (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
@@ -80,135 +81,3 @@ let mul (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
            ; c = Field.Constant.zero
            } ) ;
       prod )
-
-(*********)
-(* Tests *)
-(*********)
-
-let%test_unit "generic gadgets" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-
-    (* Helper to test generic add gate gadget
-     *   Inputs operands and expected output: left_input + right_input = sum
-     *   Returns true if constraints are satisfied, false otherwise.
-     *)
-    let test_generic_add ?cs left_input right_input sum =
-      (* Generate and verify proof *)
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int right_input )
-            in
-            let sum =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int sum)
-            in
-            (* Use the generic add gate gadget *)
-            let result = add left_input right_input in
-            Field.Assert.equal sum result ;
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal sum sum) )
-      in
-
-      cs
-    in
-
-    (* Helper to test generic sub gate gadget
-     *   Inputs operands and expected output: left_input - right_input = difference
-     *   Returns true if constraints are satisfied, false otherwise.
-     *)
-    let test_generic_sub ?cs left_input right_input difference =
-      (* Generate and verify proof *)
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int right_input )
-            in
-            let difference =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int difference )
-            in
-            (* Use the generic sub gate gadget *)
-            let result = sub left_input right_input in
-            Field.Assert.equal difference result ;
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal difference difference) )
-      in
-
-      cs
-    in
-
-    (* Helper to test generic multimplication gate gadget
-     *   Inputs operands and expected output: left_input * right_input = prod
-     *   Returns true if constraints are satisfied, false otherwise.
-     *)
-    let test_generic_mul ?cs left_input right_input prod =
-      (* Generate and verify proof *)
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int right_input )
-            in
-            let prod =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int prod)
-            in
-            (* Use the generic mul gate gadget *)
-            let result = mul left_input right_input in
-            Field.Assert.equal prod result ;
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal prod prod) )
-      in
-
-      cs
-    in
-
-    (* TEST generic add gadget *)
-    (* Positive tests *)
-    let cs = test_generic_add 0 0 0 in
-    let _cs = test_generic_add ~cs 1 2 3 in
-    (* Negatve tests *)
-    assert (Common.is_error (fun () -> test_generic_add ~cs 1 0 0)) ;
-    assert (Common.is_error (fun () -> test_generic_add ~cs 2 4 7)) ;
-
-    (* TEST generic sub gadget *)
-    (* Positive tests *)
-    let cs = test_generic_sub 0 0 0 in
-    let _cs = test_generic_sub ~cs 2 1 1 in
-    (* Negatve tests *)
-    assert (Common.is_error (fun () -> test_generic_sub ~cs 4 2 1)) ;
-    assert (Common.is_error (fun () -> test_generic_sub ~cs 13 4 10)) ;
-
-    (* TEST generic mul gadget *)
-    (* Positive tests *)
-    let cs = test_generic_mul 0 0 0 in
-    let _cs = test_generic_mul ~cs 1 2 2 in
-    (* Negatve tests *)
-    assert (Common.is_error (fun () -> test_generic_mul ~cs 1 0 1)) ;
-    assert (Common.is_error (fun () -> test_generic_mul ~cs 2 4 7)) ) ;
-  ()

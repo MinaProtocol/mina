@@ -1,7 +1,5 @@
 let BenchBase = ../../Command/Bench/Base.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -12,14 +10,16 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
+let Scope = ../../Pipeline/Scope.dhall
+
 let Spec =
       { Type =
-          { key : Text, name : Text, label : Text, mode : PipelineMode.Type }
-      , default.mode = PipelineMode.Type.PullRequest
+          { key : Text, name : Text, label : Text, scope : List Scope.Type }
+      , default.scope = Scope.Full
       }
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let pipeline
@@ -32,7 +32,7 @@ let pipeline
             , label = spec.label
             , key = spec.key
             , bench = "ledger-apply"
-            , mode = spec.mode
+            , scope = spec.scope
             , dependsOn = dependsOn
             , additionalDirtyWhen =
               [ SelectFiles.exactly
@@ -44,11 +44,13 @@ let pipeline
               , SelectFiles.exactly "scripts/tests/ledger_test_apply" "sh"
               ]
             , preCommands =
-                RunInToolchain.runInToolchain
-                  [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
-                  , "COVERALLS_TOKEN"
-                  , "BENCHMARK_FILE=input.json"
-                  ]
+                RunInToolchain.runInDefaultToolchain
+                  (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                      , "COVERALLS_TOKEN"
+                      , "BENCHMARK_FILE=input.json"
+                      ]
+                    # DebianVersions.overrideEnvs
+                  )
                   "buildkite/scripts/tests/ledger_test_apply.sh && buildkite/scripts/upload-partial-coverage-data.sh ${spec.key}"
             }
 

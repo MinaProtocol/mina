@@ -27,6 +27,8 @@ module Auth_required : sig
 
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
 
+  val access_perm_fallback_to_signature_with_older_version : t -> t
+
   module Checked : sig
     type t
 
@@ -44,6 +46,8 @@ module Auth_required : sig
       -> Boolean.var * [ `proof_must_verify of Boolean.var ]
 
     val verification_key_perm_fallback_to_signature_with_older_version : t -> t
+
+    val access_perm_fallback_to_signature_with_older_version : t -> t
   end
 
   val typ : (Checked.t, t) Typ.t
@@ -141,3 +145,11 @@ val deriver :
       as
       'a )
   -> 'a
+
+module Hardfork : sig
+  type t = Stable.Latest.t [@@deriving equal, sexp, compare]
+
+  val user_default : t
+
+  val empty : t
+end

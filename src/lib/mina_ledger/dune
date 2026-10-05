@@ -55,7 +55,6 @@
   mina_transaction_logic
   signature_lib
   mina_numbers
-  debug_assert
   merkle_address
   key_value_database
   data_hash_lib

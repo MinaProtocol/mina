@@ -8,7 +8,7 @@ module Ledger = Mina_ledger.Ledger
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -17,21 +17,36 @@ end]
 
 type t
 
+val hash : t -> Staged_ledger_hash.Aux_hash.t
+
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+    { transaction_with_status : Mina_transaction.Transaction.t With_status.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    ; hash : Aux_hash.t
     }
+
+  val create :
+       transaction_with_status:Mina_transaction.Transaction.t With_status.t
+    -> state_hash:State_hash.t * State_body_hash.t
+    -> statement:Transaction_snark.Statement.t
+    -> init_stack:Pending_coinbase.Stack_versioned.t
+    -> first_pass_ledger_witness:Mina_ledger.Sparse_ledger.t
+    -> second_pass_ledger_witness:Mina_ledger.Sparse_ledger.t
+    -> block_global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> t
 end
 
-module Ledger_proof_with_sok_message : sig
-  type t = Ledger_proof.Cached.t * Sok_message.t
+module Ledger_proof_with_hash : sig
+  type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
+
+  val create : Ledger_proof.Cached.t -> t
 end
 
 module Available_job : sig
@@ -51,7 +66,7 @@ module Make_statement_scanner (Verifier : sig
 
   val verify :
        verifier:t
-    -> Ledger_proof_with_sok_message.t list
+    -> Ledger_proof_with_hash.t list
     -> unit Or_error.t Deferred.Or_error.t
 end) : sig
   val check_invariants :
@@ -68,20 +83,6 @@ end) : sig
     -> (unit, Error.t) Deferred.Result.t
 end
 
-module Transactions_ordered : sig
-  module Poly : sig
-    type 'a t =
-      { first_pass : 'a list
-      ; second_pass : 'a list
-      ; previous_incomplete : 'a list
-      ; current_incomplete : 'a list
-      }
-    [@@deriving sexp, to_yojson]
-  end
-
-  type t = Transaction_with_witness.t Poly.t
-end
-
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
@@ -90,25 +91,9 @@ val fill_work_and_enqueue_transactions :
   -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( ( Ledger_proof.Cached.t
-       * ( Transaction.t With_status.t
-         * State_hash.t
-         * Mina_numbers.Global_slot_since_genesis.t )
-         Transactions_ordered.Poly.t
-         list )
-       option
-     * t )
-     Or_error.t
+  -> (Ledger_proof.Cached.t option * t) Or_error.t
 
-val latest_ledger_proof :
-     t
-  -> ( Ledger_proof_with_sok_message.t
-     * ( Transaction.t With_status.t
-       * State_hash.t
-       * Mina_numbers.Global_slot_since_genesis.t )
-       Transactions_ordered.Poly.t
-       list )
-     option
+val latest_ledger_proof : t -> Ledger_proof.Cached.t option
 
 (** Apply transactions coorresponding to the last emitted proof based on the
     two-pass system- first pass includes legacy transactions and zkapp payments
@@ -138,6 +123,7 @@ val get_snarked_ledger_sync :
         -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> unit Or_error.t
 
@@ -163,6 +149,7 @@ val get_snarked_ledger_async :
         -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> unit Deferred.Or_error.t
 
@@ -195,25 +182,11 @@ val get_staged_ledger_async :
         -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> [ `First_pass_ledger_hash of Ledger_hash.t ] Deferred.Or_error.t
 
 val free_space : t -> int
-
-val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
-
-(* a 0 index means next-to-latest tree *)
-val base_jobs_on_earlier_tree :
-  t -> index:int -> Transaction_with_witness.t list
-
-(** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
-val staged_transactions_with_state_hash :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Transactions_ordered.Poly.t
-     list
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t
@@ -265,6 +238,9 @@ val all_work_pairs :
      Or_error.t
 
 val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> Stable.Latest.t
+  -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t

@@ -66,7 +66,8 @@ module type S = sig
   (* in ITN logger, sets the client port of daemon to send RPC requests to
      sets the process kind for the Itn logger to "prover"
   *)
-  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
+  val set_itn_logger_data :
+    t -> daemon_port:int option -> unit Deferred.Or_error.t
 
   val get_blockchain_verification_key :
     t -> Pickles.Verification_key.t Deferred.Or_error.t

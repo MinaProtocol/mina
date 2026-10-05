@@ -267,7 +267,8 @@ module Transaction_pool = struct
       * ( Pickles.Side_loaded.Verification_key.t
         * Zkapp_statement.t
         * Pickles.Side_loaded.Proof.t )
-        list ]
+        list
+      * Error.t ]
   [@@deriving sexp_of]
 
   type partial = partial_item list [@@deriving sexp_of]
@@ -283,7 +284,7 @@ module Transaction_pool = struct
       | `Init d ->
           (* Initially, the status of all the transactions in a never-before-seen
              diff are unknown. *)
-          `In_progress (Array.of_list_map d.data ~f:(fun _ -> `Unknown))
+          `In_progress (Array.create ~len:(List.length d.data) `Unknown)
       | `Partially_validated d ->
           (* We've seen this diff before, so we have some information about its
              transactions. *)
@@ -323,7 +324,7 @@ module Transaction_pool = struct
                           match c with
                           | `Valid _ ->
                               None
-                          | `Valid_assuming (v, _) ->
+                          | `Valid_assuming (v, _, _) ->
                               (* TODO: This rechecks the signatures on zkApp transactions... oh well for now *)
                               Some ((i, j), v) ) )
             in
@@ -356,7 +357,7 @@ module Transaction_pool = struct
                 | `Invalid_proof err ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Invalid_proof err
-                | `Valid_assuming xs -> (
+                | `Valid_assuming (xs, err) -> (
                     match result.(i) with
                     | `Invalid_keys _
                     | `Invalid_signature _
@@ -369,7 +370,7 @@ module Transaction_pool = struct
                         ()
                     | `In_progress a ->
                         (* The diff may still be valid. *)
-                        a.(j) <- `Valid_assuming (v, xs) )
+                        a.(j) <- `Valid_assuming (v, xs, err) )
                 | `Valid c -> (
                     (* Similar to the above. *)
                     match result.(i) with
@@ -402,15 +403,31 @@ module Transaction_pool = struct
                   | Some res ->
                       `Valid res
                   | None ->
+                      let collected_errors =
+                        Array.to_sequence a
+                        |> Sequence.filter_map ~f:(function
+                             | `Valid_assuming (_, _, err) ->
+                                 Some err
+                             | _ ->
+                                 None )
+                        |> Sequence.to_list
+                      in
+                      let error_attached =
+                        match collected_errors with
+                        | [] ->
+                            Error.of_string "In progress"
+                        | errors ->
+                            Error.of_list errors
+                      in
                       `Potentially_invalid
                         ( list_of_array_map a ~f:(function
                             | `Unknown ->
                                 assert false
                             | `Valid c ->
                                 `Valid c
-                            | `Valid_assuming (v, xs) ->
-                                `Valid_assuming (v, xs) )
-                        , Error.of_string "In progress" ) ) ) ) )
+                            | `Valid_assuming (v, xs, err) ->
+                                `Valid_assuming (v, xs, err) )
+                        , error_attached ) ) ) ) )
 
   let verify (t : t) = verify t
 end
@@ -437,6 +454,26 @@ module Snark_pool = struct
     | Error e ->
         Error (`Crash e)
 
+  (* This check is placed in batcher in order to
+     have both positive and negative tests defined for the component.
+
+     If the check would be performed outside of batcher,
+     tests need would have to be moved to another place as well. *)
+  let sok_digest_check (proof, message) =
+    Mina_base.Sok_message.Digest.equal
+      (Mina_base.Sok_message.digest message)
+      (Ledger_proof.sok_digest proof)
+
+  let verify_batch ~verifier ps =
+    if List.for_all ps ~f:sok_digest_check then
+      Verifier.verify_transaction_snarks verifier (List.map ~f:fst ps)
+    else
+      let e =
+        Error.of_string
+          "proof's sok message digest does not match the sok message"
+      in
+      Deferred.Or_error.return (Error e)
+
   let create ~proof_cache_db ~logger verifier : t =
     create
       ~proof_cache_db
@@ -457,7 +494,7 @@ module Snark_pool = struct
               One_or_two.map ps ~f:(fun p -> (p, message)) |> One_or_two.to_list )
         in
         let open Deferred.Or_error.Let_syntax in
-        let%map result = Verifier.verify_transaction_snarks verifier ps in
+        let%map result = verify_batch ~verifier ps in
         match result with
         | Ok () ->
             List.map ps0 ~f:(fun _ -> `Valid ())
@@ -520,7 +557,8 @@ module Snark_pool = struct
           in
           let%map { fee; prover } = Fee_with_prover.gen in
           let message = Mina_base.Sok_message.create ~fee ~prover in
-          ( One_or_two.map statements ~f:Ledger_proof.For_tests.mk_dummy_proof
+          ( One_or_two.map statements ~f:(fun statement ->
+                Ledger_proof.For_tests.mk_dummy_proof ~fee ~prover ~statement )
           , message )
         in
         Envelope.Incoming.gen data_gen

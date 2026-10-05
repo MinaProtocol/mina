@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; proof_config = { proof_config_default with fork = Some fork_config }
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =

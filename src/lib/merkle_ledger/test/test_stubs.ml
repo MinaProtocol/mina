@@ -79,11 +79,6 @@ struct
     List.fold_until alist ~init ~f ~finish
 end
 
-module Storage_locations : Intf.Storage_locations = struct
-  (* TODO: The name of this value should be dynamically generated per test run*)
-  let key_value_db_dir = ""
-end
-
 module Key : sig
   include Merkle_ledger.Intf.Key with type t = Mina_base.Account.Key.t
 

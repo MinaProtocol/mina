@@ -1,0 +1,5 @@
+{ Type = { block : Optional (./properties/block/Type ) 
+} 
+, default = { block = None ((./properties/block/Type )) 
+} 
+}

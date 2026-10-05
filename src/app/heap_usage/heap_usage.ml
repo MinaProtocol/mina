@@ -13,7 +13,9 @@ let print_heap_usage name v =
     words (words * bytes_per_word)
 
 let initialize_proof_cache_db ~logger conf_dir =
-  let%map res = Proof_cache_tag.create_db ~logger (conf_dir ^/ "proof_cache") in
+  (* Ad-hoc proof cache location for convenience in this executable *)
+  let proof_cache_location = conf_dir ^/ "proof_cache" in
+  let%map res = Proof_cache_tag.create_db ~logger proof_cache_location in
   Result.(
     map_error ~f:(fun (`Initialization_error e) -> Error.to_exn e) res |> ok_exn)
 
@@ -51,8 +53,9 @@ let main ~genesis_constants ~constraint_constants conf_dir : unit Deferred.t =
   print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement
 
 let () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
   Command.(
     run
       (async ~summary:"Print heap usage of selected Mina data structures"

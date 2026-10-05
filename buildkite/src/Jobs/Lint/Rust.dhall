@@ -19,6 +19,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.contains "src/app/trace-tool"
+          , S.contains "src/app/minimina"
           , S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/Rust")
           ]
         , path = "Lint"
@@ -33,11 +34,22 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInDefaultToolchain
                   ([] : List Text)
                   "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:\$PATH cargo check"
             , label = "Rust lint steps; trace-tool"
             , key = "lint-trace-tool"
+            , target = Size.Multi
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+                RunInToolchain.runInDefaultToolchain
+                  ([] : List Text)
+                  "cd src/app/minimina ; PATH=/home/opam/.cargo/bin:\$PATH cargo check"
+            , label = "Rust lint steps; minimina"
+            , key = "lint-minimina"
             , target = Size.Multi
             , docker = None Docker.Type
             }

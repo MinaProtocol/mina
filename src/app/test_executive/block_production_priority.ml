@@ -69,7 +69,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let min_resulting_blocks = 12
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let receiver = Network.block_producer_exn network "receiver" in

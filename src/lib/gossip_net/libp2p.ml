@@ -32,7 +32,7 @@ module Config = struct
     ; initial_peers : Mina_net2.Multiaddr.t list
     ; addrs_and_ports : Node_addrs_and_ports.t
     ; metrics_port : int option
-    ; conf_dir : string
+    ; mina_net_location : string
     ; chain_id : string
     ; logger : Logger.t
     ; unsafe_no_trust_ip : bool
@@ -246,7 +246,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
         |> Error.raise
       in
-      let conf_dir = config.conf_dir ^/ "mina_net2" in
+      let conf_dir = config.mina_net_location in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
         Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)

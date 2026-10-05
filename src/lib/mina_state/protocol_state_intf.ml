@@ -32,11 +32,11 @@ module type Full = sig
     module Value : sig
       [%%versioned:
       module Stable : sig
-        module V2 : sig
+        module V3 : sig
           type t =
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V2.t
-            , Consensus.Data.Consensus_state.Value.Stable.V2.t
+            , Consensus.Data.Consensus_state.Value.Stable.V3.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
@@ -76,9 +76,9 @@ module type Full = sig
   module Value : sig
     [%%versioned:
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t =
-          (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
+          (State_hash.Stable.V1.t, Body.Value.Stable.V3.t) Poly.Stable.V1.t
         [@@deriving sexp, compare, equal, yojson]
       end
     end]
@@ -148,8 +148,9 @@ module type Full = sig
   val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
   val negative_one :
-       genesis_ledger:Mina_ledger.Ledger.t Lazy.t
-    -> genesis_epoch_data:Consensus.Genesis_epoch_data.t
+       genesis_ledger:Consensus.Genesis_data.Hashed.t
+    -> genesis_epoch_data:
+         Consensus.Genesis_data.Hashed.t Consensus.Genesis_data.Epoch.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> genesis_body_reference:Consensus.Body_reference.t

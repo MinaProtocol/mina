@@ -58,6 +58,8 @@ module Make
           [@to_yojson
             map_to_yojson ~f_key_to_string:Transaction_hash.to_base58_check
               ~f_value_to_yojson:(set_to_yojson ~element:State_hash.to_yojson)]
+    ; proof_block_state_hashes : State_hash.t list
+          [@to_yojson fun ls -> `List (List.map State_hash.to_yojson ls)]
     }
   [@@deriving to_yojson]
 
@@ -73,6 +75,7 @@ module Make
     ; blocks_produced_by_node = String.Map.empty
     ; blocks_seen_by_node = String.Map.empty
     ; blocks_including_txn = Transaction_hash.Map.empty
+    ; proof_block_state_hashes = []
     ; num_transition_frontier_loaded_from_persistence = 0
     ; num_persisted_frontier_loaded = 0
     ; num_persisted_frontier_fresh_boot = 0
@@ -116,7 +119,7 @@ module Make
                             List.cons block_produced.state_hash ls )
                   in
                   { state with
-                    epoch = block_produced.global_slot
+                    epoch = block_produced.epoch
                   ; global_slot = block_produced.global_slot
                   ; block_height = block_produced.block_height
                   ; blocks_generated = state.blocks_generated + 1
@@ -124,6 +127,11 @@ module Make
                       state.snarked_ledgers_generated
                       + snarked_ledgers_generated
                   ; blocks_produced_by_node = blocks_produced_by_node_map
+                  ; proof_block_state_hashes =
+                      ( if block_produced.snarked_ledger_generated then
+                        block_produced.state_hash
+                        :: state.proof_block_state_hashes
+                      else state.proof_block_state_hashes )
                   }
                 else state ) )
         : _ Event_router.event_subscription ) ;

@@ -407,6 +407,7 @@ module type Transaction_resource_pool_intf = sig
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
     -> vk_cache_db:Zkapp_vk_cache_tag.cache_db
     -> proof_cache_db:Proof_cache_tag.cache_db
+    -> signature_kind:Mina_signature_kind.t
     -> Config.t
 
   val member : t -> Transaction_hash.t -> bool

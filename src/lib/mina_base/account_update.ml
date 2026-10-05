@@ -671,11 +671,11 @@ module Update = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
-      type t = Mina_wire_types.Mina_base.Account_update.Update.V1.t =
+      type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
         { app_state :
-            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V2.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -936,13 +936,13 @@ end
 module Account_precondition = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Zkapp_precondition.Account.Stable.V2.t
+    module V2 = struct
+      type t = Zkapp_precondition.Account.Stable.V3.t
       [@@deriving sexp, yojson, hash]
 
       let (_ :
             ( t
-            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
+            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V2.t
             )
             Type_equal.t ) =
         Type_equal.T
@@ -1006,10 +1006,10 @@ end
 module Preconditions = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V2.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
-        ; account : Account_precondition.Stable.V1.t
+        ; account : Account_precondition.Stable.V2.t
         ; valid_while :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
@@ -1087,13 +1087,35 @@ module Body = struct
   let hash_fold_array f init x = Array.fold ~init ~f x
 
   module Events' = struct
+    (* NOTE: in the "Increase events&actions Limit MIP", we claimed that the
+       limit is unbounded, the reason we're still using [Bounded_types.ArrayN],
+       lies in that the serialization of this type is a bit different from a
+       normal array. Setting the array size limit to [max_event_elements] remove
+       the limit on event level in practice. Same goes for types in[Actions']. *)
+    module Bounded = Mina_stdlib.Bounded_types.ArrayN (struct
+      let max_array_len = Node_config.max_event_elements
+    end)
+
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
-          Pickles.Backend.Tick.Field.Stable.V1.t
-          Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
-          list
+        type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
+        [@@deriving sexp, equal, hash, compare, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Actions' = struct
+    module Bounded = Mina_stdlib.Bounded_types.ArrayN (struct
+      let max_array_len = Node_config.max_action_elements
+    end)
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
         [@@deriving sexp, equal, hash, compare, yojson]
 
         let to_latest = Fn.id
@@ -1104,19 +1126,19 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V1.t
+          ; update : Update.Stable.V2.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; actions : Events'.Stable.V1.t
+          ; actions : Actions'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; preconditions : Preconditions.Stable.V1.t
+          ; preconditions : Preconditions.Stable.V2.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1162,19 +1184,19 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V1.t
+          ; update : Update.Stable.V2.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; actions : Events'.Stable.V1.t
+          ; actions : Actions'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; preconditions : Preconditions.Stable.V1.t
+          ; preconditions : Preconditions.Stable.V2.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1189,18 +1211,18 @@ module Body = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V2.t
-        ; update : Update.Stable.V1.t
+        ; update : Update.Stable.V2.t
         ; balance_change :
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
-        ; actions : Events'.Stable.V1.t
+        ; actions : Actions'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-        ; preconditions : Preconditions.Stable.V1.t
+        ; preconditions : Preconditions.Stable.V2.t
         ; use_full_commitment : bool
         ; implicit_account_creation_fee : bool
         ; may_use_token : May_use_token.Stable.V1.t
@@ -1716,9 +1738,9 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          ( Body.Graphql_repr.Stable.V1.t
+          ( Body.Graphql_repr.Stable.V2.t
           , Control.Stable.V2.t )
           Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
@@ -1741,9 +1763,9 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          (Body.Simple.Stable.V1.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+          (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1755,9 +1777,9 @@ module T = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       (** A account_update to a zkApp transaction *)
-      type t = (Body.Stable.V1.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id

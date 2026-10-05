@@ -46,6 +46,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 module Node_status = Node_status
@@ -460,6 +462,7 @@ let glue_sync_ledger :
                       (List.filter_map ps ~f:(fun (q, r) ->
                            match r with Ok r -> Some (q, r) | Error _ -> None )
                       ) ) ) )
+      ()
   in
   don't_wait_for
     (let%bind downloader = downloader in

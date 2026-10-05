@@ -10,7 +10,7 @@
 
 | Develop[^1] | Compatible[^2] | Master[^3] | 
 | ------- | ---------- | ---------- |
-| [![Build status - develop](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=develop)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - compatible](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=compatible)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - master](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=master)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies)
+| [![Build status - develop](https://badge.buildkite.com/bf0be6f0242c50401f6490787c18803ddc141de600d31bb28a.svg?branch=develop)](https://buildkite.com/o-1-labs-2/mina-mainline-branches-nightlies) | [![Build status - compatible](https://badge.buildkite.com/bf0be6f0242c50401f6490787c18803ddc141de600d31bb28a.svg?branch=compatible)](https://buildkite.com/o-1-labs-2/mina-mainline-branches-nightlies) | [![Build status - master](https://badge.buildkite.com/bf0be6f0242c50401f6490787c18803ddc141de600d31bb28a.svg?branch=master)](https://buildkite.com/o-1-labs-2/mina-mainline-branches-nightlies)
 
 </div>
 
@@ -52,6 +52,7 @@ The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contai
 - [Developer README](README-dev.md)
 - [Running a demo node](docs/demo.md)
 - [Lifecycle of a payment](https://docs.minaprotocol.com/node-operators/lifecycle-of-a-payment)
+- [MiniMina](src/app/minimina/README.md) - CLI tool for spinning up local Mina networks
 
 ## Community
 

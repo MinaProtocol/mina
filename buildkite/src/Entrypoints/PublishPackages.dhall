@@ -4,7 +4,7 @@ let PublishPackages = ../Command/Packages/Publish.dhall
 
 let Profile = ../Constants/Profiles.dhall
 
-let Artifact = ../Constants/Artifacts.dhall
+let Artifact = ../Constants/Docker/Package.dhall
 
 let DebianChannel = ../Constants/DebianChannel.dhall
 
@@ -18,6 +18,8 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let Pipeline = ../Pipeline/Dsl.dhall
 
 let promote_artifacts =
@@ -30,7 +32,7 @@ let promote_artifacts =
       ->  \(codenames : List DebianVersions.DebVersion)
       ->  \(channel : DebianChannel.Type)
       ->  \(repo : DebianRepo.Type)
-      ->  \(publish : Bool)
+      ->  \(docker_repo : DockerRepo.Type)
       ->  \(verify : Bool)
       ->  \(build_id : Text)
       ->  let spec =
@@ -40,7 +42,7 @@ let promote_artifacts =
                 , networks = [ network ]
                 , codenames = codenames
                 , channel = channel
-                , publish_to_docker_io = False
+                , docker_repo = docker_repo
                 , backend = "local"
                 , verify = True
                 , source_version = version

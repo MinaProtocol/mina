@@ -11,6 +11,7 @@ fi
 if [[ "$DUNE_PROFILE" -eq "" ]]; then
     DUNE_PROFILE=dev
 fi
+: "${MINA_PROFILE:?MINA_PROFILE must be set (dev, devnet, lightnet or mainnet)}"
 
 ABSOLUTE_FILE_PATH="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 

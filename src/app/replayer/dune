@@ -41,6 +41,7 @@
   mina_ledger
   mina_base
   mina_stdlib
+  mina_stdlib_unix
   mina_base.import
   mina_transaction
   mina_transaction_logic

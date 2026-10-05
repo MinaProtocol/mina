@@ -18,12 +18,13 @@ module Stable = struct
       ; b2 : 'a
       ; b3 : 'a
       ; b4 : 'a
+      ; inv : 'a
       }
     [@@deriving sexp, fields, hlist]
   end
 end]
 
-let map { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 } ~f =
+let map { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4; inv } ~f =
   { xt = f xt
   ; yt = f yt
   ; xp = f xp
@@ -37,6 +38,7 @@ let map { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 } ~f =
   ; b2 = f b2
   ; b3 = f b3
   ; b4 = f b4
+  ; inv = f inv
   }
 
 let map2 t1 t2 ~f =
@@ -53,4 +55,5 @@ let map2 t1 t2 ~f =
   ; b2 = f t1.b2 t2.b2
   ; b3 = f t1.b3 t2.b3
   ; b4 = f t1.b4 t2.b4
+  ; inv = f t1.inv t2.inv
   }

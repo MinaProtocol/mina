@@ -1,6 +1,59 @@
 # An overlay defining Rust parts&dependencies of Mina
 final: prev:
 let
+  # crates.io answers 403 to any `User-Agent` starting with `curl/`, which is
+  # exactly what nixpkgs' `fetchurl` sends, so a crate fetch fails on any
+  # binary-cache miss:
+  #
+  #     trying https://crates.io/api/v1/crates/ansi_term/0.12.1/download
+  #     curl: (22) The requested URL returned error: 403
+  #     error: cannot download crate-ansi_term-0.12.1.tar.gz from any mirror
+  #
+  # `static.crates.io` is the CDN crates.io points cargo itself at: no
+  # User-Agent gate, and no crawler rate limit either. Upstream nixpkgs made the
+  # same switch in f830e6112, which landed in nixos-25.11; we pin
+  # nixos-24.11-small, so point the cargo fetches at it here instead.
+  #
+  # This is deliberately confined to the Rust build path rather than done by
+  # wrapping `fetchurl` for the whole package set: newer nixpkgs call fetchers
+  # with function-form arguments, which a set-wide wrapper cannot merge into,
+  # and the resulting failure lands on every unrelated fetcher.
+  #
+  # Crate fetches are fixed-output derivations, so a crate's output path depends
+  # only on the derivation name and the checksum, never on the URL: every
+  # existing binary-cache entry for a crate tarball stays valid.
+  #
+  # Drop all of this once the nixpkgs pin moves past the upstream fix.
+  staticCratesDl = "https://static.crates.io/crates";
+
+  # `importCargoLock` is the only consumer of the `fetchurl` argument, and it
+  # always calls it with a literal attribute set holding a single `url`.
+  fetchCrateTarball = args:
+    let
+      inherit (final.lib) hasPrefix removePrefix;
+      apiPrefix = "https://crates.io/api/v1/crates/";
+    in prev.fetchurl (args // {
+      url = if hasPrefix apiPrefix args.url then
+        "${staticCratesDl}/${removePrefix apiPrefix args.url}"
+      else
+        args.url;
+    });
+
+  withStaticCrates = platform:
+    assert final.lib.assertMsg
+      (final.lib.versionOlder final.lib.trivial.release "25.11")
+      "nix/rust.nix: nixpkgs >= 25.11 already fetches crates from static.crates.io; delete the static-crates rewrite";
+    let
+      importCargoLock =
+        platform.importCargoLock.override { fetchurl = fetchCrateTarball; };
+    in platform // {
+      inherit importCargoLock;
+      buildRustPackage =
+        platform.buildRustPackage.override { inherit importCargoLock; };
+    };
+
+  defaultRustPlatform = withStaticCrates prev.rustPlatform;
+
   rustPlatformFor = rust:
     let
       rustWithTargetPlatforms = rust // {
@@ -8,14 +61,14 @@ let
         targetPlatforms = final.lib.platforms.all;
         badTargetPlatforms = [ ];
       };
-    in prev.makeRustPlatform {
+    in withStaticCrates (prev.makeRustPlatform {
       cargo = rustWithTargetPlatforms;
       rustc = rustWithTargetPlatforms;
-    };
+    });
   toolchainHashes = {
-    "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
-    "nightly-2024-09-05" =
-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
+    "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
+    "nightly-2025-12-11" =
+      "sha256-Z8PetnKGSZjqRtodJ20XqBoTe2qNG0RaklrVW7AQ3JE=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -99,6 +152,7 @@ in {
       # Using the same toolchain which is used by the local stubs crate
       ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
+    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
     version = "0.1.0";
@@ -109,8 +163,8 @@ in {
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+      lockFileContents = fixupLockFile lock;
+      outputHashes = narHashesFromCargoLock lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -138,7 +192,7 @@ in {
   });
 
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
-  kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
+  kimchi-rust-std-deps = defaultRustPlatform.importCargoLock {
     lockFile = final.runCommand "cargo.lock" { } ''
       cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/library/Cargo.lock $out
     '';
@@ -159,10 +213,11 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
+        registryDl = staticCratesDl;
+        sha256 = "sha256-M6WuGl7EruNopHZbqBpucu4RWz44/MSdv6f0zkYw+44=";
       };
 
-      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
+      cargoHash = "sha256-/zJzxtzOZuGyvDLdJNEQFPzFHC6IbEiWOeZYrKgGxEk=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -172,11 +227,18 @@ in {
           libiconv
         ];
 
-      checkInputs = [ final.nodejs ];
-
-      # other tests, like --test=wasm-bindgen, require it to be ran in the
-      # wasm-bindgen monorepo
-      cargoTestFlags = [ "--test=reference" ];
+      # wasm-bindgen-cli >= 0.2.100 no longer ships the `reference` test target
+      # in the crates.io tarball, so the old `--test=reference` check fails with:
+      # "error: no test target named `reference`".
+      #
+      # Keep a basic CI guardrail by smoke-testing the installed binary instead.
+      doCheck = false;
+      doInstallCheck = true;
+      installCheckPhase = ''
+        runHook preInstallCheck
+        "$out/bin/wasm-bindgen" --version | grep -F "wasm-bindgen ${version}"
+        runHook postInstallCheck
+      '';
     };
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
@@ -211,9 +273,17 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="\
+      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
+      -C link-arg=--import-memory \
+      -C link-arg=--shared-memory \
+      -C link-arg=--export=__wasm_init_tls \
+      -C link-arg=--export=__tls_base \
+      -C link-arg=--export=__tls_size \
+      -C link-arg=--export=__tls_align \
+      -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- -Z build-std=panic_abort,std --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -- -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
@@ -223,11 +293,27 @@ in {
     cargoBuildFeatures = [ "nodejs" ];
   };
 
+  # Keep the historical package name expected by ocaml/javascript Nix code.
+  kimchi_wasm = final.plonk_wasm;
+
   # Jobs/Lint/Rust.dhall
-  trace-tool = final.rustPlatform.buildRustPackage rec {
+  trace-tool = defaultRustPlatform.buildRustPackage rec {
     pname = "trace-tool";
     version = "0.1.0";
     src = ../src/app/trace-tool;
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
+  };
+
+  minimina = defaultRustPlatform.buildRustPackage rec {
+    pname = "minimina";
+    version = "0.2.0";
+    src = ../src/app/minimina;
+    cargoLock.lockFile = ../src/app/minimina/Cargo.lock;
+    nativeBuildInputs = [ final.pkg-config ];
+    buildInputs = with final;
+      [ openssl ] ++ lib.optionals stdenv.isDarwin [
+        darwin.apple_sdk.frameworks.Security
+        libiconv
+      ];
   };
 }

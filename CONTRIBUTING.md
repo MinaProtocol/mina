@@ -68,10 +68,13 @@ Maintainers assign reviewers to pull requests and tag the pull requests with
 relevant labels. If you happen to have access to the development Slack,
 you can skip this step by asking reviewers directly in the #review-requests channel.
 
-- If you are PRing from the main remote branch, add the **ci-build-me** label when you want to run CI. 
-- If you are PRing from a fork, ask a core contributor to add the `!ci-build-me` comment to your PR when you're ready for CI to run. 
+- Comment `!ci-build-me` on your pull request when you want to run CI. The
+  comment must be exactly that, with nothing else in it.
+- The comment author must be a *public* member of the MinaProtocol
+  organization. If you are PRing from a fork, ask a core contributor to post it.
 
 **Note:** The `!ci-build-me` comment is required for each and every run of CI.
+Labels do not trigger CI.
 
 After a PR has been reviewed and approved and all CI tests have passed, the PR can be merged
 by a maintainer (or by you, if you have this access).
@@ -90,7 +93,7 @@ There are three main pieces of Mina documentation:
 3. Inline code comments. We are working to provide more comments. We run `ocamldoc` and the generated 
    [OCaml package documentation](https://mina-docs.storage.googleapis.com/index.html) is browsable.
 
-Changes to the software require changes to the documentation. The Mina Docs use a docs-as-code workflow to develop and publish product documentation using the same tools and processes as software code development. All user-impacting updates on the codebase require corresponding updates to the relevant documentation in the docs repo. See the [Docs Contributing Guidelines](https://github.com/o1-labs/docs2/blob/main/CONTRIBUTING.md). 
+Changes to the software require changes to the documentation. The Mina Docs use a docs-as-code workflow to develop and publish product documentation using the same tools and processes as software code development. All user-impacting updates on the codebase require corresponding updates to the relevant documentation in the docs repo.
 
 ## RFCs
 

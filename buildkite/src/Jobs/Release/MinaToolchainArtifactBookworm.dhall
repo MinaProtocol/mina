@@ -1,42 +1,22 @@
-let Pipeline = ../../Pipeline/Dsl.dhall
+let MinaArtifactToolchain = ../../Command/MinaArtifactToolchain.dhall
 
-let PipelineTag = ../../Pipeline/Tag.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let JobSpec = ../../Pipeline/JobSpec.dhall
-
-let S = ../../Lib/SelectFiles.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-in  Pipeline.build
-      Pipeline.Config::{
-      , spec = JobSpec::{
-        , dirtyWhen =
-          [ S.strictlyStart (S.contains "dockerfiles/stages/1-")
-          , S.strictlyStart (S.contains "dockerfiles/stages/2-")
-          , S.strictlyStart (S.contains "dockerfiles/stages/3-")
-          , S.strictlyStart
-              (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact")
-          , S.strictly (S.contains "opam.export")
-          , S.strictlyEnd (S.contains "rust-toolchain.toml")
-          ]
-        , path = "Release"
-        , name = "MinaToolchainArtifactBookworm"
-        , tags = [ PipelineTag.Type.Toolchain ]
-        }
-      , steps =
-        [ let toolchainBullseyeSpec =
-                DockerImage.ReleaseSpec::{
-                , service = Artifacts.Type.Toolchain
-                , deb_codename = DebianVersions.DebVersion.Bookworm
-                , no_cache = True
-                , no_debian = True
-                }
+let DockerRepo = ../../Constants/DockerRepo.dhall
 
-          in  DockerImage.generateStep toolchainBullseyeSpec
-        ]
+let Size = ../../Command/Size.dhall
+
+in  MinaArtifactToolchain.pipeline
+      DockerImage.ReleaseSpec::{
+      , service = Docker.Type.Toolchain
+      , deb_codename = DebianVersions.DebVersion.Bookworm
+      , no_cache = True
+      , deb_install_mode = DockerImage.DebianInstallMode.NoInstall
+      , docker_repo = DockerRepo.Type.Public
+      , save_to_ci_cache = True
+      , size = Size.XLarge
       }

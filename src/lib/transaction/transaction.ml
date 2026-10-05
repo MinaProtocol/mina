@@ -33,8 +33,8 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
-    type t = User_command.Stable.V2.t Poly.Stable.V2.t
+  module V3 = struct
+    type t = User_command.Stable.V3.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
@@ -48,8 +48,8 @@ type ('a, 'b, 'c) with_forest = ('a, 'b, 'c) User_command.with_forest Poly.t
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
   Poly.Stable.Latest.map ~f:User_command.read_all_proofs_from_disk
 
-let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+    Stable.Latest.t -> t =
   Poly.Stable.Latest.map
     ~f:(User_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
 

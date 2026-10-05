@@ -66,7 +66,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let run network t =
+  let run ~config:(Test_config.{ signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -142,7 +142,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       { Signed_command_payload.Poly.common; body }
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
       Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
@@ -379,13 +378,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
     in
-    let constants : Test_config.constants =
-      { genesis_constants = Network.genesis_constants network
-      ; constraint_constants = Network.constraint_constants network
-      ; compile_config = Network.compile_config network
-      }
-    in
-    let config = config ~constants in
     let%bind () =
       section_hard
         "send out a bunch more txns to fill up the snark ledger, then wait for \
@@ -495,7 +487,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 12
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:3
               ~test_config:config ) )
     in
     let%bind () =
@@ -558,9 +550,38 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     section_hard "running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~logger
+      (* Without an explicit target the replayer only replays up to the highest
+         canonical block, which in a short-lived test network is genesis, so it
+         emits too few logs. Target a recent proof block instead: it is deep in
+         the chain and therefore already persisted in the archive. *)
+      (let proof_state_hash =
+         let ns = network_state t in
+         match ns.proof_block_state_hashes with
+         | hash :: _ ->
+             hash
+         | [] ->
+             failwith "Expected at least one proof block state hash"
+       in
+       [%log info] "Replaying archive up to proof block $state_hash"
+         ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
+       let%bind logs =
+         Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
-       check_replayer_logs ~logger logs )
+       let%bind n = check_replayer_logs ~logger logs in
+       let ns = network_state t in
+       let expected = ns.blocks_generated in
+       if n < expected - 3 || n > expected + 3 then
+         Malleable_error.hard_error_string
+           (sprintf
+              "Replayer replayed %d blocks, expected %d (network \
+               blocks_generated ±3)"
+              n expected )
+       else (
+         if n <> expected then
+           [%log warn]
+             "Replayer block count %d differs from network blocks_generated %d \
+              (diff: %d)"
+             n expected (n - expected) ;
+         Malleable_error.return () ) )
 end

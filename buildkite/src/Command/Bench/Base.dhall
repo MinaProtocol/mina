@@ -1,16 +1,14 @@
 let B = ../../External/Buildkite.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
-
-let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
@@ -28,6 +26,9 @@ let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
+let B/SoftFailExit =
+      B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
+
 let Spec =
       { Type =
           { key : Text
@@ -36,58 +37,51 @@ let Spec =
           , size : Size
           , name : Text
           , path : Text
-          , mode : PipelineMode.Type
           , dependsOn : List Command.TaggedKey.Type
           , additionalDirtyWhen : List SelectFiles.Type
           , yellowThreshold : Double
           , redThreshold : Double
           , preCommands : List Cmd.Type
+          , extraArgs : Text
+          , scope : List PipelineScope.Type
           }
       , default =
-          { mode = PipelineMode.Type.PullRequest
-          , size = Size.Perf
-          , dependsOn =
-                DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , build_flag = BuildFlags.Type.Instrumented
-                  }
-              # DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+          { size = Size.Perf
+          , dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
           , preCommands = [] : List Cmd.Type
+          , extraArgs = ""
           }
       }
 
 let command
     : Spec.Type -> Command.Type
     =     \(spec : Spec.Type)
-      ->  let branch =
-                      if PipelineMode.isStable spec.mode
-
-                then  "\\\${BUILDKITE_BRANCH}"
-
-                else  "\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-
-          in  Command.build
-                Command.Config::{
-                , commands =
-                      spec.preCommands
-                    # RunInToolchain.runInToolchain
-                        (   Benchmarks.toEnvList Benchmarks.Type::{=}
-                          # [ "BRANCH=${branch}" ]
-                        )
-                        "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
-                                                                                             spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                       spec.yellowThreshold}"
-                , label =
-                    "Perf: ${spec.label} ${PipelineMode.capitalName spec.mode}"
-                , key = spec.key
-                , target = spec.size
-                , soft_fail = Some (B/SoftFail.Boolean True)
-                , docker = None Docker.Type
-                , depends_on = spec.dependsOn
-                }
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  spec.preCommands
+                # RunInToolchain.runInDefaultToolchain
+                    (   Benchmarks.toEnvList Benchmarks.Type::{=}
+                      # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
+                        ]
+                      # DebianVersions.overrideEnvs
+                    )
+                    "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
+                                                                                                                          spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                                                    spec.yellowThreshold}"
+            , label = "Perf: ${spec.label}"
+            , key = spec.key
+            , target = spec.size
+            , soft_fail = Some
+                ( B/SoftFail.ListSoft_fail/Type
+                    [ { exit_status = Some (B/SoftFailExit.Number 1) } ]
+                )
+            , docker = None Docker.Type
+            , depends_on = spec.dependsOn
+            }
 
 let pipeline
     : Spec.Type -> Pipeline.Config.Type
@@ -101,7 +95,6 @@ let pipeline
                       "dhall"
                   , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
                   , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
-                  , SelectFiles.contains "scripts/benchmark"
                   , SelectFiles.exactly
                       "buildkite/src/Jobs/Bench/${spec.name}"
                       "dhall"
@@ -109,12 +102,12 @@ let pipeline
                 # spec.additionalDirtyWhen
             , path = spec.path
             , name = spec.name
-            , mode = spec.mode
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test
               , PipelineTag.Type.Stable
               ]
+            , scope = spec.scope
             }
           , steps = [ command spec ]
           }

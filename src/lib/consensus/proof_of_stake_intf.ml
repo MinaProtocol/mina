@@ -16,7 +16,7 @@ module type Full = sig
     module Consensus_state : sig
       include
         module type of Data.Consensus_state
-          with type Value.Stable.V2.t = Data.Consensus_state.Value.Stable.V2.t
+          with type Value.Stable.V3.t = Data.Consensus_state.Value.Stable.V3.t
            and type var = Data.Consensus_state.var
 
       val global_slot : Value.t -> Global_slot.t

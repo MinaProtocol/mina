@@ -31,22 +31,19 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type t =
-      ( Transaction_witness.Stable.V2.t
+      ( Transaction_witness.Stable.V3.t
       , Ledger_proof.Stable.V2.t )
       Poly.Stable.V2.t
     [@@deriving sexp, yojson]
 
     val to_latest : t -> t
 
-    val transaction : t -> Mina_transaction.Transaction.Stable.V2.t option
+    val transaction : t -> Mina_transaction.Transaction.Stable.V3.t option
   end
 end]
 
 type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
