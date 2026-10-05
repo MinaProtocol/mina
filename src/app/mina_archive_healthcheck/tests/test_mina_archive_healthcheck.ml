@@ -75,6 +75,52 @@ module Envelope = struct
     }
   [@@deriving of_yojson]
 
+  (* --skip-block-recency: the delay is still measured, and the envelope
+     says it was not judged. *)
+  type readiness_recency_skipped_success =
+    { ready : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; block_recency_skipped : bool
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    }
+  [@@deriving of_yojson]
+
+  type readiness_failure =
+    { ready : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    ; problems : string list
+    ; error : Yojson.Safe.t
+    }
+  [@@deriving of_yojson]
+
+  type wait_recency_skipped_success =
+    { ready : bool
+    ; timed_out : bool
+    ; db_only : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; block_recency_skipped : bool
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    }
+  [@@deriving of_yojson]
+
+  type readiness_recency_skipped_no_delay_failure =
+    { ready : bool
+    ; block_height : int
+    ; block_recency_skipped : bool
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    ; problems : string list
+    ; error : Yojson.Safe.t
+    }
+  [@@deriving of_yojson]
+
   type readiness_no_delay_failure =
     { ready : bool
     ; block_height : int
@@ -558,6 +604,126 @@ let test_ready_empty_db_omits_delay () =
           (String.concat envelope.problems ~sep:", ") ;
       check_error_constructor ~label envelope.error "Thresholds_exceeded" )
 
+(* [--skip-block-recency] is a flag of the combined checks only. *)
+let test_help_skip_block_recency () =
+  List.iter [ "ready"; "wait" ] ~f:(fun sub ->
+      let code, out, err = run_cli [ sub; "--help" ] in
+      Alcotest.(check int) (sprintf "%s --help exit" sub) 0 code ;
+      check_contains
+        ~label:(sprintf "%s --help lists --skip-block-recency" sub)
+        (out ^ err) ~sub:"--skip-block-recency" )
+
+let one_hour_ms = 3_600_000L
+
+(* A tip an hour old: what a database restored from a dump, or a slow
+   block period, looks like to the probe. *)
+let insert_stale_blocks ~postgres_uri =
+  ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
+  let timestamp =
+    Int64.to_string (Int64.( - ) (current_epoch_ms ()) one_hour_ms)
+  in
+  ignore
+    (run_psql_exn ~uri:postgres_uri
+       (sprintf
+          {sql|
+            INSERT INTO blocks (height, timestamp, parent_id) VALUES
+              (10, '%s', NULL),
+              (11, '%s', 1);
+          |sql}
+          timestamp timestamp ) )
+
+let readiness_args =
+  [ "--window"
+  ; "3"
+  ; "--max-delay"
+  ; "60"
+  ; "--max-missing"
+  ; "1"
+  ; "--max-unparented"
+  ; "0"
+  ]
+
+let test_ready_skip_block_recency_stale_tip () =
+  with_test_db (fun postgres_uri ->
+      insert_stale_blocks ~postgres_uri ;
+      (* Without the flag the stale tip alone makes it NOT READY ... *)
+      let label, json =
+        run_failure_json ~postgres_uri ~sub:"ready" ~extra_args:readiness_args
+          ()
+      in
+      check_absent_field ~label json "block_recency_skipped" ;
+      let envelope =
+        of_yojson_exn ~label Envelope.readiness_failure_of_yojson json
+      in
+      if
+        not
+          (List.exists envelope.problems ~f:(fun problem ->
+               String.is_prefix problem ~prefix:"block delay " ) )
+      then
+        Alcotest.failf "%s: expected a block-delay problem, got %s" label
+          (String.concat envelope.problems ~sep:", ") ;
+      (* ... and with it the same archive is READY, the delay still
+         reported. *)
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"ready"
+          ~extra_args:("--skip-block-recency" :: readiness_args)
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label
+          Envelope.readiness_recency_skipped_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": ready") true envelope.ready ;
+      Alcotest.(check bool)
+        (label ^ ": block_recency_skipped")
+        true envelope.block_recency_skipped ;
+      Alcotest.(check int) (label ^ ": block_height") 11 envelope.block_height ;
+      if Int64.( < ) envelope.delay_seconds 3500L then
+        Alcotest.failf "%s: expected delay_seconds of about an hour, got %Ld"
+          label envelope.delay_seconds )
+
+let test_wait_skip_block_recency_stale_tip () =
+  with_test_db (fun postgres_uri ->
+      insert_stale_blocks ~postgres_uri ;
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"wait"
+          ~extra_args:
+            ( [ "--skip-block-recency"; "--timeout"; "5"; "--interval"; "1" ]
+            @ readiness_args )
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.wait_recency_skipped_success_of_yojson
+          json
+      in
+      Alcotest.(check bool) (label ^ ": ready") true envelope.ready ;
+      Alcotest.(check bool) (label ^ ": timed_out") false envelope.timed_out ;
+      Alcotest.(check bool)
+        (label ^ ": block_recency_skipped")
+        true envelope.block_recency_skipped )
+
+(* Skipping the age check does not make an empty archive ready. *)
+let test_ready_skip_block_recency_empty_db () =
+  with_test_db (fun postgres_uri ->
+      ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
+      let label, json =
+        run_failure_json ~postgres_uri ~sub:"ready"
+          ~extra_args:("--skip-block-recency" :: readiness_args)
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label
+          Envelope.readiness_recency_skipped_no_delay_failure_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+      if
+        not
+          (List.mem envelope.problems "no blocks in archive database"
+             ~equal:String.equal )
+      then
+        Alcotest.failf "%s: expected no-blocks problem, got %s" label
+          (String.concat envelope.problems ~sep:", ") )
+
 (* ---------- Runner ---------- *)
 
 let () =
@@ -565,6 +731,9 @@ let () =
     [ ( "help"
       , [ ("root", `Quick, test_help_root)
         ; ("each subcommand", `Quick, test_help_subs)
+        ; ( "ready and wait list --skip-block-recency"
+          , `Quick
+          , test_help_skip_block_recency )
         ] )
     ; ( "db-ready against dead PG"
       , [ ("text format", `Quick, test_db_ready_dead_pg_text)
@@ -601,5 +770,14 @@ let () =
         ; ( "ready omits unavailable delay"
           , `Quick
           , test_ready_empty_db_omits_delay )
+        ; ( "ready --skip-block-recency passes a stale tip"
+          , `Quick
+          , test_ready_skip_block_recency_stale_tip )
+        ; ( "wait --skip-block-recency passes a stale tip"
+          , `Quick
+          , test_wait_skip_block_recency_stale_tip )
+        ; ( "ready --skip-block-recency still needs a block"
+          , `Quick
+          , test_ready_skip_block_recency_empty_db )
         ] )
     ]
