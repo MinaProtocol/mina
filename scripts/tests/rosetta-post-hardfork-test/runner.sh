@@ -15,7 +15,7 @@ show_help() {
     echo "  -f, --offline-url     📴 Offline URL for the network"
     echo "  -k, --privkey         🔑 Hex-encoded private key for funding account (NOT base58 Mina format)"
     echo "  -a, --address         💰 Public key address in mina format"
-    echo "  -i, --image           🐳 Docker image for rosetta-cli (default: gcr.io/o1labs-192920/rosetta-cli:mesa-hardfork-testing)"
+    echo "  -i, --image           🐳 Docker image for rosetta-cli (default: docker.io/minaprotocol/rosetta-cli:mesa-hardfork-testing)"
     echo "  -h, --help            ❓ Show this help message"
     echo ""
     echo "💡 Examples:"
@@ -29,7 +29,7 @@ online_url=""
 offline_url=""
 founder_privkey=""
 recipient_publickey=""
-rosetta_image="gcr.io/o1labs-192920/rosetta-cli:mesa-hardfork-testing"
+rosetta_image="docker.io/minaprotocol/rosetta-cli:mesa-hardfork-testing"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do

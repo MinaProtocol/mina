@@ -1,7 +1,7 @@
 ARG deb_version=latest
 ARG deb_codename=bullseye
 ARG network=mainnet
-ARG docker_repo=gcr.io/o1labs-192920
+ARG docker_repo=docker.io/minaprotocol
 ARG image_name=mina-daemon
 ARG custom_suffix=""
 ARG image_profile=""
