@@ -52,6 +52,8 @@ function usage() {
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
   echo "      --image-ref-file      (Optional) Write the local image ID (sha256:...) of the built image to this file"
+  echo "      --build-cache-dir     (Optional) Save the image, with the tags it is published under, to <dir>/<service>/<tag>.tar.zst"
+  echo "      --base-cache-dir      (Optional) Load the -generic base of a layered image from <dir>/<image>/<tag>.tar.zst when it is not local"
   echo "      --no-hash-tag         Push only the version tag; do not add the short hash tag in the registry"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
@@ -85,6 +87,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --save-to-ci-cache) export SAVE_TO_CI_CACHE_ROOT="$2"; shift;;
   --image-ref-file) IMAGE_REF_FILE="$2"; shift;;
+  --build-cache-dir) BUILD_CACHE_DIR="$2"; shift;;
+  --base-cache-dir) BASE_CACHE_DIR="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --custom-suffix) export CUSTOM_SUFFIX="$2"; shift;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
@@ -431,6 +435,19 @@ fi
 export_version
 export_docker_tag
 
+function ensure_zstd () {
+  if ! command -v zstd >/dev/null 2>&1; then
+    echo "zstd not found on host; installing"
+    if command -v apt-get >/dev/null 2>&1; then
+      ${SUDO:-sudo} apt-get update -qq
+      ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
+    else
+      echo "ERROR: zstd missing and no apt-get available to install it"
+      exit 1
+    fi
+  fi
+}
+
 # gar-cache (Phase 2): for Dockerfile-install-config services, probe the
 # cache for the specific dependency manifest the FROM line will pull, and
 # only rewrite docker_repo to use the cache when that manifest is present.
@@ -450,9 +467,28 @@ if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCK
     # GENERIC_BASE_SEG is "-<profile>" for the daemon (profiled base) and
     # "-<network>" for rosetta (per-network generic base).
     _dep_tag="${_dep_version}${GENERIC_BASE_SEG}-generic${_dep_build_flags}${_dep_custom}"
-    _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
-    DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
-    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+    _dep_ref="${DOCKER_REGISTRY}/${_dep_image_name}:${_dep_tag}"
+    # --base-cache-dir: the base was built in this release and never pushed,
+    # so it comes from the build cache (see --build-cache-dir) unless this
+    # agent already has it.
+    if [[ -n "${BASE_CACHE_DIR:-}" ]] && ! docker image inspect "${_dep_ref}" >/dev/null 2>&1; then
+      _dep_archive="${BASE_CACHE_DIR}/${_dep_image_name}/${_dep_tag}.tar.zst"
+      if [[ ! -f "${_dep_archive}" ]]; then
+        echo "ERROR: base image ${_dep_ref} is neither local nor in the build cache at ${_dep_archive}"
+        exit 1
+      fi
+      ensure_zstd
+      echo "Loading base image ${_dep_ref} from ${_dep_archive}"
+      zstd -dc "${_dep_archive}" | docker load
+    fi
+    if docker image inspect "${_dep_ref}" >/dev/null 2>&1; then
+      # A local base must not be redirected through gar-cache.
+      DOCKER_REPO_ARG="--build-arg docker_repo=${DOCKER_REGISTRY}"
+    else
+      _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
+      DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
+    fi
+    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _dep_ref _dep_archive _rewritten_repo
 fi
 
 # FORCE_DOCKER_OVERWRITE — when set (to any non-empty value), allows pushing a
@@ -498,16 +534,7 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
   FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${HASHTAG_VERSION_PART}.tar.zst"
 
-  if ! command -v zstd >/dev/null 2>&1; then
-    echo "zstd not found on host; installing (required for --save-to-ci-cache)"
-    if command -v apt-get >/dev/null 2>&1; then
-      ${SUDO:-sudo} apt-get update -qq
-      ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
-    else
-      echo "ERROR: zstd missing and no apt-get available to install it"
-      exit 1
-    fi
-  fi
+  ensure_zstd
 
   # Hard sanity check: fail if --load did not produce the expected local image.
   docker image inspect "$TAG"
@@ -515,6 +542,23 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
   mkdir -p "$(dirname "${FULL_IMAGE_PATH}")"
   echo "Saving built image to CI cache at ${FULL_IMAGE_PATH}"
   docker save "$TAG" "$HASHTAG" | zstd -T0 -3 > "${FULL_IMAGE_PATH}"
+fi
+
+# --build-cache-dir: the image as the publish stage will push it. Named by its
+# version tag, which is what a layered image's FROM names, and holding only
+# the tags it is published under.
+if [[ -n "${BUILD_CACHE_DIR:-}" ]]; then
+  ensure_zstd
+  PUBLISH_TAGS=("$TAG")
+  if [[ "${PUSH_HASH_TAG:-1}" == "1" ]]; then
+    PUBLISH_TAGS+=("$HASHTAG")
+  fi
+  BUILD_CACHE_PATH="${BUILD_CACHE_DIR}/${SERVICE}/${TAG##*:}.tar.zst"
+  mkdir -p "$(dirname "${BUILD_CACHE_PATH}")"
+  echo "Saving ${PUBLISH_TAGS[*]} to ${BUILD_CACHE_PATH}"
+  # Write then rename: a reader never sees a partial archive.
+  docker save "${PUBLISH_TAGS[@]}" | zstd -T0 -3 > "${BUILD_CACHE_PATH}.partial.$$"
+  mv -f "${BUILD_CACHE_PATH}.partial.$$" "${BUILD_CACHE_PATH}"
 fi
 
 if [[ "$DOCKER_ACTION" == "push" ]]; then

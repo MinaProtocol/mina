@@ -61,6 +61,8 @@ let ReleaseSpec =
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
           , save_to_ci_cache : Bool
+          , build_cache_dir : Optional Text
+          , base_cache_dir : Optional Text
           , image_name : Optional Text
           , generic : Bool
           , verify : Bool
@@ -88,6 +90,8 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , save_to_ci_cache = False
+          , build_cache_dir = None Text
+          , base_cache_dir = None Text
           , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
@@ -187,8 +191,9 @@ let generateStep =
           let imageRefFile = "docker-image-id"
 
           let verifies =
-                    spec.verify
-                &&  DockerPublish.shouldPublish spec.docker_publish spec.service
+              -- The check runs on the image this step built, never a pulled
+              -- one, so it does not depend on the image being pushed.
+                spec.verify
 
           let maybeVerify =
                       if verifies
@@ -292,6 +297,16 @@ let generateStep =
 
                       else  ""
                     )
+                ++  merge
+                      { Some = \(dir : Text) -> " --build-cache-dir ${dir}"
+                      , None = ""
+                      }
+                      spec.build_cache_dir
+                ++  merge
+                      { Some = \(dir : Text) -> " --base-cache-dir ${dir}"
+                      , None = ""
+                      }
+                      spec.base_cache_dir
 
           let commands =
                 [ Cmd.run

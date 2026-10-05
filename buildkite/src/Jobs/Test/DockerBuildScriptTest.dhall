@@ -24,6 +24,8 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "dockerfiles")
           , S.exactly "scripts/export-git-env-vars" "sh"
           , S.exactly "buildkite/src/Jobs/Test/DockerBuildScriptTest" "dhall"
+          , S.exactly "buildkite/scripts/docker/publish_from_cache" "sh"
+          , S.strictlyStart (S.contains "buildkite/scripts/docker/tests")
           ]
         , path = "Test"
         , name = "DockerBuildScriptTest"
@@ -40,6 +42,8 @@ in  Pipeline.build
             , commands =
               [ Cmd.run "./scripts/docker/tests/test_build.sh"
               , Cmd.run "./scripts/docker/tests/test_install_config_profile.sh"
+              , Cmd.run
+                  "./buildkite/scripts/docker/tests/test_publish_from_cache.sh"
               ]
             , label = "Docker build script tests"
             , key = "docker-build-script-tests"
