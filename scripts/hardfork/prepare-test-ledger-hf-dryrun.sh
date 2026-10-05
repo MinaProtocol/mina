@@ -107,7 +107,7 @@ function update_extra_balances(){
   fi
 }
 
-ledger_script="$SCRIPT_DIR/prepare-test-ledger.sh"
+ledger_script="$SCRIPT_DIR/../genesis/prepare-test-ledger.sh"
 
 # Verify required script exists and is executable
 if [[ ! -x "$ledger_script" ]]; then

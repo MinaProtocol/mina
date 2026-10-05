@@ -196,7 +196,7 @@ opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs
 opam update
 opam switch import src/opam.export --strict
 eval $(opam env)
-./scripts/pin-external-packages.sh
+./scripts/build/pin-external-packages.sh
 ```
 
 You can also use Nix to only fetch the "system" (native) dependencies of Mina,

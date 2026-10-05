@@ -10,7 +10,7 @@ It expects success
 
 ### Regenerate data
 
-The data can be regenerated with the script `./scripts/regenerate-archive.sh`
+The data can be regenerated with the script `./scripts/tests/regenerate-archive.sh`
 
 You can also regenerate it manually.
 Mina local network script (./script/mina-local-network/mina-local-network.sh) can be used to bootstrap small network and generate archive data. For example below command is usually used:

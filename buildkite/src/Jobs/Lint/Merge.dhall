@@ -62,7 +62,8 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh master" ]
+            , commands =
+              [ Cmd.run "scripts/lint/merged-to-proof-systems.sh master" ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems master branch"
             , key = "merged-to-proof-systems-master"
@@ -75,7 +76,7 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "scripts/merged-to-kimchi-stubs-vendors.sh main" ]
+              [ Cmd.run "scripts/lint/merged-to-kimchi-stubs-vendors.sh main" ]
             , label =
                 "[kimchi-stubs-vendors] Check merges cleanly into kimchi-stubs-vendors main branch"
             , key = "merged-to-kimchi-stubs-vendors-main"

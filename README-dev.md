@@ -93,7 +93,7 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
 4. Pin dependencies that override opam versions:
 
     ```sh
-    scripts/pin-external-packages.sh
+    scripts/build/pin-external-packages.sh
     ```
 
 5. Install the correct version of golang:
@@ -137,7 +137,7 @@ opam switch import opam.export
 
 **NOTE**: The `switch` command provides a `dune_wrapper` binary that you can use instead of dune and fails early if your switch becomes out of sync with the `opam.export` file.
 
-Some dependencies that are not taken from `opam` or integrated with `dune` must be added manually. Run the `scripts/pin-external-packages.sh` script.
+Some dependencies that are not taken from `opam` or integrated with `dune` must be added manually. Run the `scripts/build/pin-external-packages.sh` script.
 
 A number of C libraries are expected to be available in the system and are also listed in the Dockerfiles. Unlike most of the C libraries that are installed using `apt` in the Dockerfiles, the libraries for RocksDB are automatically installed when building Mina by using a `dune` rule in the library `ocaml-rocksdb`.
 

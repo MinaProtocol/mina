@@ -20,7 +20,7 @@ export LAGRANGE_CACHE_DIR="/tmp/lagrange-cache"
 
 # Allow core dumps.
 #
-# Both failure paths below already call scripts/link-coredumps.sh, which
+# Both failure paths below already call scripts/tests/link-coredumps.sh, which
 # collects core.<pid>.* into core_dumps/ for the artifact upload, but nothing
 # ever raised the core-file limit, so the tests ran with the container default
 # of 0 and no core file was ever written.
@@ -65,7 +65,7 @@ fi
 # forces Dune to rerun the whole test suite, including tests that already passed.
 echo "--- Run unit tests"
 time dune runtest ${FORCE_FLAG} "${path}" || \
-(./scripts/link-coredumps.sh && \
+(./scripts/tests/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
  time dune runtest "${path}" || \
- (./scripts/link-coredumps.sh && false))
+ (./scripts/tests/link-coredumps.sh && false))

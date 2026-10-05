@@ -2,7 +2,7 @@
 
 # Rosetta devnet/mainnet connectivity test, run from bare binaries.
 #
-# This replaces running scripts/tests/rosetta-connectivity.sh against the
+# This replaces running scripts/tests/rosetta/rosetta-connectivity.sh against the
 # prebuilt mina-rosetta docker image. That image is a packaging artifact: to get
 # one, the test had to depend on the Debian build and the docker build, which is
 # the entire reason those run on ordinary PRs and in nightly.
@@ -233,7 +233,7 @@ execute_script() {
 }
 
 echo "========================= ROSETTA SANITY TEST ==========================="
-./scripts/tests/rosetta-sanity.sh \
+./scripts/tests/rosetta/rosetta-sanity.sh \
   --address "http://localhost:${MINA_ROSETTA_ONLINE_PORT}" \
   --daemon-graphql-address "http://localhost:${MINA_GRAPHQL_PORT}/graphql" \
   --network "$MINA_NETWORK" \
@@ -255,7 +255,7 @@ if [[ "$RUN_LOAD_TEST" == true ]]; then
   [[ -n "$BRANCH" ]] && load_test_args+=(--branch "$BRANCH")
   [[ -n "$COMMIT" ]] && load_test_args+=(--commit "$COMMIT")
 
-  if ./scripts/tests/rosetta-load.sh "${load_test_args[@]}"; then
+  if ./scripts/tests/rosetta/rosetta-load.sh "${load_test_args[@]}"; then
     echo -e "${GREEN}Load test completed successfully.${CLEAR}"
   else
     echo -e "${RED}Load test failed.${CLEAR}"

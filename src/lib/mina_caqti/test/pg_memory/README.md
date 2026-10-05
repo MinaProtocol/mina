@@ -74,7 +74,7 @@ prepared-statement count exceeds `K`, so it can double as a CI regression guard.
 ### Perf metrics (InfluxDB)
 
 `--influxdb-file PATH` writes one InfluxDB line-protocol point per scenario,
-using the same measurement/tag convention as `scripts/tests/rosetta-load.sh`
+using the same measurement/tag convention as `scripts/tests/rosetta/rosetta-load.sh`
 so runs land in the perf time-series database:
 
 ```

@@ -37,7 +37,7 @@ pkgs.mkShell {
       printf 'opam update\n'
       printf 'opam switch import opam.export --strict\n'
       printf 'eval $(opam env)\n'
-      printf './scripts/pin-external-packages.sh\n'
+      printf './scripts/build/pin-external-packages.sh\n'
       tput sgr0
       echo
       printf "After that, you can build Mina using:\n"

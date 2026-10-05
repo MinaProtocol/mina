@@ -15,7 +15,7 @@ PG_URI="postgresql://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 PROFILE=devnet
 
 # go to root of mina repo
-cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
+cd "$(dirname -- "${BASH_SOURCE[0]}")"/../..
 
 # Prepare the database
 PGPASSWORD="${PG_PW}" dropdb \

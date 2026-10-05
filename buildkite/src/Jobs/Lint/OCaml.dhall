@@ -43,7 +43,7 @@ in  Pipeline.build
                 RunInToolchain.runInDefaultToolchain
                   ([] : List Text)
                   (     "./buildkite/scripts/lint-check-format.sh && "
-                    ++  "./scripts/require-ppxs.py"
+                    ++  "./scripts/lint/require-ppxs.py"
                   )
             , label = "OCaml Lints; Check-format, Require-ppx-version"
             , key = "check"

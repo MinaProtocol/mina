@@ -4,7 +4,7 @@
 # Requires: mina binary (or nix to build it), jq
 #
 # Usage:
-#   ./scripts/generate-local-genesis.sh --profile devnet --mina-binary /path/to/mina --output-dir /tmp/my-genesis
+#   ./scripts/genesis/generate-local-genesis.sh --profile devnet --mina-binary /path/to/mina --output-dir /tmp/my-genesis
 #
 # If --mina-binary is not provided, builds via nix.
 # Produces:
@@ -86,7 +86,7 @@ elif [[ -n "$MINA_BINARY" ]]; then
   echo "Error: mina binary not found or not executable: $MINA_BINARY" >&2; exit 1
 else
   echo "Building mina via nix..."
-  nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1#devnet")
+  nix_result=$(nix build --no-link --print-out-paths "$(dirname "$(dirname "$SCRIPT_DIR")")?submodules=1#devnet")
   MINA_BINARY="$nix_result/bin/mina"
   echo "Built mina: $MINA_BINARY"
 fi
@@ -98,7 +98,7 @@ elif [[ -n "$RUNTIME_GENESIS_LEDGER_BINARY" ]]; then
   echo "Error: runtime_genesis_ledger binary not found or not executable: $RUNTIME_GENESIS_LEDGER_BINARY" >&2; exit 1
 else
   echo "Building runtime_genesis_ledger via nix..."
-  nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1#devnet.genesis")
+  nix_result=$(nix build --no-link --print-out-paths "$(dirname "$(dirname "$SCRIPT_DIR")")?submodules=1#devnet.genesis")
   RUNTIME_GENESIS_LEDGER_BINARY="$nix_result/bin/runtime_genesis_ledger"
   echo "Built runtime_genesis_ledger: $RUNTIME_GENESIS_LEDGER_BINARY"
 fi
