@@ -31,7 +31,7 @@
 , minaToolchainBookworm =
     { amd64 = "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
     , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:f009c00-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
     "docker.io/minaprotocol/mina-toolchain:e1cea26-bullseye-devnet"
@@ -53,6 +53,6 @@
 , minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
 , postgres = "docker.io/library/postgres:12.4-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
-, nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
+, nixos = "docker.io/minaprotocol/nixos:1.0.0"
 , minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }
