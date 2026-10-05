@@ -1,0 +1,17 @@
+(library
+ (name test_parallel_scan)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  core_kernel
+  digestif
+  ;; local libraries
+  parallel_scan)
+ (preprocess
+  (pps
+   ppx_version
+   ppx_jane
+   ppx_compare))
+ (instrumentation
+  (backend bisect_ppx)))
