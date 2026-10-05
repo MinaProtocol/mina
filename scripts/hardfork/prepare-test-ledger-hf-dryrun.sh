@@ -81,7 +81,7 @@ while [[ $# -gt 0 ]]; do
       echo "Script assumes mainnet's start was at epoch 0 on $(date --date="$MAINNET_START" '+%d %B %Y'), if it's not the case, update the script please" >&2
       echo "Usage: $0 [-e|--extra-keys $EXTRA_KEYS] [-b|--extra-key-balance $EXTRA_KEY_BALANCE] <BP key 1> <BP key 2> ... <BP key n>" >&2
       exit 0 ;;
-    -*|--*)
+    -*)
       echo "Unknown option $1"; exit 1 ;;
     *)
       KEYS+=("$1") ; shift ;;

@@ -83,7 +83,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 [-r|--replace-top] [-n|--norm] [-c|--delegation-cutoff $DELEGATEE_CUTOFF] [-b|--key-balance $KEY_BALANCE] [-p|--ledger-prefix $LEDGER_PREFIX] <BP key 1> <BP key 2> ... <BP key n>" >&2
       echo "Consider reading script's code for information on optional arguments" >&2
       exit 0 ;;
-    -*|--*)
+    -*)
       echo "Unknown option $1"; exit 1 ;;
     *)
       KEYS+=("$1") ; shift ;;
