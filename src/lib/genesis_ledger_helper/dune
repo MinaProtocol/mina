@@ -18,12 +18,8 @@
   digestif
   ;; local libraries
   mina_ledger
-  with_hash
-  mina_stdlib
-  blockchain_snark
   error_json
   mina_state
-  random_oracle
   blake2
   mina_numbers
   genesis_ledger_helper.lib
@@ -36,16 +32,11 @@
   cache_dir
   coda_genesis_proof
   currency
-  data_hash_lib
   snark_params
-  unsigned_extended
   consensus
-  pickles
   logger
-  mina_base.import
   staged_ledger_diff
-  mina_stdlib_unix
-  cli_lib)
+  mina_stdlib_unix)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

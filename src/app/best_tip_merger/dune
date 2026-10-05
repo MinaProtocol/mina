@@ -10,7 +10,6 @@
   stdio
   base.caml
   yojson
-  lib
   core_kernel
   async
   ppx_deriving_yojson.runtime
@@ -29,14 +28,8 @@
   logger
   cli_lib
   transition_frontier
-  data_hash_lib
   mina_stdlib
-  consensus
-  mina_wire_types
-  pickles.backend
-  snark_params
-  pickles
-  kimchi_pasta)
+  consensus)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
