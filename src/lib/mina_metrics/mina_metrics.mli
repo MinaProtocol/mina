@@ -607,11 +607,17 @@ val server :
 module Archive : sig
   type t
 
+  module Ingest_duration_histogram : Histogram
+
   val unparented_blocks : t -> Gauge.t
 
   val max_block_height : t -> Gauge.t
 
   val missing_blocks : t -> Gauge.t
+
+  (** Time from the archive accepting a block ingest request to answering it,
+      labelled by the source that sent the block. *)
+  val ingest_duration_ms : t -> string -> Ingest_duration_histogram.t
 
   val create_archive_server :
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t

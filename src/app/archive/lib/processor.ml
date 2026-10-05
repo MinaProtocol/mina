@@ -4902,7 +4902,8 @@ let serve_metrics_server ~logger ~metric_server ~missing_blocks_width
         in
         after interval
       in
-      Deferred.forever () serve
+      Deferred.forever () serve ;
+      Deferred.unit
 
 (* for running the archive process *)
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
