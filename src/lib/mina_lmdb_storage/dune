@@ -33,7 +33,7 @@
   lmdb_storage
   network_peer
   pipe_lib
-  timeout_lib
+  mina_stdlib
   mina_metrics
   o1trace
   staged_ledger_diff
