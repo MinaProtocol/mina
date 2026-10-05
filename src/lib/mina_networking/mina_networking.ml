@@ -211,19 +211,25 @@ let broadcast_state t state =
   Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
 
 let broadcast_transaction_pool_diff ?nonce t diff =
-  [%str_log' trace t.logger]
-    (Gossip_transaction_pool_diff
-       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
-    ) ;
+  (* the summaries cost a base58 encoding, and so a hash, for every command in
+     the diff; a structured event is serialised before it is filtered, so
+     without this they are paid for whether or not anything logs them *)
+  if Logger.would_log t.logger Logger.Level.Trace then
+    [%str_log' trace t.logger]
+      (Gossip_transaction_pool_diff
+         { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff
+         } ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
 let broadcast_snark_pool_diff ?nonce t diff =
   Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
-  [%str_log' trace t.logger]
-    (Gossip_snark_pool_diff
-       { work = Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
-       } ) ;
+  if Logger.would_log t.logger Logger.Level.Trace then
+    [%str_log' trace t.logger]
+      (Gossip_snark_pool_diff
+         { work =
+             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+         } ) ;
   Gossip_net.Any.broadcast_snark_pool_diff ?nonce t.gossip_net diff
 
 let find_map xs ~f =

@@ -95,6 +95,8 @@ module Processor = struct
     type t
 
     val process : t -> Message.t -> string option
+
+    val accepts : t -> Level.t -> bool
   end
 
   type t
@@ -141,6 +143,9 @@ let null () = Metadata.empty
 let extend t _ = t
 
 let change_id t ~id:_ = t
+
+(* logging here is a no-op, so nothing a caller might build would be emitted *)
+let would_log _ _ = false
 
 let raw _ _ = not_implemented ()
 
