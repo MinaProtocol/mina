@@ -27,6 +27,12 @@
 --       A stale or unpublished hash is not fatal -- scripts/docker/build.sh falls back to
 --       inlining the base-deps fragment when the image is not available locally -- so the
 --       only cost of forgetting the bump is losing the reuse.
+-- NOTE: postgres is the server every archive job runs against, via RunWithPostgres
+-- NOTE: postgres 17 matches the version the published archive dumps are produced by,
+--       so a production dump restores into CI, and it carries
+--       pg_backend_memory_contexts (PostgreSQL 14+) which the memory benchmarks read
+-- NOTE: postgres comes from Docker Hub because euro-docker-repo has no 14+ tag;
+--       mirror one and repoint the constant if Docker Hub pull limits start to bite
 { toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
     { amd64 = "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
@@ -51,7 +57,7 @@
 , minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
 , minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
 , minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
-, postgres = "docker.io/library/postgres:12.4-alpine"
+, postgres = "docker.io/library/postgres:17-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
 , minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
