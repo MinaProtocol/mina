@@ -1,49 +1,76 @@
 # zkApp-heavy precomputed-block corpus
 
 Static data for the **archive-node end-to-end memory benchmark**
-(`buildkite/scripts/tests/archive-memory-bench.sh`).
+(`src/test/archive/archive_memory_bench`, CI job `ArchiveMemoryBench`).
 
-`precomputed_blocks.tar.xz` is a chain of **1273 precomputed blocks** produced by a local
-`develop` network, deliberately loaded with heavy zkApp traffic:
+`precomputed_blocks.tar.xz` is a chain of **49 precomputed blocks** produced by a local
+`compatible` network (devnet profile, `--proof-level none`), loaded with heavy zkApp
+traffic:
 
-- **89 zkApp commands**, carrying **~13,600 event fields + ~13,600 action fields**
-  (≈1,700 event arrays and 1,700 action arrays of 8 fields each).
+- **94 zkApp commands**, carrying **14,720 event fields + 14,720 action fields**
+  (20 event arrays and 20 action arrays of 8 fields each per `update-state`).
 
 That volume is what exercises the archive's `zkapp_field_array` / event / action insert
-paths, where the per-backend PostgreSQL memory leak (unbounded prepared-statement plan
-caching, see the epic) shows up most.
+paths, where per-connection prepared-statement growth shows up most. `genesis.json` is
+the configuration of the network that produced the blocks.
+
+The blocks must be decodable by the `archive_blocks` of the branch that replays them: a
+corpus produced on another release line (e.g. `develop`) does not parse here, because
+the serialised proofs differ. Regenerate it on the same line.
 
 ## What the benchmark does
 
 It replays these blocks through the real archive insert path
 (`archive_blocks --precomputed` → `Processor.add_block_aux_precomputed` → the
-`Mina_caqti` helpers) directly into a fresh PostgreSQL, and samples the resident memory
-of both the `archive_blocks` process and the serving PostgreSQL backend. A leaking build
-grows the backend RSS roughly with blocks ingested; a fixed build keeps it flat. The
-result is published to the perf-infra InfluxDB (measurement `archive_memory_bench`).
+`Mina_caqti` helpers) into PostgreSQL, and samples the resident memory of both the
+`archive_blocks` process and the serving PostgreSQL backend. The result is published to
+the perf InfluxDB (measurement `archive_memory_bench`).
+
+**The Caqti pool is pinned to one connection that is never recycled**
+(`CAQTI_POOL_MAX_SIZE=1`, `CAQTI_POOL_MAX_IDLE_SIZE=1`, `CAQTI_POOL_MAX_IDLE_AGE=none`,
+`CAQTI_POOL_MAX_USE_COUNT=none`). Caqti keeps prepared statements per connection, so
+growth only accumulates while one connection stays open; by default `archive_blocks`
+spreads the ingest over several connections and retires each after 100 uses. The
+summary reports how many backends were seen and how often the backend changed; anything
+other than one stable backend means the numbers understate the growth.
+
+**Growth is measured against inserted zkApp arrays, not elapsed time.** The bench counts
+the rows in `zkapp_field_array` and `zkapp_events` and fits a least-squares line of RSS
+against that count (`pg_backend_rss_kib_per_1k_arrays`, with r²). The end-to-end
+difference, peak and tail average are reported too.
+
+No threshold is applied: the job measures, it does not gate. Nothing is published if no
+block was ingested, or if more than `--max-failed-blocks` (default 0) failed:
+`archive_blocks` exits 0 even when every block fails.
+
+The backend RSS is read from `/proc/<pid>/status`, so PostgreSQL must share the host's
+PID namespace (`RunWithPostgres` starts it with `--pid=host`).
 
 ## Run it locally
 
 ```bash
-nix develop mina
-# from the repo root, with a local postgres available:
-./buildkite/scripts/tests/archive-memory-bench.sh <pg_user> <pg_password> <pg_db>
+docker run -d --name pg-bench --pid=host -e POSTGRES_PASSWORD=bench \
+  -e POSTGRES_USER=bench -e POSTGRES_DB=archive -p 127.0.0.1:55441:5432 postgres:17-alpine
+psql postgresql://bench:bench@127.0.0.1:55441/archive -f src/app/archive/create_schema.sql
+
+export MINA_PROFILE=devnet
+dune build src/app/archive_blocks/archive_blocks.exe \
+  src/test/archive/archive_memory_bench/archive_memory_bench.exe
+./_build/default/src/test/archive/archive_memory_bench/archive_memory_bench.exe \
+  --uri postgresql://bench:bench@127.0.0.1:55441/archive
 ```
 
-It builds `archive_blocks`, unpacks this corpus, feeds it, and prints the growth curve, a
-summary (archive RSS growth, PG-backend RSS peak, head→tail rise), and the InfluxDB line
-it would upload.
+`--limit N` replays only the first N blocks; `-help` lists the rest.
 
-## Regenerate / refresh the corpus (the zkApp-heavy load test)
+## Regenerate the corpus
 
-Use the co-located `generate-corpus.sh`. It bootstraps a small local network, submits
-heavy zkApp `update-state` transactions (using `zkapp_test_transaction`'s
-`--num-events` / `--num-actions` / `--elements-per` flags), then extracts and repackages
-the produced precomputed blocks.
+`generate_corpus.py` starts a local network (`scripts/mina-local-network`), deploys a
+zkApp account, submits heavy `update-state` commands through `zkapp_test_transaction`,
+then extracts the produced precomputed blocks into `precomputed_blocks.tar.xz` and the
+network configuration into `genesis.json`.
 
 ```bash
-nix develop mina
-# build the apps the generator needs
+export MINA_PROFILE=devnet
 dune build \
   src/app/cli/src/mina.exe \
   src/app/archive/archive.exe \
@@ -51,16 +78,15 @@ dune build \
   src/app/mina_graphql_client/mina_graphql_client_app.exe \
   src/app/logproc/logproc.exe
 
-# generate ~120 heavy zkApp update-states and repackage the corpus in place
-./src/test/archive/sample_zkapp_heavy/generate-corpus.sh 120 20 20 8
+./src/test/archive/sample_zkapp_heavy/generate_corpus.py \
+  --network-dir /tmp/zkapp-corpus-net \
+  --count 120 --num-events 20 --num-actions 20 --elements-per 8
 ```
 
-Tune the load with the arguments `<count> <num_events> <num_actions> <elements_per>`
-(defaults `120 20 20 8`). The script prints the resulting block / event / action counts
-so you can confirm the corpus is heavy enough (aim for ≥10 canonical blocks with zkApp
-commands, matching the archive test convention).
+The network directory is deleted and recreated. A `libp2p_helper` must be on `PATH`. The
+script prints the block / event / action counts it extracted; commands still in the
+mempool after `--drain-sec` are not in the corpus.
 
-> Note: the zkApp deploy must use the **same** key as both fee-payer and sender —
-> `create_zkapp_command` sets the sender's nonce precondition to `succ(sender_nonce)` when
-> fee-payer ≠ sender, which no external nonce can satisfy. `generate-corpus.sh` already
-> does this.
+> The zkApp deploy uses the **same** key as fee payer and sender: with distinct keys
+> `create_zkapp_command` sets the sender's nonce precondition to `succ(sender_nonce)`,
+> which no external nonce satisfies.
