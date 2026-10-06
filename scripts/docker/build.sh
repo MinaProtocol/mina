@@ -51,6 +51,7 @@ function usage() {
   echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
+  echo "      --no-hash-tag         Push only the version tag; do not add the short hash tag in the registry"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -79,6 +80,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -r|--repo) MINA_REPO="$2"; shift;;
   -p|--platform) INPUT_PLATFORM="$2"; shift;;
   -l|--load-only) DOCKER_ACTION="load" ;;
+  --no-hash-tag) PUSH_HASH_TAG=0 ;;
   --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --save-to-ci-cache) export SAVE_TO_CI_CACHE_ROOT="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
@@ -519,8 +521,12 @@ if [[ "$DOCKER_ACTION" == "push" ]]; then
   # This publishes the hash tag as a single-entry manifest list, so it does not
   # share a top-level digest with $TAG; both resolve to the same image, and
   # consumers pull/run it, which handles a list transparently.
-  echo "📎 Tagging pushed image as ${HASHTAG} (registry-side)"
-  docker buildx imagetools create --tag "$HASHTAG" "$TAG"
+  if [[ "${PUSH_HASH_TAG:-1}" == "1" ]]; then
+    echo "📎 Tagging pushed image as ${HASHTAG} (registry-side)"
+    docker buildx imagetools create --tag "$HASHTAG" "$TAG"
+  else
+    echo "Skipping the registry-side hash tag (--no-hash-tag)."
+  fi
 else
   echo "Skipping push to remote registry, image loaded to local docker daemon only."
 fi

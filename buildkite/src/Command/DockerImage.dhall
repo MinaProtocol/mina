@@ -279,6 +279,12 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
+                ++  (       if DockerRepo.hashTag spec.docker_repo
+
+                      then  ""
+
+                      else  " --no-hash-tag"
+                    )
                 ++  loadOnlyArg
                 ++  customSuffix
                 ++  imageNameArg

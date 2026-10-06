@@ -116,5 +116,4 @@ Key differences between networks:
 |----------|--------|---------|
 | `MINA_NETWORK` | `devnet` | `mainnet` |
 | `MINA_PEERLIST_URL` | devnet seeds | mainnet bootnodes |
-| `ARCHIVE_DUMP_PREFIX` | `devnet-archive-dump` | `mainnet-archive-dump` |
 | Docker image tags | `*-devnet` | `*-mainnet` |

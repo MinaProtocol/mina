@@ -46,6 +46,8 @@ let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
 
+let DockerCommand = ./Docker/Type.dhall
+
 let BaseImage = ../Constants/Docker/BaseImage.dhall
 
 let Artifact = ../Constants/Artifact/Artifacts.dhall
@@ -519,6 +521,28 @@ let appsFromAnotherBuild
       -- packaging-only pipeline does. See restore_build_tree.sh.
       Some env:MINA_APPS_CACHE_ROOT as Text ? None Text
 
+let genericFromAnotherBuild
+    : Optional Text
+    =
+      -- Set when MINA_GENERIC_CACHE_ROOT names the build that made the
+      -- network-less packages (the PackagingAmd64Generic stage). The network
+      -- jobs then read those .debs from it (read_all_from_cache.sh) and take the
+      -- generic image from the registry, so neither is built a second time with
+      -- the same version.
+      Some env:MINA_GENERIC_CACHE_ROOT as Text ? None Text
+
+let dependsOnGenericJob
+    : List Command.TaggedKey.Type -> List Command.TaggedKey.Type
+    =
+      -- Nothing to wait for when the generic packages came from another build.
+          \(deps : List Command.TaggedKey.Type)
+      ->  Prelude.Optional.fold
+            Text
+            genericFromAnotherBuild
+            (List Command.TaggedKey.Type)
+            (\(_ : Text) -> [] : List Command.TaggedKey.Type)
+            deps
+
 let dependsOnApps
     : PackagingSpec.Type -> List Command.TaggedKey.Type
     =
@@ -590,10 +614,11 @@ let docker_step
 
                 then  [] : List Command.TaggedKey.Type
 
-                else  [ { name = genericPackagingName spec
-                        , key = "build-deb-pkg"
-                        }
-                      ]
+                else  dependsOnGenericJob
+                        [ { name = genericPackagingName spec
+                          , key = "build-deb-pkg"
+                          }
+                        ]
 
           let deps
               : List Command.TaggedKey.Type
@@ -623,13 +648,14 @@ let docker_step
                 then  deps
 
                 else    deps
-                      # [ { name = genericPackagingName spec
-                          , key =
-                              "${Docker.lowerName
-                                   Docker.Type.DaemonGeneric}-${Network.lowerName
-                                                                  genericNetwork}-docker-image"
-                          }
-                        ]
+                      # dependsOnGenericJob
+                          [ { name = genericPackagingName spec
+                            , key =
+                                "${Docker.lowerName
+                                     Docker.Type.DaemonGeneric}-${Network.lowerName
+                                                                    genericNetwork}-docker-image"
+                            }
+                          ]
 
           let size = Size.XLarge
 
@@ -910,7 +936,34 @@ let packagePipeline
             , includeIf = spec.includeIf
             , excludeIf = spec.excludeIf
             }
-          , steps = [ build_debian spec ] # docker_commands spec
+          , steps =
+              let reused =
+                        \(root : Text)
+                    ->  [ Command.build
+                            Command.Config::{
+                            , commands =
+                              [ Cmd.run
+                                  "echo Generic packages are not built here: they come from build ${root}"
+                              ]
+                            , label = "Generic: reused from build ${root}"
+                            , key = "generic-reused"
+                            , target = Size.Small
+                            , docker = None DockerCommand.Type
+                            }
+                        ]
+
+              let built = [ build_debian spec ] # docker_commands spec
+
+              in        if spec.generic
+
+                  then  Prelude.Optional.fold
+                          Text
+                          genericFromAnotherBuild
+                          (List Command.Type)
+                          reused
+                          built
+
+                  else  built
           }
 
 in  { onlyDebianPipeline = onlyDebianPipeline

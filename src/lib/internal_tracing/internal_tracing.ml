@@ -198,6 +198,10 @@ module For_logger = struct
       in
       json_lines
 
+    (* only [Internal] messages are expanded below, so nothing else need be
+       built on this processor's account *)
+    let accepts () level = Logger.Level.equal level Logger.Level.Internal
+
     let process () msg =
       let { Logger.Message.level; message; metadata; timestamp; _ } = msg in
       if is_enabled () && Logger.Level.equal level Logger.Level.Internal then
