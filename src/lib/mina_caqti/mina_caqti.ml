@@ -422,38 +422,49 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
              ~cols:(fst cols) () )
         value
 
-let sep_by_comma ?(parenthesis = false) xs =
-  List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
-  |> String.concat ~sep:", "
+(* A [text[]] query parameter. Every element is double-quoted and escaped, so
+   any string (including [NULL], commas, braces, quotes, backslashes) round-trips
+   unchanged. Parameter-only: decoding is not supported. *)
+let text_array_param_typ : string list Caqti_type.t =
+  let quote s =
+    let buf = Buffer.create (String.length s + 2) in
+    Buffer.add_char buf '"' ;
+    String.iter s ~f:(fun c ->
+        if Char.equal c '"' || Char.equal c '\\' then Buffer.add_char buf '\\' ;
+        Buffer.add_char buf c ) ;
+    Buffer.add_char buf '"' ;
+    Buffer.contents buf
+  in
+  let encode xs =
+    Ok (sprintf "{%s}" (String.concat ~sep:"," (List.map xs ~f:quote)))
+  in
+  let decode _ = Error "text_array_param_typ is parameter-only" in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
-let insert_multi_into_col ~(table_name : string)
-    ~(col : string * 'col Caqti_type.t) (module Conn : CONNECTION)
-    (values : string list) =
+(* Insert [values] into the text column [col] of [table_name], ignoring
+   conflicts, and return the (value, id) pairs of the matching rows. The whole
+   batch is bound as one [text[]] parameter and expanded with [unnest], so it
+   costs two round trips regardless of size, and no value enters the SQL text.
+   Requests are [~oneshot:true] because the SQL depends on [table_name]/[col]. *)
+let insert_multi_into_col ~(table_name : string) ~(col : string)
+    (module Conn : CONNECTION) (values : string list) =
   let open Deferred.Result.Let_syntax in
-  let insert =
-    sprintf
-      {sql| INSERT INTO %s (%s) VALUES %s
-            ON CONFLICT (%s)
-            DO NOTHING |sql}
-      table_name (fst col)
-      (sep_by_comma ~parenthesis:true values)
-      (fst col)
+  let insert_req =
+    Caqti_request.Infix.(text_array_param_typ ->. Caqti_type.unit)
+      ~oneshot:true
+      (sprintf
+         "INSERT INTO %s (%s) SELECT unnest(?::text[]) ON CONFLICT (%s) DO \
+          NOTHING"
+         table_name col col )
   in
-  let%bind () =
-    Conn.exec
-      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
-      ()
+  let select_req =
+    Caqti_request.Infix.(text_array_param_typ ->* Caqti_type.(t2 string int))
+      ~oneshot:true
+      (sprintf "SELECT %s, id FROM %s WHERE %s = ANY(?::text[])" col table_name
+         col )
   in
-  let search =
-    sprintf
-      {sql| SELECT %s, id FROM %s
-            WHERE %s in (%s) |sql}
-      (fst col) table_name (fst col) (sep_by_comma values)
-  in
-  Conn.collect_list
-    Caqti_request.Infix.(
-      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
-    ()
+  let%bind () = Conn.exec insert_req values in
+  Conn.collect_list select_req values
 
 (* Like the [None] branch of [select_insert_into_cols]: always INSERT and return
    the new [returning] value. Performs NO content lookup/dedup, so it is safe for
@@ -491,26 +502,48 @@ let upsert_into_cols_returning ~(on_conflict : string)
          ?tannot ~cols:(fst cols) () )
     value
 
-(* No-dedup multi-row insert of one column's pre-rendered SQL literals, returning
-   the new ids in VALUES order (a single INSERT ... RETURNING returns rows in
-   VALUES order in PostgreSQL). Unlike [insert_multi_into_col] there is NO
+(* No-dedup insert of int arrays into the [int[]] column [col] of
+   [table_name], returning the new ids in [values] order. There is NO
    ON CONFLICT and NO content SELECT-back, so it does not require a UNIQUE
    constraint and never deduplicates: identical inputs yield distinct rows. Used
-   for zkapp_field_array.element_ids after its UNIQUE/index was dropped. *)
-let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
-    (module Conn : CONNECTION) (values : string list) =
+   for zkapp_field_array.element_ids after its UNIQUE/index was dropped.
+
+   Ids are reserved from [table_name]'s [id] sequence first and inserted
+   explicitly, so the id-to-value mapping does not depend on the row order of
+   [RETURNING]. Arrays are ragged, so each is bound as one [text[]] element and
+   cast to [int[]] by the server. Two round trips regardless of size. *)
+let insert_int_arrays_no_dedup ~(table_name : string) ~(col : string)
+    (module Conn : CONNECTION) (values : int array list) =
   let open Deferred.Result.Let_syntax in
   match values with
   | [] ->
       return []
   | _ ->
-      let insert =
-        sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table_name col
-          (sep_by_comma ~parenthesis:true values)
+      let reserve_req =
+        Caqti_request.Infix.(Caqti_type.int ->* Caqti_type.int)
+          ~oneshot:true
+          (sprintf
+             "SELECT nextval(pg_get_serial_sequence('%s', 'id')) FROM \
+              generate_series(1, ?)"
+             table_name )
       in
-      Conn.collect_list
-        Caqti_request.Infix.((Caqti_type.unit ->* Caqti_type.int) insert)
-        ()
+      let insert_req =
+        Caqti_request.Infix.(
+          Caqti_type.(t2 array_int_typ text_array_param_typ) ->. Caqti_type.unit)
+          ~oneshot:true
+          (sprintf
+             "INSERT INTO %s (id, %s) SELECT i, e::int[] FROM unnest(?::int[], \
+              ?::text[]) AS u(i, e)"
+             table_name col )
+      in
+      let%bind ids = Conn.collect_list reserve_req (List.length values) in
+      let literals =
+        List.map values ~f:(fun xs ->
+            Array.to_list xs |> List.map ~f:Int.to_string
+            |> String.concat ~sep:"," |> sprintf "{%s}" )
+      in
+      let%map () = Conn.exec insert_req (Array.of_list ids, literals) in
+      ids
 
 (** Unwrap a Caqti result, raising on error. [ctx] names the operation being
     performed and is prepended to the message. *)
