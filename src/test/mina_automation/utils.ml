@@ -118,3 +118,35 @@ let get_memory_usage_mib_of_user_process process =
     |> fun kb -> kb /. 1024.0
   in
   Deferred.return total_memory_mb
+
+(** [log_output_to_file process ~log_file] appends the stdout and stderr of
+    [process] to [log_file] until the process closes them. Nothing else may
+    read them: an undrained pipe blocks the process once it fills. *)
+let log_output_to_file process ~log_file =
+  don't_wait_for
+    (let%bind writer = Writer.open_file ~append:true log_file in
+     let drain reader =
+       Pipe.iter_without_pushback (Reader.pipe reader) ~f:(Writer.write writer)
+     in
+     let%bind () =
+       Deferred.all_unit
+         [ drain (Process.stdout process); drain (Process.stderr process) ]
+     in
+     Writer.close writer )
+
+(** [is_running process] is false once [process] has exited. Async reaps its
+    children, so an exited one is never found as a zombie. *)
+let is_running process = Option.is_none (Deferred.peek (Process.wait process))
+
+(** [terminate ?grace process] sends SIGTERM, and SIGKILL if [process] is
+    still running after [grace] (default 10 s). *)
+let terminate ?(grace = Time.Span.of_sec 10.) process =
+  if not (is_running process) then return ()
+  else (
+    Process.send_signal process Signal.term ;
+    match%bind Clock.with_timeout grace (Process.wait process) with
+    | `Result _ ->
+        return ()
+    | `Timeout ->
+        Process.send_signal process Signal.kill ;
+        Process.wait process >>| ignore )

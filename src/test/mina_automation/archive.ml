@@ -6,27 +6,42 @@ open Core
 open Async
 
 module Config = struct
+  (** [config_file] is [None] for an archive that only follows a daemon; it
+      then takes the genesis ledger from the blocks it is sent. *)
   type t =
-    { config_file : String.t; postgres_uri : String.t; server_port : int }
+    { config_file : String.t option
+    ; postgres_uri : String.t
+    ; server_port : int
+    ; log_level : String.t option
+    }
 
   let to_args t =
-    [ "run"
-    ; "--config-file"
-    ; t.config_file
-    ; "--postgres-uri"
-    ; t.postgres_uri
-    ; "--server-port"
-    ; string_of_int t.server_port
-    ; "--log-json"
-    ]
+    [ "run" ]
+    @ Option.value_map t.config_file ~default:[] ~f:(fun file ->
+          [ "--config-file"; file ] )
+    @ [ "--postgres-uri"
+      ; t.postgres_uri
+      ; "--server-port"
+      ; string_of_int t.server_port
+      ; "--log-json"
+      ]
+    @ Option.value_map t.log_level ~default:[] ~f:(fun level ->
+          [ "--log-level"; level ] )
 
   let create ~config_file ~postgres_uri ~server_port =
-    { config_file; postgres_uri; server_port }
+    { config_file = Some config_file
+    ; postgres_uri
+    ; server_port
+    ; log_level = None
+    }
+
+  let without_config_file ?log_level ~postgres_uri ~server_port () =
+    { config_file = None; postgres_uri; server_port; log_level }
 
   let of_config_file config_file
       ?(postgres_uri = "postgres://postgres:postgres@localhost:5432/archive")
       ?(server_port = 3030) =
-    { config_file; postgres_uri; server_port }
+    create ~config_file ~postgres_uri ~server_port
 end
 
 module Paths = struct

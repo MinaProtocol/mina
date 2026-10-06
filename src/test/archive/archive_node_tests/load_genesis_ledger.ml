@@ -23,7 +23,7 @@ let postgres_user_name = "postgres"
 
 let test_case (test_data : t) =
   let config =
-    { test_data.config with config_file = "genesis_ledgers/mainnet.json" }
+    { test_data.config with config_file = Some "genesis_ledgers/mainnet.json" }
   in
   let logger = Logger.create () in
   let log_file = test_data.temp_dir ^/ "archive.load_genesis_ledger.log" in
