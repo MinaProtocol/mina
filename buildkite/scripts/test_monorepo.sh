@@ -148,6 +148,18 @@ test_find_closest_ancestor() {
   (cd "$repo" && git checkout -q --detach origin/develop)
   assert_equals "develop" "$(closest master "")" \
     "find_closest_ancestor: a strictly closer branch beats the preference"
+
+  # A listed branch with no origin ref (deleted upstream) has no merge-base;
+  # it must not read as distance 0 and win over the real base of a PR that is
+  # a commit ahead of it.
+  (
+    cd "$repo"
+    git checkout -q --detach origin/compatible
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m pr-change
+  )
+  local MAINLINE_BRANCHES=(master compatible gone develop)
+  assert_equals "compatible" "$(closest my-feature compatible)" \
+    "find_closest_ancestor: a branch missing from origin is skipped"
 }
 
 # Test: has_matching_tags with filter_any mode
