@@ -17,7 +17,7 @@
 #                    copy_common_daemon_configs)
 #   archive data  -> the network's latest daily dump from mina-archive-dumps,
 #                    as src/app/rosetta/scripts/init-db.sh restored it
-#   upgrade/downgrade SQL -> src/app/archive/{upgrade_to_mesa,downgrade_to_berkeley}.sql
+#   upgrade/downgrade SQL -> src/app/archive/{upgrade,downgrade}.sql
 #                    (the image had them under /etc/mina/archive)
 #   postgres      -> a cluster created here, as the rosetta image's Dockerfile did
 #
@@ -309,8 +309,8 @@ if [[ -n "$COMPATIBILITY_BRANCH" ]]; then
   echo "Running compatibility test with branch: $COMPATIBILITY_BRANCH"
 
   # In-repo copies of what the image shipped under /etc/mina/archive.
-  upgrade_script_path="./src/app/archive/upgrade_to_mesa.sql"
-  rollback_script_path="./src/app/archive/downgrade_to_berkeley.sql"
+  upgrade_script_path="./src/app/archive/upgrade.sql"
+  rollback_script_path="./src/app/archive/downgrade.sql"
 
   initial_blocks=$(psql "$PG_CONN" -t -c 'SELECT COUNT(*) FROM blocks;' | tr -d ' ')
 
