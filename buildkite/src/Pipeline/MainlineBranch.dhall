@@ -40,7 +40,10 @@ let join =
           \(branches : List Branch)
       ->  Extensions.join "," (Prelude.List.map Branch Text lowerName branches)
 
-let Full = [ Branch.Master, Branch.Compatible, Branch.Mesa, Branch.Develop ]
+let Full =
+    -- the branches the triage measures ancestry against. Mesa stays in the
+    -- type for existing excludeIf rules, but the branch is gone from origin.
+      [ Branch.Master, Branch.Compatible, Branch.Develop ]
 
 in  { Type = Branch
     , Full = Full
