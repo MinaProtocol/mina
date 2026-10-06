@@ -246,7 +246,7 @@ mina-test-executive docker "$TEST_NAME" \
 | `zkapps-timing` | `develop` |
 | `snarkyjs` | `develop` |
 
-In CI the integration tests are driven by `buildkite/scripts/run-test-executive-docker.sh`. The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
+In CI the integration tests are driven by `buildkite/scripts/run-test-executive-docker.sh`. CI runs `block-prod-prio` only when `RUN_OPT_TESTS` is set in the environment that generates the pipeline (see `buildkite/src/Jobs/Test/TestnetIntegrationTests.dhall`). The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
 
 #### Native engine (no Docker)
 
