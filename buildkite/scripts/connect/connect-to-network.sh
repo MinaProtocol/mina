@@ -150,13 +150,13 @@ start_daemon_and_wait_for_sync() {
         sync_status=$(timeout 5 mina-graphql-client sync-status \
             --graphql-uri http://localhost:3085/graphql --raw \
             2>/dev/null || echo "CONNECT_ERROR")
-        if [[ "$sync_status" == "SYNCED" ]]; then
+        if [[ "$sync_status" == "Synced" ]]; then
             break
         fi
         sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
     done
 
-    if [[ "$sync_status" != "SYNCED" ]]; then
+    if [[ "$sync_status" != "Synced" ]]; then
         echo "Error: Daemon failed to sync into network within timeout of $SYNC_TIMEOUT, current status: $sync_status"
         exit 1
     fi
