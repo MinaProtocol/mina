@@ -179,6 +179,30 @@ module Config = struct
 
   let generate_keys t =
     Init.Client.generate_libp2p_keypair_do (libp2p_keypair_folder t) ()
+
+  (** The directory the daemon writes its generated hard fork config to
+      ([auto-fork-*] in its config directory), once it has written one. *)
+  let auto_fork_dir t =
+    let%map entries = Async.Sys.readdir t.dirs.conf in
+    Array.find entries ~f:(String.is_prefix ~prefix:"auto-fork-")
+    |> Option.map ~f:(fun dir -> t.dirs.conf ^/ dir)
+
+  (** Write the key of [account_name], an account of the test config's genesis
+      ledger, where [--block-producer-key] reads it, under the password the
+      test framework gives every key. Returns the path. *)
+  let write_block_producer_key t ~account_name =
+    let (network_keypair : Network_keypair.t) =
+      String.Map.find_exn t.genesis_ledger.keypairs account_name
+    in
+    let path = t.dirs.conf ^/ "block-producer-key" in
+    let%map () =
+      Secrets.Keypair.write_exn network_keypair.keypair ~privkey_path:path
+        ~password:
+          ( lazy
+            (Deferred.return (Bytes.of_string network_keypair.privkey_password))
+            )
+    in
+    path
 end
 
 (** 
@@ -277,9 +301,9 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key ?config_files ?env
-    ?peer_list_url ?node_status_url ?node_error_url ?simplified_node_stats
-    ?(start_filtered_logs = default_init_log_filters) t =
+let start ?hardfork_handling ?block_producer_key ?archive_address ?external_port
+    ?config_files ?env ?peer_list_url ?node_status_url ?node_error_url
+    ?simplified_node_stats ?(start_filtered_logs = default_init_log_filters) t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -329,6 +353,8 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     base_args
     @ opt_arg "--hardfork-handling" hardfork_handling
     @ opt_arg "--block-producer-key" block_producer_key
+    @ opt_arg "--archive-address" archive_address
+    @ opt_arg "--external-port" (Option.map external_port ~f:Int.to_string)
     @ opt_arg "--node-status-url" node_status_url
     @ opt_arg "--node-error-url" node_error_url
     @ bool_flag "--simplified-node-stats" simplified_node_stats

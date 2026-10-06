@@ -23,6 +23,7 @@
   logger
   currency
   integration_test_lib
+  secrets
   mina_graphql_client
   mina_runtime_config
   mina_caqti
