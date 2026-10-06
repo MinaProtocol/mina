@@ -436,8 +436,8 @@ let () =
          ~doc:"N replay only the first N blocks (default: all)"
      and interval =
        flag "--sample-interval"
-         (optional_with_default 0.5 float)
-         ~doc:"SEC sampling period (default 0.5)"
+         (optional_with_default 0.1 float)
+         ~doc:"SEC sampling period (default 0.1)"
      and max_failed =
        flag "--max-failed-blocks"
          (optional_with_default 0 int)
