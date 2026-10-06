@@ -250,6 +250,14 @@
       "libs": 250,
       "opam": 64
     },
+    "exe:test/daemon/graphql_mock:graphql_mock": {
+      "libs": 234,
+      "opam": 60
+    },
+    "exe:test/daemon/graphql_mock:mock_schema_dump": {
+      "libs": 234,
+      "opam": 60
+    },
     "exe:test/node_status_mock_server:node_status_mock_server": {
       "libs": 0,
       "opam": 6
