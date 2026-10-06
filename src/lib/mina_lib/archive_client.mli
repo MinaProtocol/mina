@@ -13,6 +13,15 @@ val dispatch_extensional_block :
   -> Archive_lib.Extensional.Block.t
   -> unit Async.Deferred.Or_error.t
 
+(** Announce a hard fork to the archive ([Announce_hardfork]). Retries only a
+    failed exchange; the archive's reply, accepted or refused, is final. *)
+val announce_hardfork :
+     ?max_tries:int
+  -> logger:Logger.t
+  -> Host_and_port.t Cli_lib.Flag.Types.with_name
+  -> Archive_lib.Hardfork_announcement.Query.t
+  -> Archive_lib.Hardfork_announcement.Reply.t Async.Deferred.Or_error.t
+
 val run :
      logger:Logger.t
   -> precomputed_values:Precomputed_values.t

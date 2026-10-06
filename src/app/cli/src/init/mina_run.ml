@@ -68,6 +68,96 @@ let wait_for_best_tip ~logger ~slot_tx_end mina =
             let%map () = after (Time.Span.of_sec 15.0) in
             `Repeat () ) )
 
+(** Announce the fork a runtime configuration names to the archive process,
+    if one is configured. [side] says whether this daemon is announcing the
+    fork that ends its era ([Before_fork]) or re-sending the one that started
+    it ([After_fork]).
+
+    Best effort: nothing here can stop the daemon, which completes its own
+    transition regardless. Returns the archive's reply, or [None] when there
+    was no archive, no usable configuration, or no answer. *)
+let send_hardfork_config_to_archive ~logger ~side ~archive_location ~config_json
+    =
+  let open Archive_lib.Hardfork_announcement in
+  match archive_location with
+  | None ->
+      return None
+  | Some archive_location -> (
+      match
+        query_of_config ~side ~protocol_version:Protocol_version.current
+          ~config_json
+      with
+      | Error msg ->
+          [%log error]
+            "Auto HF: cannot announce the hard fork to the archive, the \
+             configuration is unusable: %s"
+            msg ;
+          return None
+      | Ok query -> (
+          match%map
+            Mina_lib.Archive_client.announce_hardfork ~logger archive_location
+              query
+          with
+          | Ok (Reply.Accepted Recorded as reply) ->
+              [%log info] "Auto HF: the archive recorded the hard fork" ;
+              Some reply
+          | Ok (Reply.Accepted Already_recorded as reply) ->
+              [%log info] "Auto HF: the archive already records the hard fork" ;
+              Some reply
+          | Ok (Reply.Accepted Era_start as reply) ->
+              [%log debug]
+                "Auto HF: the archive's era began with this fork; nothing to \
+                 hand over" ;
+              Some reply
+          | Ok (Reply.Refused refusal as reply) ->
+              [%log error]
+                "Auto HF: the archive refused the hard fork announcement: %s"
+                (Refusal.to_string refusal) ;
+              Some reply
+          | Error e ->
+              [%log warn]
+                "Auto HF: could not announce the hard fork to the archive: \
+                 $error"
+                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              None ) )
+
+(** Re-send the fork that started this daemon's era, on a slow cadence, for as
+    long as the daemon runs. An archive of this era answers that it has nothing
+    to do; a pre-fork archive that missed the fork, e.g. one restored from a
+    backup, records it and hands over.
+
+    Stops after a refusal: the same payload is not sent to the same archive
+    again, and the refusal was logged at error level. *)
+let hardfork_config_heartbeat ~logger ?(interval = Time.Span.of_hr 1.)
+    ?(stop = Deferred.never ()) ~archive_location runtime_config =
+  match Runtime_config.fork runtime_config with
+  | None ->
+      (* Not a forked network: nothing for the archive to be told about. *)
+      Deferred.unit
+  | Some _ ->
+      let config_json =
+        Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_string
+      in
+      Deferred.repeat_until_finished () (fun () ->
+          if Deferred.is_determined stop then return (`Finished ())
+          else
+            match%bind
+              send_hardfork_config_to_archive ~logger
+                ~side:Archive_lib.Hardfork_announcement.Side.After_fork
+                ~archive_location ~config_json
+            with
+            | Some (Archive_lib.Hardfork_announcement.Reply.Refused _) ->
+                return (`Finished ())
+            | Some (Accepted _) | None ->
+                let%map () = Deferred.any [ after interval; stop ] in
+                `Repeat () )
+
+let start_hardfork_config_heartbeat ~logger ?interval mina =
+  let config = Mina_lib.config mina in
+  hardfork_config_heartbeat ~logger ?interval
+    ~archive_location:config.archive_process_location
+    config.precomputed_values.runtime_config
+
 let start_auto_hardfork_config_generation ~logger mina =
   let open Deferred.Let_syntax in
   let config = Mina_lib.config mina in
@@ -129,6 +219,30 @@ let start_auto_hardfork_config_generation ~logger mina =
               [%log info]
                 "Auto HF: successfully generated hardfork config, shutting \
                  down daemon" ;
+              (* Hand the generated configuration to the archive before we go.
+                 It is the only message the archive's hand-over needs: its
+                 [fork] stanza identifies the fork block, and its ledger
+                 hashes locate and verify the genesis ledger. We are about to
+                 exit, so this is one shot -- the post-fork daemon's heartbeat
+                 is what covers a loss here. *)
+              let%bind () =
+                match%bind
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      Reader.file_contents (config_dir ^/ "daemon.json") )
+                with
+                | Ok config_json ->
+                    send_hardfork_config_to_archive ~logger
+                      ~side:Archive_lib.Hardfork_announcement.Side.Before_fork
+                      ~archive_location:config.archive_process_location
+                      ~config_json
+                    >>| ignore
+                | Error e ->
+                    [%log error]
+                      "Auto HF: generated a hardfork config but could not read \
+                       it back to send to the archive: $error"
+                      ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                    Deferred.unit
+              in
               (* Shutdown like Stop_daemon *)
               Scheduler.yield () >>= fun () -> exit 0
           | Error e ->

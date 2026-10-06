@@ -2,9 +2,8 @@
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
 -- + record status in migration_history
 --
--- 5.0.0 has no schema change yet, so there is nothing to undo. Reverse the
--- steps of upgrade.sql here as they are added, and bump
--- archive.migration_version below.
+-- Reverses the steps of upgrade.sql. Reverse further steps here as they are
+-- added, and bump archive.migration_version below.
 -- ============================================================================
 
 -- NOTE: When modifying this script, please keep TXNs small, and idempotent
@@ -23,7 +22,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.1';
+SET archive.migration_version = '0.0.2';
 
 -- TODO: put below in a common script
 
@@ -98,7 +97,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. No schema change.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drops hardfork_state.',
             'starting'::migration_status
         );
     ELSIF
@@ -115,9 +114,15 @@ BEGIN
     END IF;
 END$$;
 
+-- 2a. Remove what the upgrade added for the automatic hard fork hand-over.
 --
+-- The row describes a fork a 4.0.0 archive has no use for. The daemon sends
+-- its configuration again once the archive is upgraded.
 
--- 2. Update schema_history
+DROP TABLE IF EXISTS hardfork_state;
+DROP TYPE  IF EXISTS hardfork_source;
+
+-- 3. Update schema_history
 
 DO $$
 BEGIN

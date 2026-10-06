@@ -66,6 +66,41 @@ let dispatch_precomputed_block =
 let dispatch_extensional_block =
   make_dispatch_block Archive_lib.Rpc.extensional_block
 
+(** Announce a hard fork to the archive. Retries only a failed exchange -- no
+    connection, no answer -- up to [max_tries]. The archive's reply, accepted
+    or refused, is final and returned as is: a refusal is not retried. *)
+let announce_hardfork ?(max_tries = 5) ~logger
+    (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) query =
+  let rec go tries_left errs =
+    if Int.( <= ) tries_left 0 then
+      return
+        (Error
+           (Error.tag_arg
+              (Error.of_list (List.rev errs))
+              (sprintf
+                 "Could not announce the hard fork to the archive process \
+                  after %d tries. The process may not be running, please check \
+                  the daemon-argument"
+                 max_tries )
+              ( ("host_and_port", archive_location.value)
+              , ("daemon-argument", archive_location.name) )
+              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
+    else
+      match%bind
+        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.announce_hardfork query
+          archive_location.value
+      with
+      | Ok reply ->
+          return (Ok reply)
+      | Error e ->
+          [%log warn]
+            "Could not reach the archive to announce the hard fork: $error. \
+             Retrying..."
+            ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+          go (tries_left - 1) (e :: errs)
+  in
+  go max_tries []
+
 let transfer
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
