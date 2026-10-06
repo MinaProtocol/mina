@@ -4,8 +4,7 @@ module Make (Lib : Intf.Lib_intf) = struct
     | [] ->
         None
     | x :: _ ->
-        Lib.State.mark_scheduled ~logger state x ;
-        Some x
+        Lib.State.schedule_and_build_spec ~logger state x
 end
 
 let%test_module "test" =

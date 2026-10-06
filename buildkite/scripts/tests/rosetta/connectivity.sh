@@ -105,6 +105,9 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_ONLINE_PORT=${MINA_ROSETTA_ONLINE_PORT:=3087}
 export MINA_ROSETTA_OFFLINE_PORT=${MINA_ROSETTA_OFFLINE_PORT:=3088}
+# Required by mina-rosetta, which exits at startup without it; same default as
+# docker-start.sh.
+export MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE:=80}
 
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_LIBP2P_KEYPAIR_PATH="${MINA_LIBP2P_KEYPAIR_PATH:=$HOME/libp2p-keypair}"
@@ -160,13 +163,24 @@ sudo -u postgres createdb -O "${POSTGRES_USERNAME}" "${POSTGRES_DBNAME}"
 psql -f ./src/app/archive/create_schema.sql "${PG_CONN}"
 
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
+ROSETTA_PIDS=()
 for port in "$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT"; do
   mina-rosetta \
     --archive-uri "${PG_CONN}" \
     --graphql-uri "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql" \
     --log-level "${LOG_LEVEL}" \
     --port "${port}" >>rosetta.log 2>&1 &
+  ROSETTA_PIDS+=("$!")
   sleep 5
+done
+# Fail now if rosetta exited at startup, rather than waiting out the whole sync
+# timeout for a server that is not there.
+for pid in "${ROSETTA_PIDS[@]}"; do
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "mina-rosetta (PID ${pid}) exited at startup:"
+    cat rosetta.log
+    exit 1
+  fi
 done
 
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="

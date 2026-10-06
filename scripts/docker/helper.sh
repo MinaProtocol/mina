@@ -20,7 +20,7 @@ function export_base_image () {
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
     ;;
     bookworm)
-        IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
+        IMAGE="debian:bookworm"
     ;;
     esac
     export IMAGE

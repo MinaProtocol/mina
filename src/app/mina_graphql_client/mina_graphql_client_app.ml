@@ -308,7 +308,7 @@ let sync_status_command =
     (let%map_open.Command uri_str = graphql_uri_flag
      and raw =
        flag "--raw" no_arg
-         ~doc:"Print just the bare status string (e.g. SYNCED) instead of JSON"
+         ~doc:"Print just the bare status string (e.g. Synced) instead of JSON"
      in
      fun () ->
        let logger = if raw then Logger.null () else Logger.create () in

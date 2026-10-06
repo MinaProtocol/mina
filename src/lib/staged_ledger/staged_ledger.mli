@@ -283,6 +283,35 @@ val all_work_pairs :
      list
      Or_error.t
 
+(** A single unit of pending SNARK work. Work selection deals in these and their
+    statements; a job's proving spec is built separately. Re-exported from the
+    scan state. *)
+module Available_job : sig
+  type t
+end
+
+(** All the pending work as raw jobs; work selection reads only their statements.
+    Same grouping/order as [all_work_pairs]. *)
+val all_work_jobs : t -> Available_job.t One_or_two.t list
+
+(** Build the full proving spec (statement and transaction witness) for one job —
+    called when a job is dispatched to a worker, the only point the witness is
+    needed. *)
+val single_spec_of_job :
+     get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> Available_job.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
+     Or_error.t
+
+(** The statement of a job (for selection/dedup); [None] only if a merge job's
+    sub-statements fail to merge. *)
+val statement_of_job : Available_job.t -> Transaction_snark.Statement.t option
+
+(** The transaction of a base job (for log summaries); [None] for merge jobs. *)
+val job_transaction : Available_job.t -> Mina_transaction.Transaction.t option
+
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 

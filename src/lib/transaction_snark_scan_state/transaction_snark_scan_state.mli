@@ -193,6 +193,9 @@ val partition_if_overflowing : t -> Space_partition.t
 
 val statement_of_job : Available_job.t -> Transaction_snark.Statement.t option
 
+(** The transaction of a base job (for log summaries); [None] for merge jobs. *)
+val job_transaction : Available_job.t -> Mina_transaction.Transaction.t option
+
 val snark_job_list_json : t -> string
 
 (** All the proof bundles *)
@@ -235,6 +238,22 @@ val all_work_pairs :
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
+     Or_error.t
+
+(** All the pending work as raw jobs. Work selection reads only their statements
+    (via [statement_of_job]); [single_spec_of_job] builds a job's proving spec
+    separately. Same grouping/order as [all_work_pairs]. *)
+val all_work_jobs : t -> Available_job.t One_or_two.t list
+
+(** Build the full proving spec (statement and transaction witness) for one job.
+    The witness is needed only to prove the work, so this is called when a job is
+    dispatched to a worker — not during work selection. *)
+val single_spec_of_job :
+     get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> Available_job.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
      Or_error.t
 
 val write_all_proofs_to_disk :

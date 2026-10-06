@@ -40,7 +40,11 @@ in  Pipeline.build
       , steps =
         [ PublishDebians.step
             PublishDebians.Spec::{
-            , codenames = [ DebianVersions.DebVersion.Bookworm ]
+            , codenames =
+              [ DebianVersions.DebVersion.Bookworm
+              , DebianVersions.DebVersion.Jammy
+              , DebianVersions.DebVersion.Noble
+              ]
             , debianRepo = DebianRepo.Type.O1Test
             , label = "Publish: debians"
             , key = "publish-debians"
