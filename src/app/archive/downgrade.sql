@@ -1,6 +1,7 @@
 -- ============================================================================
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
 -- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
+-- + drop hardfork_state
 -- + record status in migration_history
 --
 -- Reverse further steps of upgrade.sql here as they are added, and bump
@@ -23,7 +24,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.3';
+SET archive.migration_version = '0.0.4';
 
 -- TODO: put below in a common script
 
@@ -98,7 +99,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes and hardfork_state.',
             'starting'::migration_status
         );
     ELSIF
@@ -115,7 +116,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes and hardfork_state.',
             'starting'::migration_status
         );
     ELSIF
@@ -142,7 +143,15 @@ DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
 DROP INDEX IF EXISTS idx_user_commands_source_id;
 DROP INDEX IF EXISTS idx_user_commands_receiver_id;
 
--- 3. Update schema_history
+-- 3. Remove what the upgrade added for the automatic hard fork hand-over.
+--
+-- The row describes a fork a 4.0.0 archive has no use for. The daemon sends
+-- its configuration again once the archive is upgraded.
+
+DROP TABLE IF EXISTS hardfork_state;
+DROP TYPE  IF EXISTS hardfork_source;
+
+-- 4. Update schema_history
 
 DO $$
 BEGIN

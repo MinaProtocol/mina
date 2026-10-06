@@ -2,6 +2,7 @@
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
 -- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + genesis_accounts: the accounts of each era's genesis ledger
+-- + hardfork_state: the hard fork a daemon announces to the archive
 -- + record status in migration_history
 --
 -- Add further 5.0.0 schema changes here as they land, and bump
@@ -24,7 +25,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '5.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.3';
+SET archive.migration_version = '0.0.4';
 
 -- TODO: put below in a common script
 
@@ -99,7 +100,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts and hardfork_state.',
             'starting'::migration_status
         );
     ELSIF
@@ -116,7 +117,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts and hardfork_state.',
             'starting'::migration_status
         );
     ELSIF
@@ -247,7 +248,34 @@ CREATE TABLE IF NOT EXISTS genesis_accounts (
     PRIMARY KEY (public_key, token, genesis_height)
 );
 
--- 4. Update schema_history
+-- 4. `hardfork_state`: what the archive knows about the fork it is passing
+-- through. Created here as well as in create_schema.sql, because a database
+-- built before this version never ran the latter. At most one row can ever
+-- exist: several archive processes may share one database and must not be
+-- able to hold different opinions about the fork.
+--
+-- Run this script before the fork: the pre-fork archive records the
+-- announcement into this table.
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'hardfork_source') THEN
+        CREATE TYPE hardfork_source AS ENUM ('daemon_config', 'fork_genesis', 'operator');
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS hardfork_state (
+    id                      int              PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    fork_state_hash         text             NOT NULL,
+    fork_blockchain_length  bigint           NOT NULL,
+    fork_global_slot        bigint           NOT NULL,
+    config_json             text             NOT NULL,
+    source                  hardfork_source  NOT NULL,
+    announced_at            timestamptz      NOT NULL DEFAULT now(),
+    finalized_at            timestamptz
+);
+
+-- 5. Update schema_history
 
 DO $$
 BEGIN

@@ -1681,6 +1681,14 @@ let hard_fork_genesis_slot_delta t =
   let%map delta = daemon.hard_fork_genesis_slot_delta in
   Mina_numbers.Global_slot_span.of_int delta
 
+(** The [fork] stanza, present exactly when this configuration describes a
+    network that has already forked. It identifies the block the fork was taken
+    from. *)
+let fork t =
+  let open Option.Let_syntax in
+  let%bind proof = t.proof in
+  proof.fork
+
 (** Compute the hard fork genesis slot from the runtime config, if all the stop
     slots and the genesis slot delta have been set. Note that this is the hard
     fork genesis slot expressed as a
