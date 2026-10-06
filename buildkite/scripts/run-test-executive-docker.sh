@@ -124,7 +124,7 @@ fi
   done ) &
 
 export MINA_PROFILE="devnet"
-mina-test-executive local "$TEST_NAME" \
+mina-test-executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   | tee "$TEST_NAME.local.test.log" \

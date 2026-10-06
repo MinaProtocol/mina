@@ -203,7 +203,7 @@ export TEST_NAME=<test>
 export MINA_IMAGE=<url-to-mina-daemon-image>
 export ARCHIVE_IMAGE=<url-to-mina-archive-image>
 
-test_executive local "$TEST_NAME" \
+test_executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   --debug \
@@ -222,7 +222,7 @@ apt-get update && apt-get install -y mina-test-executive
 Then invoke the installed binary directly:
 
 ```bash
-mina-test-executive local "$TEST_NAME" \
+mina-test-executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   --debug \
@@ -246,7 +246,7 @@ mina-test-executive local "$TEST_NAME" \
 | `zkapps-timing` | `develop` |
 | `snarkyjs` | `develop` |
 
-In CI the integration tests are driven by `buildkite/scripts/run-test-executive-local.sh`. The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
+In CI the integration tests are driven by `buildkite/scripts/run-test-executive-docker.sh`. The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
 
 ---
 

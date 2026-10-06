@@ -25,7 +25,7 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
           , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
-              (S.contains "buildkite/scripts/run-test-executive-local")
+              (S.contains "buildkite/scripts/run-test-executive-docker")
           , S.strictlyStart (S.contains "buildkite/scripts/apps")
           ]
         , path = "Test"
@@ -38,19 +38,19 @@ in  Pipeline.build
         , scope = PipelineScope.AllButPullRequest
         }
       , steps =
-        [ TestExecutive.executeLocal "block-prod-prio" dependsOn
-        , TestExecutive.executeLocal "block-reward" dependsOn
-        , TestExecutive.executeLocal "chain-reliability" dependsOn
-        , TestExecutive.executeLocal "epoch-ledger" dependsOn
-        , TestExecutive.executeLocal "genesis-export" dependsOn
-        , TestExecutive.executeLocal "gossip-consis" dependsOn
-        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
-        , TestExecutive.executeLocal "payments" dependsOn
-        , TestExecutive.executeLocal "peers-reliability" dependsOn
-        , TestExecutive.executeLocal "slot-end" dependsOn
-        , TestExecutive.executeLocal "verification-key" dependsOn
-        , TestExecutive.executeLocal "zkapps" dependsOn
-        , TestExecutive.executeLocal "zkapps-timing" dependsOn
-        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
+        [ TestExecutive.executeDocker "block-prod-prio" dependsOn
+        , TestExecutive.executeDocker "block-reward" dependsOn
+        , TestExecutive.executeDocker "chain-reliability" dependsOn
+        , TestExecutive.executeDocker "epoch-ledger" dependsOn
+        , TestExecutive.executeDocker "genesis-export" dependsOn
+        , TestExecutive.executeDocker "gossip-consis" dependsOn
+        , TestExecutive.executeDocker "medium-bootstrap" dependsOn
+        , TestExecutive.executeDocker "payments" dependsOn
+        , TestExecutive.executeDocker "peers-reliability" dependsOn
+        , TestExecutive.executeDocker "slot-end" dependsOn
+        , TestExecutive.executeDocker "verification-key" dependsOn
+        , TestExecutive.executeDocker "zkapps" dependsOn
+        , TestExecutive.executeDocker "zkapps-timing" dependsOn
+        , TestExecutive.executeDocker "zkapps-nonce" dependsOn
         ]
       }
