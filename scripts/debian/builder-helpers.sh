@@ -526,6 +526,10 @@ build_rosetta_generic_deb() {
     "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
   cp ./default/src/app/rosetta/search_test/rosetta_search_test.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta-search-test"
+  cp ./default/src/app/rosetta/load/rosetta_load_cli.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-load"
+  cp ./default/src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-connectivity-test"
 
   build_deb "${package_name}"
 }
