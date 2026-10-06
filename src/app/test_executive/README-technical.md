@@ -8,7 +8,7 @@ reliability, payment processing, and ZkApp functionality.
 ## Features
 
 - Modular test architecture with pluggable test implementations
-- Supports multiple test execution engines (currently the Docker-based `docker` engine)
+- Supports two test execution engines: `docker` (nodes in Docker containers) and `native` (nodes as processes on the host)
 - Comprehensive test suite covering various aspects of the Mina protocol
 - Detailed test reporting with color-coded error categorization
 - Live monitoring of node status during test execution
@@ -21,6 +21,7 @@ reliability, payment processing, and ZkApp functionality.
 - OPAM package dependencies for Mina
 - Docker (for `docker` engine tests)
 - Docker Compose (for `docker` engine tests)
+- PostgreSQL, `psql`, `pg_dump` and `jq` (for `native` engine tests with archive nodes)
 
 ## Compilation
 
@@ -38,7 +39,7 @@ _build/default/src/app/test_executive/test_executive.exe docker TEST_NAME --mina
 
 ### Arguments:
 
-- `docker`: Currently the only supported engine
+- `docker` or `native`: the engine. For `native`, `--mina-image` and `--archive-image` are paths to the `mina` and `mina-archive` binaries; see `docs/tests.md`
 - `TEST_NAME`: Name of the test to run (see available tests below)
 - `--mina-image`: Docker image for Mina nodes (required)
 - `--archive-image`: Docker image for archive nodes (required for tests using archive nodes)
@@ -82,7 +83,8 @@ The Test Executive uses a modular architecture with several key components:
    defining the test configuration and execution logic.
 
 2. **Test Engine**: The engine handles deployment and management of the test environment.
-   Currently, only the `docker` engine is supported, which uses Docker for test execution.
+   The `docker` engine runs every node in Docker. The `native` engine runs `mina` and
+   `mina-archive` processes on the host; it is for local runs (`make intgtest-native`).
 
 3. **Domain-Specific Language (DSL)**: The DSL provides high-level abstractions for
    interacting with the test network, such as waiting for conditions, sending transactions,

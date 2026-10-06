@@ -58,6 +58,7 @@
 (package (name integers_stubs_js))
 (package (name integration_test_docker_engine))
 (package (name integration_test_lib))
+(package (name integration_test_native_engine))
 (package (name internal_tracing))
 (package (name interpolator_lib))
 (package (name interruptible))
