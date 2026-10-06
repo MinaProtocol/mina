@@ -74,7 +74,6 @@ let PackagingSpec =
           , arch : Arch.Type
           , deb_legacy_version : Text
           , deb_legacy_githash_config : Text
-          , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
           , generic : Bool
           , suffix : Optional Text
@@ -98,7 +97,6 @@ let PackagingSpec =
           , deb_legacy_version = "3.5.0-mainnet-stop-slot-8110ede"
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
-          , docker_publish = DockerPublish.Type.Essential
           , docker_repo = DockerRepo.Type.InternalEurope
           , generic = False
           , if_ = None B/If
@@ -531,6 +529,25 @@ let genericFromAnotherBuild
       -- the same version.
       Some env:MINA_GENERIC_CACHE_ROOT as Text ? None Text
 
+let buildCacheDir
+    : Text -> Text
+    =
+      -- Packaging never pushes. It writes its images here (build.sh
+      -- --build-cache-dir), and the publish stage pushes them after the gate
+      -- (publish_from_cache.sh), as it publishes the debians.
+      \(build : Text) -> "/var/storagebox/${build}/docker-images"
+
+let ownBuildCacheDir = buildCacheDir "\\\${BUILDKITE_BUILD_ID}"
+
+let genericBuildCacheDir
+    : Text
+    =
+      -- The -generic images: built by this build, or by the generic stage
+      -- when MINA_GENERIC_CACHE_ROOT names it.
+      merge
+        { Some = buildCacheDir, None = ownBuildCacheDir }
+        genericFromAnotherBuild
+
 let dependsOnGenericJob
     : List Command.TaggedKey.Type -> List Command.TaggedKey.Type
     =
@@ -663,9 +680,9 @@ let docker_step
                 DockerImage.ReleaseSpec::{
                 , deps = dependsOnGeneric
                 , service = Docker.Type.DaemonProfiled { profile = profile }
+                , base_cache_dir = Some genericBuildCacheDir
                 , network = network
                 , deb_codename = spec.debVersion
-                , docker_publish = spec.docker_publish
                 , deb_profile = profile
                 , build_flags = spec.buildFlags
                 , deb_install_mode = DockerImage.DebianInstallMode.DownloadOnly
@@ -688,7 +705,6 @@ let docker_step
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
-                          , docker_publish = spec.docker_publish
                           , deb_legacy_version = spec.deb_legacy_version
                           , size = size
                           }
@@ -709,7 +725,6 @@ let docker_step
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
-                          , docker_publish = spec.docker_publish
                           , deb_legacy_version = spec.deb_legacy_version
                           , arch = spec.arch
                           , size = size
@@ -724,7 +739,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -744,9 +758,9 @@ let docker_step
                                   }
                                 ]
                           , service = Docker.Type.Daemon { network = network }
+                          , base_cache_dir = Some ownBuildCacheDir
                           , network = network
                           , deb_codename = spec.debVersion
-                          , docker_publish = spec.docker_publish
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , deb_install_mode =
@@ -763,7 +777,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -778,7 +791,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -795,7 +807,6 @@ let docker_step
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
-                          , docker_publish = spec.docker_publish
                           , deb_legacy_version = spec.deb_legacy_version
                           , verify = True
                           , arch = spec.arch
@@ -811,7 +822,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -825,6 +835,7 @@ let docker_step
                     ->  [ DockerImage.ReleaseSpec::{
                           , deps = withDocker Docker.Type.RosettaGeneric
                           , service = Docker.Type.Rosetta { network = network }
+                          , base_cache_dir = Some ownBuildCacheDir
                           , network = network
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -833,7 +844,6 @@ let docker_step
                                   (Docker.Type.Rosetta { network = network })
                               )
                           , deb_codename = spec.debVersion
-                          , docker_publish = spec.docker_publish
                           , deb_install_mode =
                               DockerImage.DebianInstallMode.DownloadOnly
                           , arch = spec.arch
@@ -872,6 +882,8 @@ let docker_commands
                                   DebianChannel.effective spec.channel
                               , docker_repo =
                                   DockerRepo.effective spec.docker_repo
+                              , docker_publish = DockerPublish.Type.Disabled
+                              , build_cache_dir = Some ownBuildCacheDir
                               }
                         )
                 )
