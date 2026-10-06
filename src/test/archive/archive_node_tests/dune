@@ -16,6 +16,7 @@
    cmdliner
    yojson
    ;; mina libraries
+   integration_test_lib
    archive_lib
    init
    mina_runtime_config

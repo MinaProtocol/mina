@@ -58,6 +58,15 @@ let () =
                           (Hardfork_rpc) ) )
         ] )
     ; ("daemon_hardfork_rpc", Daemon_hardfork_rpc.tests)
+    ; ( "prefork_handover"
+      , [ test_case
+            "One node forks on its own; daemon, archive and Rosetta hand over"
+            `Slow
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Prefork_handover) ) )
+        ] )
     ; ( "rosetta_fork_detection"
       , [ test_case
             "Pre-fork Rosetta stands down once a fork is recorded and the \
