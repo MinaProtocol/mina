@@ -20,7 +20,7 @@ in  { step =
                     , "MINA_TEST_NETWORK_DATA=src/test/archive/sample_db"
                     , "APPS_BUILD_FLAG=instrumented"
                     , "MINA_PROFILE=devnet"
-                    , "APPS_BARE_BINARIES=archive_node_tests.exe:mina-archive-node-test,archive.exe:mina-archive,archive_blocks.exe:mina-archive-blocks,replayer.exe:mina-replayer,mina.exe:mina,runtime_genesis_ledger.exe:mina-create-genesis,mina_archive_healthcheck.exe:mina-archive-healthcheck"
+                    , "APPS_BARE_BINARIES=archive_node_tests.exe:mina-archive-node-test,archive.exe:mina-archive,archive_blocks.exe:mina-archive-blocks,replayer.exe:mina-replayer,mina.exe:mina,runtime_genesis_ledger.exe:mina-create-genesis,mina_archive_healthcheck.exe:mina-archive-healthcheck,rosetta.exe:mina-rosetta"
                     ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Script
@@ -28,7 +28,7 @@ in  { step =
                         )
                     )
                     ContainerImages.minaToolchainBookworm.amd64
-                    "mina-test-suite,mina-generic-instrumented,mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
+                    "mina-test-suite,mina-generic-instrumented,mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented,mina-rosetta-generic-instrumented"
                     "./scripts/tests/archive-node-test.sh"
                 , Cmd.run
                     "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
