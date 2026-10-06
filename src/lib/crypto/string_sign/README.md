@@ -1,8 +1,16 @@
 # String Sign
 
-A library for signing and verifying strings using Schnorr signatures in the Mina
+**DEPRECATED: This library should not be used anymore.**
+
+The implementation has been moved to `signature_lib`. Please use
+`signature_lib.Schnorr.Legacy` or `signature_lib.Schnorr.Chunked` directly
+for signing operations.
+
+---
+
+~~A library for signing and verifying strings using Schnorr signatures in the Mina
 protocol. This library simplifies the process of signing arbitrary strings and
-verifying those signatures, with support for different network types.
+verifying those signatures, with support for different network types.~~
 
 ## Overview
 
