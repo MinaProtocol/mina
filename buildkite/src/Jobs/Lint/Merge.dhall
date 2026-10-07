@@ -8,6 +8,8 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Cmd = ../../Lib/Cmds.dhall
 
 let Command = ../../Command/Base.dhall
@@ -62,7 +64,10 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh master" ]
+            , commands =
+              [ RunInToolchain.submoduleInit "src/lib/crypto/proof-systems"
+              , Cmd.run "scripts/merged-to-proof-systems.sh master"
+              ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems master branch"
             , key = "merged-to-proof-systems-master"
@@ -75,7 +80,10 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "scripts/merged-to-kimchi-stubs-vendors.sh main" ]
+              [ RunInToolchain.submoduleInit
+                  "src/lib/crypto/kimchi_bindings/stubs/kimchi-stubs-vendors"
+              , Cmd.run "scripts/merged-to-kimchi-stubs-vendors.sh main"
+              ]
             , label =
                 "[kimchi-stubs-vendors] Check merges cleanly into kimchi-stubs-vendors main branch"
             , key = "merged-to-kimchi-stubs-vendors-main"
