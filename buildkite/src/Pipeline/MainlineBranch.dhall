@@ -40,7 +40,9 @@ let join =
           \(branches : List Branch)
       ->  Extensions.join "," (Prelude.List.map Branch Text lowerName branches)
 
-let Full = [ Branch.Master, Branch.Compatible, Branch.Mesa, Branch.Develop ]
+let Full =
+    -- the branches the triage measures ancestry against
+      [ Branch.Master, Branch.Compatible, Branch.Develop ]
 
 in  { Type = Branch
     , Full = Full
