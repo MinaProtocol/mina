@@ -41,8 +41,7 @@ let join =
       ->  Extensions.join "," (Prelude.List.map Branch Text lowerName branches)
 
 let Full =
-    -- the branches the triage measures ancestry against. Mesa stays in the
-    -- type for existing excludeIf rules, but the branch is gone from origin.
+    -- the branches the triage measures ancestry against
       [ Branch.Master, Branch.Compatible, Branch.Develop ]
 
 in  { Type = Branch
