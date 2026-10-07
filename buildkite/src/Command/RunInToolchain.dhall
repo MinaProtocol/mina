@@ -104,4 +104,5 @@ let runInDefaultToolchain
 in  { Config = Config
     , runInToolchain = runInToolchain
     , runInDefaultToolchain = runInDefaultToolchain
+    , submodulesInit = submodulesInit
     }

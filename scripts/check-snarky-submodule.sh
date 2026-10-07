@@ -2,6 +2,10 @@
 
 set -eu
 
+# CI agents do not always check out submodules. Init this one (not recursive,
+# full history: the ancestry check below needs it).
+git submodule update --init -- src/lib/snarky
+
 cd src/lib/snarky
 
 CURR=$(git rev-parse HEAD)

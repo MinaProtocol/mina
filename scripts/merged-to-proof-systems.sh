@@ -7,6 +7,10 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
+# CI agents do not always check out submodules. Init this one (not recursive,
+# full history: the ancestry check below needs it).
+git submodule update --init -- src/lib/crypto/proof-systems
+
 cd src/lib/crypto/proof-systems
 
 CURR=$(git rev-parse HEAD)
@@ -23,7 +27,7 @@ fi
 BRANCH=$1
 
 function in_branch {
-  if git rev-list origin/$1 | grep -q $CURR; then
+  if git rev-list origin/"$1" | grep -q "$CURR"; then
     echo "Proof systems submodule commit is an ancestor of $1"
     true
   else
@@ -31,7 +35,7 @@ function in_branch {
   fi
 }
 
-if (! in_branch ${BRANCH}); then
+if (! in_branch "${BRANCH}"); then
   echo "Proof-systems submodule commit is NOT an ancestor of ${BRANCH} branch"
   exit 1
 fi
