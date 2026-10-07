@@ -592,3 +592,37 @@ CREATE TABLE blocks_zkapp_commands
 CREATE INDEX idx_blocks_zkapp_commands_block_id ON blocks_zkapp_commands(block_id);
 CREATE INDEX idx_blocks_zkapp_commands_zkapp_command_id ON blocks_zkapp_commands(zkapp_command_id);
 CREATE INDEX idx_blocks_zkapp_commands_sequence_no ON blocks_zkapp_commands(sequence_no);
+
+/* -----------------------------------------------------------------------
+   Genesis ledger accounts
+
+   The state of every account when an era's genesis ledger took effect. No
+   block touched these accounts, so they are initial conditions, not block
+   effects, and do not belong in accounts_accessed.
+
+   A balance query is a snapshot lookup: the most recent block at or below the
+   requested height where the account appears. An account untouched since its
+   era's genesis appears in no such block; this table answers for it.
+
+   Append only, keyed by the height the ledger takes effect at: a database
+   spans every era it has lived through, and a query at a pre-fork height
+   still needs that era's genesis balance. Timing columns are NULL for untimed
+   accounts.
+*/
+
+CREATE TABLE genesis_accounts
+( genesis_height           bigint  NOT NULL
+, public_key               text    NOT NULL
+, token                    text    NOT NULL
+, balance                  text    NOT NULL
+, nonce                    bigint  NOT NULL
+, initial_minimum_balance  text
+, cliff_time               bigint
+, cliff_amount             text
+, vesting_period           bigint
+, vesting_increment        text
+, PRIMARY KEY (genesis_height, public_key, token)
+);
+
+CREATE INDEX idx_genesis_accounts_lookup
+  ON genesis_accounts(public_key, token, genesis_height DESC);
