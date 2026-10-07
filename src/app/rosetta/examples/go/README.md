@@ -6,6 +6,8 @@ These examples are intentionally minimal. For Go, the upstream `mesh-sdk-go/exam
 
 ## Setup
 
+Requires Go 1.21 or newer.
+
 ```bash
 cd src/app/rosetta/examples/go
 go mod download
