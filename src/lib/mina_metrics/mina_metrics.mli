@@ -615,8 +615,9 @@ module Archive : sig
 
   val missing_blocks : t -> Gauge.t
 
-  (** Time from the archive accepting a block ingest request to answering it,
-      labelled by the source that sent the block. *)
+  (** Time from the archive accepting a block ingest request until its ingest
+      loop takes the block off the queue, labelled by the source that sent
+      the block. This is queueing time, not the block's own write. *)
   val ingest_duration_ms : t -> string -> Ingest_duration_histogram.t
 
   val create_archive_server :

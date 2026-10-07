@@ -4872,7 +4872,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
    than alongside the polling loop that fills the gauges, because the handlers
    record into the same registry. A consequence is that the metrics endpoint
    answers earlier than it used to: from before the genesis ledger is
-   imported, rather than after. *)
+   imported, rather than after, and also when the database connection
+   fails. *)
 let create_metrics_server ~logger ~metrics_server_port =
   match metrics_server_port with
   | None ->
@@ -4902,8 +4903,7 @@ let serve_metrics_server ~logger ~metric_server ~missing_blocks_width
         in
         after interval
       in
-      Deferred.forever () serve ;
-      Deferred.unit
+      Deferred.forever () serve ; Deferred.unit
 
 (* for running the archive process *)
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
@@ -4923,10 +4923,12 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     Strict_pipe.create ~name:"extensional_archive_block" Synchronous
   in
   (* Each handler is timed as a whole, so the histogram records the span the
-     sender waits for, not the span the database write takes. A [Synchronous]
-     pipe does not acknowledge a write until the reader has taken it, and the
-     reader handles one block at a time, so this span already includes waiting
-     for whatever the archive was doing before. *)
+     sender waits for. A [Synchronous] pipe acknowledges a write when the
+     reader takes the value, and the reader takes it before it writes the
+     block, so the span is the time spent queueing behind blocks already being
+     written, not this block's own write. Each source has its own pipe and
+     reader, so one source does not queue behind another; they share only the
+     database connection pool. *)
   let time_ingest = Metrics.time_ingest metric_server in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->

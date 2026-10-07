@@ -37,10 +37,10 @@ let default_missing_blocks_width = 2000
     took in the [ingest_duration_ms] histogram, under the label [source].
 
     [f] is the whole RPC handler, so the span measured is the one the sender
-    experiences: from the moment the archive accepts the call to the moment it
-    answers. It therefore includes any time the handler spent waiting behind
-    work the archive was already doing, which is the point -- this is the
-    number that must not move when the archive is given a background job.
+    experiences: from the moment the archive accepts the call until the ingest
+    loop takes the block off its queue. The loop handles one block at a time,
+    so this is the time the block waited behind blocks already being written.
+    It does not include the block's own write, which {!time} logs separately.
 
     [metric_server] is [None] when the archive was started without
     [--metrics-port]. Then nothing is recorded and [f] runs unchanged. *)

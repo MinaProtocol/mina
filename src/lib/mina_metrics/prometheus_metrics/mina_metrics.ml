@@ -1834,7 +1834,7 @@ let server ?forward_uri ~port ~logger () =
 
 module Archive = struct
   (* How long the archive held one block ingest request, in milliseconds.
-     The interesting range is wide: a healthy write is a few milliseconds,
+     The interesting range is wide: an idle archive answers in about 0 ms,
      while the daemon that sent the block gives up at the RPC heartbeat
      timeout of 60 s. Buckets 1, 4, 16, ... 16384 ms cover both ends. *)
   module Ingest_duration_histogram = Histogram (struct
@@ -1884,10 +1884,11 @@ module Archive = struct
       the block: "diff" for the daemon feed, "precomputed" or "extensional"
       for a block pushed by a client.
 
-      This is the time the sender waits, not the time the database write
-      takes, so it includes queueing behind whatever the archive is already
-      doing. That is what makes it the number to watch when anything else is
-      given work to do inside the archive process. *)
+      This is the time the sender waits: from accepting the call until the
+      ingest loop takes the block off its queue. It is the time spent
+      queueing behind blocks already being written, and does not include the
+      block's own write. Each source has its own queue, so one source does
+      not queue behind another. *)
   let ingest_duration_ms t = t.ingest_duration_ms
 
   let create_archive_server ?forward_uri ~port ~logger () =
@@ -1902,8 +1903,8 @@ module Archive = struct
         Ingest_duration_histogram.v_label ~label_name:"source"
           ~registry:archive_registry
           ~help:
-            "Time the archive held a block ingest request, in milliseconds, by \
-             the source that sent it"
+            "Time a block ingest request waited before the archive took the \
+             block off its queue, in milliseconds, by the source that sent it"
           ~namespace ~subsystem "ingest_duration_ms"
     }
 end
