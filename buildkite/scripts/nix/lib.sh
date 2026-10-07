@@ -36,4 +36,8 @@ prepare_nix_workdir() {
   git branch -D "$BUILDKITE_BRANCH" 2>/dev/null || true
   git checkout -b "$BUILDKITE_BRANCH"
   git reset --hard "$BUILDKITE_COMMIT"
+
+  # `?submodules=1` reads the submodules from the working tree, and CI agents
+  # do not always check them out.
+  git submodule update --init --recursive --depth 1
 }
