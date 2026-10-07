@@ -23,7 +23,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.2';
+SET archive.migration_version = '0.0.3';
 
 -- TODO: put below in a common script
 
@@ -98,7 +98,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes.',
             'starting'::migration_status
         );
     ELSIF
@@ -115,7 +115,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes.',
             'starting'::migration_status
         );
     ELSIF
@@ -132,9 +132,12 @@ BEGIN
     END IF;
 END$$;
 
---
+-- 2. Drop genesis_accounts. The archive writes it again from the genesis
+-- ledger at start-up once the database is upgraded.
 
--- 2. Drop the user_commands account indexes added by upgrade.sql
+DROP TABLE IF EXISTS genesis_accounts;
+
+-- 3. Drop the user_commands account indexes added by upgrade.sql
 --
 -- DROP INDEX takes an ACCESS EXCLUSIVE lock on user_commands. lock_timeout
 -- above bounds how long it waits for that lock (it can queue behind running
@@ -144,7 +147,7 @@ DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
 DROP INDEX IF EXISTS idx_user_commands_source_id;
 DROP INDEX IF EXISTS idx_user_commands_receiver_id;
 
--- 3. Update schema_history
+-- 4. Update schema_history
 
 DO $$
 BEGIN
