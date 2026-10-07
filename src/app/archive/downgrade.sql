@@ -1,9 +1,9 @@
 -- ============================================================================
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
+-- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
 -- + record status in migration_history
 --
--- 5.0.0 has no schema change yet, so there is nothing to undo. Reverse the
--- steps of upgrade.sql here as they are added, and bump
+-- Reverse further steps of upgrade.sql here as they are added, and bump
 -- archive.migration_version below.
 -- ============================================================================
 
@@ -23,7 +23,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.1';
+SET archive.migration_version = '0.0.2';
 
 -- TODO: put below in a common script
 
@@ -98,7 +98,24 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. No schema change.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'starting'::migration_status
+        );
+    ELSIF
+        latest_protocol_version = target_protocol_version AND
+        latest_migration_version < target_migration_version
+    THEN
+        -- An earlier revision of this script already ran. Its steps are
+        -- idempotent, so record a new attempt and apply them again.
+        RAISE NOTICE
+          'Advancing migration version % -> % for protocol version %',
+          latest_migration_version, target_migration_version, target_protocol_version;
+        INSERT INTO migration_history(
+            protocol_version, migration_version, description, status
+        ) VALUES (
+            target_protocol_version,
+            target_migration_version,
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
             'starting'::migration_status
         );
     ELSIF
@@ -117,7 +134,17 @@ END$$;
 
 --
 
--- 2. Update schema_history
+-- 2. Drop the user_commands account indexes added by upgrade.sql
+--
+-- DROP INDEX takes an ACCESS EXCLUSIVE lock on user_commands. lock_timeout
+-- above bounds how long it waits for that lock (it can queue behind running
+-- reads until then), not how long it is held. On a live archive,
+-- DROP INDEX CONCURRENTLY outside this script avoids the wait entirely.
+DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
+DROP INDEX IF EXISTS idx_user_commands_source_id;
+DROP INDEX IF EXISTS idx_user_commands_receiver_id;
+
+-- 3. Update schema_history
 
 DO $$
 BEGIN
