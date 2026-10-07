@@ -45,6 +45,13 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
+     and settle_pending_blocks =
+       flag "--settle-pending-blocks"
+         ~aliases:[ "-settle-pending-blocks" ]
+         no_arg
+         ~doc:
+           "Before accepting blocks, settle the pending blocks that can no \
+            longer stay pending (see the settle-pending-blocks command)"
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
@@ -61,6 +68,18 @@ let command_run =
        let proof_cache_db = Proof_cache_tag.create_identity_db () in
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
+       let%bind.Deferred () =
+         if settle_pending_blocks then
+           Deferred.map
+             (Archive_lib.Pending_blocks.settle_uri ~logger postgres.value)
+             ~f:(function
+             | Ok (_ : Archive_lib.Pending_blocks.t) ->
+                 ()
+             | Error e ->
+                 failwithf "Could not settle pending blocks: %s"
+                   (Caqti_error.show e) () )
+         else Deferred.unit
+       in
        Archive_lib.Processor.setup_server ~proof_cache_db ~metrics_server_port
          ~logger ~genesis_constants ~constraint_constants ~chunks_length
          ~postgres_address:postgres.value
@@ -136,4 +155,33 @@ let command_prune =
              ~metadata:
                (("error", `String (Caqti_error.show err)) :: cmd_metadata) )
 
-let commands = [ ("run", command_run); ("prune", command_prune) ]
+let command_settle_pending_blocks =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Settle the pending blocks that can no longer stay pending: at the \
+       newest hard fork, make the chain to the fork block canonical and orphan \
+       the rest of the ended chain; then orphan pending blocks at heights that \
+       have a canonical block"
+    (let%map_open postgres = Flag.Uri.Archive.postgres
+     and dry_run =
+       flag "--dry-run" ~aliases:[ "-dry-run" ] no_arg
+         ~doc:"Report what would change, and change nothing"
+     in
+     fun () ->
+       let logger = Logger.create () in
+       match%map.Deferred
+         Archive_lib.Pending_blocks.settle_uri ~dry_run ~logger postgres.value
+       with
+       | Ok t ->
+           print_endline
+             (Yojson.Safe.to_string (Archive_lib.Pending_blocks.to_yojson t))
+       | Error e ->
+           failwithf "Could not settle pending blocks: %s" (Caqti_error.show e)
+             () )
+
+let commands =
+  [ ("run", command_run)
+  ; ("prune", command_prune)
+  ; ("settle-pending-blocks", command_settle_pending_blocks)
+  ]
