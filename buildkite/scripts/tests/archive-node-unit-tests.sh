@@ -69,6 +69,9 @@ dune runtest src/test/mina_automation/test/synthetic_archive
 # A running Rosetta asked for a balance after a hard fork
 dune runtest src/test/rosetta_fork_balance
 
+# Rosetta account balances read from the archive: blocks and genesis ledgers
+dune runtest src/test/rosetta_genesis_balances
+
 # mina-archive-healthcheck: hermetic CLI smoke tests, plus DB-backed tests on
 # the same server ($MINA_TEST_POSTGRES)
 dune runtest src/app/mina_archive_healthcheck
