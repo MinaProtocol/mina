@@ -58,4 +58,19 @@ let () =
                           (Hardfork_rpc) ) )
         ] )
     ; ("daemon_hardfork_rpc", Daemon_hardfork_rpc.tests)
+    ; ( "rosetta_fork_detection"
+      , [ test_case
+            "Pre-fork Rosetta stands down once a fork is recorded and the \
+             schema moved on"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Rosetta_fork_detection) ) )
+        ; test_case "What the stand-down watcher reads from the database" `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Rosetta_fork_detection.Verdicts) ) )
+        ] )
     ]

@@ -2,6 +2,9 @@
  (names archive_node_tests)
  (libraries
    ;; opam libraries
+   caqti
+   caqti-async
+   uri
    async_kernel
    core_kernel
    ppx_inline_test.config
@@ -18,6 +21,7 @@
    mina_runtime_config
    cli_lib
    logger
+   mina_caqti
    mina_lib
    mina_automation
    mina_automation.fixture
