@@ -76,6 +76,10 @@ let submodulesInit
 
           else  [] : List Cmd.Type
 
+let submoduleInit =
+    -- one submodule, not recursive, with full history (for ancestry checks)
+      \(path : Text) -> Cmd.run "git submodule update --init -- ${path}"
+
 let runInToolchain
     : Config.Type -> List Cmd.Type
     =     \(c : Config.Type)
@@ -104,4 +108,6 @@ let runInDefaultToolchain
 in  { Config = Config
     , runInToolchain = runInToolchain
     , runInDefaultToolchain = runInDefaultToolchain
+    , submodulesInit = submodulesInit
+    , submoduleInit = submoduleInit
     }

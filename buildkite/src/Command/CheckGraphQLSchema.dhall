@@ -9,9 +9,12 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                  RunInToolchain.runInDefaultToolchain
-                    ([] : List Text)
-                    "./buildkite/scripts/check-graphql-schema.sh"
+                  RunInToolchain.runInToolchain
+                    RunInToolchain.Config::{
+                    , submodules = True
+                    , innerScript =
+                        "./buildkite/scripts/check-graphql-schema.sh"
+                    }
               , label = "Check GraphQL Schema"
               , key = "check-graphql-schema"
               , target = Size.Large
