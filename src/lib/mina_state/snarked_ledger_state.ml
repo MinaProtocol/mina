@@ -141,6 +141,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
 
     let with_empty_local_state ~source_total_currency ~target_total_currency
+        ~source_ledger_after_coinbase ~target_ledger_after_coinbase
+        ~source_total_supply_after_coinbase ~target_total_supply_after_coinbase
         ~source_fee_excess ~target_fee_excess ~sok_digest
         ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger ~target_second_pass_ledger
@@ -157,6 +159,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; local_state = Local_state.empty ()
           ; fee_excess = source_fee_excess
           ; total_currency = source_total_currency
+          ; ledger_after_coinbase = source_ledger_after_coinbase
+          ; total_supply_after_coinbase = source_total_supply_after_coinbase
           }
       ; target =
           { first_pass_ledger = target_first_pass_ledger
@@ -165,6 +169,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; local_state = Local_state.empty ()
           ; fee_excess = target_fee_excess
           ; total_currency = target_total_currency
+          ; ledger_after_coinbase = target_ledger_after_coinbase
+          ; total_supply_after_coinbase = target_total_supply_after_coinbase
           }
       }
 
@@ -179,6 +185,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; pending_coinbase
           ; local_state_typ
           ; fee_excess
+          ; amount
+          ; ledger_hash
           ; amount
           ]
           ~var_to_hlist:Registers.to_hlist ~var_of_hlist:Registers.of_hlist
@@ -240,6 +248,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
       ; total_currency =
           Currency.Amount.to_yojson t.total_currency |> Yojson.Safe.to_string
+      ; ledger_after_coinbase = display_ledger_hash t.ledger_after_coinbase
+      ; total_supply_after_coinbase =
+          Currency.Amount.to_yojson t.total_supply_after_coinbase
+          |> Yojson.Safe.to_string
       }
     in
     { Poly.source = display_register t.source
@@ -257,6 +269,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; local_state = Local_state.dummy ()
       ; fee_excess = Fee_excess.empty
       ; total_currency = genesis_total_currency
+      ; ledger_after_coinbase = genesis_ledger_hash
+      ; total_supply_after_coinbase = genesis_total_currency
       }
     in
     { source = registers
@@ -622,9 +636,17 @@ module Make_str (A : Wire_types.Concrete) = struct
     let connecting_ledger_left = s1.connecting_ledger_left in
     let connecting_ledger_right = s2.connecting_ledger_right in
     (*The total currency is a register: [s1] must end where [s2] begins.*)
-    let%map () =
+    let%bind () =
       or_error_of_bool ~error:"Total currency is not connected"
         (Currency.Amount.equal s1.target.total_currency s2.source.total_currency)
+    in
+    (*So are the values recorded as of the most recent coinbase.*)
+    let%map () =
+      or_error_of_bool ~error:"Post-coinbase state is not connected"
+        ( Frozen_ledger_hash.equal s1.target.ledger_after_coinbase
+            s2.source.ledger_after_coinbase
+        && Currency.Amount.equal s1.target.total_supply_after_coinbase
+             s2.source.total_supply_after_coinbase )
     in
     ( { source = s1.source
       ; target = s2.target

@@ -37,44 +37,44 @@
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 12,877      | 298          | 37,511          |
-    | zkapp-opt_signed-opt_signed | 16,334      | 298          | 73,489          |
-    | zkapp-opt_signed            | 8,926       | 298          | 40,599          |
-    | zkapp-proved                | 5,149       | 298          | 39,165          |
+    | transaction-merge           | 592         | 302          | 2,115           |
+    | transaction-base            | 12,910      | 302          | 37,863          |
+    | zkapp-opt_signed-opt_signed | 16,364      | 302          | 73,839          |
+    | zkapp-opt_signed            | 8,956       | 302          | 40,949          |
+    | zkapp-proved                | 5,179       | 302          | 39,515          |
     v}
 
     {b Devnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 15,357      | 298          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
-    | zkapp-proved                | 5,106       | 298          | 39,736          |
+    | transaction-merge           | 592         | 302          | 2,115           |
+    | transaction-base            | 15,357      | 302          | 63,806          |
+    | zkapp-opt_signed-opt_signed | 16,206      | 302          | 74,242          |
+    | zkapp-opt_signed            | 8,883       | 302          | 41,170          |
+    | zkapp-proved                | 5,106       | 302          | 39,736          |
     v}
 
     {b Lightnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 15,357      | 298          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
-    | zkapp-proved                | 5,106       | 298          | 39,736          |
+    | transaction-merge           | 592         | 302          | 2,115           |
+    | transaction-base            | 15,357      | 302          | 63,806          |
+    | zkapp-opt_signed-opt_signed | 16,206      | 302          | 74,242          |
+    | zkapp-opt_signed            | 8,883       | 302          | 41,170          |
+    | zkapp-proved                | 5,106       | 302          | 39,736          |
     v}
 
     {b Mainnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 15,357      | 298          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
-    | zkapp-proved                | 5,106       | 298          | 39,736          |
+    | transaction-merge           | 592         | 302          | 2,115           |
+    | transaction-base            | 15,357      | 302          | 63,806          |
+    | zkapp-opt_signed-opt_signed | 16,206      | 302          | 74,242          |
+    | zkapp-opt_signed            | 8,883       | 302          | 41,170          |
+    | zkapp-proved                | 5,106       | 302          | 39,736          |
     v}
 
     If these values change, update the tables above and the expected values in
@@ -275,6 +275,8 @@ module type Full = sig
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
     -> total_currency:Currency.Amount.t
+    -> ledger_after_coinbase:Frozen_ledger_hash.t
+    -> total_supply_after_coinbase:Currency.Amount.t
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
        * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
        * [ `Ledger of Mina_ledger.Ledger.t

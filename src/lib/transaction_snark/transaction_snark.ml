@@ -2120,6 +2120,18 @@ module Make_str (A : Wire_types.Concrete) = struct
                  the excess it ends with is the target register's. *)
               (Fee_excess.assert_equal_checked statement.target.fee_excess
                  (Amount.Signed.Checked.to_fee global.fee_excess) ) ) ;
+        with_label __LOC__ (fun () ->
+            run_checked
+              (* A zkApp command is never a coinbase, so the state recorded as
+                 of the latest coinbase passes through untouched. *)
+              (Tick.Checked.all_unit
+                 [ Frozen_ledger_hash.assert_equal
+                     statement.source.ledger_after_coinbase
+                     statement.target.ledger_after_coinbase
+                 ; Amount.Checked.assert_equal
+                     statement.source.total_supply_after_coinbase
+                     statement.target.total_supply_after_coinbase
+                 ] ) ) ;
         (Stdlib.( ! ) zkapp_input, `Must_verify (Stdlib.( ! ) must_verify))
 
       (* Horrible hack :( *)
@@ -3138,6 +3150,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           statement.target.pending_coinbase_stack state_body t
       in
       let fee_excess = Amount.Signed.Checked.to_fee fee_excess in
+      let is_coinbase =
+        Transaction_union.Tag.Unpacked.is_coinbase t.payload.body.tag
+      in
       let%bind () =
         [%with_label_ "local state check"] (fun () ->
             make_checked (fun () ->
@@ -3177,6 +3192,28 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               Fee_excess.assert_equal_checked target_fee_excess
                 statement.target.fee_excess )
+          (*A coinbase moves the recorded post-coinbase state on to where this
+            transition ends; anything else carries it through untouched.*)
+        ; [%with_label_ "post-coinbase state tracks the latest coinbase"]
+            (fun () ->
+              let open Tick.Checked.Let_syntax in
+              let%bind ledger_after_coinbase =
+                Frozen_ledger_hash.if_ is_coinbase
+                  ~then_:statement.target.second_pass_ledger
+                  ~else_:statement.source.ledger_after_coinbase
+              in
+              let%bind total_supply_after_coinbase =
+                Currency.Amount.Checked.if_ is_coinbase
+                  ~then_:statement.target.total_currency
+                  ~else_:statement.source.total_supply_after_coinbase
+              in
+              Checked.all_unit
+                [ Frozen_ledger_hash.assert_equal ledger_after_coinbase
+                    statement.target.ledger_after_coinbase
+                ; Currency.Amount.Checked.assert_equal
+                    total_supply_after_coinbase
+                    statement.target.total_supply_after_coinbase
+                ] )
         ]
 
     let rule ~signature_kind ~constraint_constants : _ Pickles.Inductive_rule.t
@@ -3312,6 +3349,34 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; [%with_label_ "equal target total currency"] (fun () ->
                 Amount.Checked.assert_equal s.target.total_currency
                   s2.target.total_currency )
+          ; [%with_label_ "post-coinbase state connects at the merge point"]
+              (fun () ->
+                Tick.Checked.all_unit
+                  [ Frozen_ledger_hash.assert_equal
+                      s1.Statement.Poly.target.ledger_after_coinbase
+                      s2.Statement.Poly.source.ledger_after_coinbase
+                  ; Amount.Checked.assert_equal
+                      s1.Statement.Poly.target.total_supply_after_coinbase
+                      s2.Statement.Poly.source.total_supply_after_coinbase
+                  ] )
+          ; [%with_label_ "equal source post-coinbase state"] (fun () ->
+                Tick.Checked.all_unit
+                  [ Frozen_ledger_hash.assert_equal
+                      s.source.ledger_after_coinbase
+                      s1.source.ledger_after_coinbase
+                  ; Amount.Checked.assert_equal
+                      s.source.total_supply_after_coinbase
+                      s1.source.total_supply_after_coinbase
+                  ] )
+          ; [%with_label_ "equal target post-coinbase state"] (fun () ->
+                Tick.Checked.all_unit
+                  [ Frozen_ledger_hash.assert_equal
+                      s.target.ledger_after_coinbase
+                      s2.target.ledger_after_coinbase
+                  ; Amount.Checked.assert_equal
+                      s.target.total_supply_after_coinbase
+                      s2.target.total_supply_after_coinbase
+                  ] )
           ; [%with_label_ "equal source fee payment ledger hashes"] (fun () ->
                 Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
                   s1.source.first_pass_ledger )
@@ -3469,9 +3534,30 @@ module Make_str (A : Wire_types.Concrete) = struct
           ( Currency.Amount.zero
           , Currency.Amount.Signed.magnitude supply_increase )
     in
+    (*The second pass ledger does not move for a transaction union, so a
+      coinbase records the ledger this transition ends at.*)
+    let source_ledger_after_coinbase = source_first_pass_ledger in
+    let source_total_supply_after_coinbase = source_total_currency in
+    let is_coinbase =
+      match transaction.payload.body.tag with
+      | Transaction_union_tag.Coinbase ->
+          true
+      | Payment | Stake_delegation | Fee_transfer ->
+          false
+    in
+    let target_ledger_after_coinbase =
+      if is_coinbase then target_first_pass_ledger
+      else source_ledger_after_coinbase
+    in
+    let target_total_supply_after_coinbase =
+      if is_coinbase then target_total_currency
+      else source_total_supply_after_coinbase
+    in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~source_total_currency
-        ~target_total_currency ~source_first_pass_ledger
+        ~target_total_currency ~source_ledger_after_coinbase
+        ~target_ledger_after_coinbase ~source_total_supply_after_coinbase
+        ~target_total_supply_after_coinbase ~source_first_pass_ledger
         ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
@@ -3559,9 +3645,28 @@ module Make_str (A : Wire_types.Concrete) = struct
           ( Currency.Amount.zero
           , Currency.Amount.Signed.magnitude supply_increase )
     in
+    let source_ledger_after_coinbase = source_first_pass_ledger in
+    let source_total_supply_after_coinbase = source_total_currency in
+    let is_coinbase =
+      match transaction.payload.body.tag with
+      | Transaction_union_tag.Coinbase ->
+          true
+      | Payment | Stake_delegation | Fee_transfer ->
+          false
+    in
+    let target_ledger_after_coinbase =
+      if is_coinbase then target_first_pass_ledger
+      else source_ledger_after_coinbase
+    in
+    let target_total_supply_after_coinbase =
+      if is_coinbase then target_total_currency
+      else source_total_supply_after_coinbase
+    in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~source_total_currency
-        ~target_total_currency ~source_fee_excess:Fee_excess.zero
+        ~target_total_currency ~source_ledger_after_coinbase
+        ~target_ledger_after_coinbase ~source_total_supply_after_coinbase
+        ~target_total_supply_after_coinbase ~source_fee_excess:Fee_excess.zero
         ~target_fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
@@ -3720,6 +3825,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let zkapp_command_witnesses_exn ~signature_kind ~constraint_constants
       ~global_slot ~state_body ~fee_excess ~total_currency
+      ~ledger_after_coinbase ~total_supply_after_coinbase
       (zkapp_commands_with_context :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
@@ -4042,7 +4148,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; ledger = source_local_ledger
                   }
               ; fee_excess = source_fee_excess
-              ; total_currency = source_total_currency
+              ; total_currency =
+                  source_total_currency
+                  (*A zkApp command is never a coinbase, so these pass through.*)
+              ; ledger_after_coinbase
+              ; total_supply_after_coinbase
               }
           ; target =
               { first_pass_ledger = target_first_pass_ledger_root
@@ -4058,6 +4168,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   }
               ; fee_excess = target_fee_excess
               ; total_currency = target_total_currency
+              ; ledger_after_coinbase
+              ; total_supply_after_coinbase
               }
           ; connecting_ledger_left = connecting_ledger
           ; connecting_ledger_right = connecting_ledger
