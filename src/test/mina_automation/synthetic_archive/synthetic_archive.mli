@@ -157,6 +157,9 @@ val zkapp_command :
 
 val zkapp_command_hash : zkapp_command -> string
 
+(** The coinbase's hash in [internal_commands]. *)
+val coinbase_hash : coinbase -> string
+
 (** Record that [block] created [account], charging [fee]. *)
 val account_created : ?fee:int -> t -> block -> account -> unit
 

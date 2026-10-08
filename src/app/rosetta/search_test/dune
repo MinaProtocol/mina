@@ -1,0 +1,23 @@
+; Needs the PostgreSQL server MINA_TEST_POSTGRES names, so it is an
+; executable rather than a test (RosettaUnitTest has no server). Shipped as
+; mina-rosetta-search-test and run by RosettaIntegrationTests, as the indexer
+; test is (buildkite/scripts/tests/rosetta/integration-tests.sh).
+(executable
+ (name rosetta_search_test)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  ;; local libraries
+  lib
+  logger
+  mina_automation.synthetic_archive
+  rosetta_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
