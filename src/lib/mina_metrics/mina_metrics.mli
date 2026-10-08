@@ -607,11 +607,18 @@ val server :
 module Archive : sig
   type t
 
+  module Ingest_duration_histogram : Histogram
+
   val unparented_blocks : t -> Gauge.t
 
   val max_block_height : t -> Gauge.t
 
   val missing_blocks : t -> Gauge.t
+
+  (** Time from the archive accepting a block ingest request until its ingest
+      loop takes the block off the queue, labelled by the source that sent
+      the block. This is queueing time, not the block's own write. *)
+  val ingest_duration_ms : t -> string -> Ingest_duration_histogram.t
 
   val create_archive_server :
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
