@@ -1,0 +1,31 @@
+(library
+ (name missing_blocks_auditor_lib)
+ (public_name missing_blocks_auditor.lib)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  core
+  core_kernel
+  ppx_deriving_yojson.runtime
+  ppx_inline_test.config
+  yojson
+  ;; local libraries
+  archive_health_queries
+  logger
+  mina_caqti)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_let
+   ppx_compare
+   ppx_sexp_conv
+   ppx_deriving_yojson
+   ppx_inline_test)))
