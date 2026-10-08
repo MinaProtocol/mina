@@ -80,9 +80,14 @@ let sets
         }
       , { name = "prefork"
         , dockers = [] : List Text
-        , debians = [ "daemon_*_prefork", "prefork_*_genesis_ledger" ]
+        , debians =
+          [ "daemon_*_prefork"
+          , "archive_*_prefork"
+          , "rosetta_*_prefork"
+          , "prefork_*_genesis_ledger"
+          ]
         , description =
-            "what is built FOR the next hardfork: the prefork daemon and its genesis ledger. Packages only, no image"
+            "what is built FOR the next hardfork: the prefork daemon, archive and rosetta, and the genesis ledger. Packages only, no image"
         }
       , { name = "logproc"
         , dockers = [] : List Text
