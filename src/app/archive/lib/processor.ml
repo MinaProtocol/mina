@@ -4799,37 +4799,50 @@ module Genesis_accounts = struct
          "SELECT to_regclass('genesis_accounts') IS NOT NULL" )
       ()
 
-  let loaded (module Conn : CONNECTION) ~genesis_height =
+  let written (module Conn : CONNECTION) ~genesis_height =
     Conn.find
-      (find_req Caqti_type.int64 Caqti_type.bool
-         {sql| SELECT EXISTS (
-                 SELECT 1 FROM genesis_accounts WHERE genesis_height = ? )
+      (find_req Caqti_type.int64 Caqti_type.int
+         {sql| SELECT count(*)::int FROM genesis_accounts
+               WHERE genesis_height = ?
          |sql} )
       genesis_height
 
-  let insert_req =
+  (* One statement per chunk: the rows travel as one array per column. *)
+  let insert_chunk_req =
     exec_req
       Caqti_type.(
         t2
-          (t4 int64 string string string)
-          (t2
-             (t3 int64 (option string) (option int64))
-             (t3 (option string) (option int64) (option string)) ))
+          (t4 int64 Mina_caqti.array_string_typ Mina_caqti.array_string_typ
+             Mina_caqti.array_string_typ )
+          (t2 Mina_caqti.array_int64_typ
+             (t5 Mina_caqti.array_nullable_string_typ
+                Mina_caqti.array_nullable_int64_typ
+                Mina_caqti.array_nullable_string_typ
+                Mina_caqti.array_nullable_int64_typ
+                Mina_caqti.array_nullable_string_typ ) ))
       {sql| INSERT INTO genesis_accounts
               (genesis_height, public_key, token, balance, nonce,
                initial_minimum_balance, cliff_time, cliff_amount,
                vesting_period, vesting_increment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            SELECT $1, rows.*
+            FROM unnest($2::text[], $3::text[], $4::text[], $5::bigint[],
+                        $6::text[], $7::bigint[], $8::text[], $9::bigint[],
+                        $10::text[]) AS rows
+            ON CONFLICT DO NOTHING
       |sql}
 
-  let insert (module Conn : CONNECTION) ~genesis_height row =
-    let timing f = Option.map row.timing ~f in
-    Conn.exec insert_req
-      ( (genesis_height, row.public_key, row.token, row.balance)
-      , ( ( row.nonce
-          , timing (fun t -> t.initial_minimum_balance)
-          , timing (fun t -> t.cliff_time) )
-        , ( timing (fun t -> t.cliff_amount)
+  let insert_chunk (module Conn : CONNECTION) ~genesis_height rows =
+    let column f = Array.of_list (List.map rows ~f) in
+    let timing f = column (fun row -> Option.map row.timing ~f) in
+    Conn.exec insert_chunk_req
+      ( ( genesis_height
+        , column (fun row -> row.public_key)
+        , column (fun row -> row.token)
+        , column (fun row -> row.balance) )
+      , ( column (fun row -> row.nonce)
+        , ( timing (fun t -> t.initial_minimum_balance)
+          , timing (fun t -> t.cliff_time)
+          , timing (fun t -> t.cliff_amount)
           , timing (fun t -> t.vesting_period)
           , timing (fun t -> t.vesting_increment) ) ) )
 
@@ -4912,32 +4925,51 @@ module Genesis_accounts = struct
         Option.map found ~f:(fun (genesis_height, genesis_slot, row) ->
             { genesis_height; genesis_slot; row = row_of_tuple row } )
 
+  let default_chunk_size = 5_000
+
   (** Write [accounts] as the genesis ledger that takes effect at
-      [genesis_height], in one transaction. Rows for that height mark the
-      ledger as written, so a partial write never happens and a second call
-      writes nothing. *)
-  let add (module Conn : CONNECTION) ~genesis_height accounts =
+      [genesis_height].
+
+      Each chunk of [chunk_size] accounts is one statement and one
+      transaction, so an interrupted import keeps what it wrote. The accounts
+      are written in a fixed order (public key, then token), so the rows a
+      height already has are the first ones in that order, and a later call
+      continues after them. The ledger is written when the height has as many
+      rows as the ledger has accounts; a repeated row is ignored. *)
+  let add ?(chunk_size = default_chunk_size) (module Conn : CONNECTION)
+      ~genesis_height accounts =
     let open Deferred.Result.Let_syntax in
     match%bind table_exists (module Conn) with
     | false ->
         return `No_table
-    | true -> (
-        match%bind loaded (module Conn) ~genesis_height with
-        | true ->
-            return `Already_loaded
-        | false -> (
-            let%bind () = Conn.start () in
-            match%bind.Deferred
-              Mina_caqti.deferred_result_list_fold accounts ~init:()
-                ~f:(fun () account ->
-                  insert (module Conn) ~genesis_height (row_of_account account) )
-            with
-            | Error e ->
-                let%bind.Deferred (_ : (unit, _) Result.t) = Conn.rollback () in
-                Deferred.Result.fail e
-            | Ok () ->
-                let%map () = Conn.commit () in
-                `Added (List.length accounts) ) )
+    | true ->
+        let rows =
+          List.map accounts ~f:row_of_account
+          |> List.sort ~compare:(fun a b ->
+                 [%compare: string * string] (a.public_key, a.token)
+                   (b.public_key, b.token) )
+        in
+        let total = List.length rows in
+        let%bind already = written (module Conn) ~genesis_height in
+        if already >= total then return `Already_loaded
+        else
+          let%map () =
+            List.drop rows already
+            |> List.chunks_of ~length:chunk_size
+            |> Mina_caqti.deferred_result_list_fold ~init:() ~f:(fun () chunk ->
+                   let%bind () = Conn.start () in
+                   match%bind.Deferred
+                     insert_chunk (module Conn) ~genesis_height chunk
+                   with
+                   | Ok () ->
+                       Conn.commit ()
+                   | Error e ->
+                       let%bind.Deferred (_ : (unit, _) Result.t) =
+                         Conn.rollback ()
+                       in
+                       Deferred.Result.fail e )
+          in
+          `Added (total - already, already)
 end
 
 (* [add_genesis_accounts] is called when starting the archive process *)
@@ -5090,11 +5122,13 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                 Ok ()
             | Ok `Already_loaded ->
                 Ok ()
-            | Ok (`Added count) ->
+            | Ok (`Added (count, resumed_after)) ->
                 [%log info]
-                  "Wrote $count genesis ledger accounts at height $height"
+                  "Wrote $count genesis ledger accounts at height $height, \
+                   after $resumed_after written before"
                   ~metadata:
                     [ ("count", `Int count)
+                    ; ("resumed_after", `Int resumed_after)
                     ; ("height", `String (Int64.to_string genesis_height))
                     ] ;
                 Ok () )
