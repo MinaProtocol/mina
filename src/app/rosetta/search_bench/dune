@@ -1,0 +1,25 @@
+(executable
+ (name rosetta_search_bench)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  async
+  async_kernel
+  async_unix
+  core_unix.command_unix
+  uri
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  yojson
+  ;; local libraries
+  lib
+  rosetta_lib
+  logger
+  mina_base
+  mina_caqti)
+ (preprocess
+  (pps ppx_version ppx_jane ppx_mina))
+ (instrumentation
+  (backend bisect_ppx)))

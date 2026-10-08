@@ -176,9 +176,44 @@ if [[ "${1:-}" == "manifest" ]]; then
     [[ -n "${STUB_TAG_IN_REGISTRY:-}" ]] && exit 0
     exit 1
 fi
+# "docker image inspect --format {{.Id}}" gives the local image ID.
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" && "${3:-}" == "--format" ]]; then
+    echo "sha256:stub"
+    exit 0
+fi
+# "docker image inspect <ref>": every image is local, except the ones a test
+# lists in STUB_MISSING_IMAGES that have not been loaded since.
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+    for missing in ${STUB_MISSING_IMAGES:-}; do
+        if [[ "$3" == "$missing" ]] && ! grep -qx -- "$3" "${STUB_LOADED_FILE:-/dev/null}" 2>/dev/null; then
+            exit 1
+        fi
+    done
+    exit 0
+fi
+# "docker save <tags>" writes the tags, one on each line, as the archive.
+if [[ "${1:-}" == "save" ]]; then
+    shift
+    printf '%s\n' "$@"
+    exit 0
+fi
+# "docker load" reads such an archive and makes its tags local.
+if [[ "${1:-}" == "load" ]]; then
+    while read -r tag; do
+        echo "$tag" >> "${STUB_LOADED_FILE:-/dev/null}"
+        echo "Loaded image: $tag"
+    done
+    exit 0
+fi
 exit 0
 STUB
     chmod +x "${STUB_DIR}/docker"
+    # zstd passes the stub archives through unchanged.
+    cat > "${STUB_DIR}/zstd" <<'STUB'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-dc" ]]; then cat "$2"; else cat; fi
+STUB
+    chmod +x "${STUB_DIR}/zstd"
 }
 
 teardown_stub_docker() {
@@ -194,7 +229,7 @@ teardown_stub_docker() {
 run_build() {
     local args_file="$1"
     shift
-    rm -f "$args_file" "${args_file}.calls"
+    rm -f "$args_file" "${args_file}.calls" "${STUB_DIR}/loaded"
     set +e
     ( cd "$REPO_ROOT" && \
       PATH="${STUB_DIR}:${PATH}" \
@@ -206,8 +241,12 @@ run_build() {
       MINA_DEB_CODENAME="bullseye" \
       KEEP_MY_TAGS_INTACT="true" \
       STUB_TAG_IN_REGISTRY="${STUB_TAG_IN_REGISTRY:-}" \
+      STUB_MISSING_IMAGES="${STUB_MISSING_IMAGES:-}" \
+      STUB_LOADED_FILE="${STUB_DIR}/loaded" \
+      GAR_CACHE_DISABLED=true \
       FORCE_DOCKER_OVERWRITE="${FORCE_DOCKER_OVERWRITE:-}" \
       CI="" BUILDKITE="" GITHUB_ACTIONS="" \
+      SKIP_GITBRANCH="" \
       ./scripts/docker/build.sh "$@" ) > "${args_file}.log" 2>&1
     LAST_EXIT=$?
     set -e
@@ -285,6 +324,22 @@ test_load_only_does_not_push() {
     assert_has_line "buildx still loads" "$args" "--load"
     assert_not_called "no push" "${args}.calls" "^push "
     assert_not_called "no registry tag" "${args}.calls" "^buildx imagetools"
+}
+
+# --image-ref-file records the ID of the built image: a tag in a daemon shared
+# with concurrent jobs can be re-pointed by another build of it.
+test_image_ref_file_holds_the_image_id() {
+    local args="${STUB_DIR}/ref.args"
+    local ref="${STUB_DIR}/image-id"
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --load-only \
+        --image-ref-file "$ref"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the ID is read from the built tag" "${args}.calls" \
+        "^image inspect --format \{\{\.Id\}\} testreg/mina-daemon:3\.1\.0$"
+    assert_eq "the file holds the ID" "sha256:stub" "$(cat "$ref")"
 }
 
 # A tag that is already published is not overwritten. The check runs before the
@@ -378,6 +433,74 @@ test_hardfork_targets() {
         "deb_legacy_version=2.0.0"
     assert_has_line "the tag holds the network" "$args" \
         "testreg/mina-daemon-auto-hardfork:3.1.0-devnet"
+}
+
+# --build-cache-dir saves the image for the publish stage, named by its version
+# tag and holding exactly the tags it is published under.
+test_build_cache_dir_holds_the_published_tags() {
+    local args="${STUB_DIR}/bcache.args"
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --load-only \
+        --build-cache-dir "${STUB_DIR}/bcache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_file_exists "archive named by the version tag" \
+        "${STUB_DIR}/bcache/mina-daemon/3.1.0.tar.zst"
+    assert_has_line "version tag" "${STUB_DIR}/bcache/mina-daemon/3.1.0.tar.zst" \
+        "testreg/mina-daemon:3.1.0"
+    assert_has_line "hash tag" "${STUB_DIR}/bcache/mina-daemon/3.1.0.tar.zst" \
+        "testreg/mina-daemon:abcdefg-bullseye"
+    assert_eq "no partial archive is left" "" \
+        "$(find "${STUB_DIR}/bcache" -name '*.partial.*')"
+}
+
+# A registry without hash tags gets none from the archive either.
+test_build_cache_dir_without_hash_tag() {
+    local args="${STUB_DIR}/bcache-nohash.args"
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --load-only \
+        --no-hash-tag --build-cache-dir "${STUB_DIR}/bcache-nohash"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_has_line "version tag" "${STUB_DIR}/bcache-nohash/mina-daemon/3.1.0.tar.zst" \
+        "testreg/mina-daemon:3.1.0"
+    assert_no_line "no hash tag" "${STUB_DIR}/bcache-nohash/mina-daemon/3.1.0.tar.zst" \
+        "testreg/mina-daemon:abcdefg-bullseye"
+}
+
+# --base-cache-dir: the -generic base of a layered image was never pushed, so
+# it is loaded from the build cache, and the FROM is not sent through gar-cache.
+test_base_cache_dir_loads_a_missing_base() {
+    local args="${STUB_DIR}/base.args"
+    local base="testreg/mina-daemon:3.1.0-devnet-generic"
+    mkdir -p "${STUB_DIR}/base/mina-daemon"
+    echo "$base" > "${STUB_DIR}/base/mina-daemon/3.1.0-devnet-generic.tar.zst"
+    STUB_MISSING_IMAGES="$base" run_build "$args" \
+        --service mina-daemon-configured --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet \
+        --load-only --base-cache-dir "${STUB_DIR}/base"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the base is loaded" "${args}.calls" "^load$"
+    assert_has_line "FROM names the registry, not gar-cache" "$args" \
+        "docker_repo=testreg"
+}
+
+# A base that is neither local nor cached stops the build before buildx, with
+# the path that was expected.
+test_base_cache_dir_missing_archive_fails() {
+    local args="${STUB_DIR}/base-missing.args"
+    STUB_MISSING_IMAGES="testreg/mina-daemon:3.1.0-devnet-generic" run_build "$args" \
+        --service mina-daemon-configured --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet \
+        --load-only --base-cache-dir "${STUB_DIR}/nothing-here"
+
+    assert_eq "exit code" 1 "$LAST_EXIT"
+    assert_matches "names the expected archive" "${args}.log" \
+        "nothing-here/mina-daemon/3.1.0-devnet-generic.tar.zst"
+    assert_not_called "no build ran" "${args}.calls" "^buildx build"
 }
 
 # A *-configured or *-profiled service adds a layer on top of the image of
@@ -727,6 +850,11 @@ main() {
     run_test test_push_is_a_separate_docker_call
     run_test test_no_hash_tag_pushes_only_the_version_tag
     run_test test_load_only_does_not_push
+    run_test test_image_ref_file_holds_the_image_id
+    run_test test_build_cache_dir_holds_the_published_tags
+    run_test test_build_cache_dir_without_hash_tag
+    run_test test_base_cache_dir_loads_a_missing_base
+    run_test test_base_cache_dir_missing_archive_fails
     run_test test_published_tag_is_not_overwritten
     run_test test_force_overwrite_pushes_over_a_published_tag
     run_test test_load_only_ignores_the_published_tag

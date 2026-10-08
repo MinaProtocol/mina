@@ -61,6 +61,8 @@ let ReleaseSpec =
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
           , save_to_ci_cache : Bool
+          , build_cache_dir : Optional Text
+          , base_cache_dir : Optional Text
           , image_name : Optional Text
           , generic : Bool
           , verify : Bool
@@ -88,6 +90,8 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , save_to_ci_cache = False
+          , build_cache_dir = None Text
+          , base_cache_dir = None Text
           , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
@@ -184,24 +188,22 @@ let generateStep =
                   }
                   spec.service
 
+          let imageRefFile = "docker-image-id"
+
+          let verifies =
+              -- The check runs on the image this step built, never a pulled
+              -- one, so it does not depend on the image being pushed.
+                spec.verify
+
           let maybeVerify =
-                      if     spec.verify
-                         &&  DockerPublish.shouldPublish
-                               spec.docker_publish
-                               spec.service
+                      if verifies
 
                 then      " && "
                       ++  VerifyDockers.verify
                             VerifyDockers.Spec::{
-                            , artifacts = [ spec.service ]
-                            , networks = [ spec.network ]
-                            , version = spec.deb_version
-                            , codenames = [ spec.deb_codename ]
-                            , profile = spec.deb_profile
-                            , buildFlag = spec.build_flags
-                            , archs = [ spec.arch ]
-                            , repo = spec.docker_repo
-                            , generic = spec.generic
+                            , service = spec.service
+                            , arch = spec.arch
+                            , imageRefFile = imageRefFile
                             }
 
                 else  ""
@@ -289,6 +291,22 @@ let generateStep =
                 ++  customSuffix
                 ++  imageNameArg
                 ++  maybeSaveToCacheArg
+                ++  (       if verifies
+
+                      then  " --image-ref-file ${imageRefFile}"
+
+                      else  ""
+                    )
+                ++  merge
+                      { Some = \(dir : Text) -> " --build-cache-dir ${dir}"
+                      , None = ""
+                      }
+                      spec.build_cache_dir
+                ++  merge
+                      { Some = \(dir : Text) -> " --base-cache-dir ${dir}"
+                      , None = ""
+                      }
+                      spec.base_cache_dir
 
           let commands =
                 [ Cmd.run
