@@ -20,7 +20,7 @@ let default = Executor.default
 type format = Precomputed | Extensional
 
 let path () =
-  Deferred.map Executor.PathFinder.standalone_path ~f:(fun opt ->
+  Deferred.map (Executor.PathFinder.standalone_path ()) ~f:(fun opt ->
       Option.value_exn opt
         ~message:
           "Could not find standalone path for archive blocks. Archive blocks \

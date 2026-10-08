@@ -17,9 +17,9 @@ end
 module type PathFinder = sig
   module Paths : AppPaths
 
-  val standalone_path : string option Deferred.t
+  val standalone_path : unit -> string option Deferred.t
 
-  val standalone_path_exn : string Deferred.t
+  val standalone_path_exn : unit -> string Deferred.t
 end
 
 (* application ran inside docker container *)
@@ -42,7 +42,9 @@ module Make_PathFinder (P : AppPaths) = struct
     | _ ->
         Deferred.return None
 
-  let standalone_path =
+  (* looked up on use: at module load it would run (and, for the _exn form,
+     raise) in every program that merely links an app's module *)
+  let standalone_path () =
     match%bind Sys.file_exists built_name with
     | `Yes ->
         Deferred.return (Some built_name)
@@ -55,8 +57,8 @@ module Make_PathFinder (P : AppPaths) = struct
         | _ ->
             Deferred.return None )
 
-  let standalone_path_exn =
-    let%bind path = standalone_path in
+  let standalone_path_exn () =
+    let%bind path = standalone_path () in
     match path with
     | Some p ->
         Deferred.return p

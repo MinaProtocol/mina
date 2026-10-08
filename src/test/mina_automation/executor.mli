@@ -26,11 +26,11 @@ module type PathFinder = sig
 
   (** [standalone_path] Path to the executable after installation (outside dune context)
     It returns [Some path] if the path is available, otherwise [None]. *)
-  val standalone_path : string option Deferred.t
+  val standalone_path : unit -> string option Deferred.t
 
   (** [standalone_path_exn] Path to the executable after installation (outside dune context)
       It raises an exception if the path is not available. *)
-  val standalone_path_exn : string Deferred.t
+  val standalone_path_exn : unit -> string Deferred.t
 end
 
 module Make_PathFinder (P : AppPaths) : PathFinder
