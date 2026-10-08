@@ -199,7 +199,7 @@ module Sql = struct
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
       Mina_caqti.find_opt_req
-        Caqti_type.(t2 string int64)
+        Mina_caqti.Typ.(t2 string int64)
         typ
         [%string
           {|
@@ -322,7 +322,7 @@ module Sql = struct
     end
 
     let typ =
-      Caqti_type.(
+      Mina_caqti.Typ.(
         t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
 
     let fields =
@@ -333,7 +333,7 @@ module Sql = struct
 
     let query =
       Mina_caqti.collect_req
-        Caqti_type.(t2 int string)
+        Mina_caqti.Typ.(t2 int string)
         typ
         [%string
           {|
@@ -534,7 +534,7 @@ module Sql = struct
 
     let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list
-        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
+        (Mina_caqti.collect_req Mina_caqti.Typ.(t2 int string) typ query)
         (id, Mina_base.Token_id.(to_string default))
 
     let to_info t =
@@ -719,7 +719,7 @@ module Sql = struct
       |}]
 
     let query =
-      Mina_caqti.collect_req Caqti_type.(t2 int string) typ query_string
+      Mina_caqti.collect_req Mina_caqti.Typ.(t2 int string) typ query_string
 
     let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))

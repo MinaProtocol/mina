@@ -40,6 +40,7 @@ echo "Running the micro-benchmark (${iterations} iterations/scenario)..."
 ./_build/default/src/lib/mina_caqti/test/pg_memory/main.exe \
     --uri "${POSTGRES_URI}" \
     --iterations "${iterations}" \
+    --assert-no-growth \
     --variant "${MINA_BENCH_VARIANT:-ci}" \
     --git-branch "${BUILDKITE_BRANCH:-unknown}" \
     --git-commit "${BUILDKITE_COMMIT:-unknown}" \

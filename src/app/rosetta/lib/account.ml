@@ -32,8 +32,8 @@ module Sql = struct
   module Balance_from_last_relevant_command = struct
     let query_pending =
       Mina_caqti.find_opt_req
-        Caqti_type.(t3 string int64 string)
-        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
+        Mina_caqti.Typ.(t3 string int64 string)
+        Mina_caqti.Typ.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -83,8 +83,8 @@ module Sql = struct
 
     let query_canonical =
       Mina_caqti.find_opt_req
-        Caqti_type.(t3 string int64 string)
-        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
+        Mina_caqti.Typ.(t3 string int64 string)
+        Mina_caqti.Typ.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
                 SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 

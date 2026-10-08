@@ -17,6 +17,7 @@ let Size = ../../Command/Size.dhall
 let commands =
       [ Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
+      , Cmd.run "./scripts/lint_caqti_requests.sh"
       , Cmd.run "make check-snarky-submodule"
       ]
 
@@ -43,7 +44,7 @@ in  Pipeline.build
             Command.Config::{
             , commands = commands
             , label =
-                "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
+                "Fast lint steps; CODEOWNERs, RFCs, Caqti requests, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"
             , target = Size.Multi
             , docker = Some Docker::{
