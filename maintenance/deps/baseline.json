@@ -242,6 +242,10 @@
       "libs": 144,
       "opam": 40
     },
+    "exe:test/archive/archive_memory_bench:archive_memory_bench": {
+      "libs": 105,
+      "opam": 37
+    },
     "exe:test/archive/patch_archive_test:patch_archive_test": {
       "libs": 248,
       "opam": 64
