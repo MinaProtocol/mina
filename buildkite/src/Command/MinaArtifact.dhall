@@ -290,6 +290,8 @@ let expandDockerServices =
                     ->  [ mk (Docker.Type.DaemonAutoHardfork { network = net })
                         ]
                 , DaemonPrefork = \(_ : { network : Network.Type }) -> none
+                , ArchivePrefork = \(_ : { network : Network.Type }) -> none
+                , RosettaPrefork = \(_ : { network : Network.Type }) -> none
                 , DaemonPostfork = \(_ : { network : Network.Type }) -> none
                 , CreatePreforkGenesis =
                     \(_ : { network : Network.Type }) -> none

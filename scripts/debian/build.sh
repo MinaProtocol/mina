@@ -74,12 +74,16 @@ resolve_deb_output() {
       echo "mina-generic${_sfx:+-${_sfx}}" ;;
 
     # Prefork / postfork / automode
-    daemon_mainnet_prefork)  echo "mina-mainnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
-    daemon_devnet_prefork)   echo "mina-devnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
+    daemon_mainnet_prefork)  echo "mina-mainnet-prefork-${PREFORK_PACKAGE_CODENAME:-starlight}" ;;
+    daemon_devnet_prefork)   echo "mina-devnet-prefork-${PREFORK_PACKAGE_CODENAME:-starlight}" ;;
     daemon_mainnet_postfork) echo "mina-mainnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
     daemon_devnet_postfork)  echo "mina-devnet-postfork-${POSTFORK_CODENAME:-mesa}" ;;
     daemon_mainnet_automode) echo "mina-mainnet-automode" ;;
     daemon_devnet_automode)  echo "mina-devnet-automode" ;;
+    archive_mainnet_prefork) echo "mina-archive-mainnet-prefork-${PREFORK_PACKAGE_CODENAME:-starlight}" ;;
+    archive_devnet_prefork)  echo "mina-archive-devnet-prefork-${PREFORK_PACKAGE_CODENAME:-starlight}" ;;
+    rosetta_mainnet_prefork) echo "mina-rosetta-mainnet-prefork-${PREFORK_PACKAGE_CODENAME:-starlight}" ;;
+    rosetta_devnet_prefork)  echo "mina-rosetta-devnet-prefork-${PREFORK_PACKAGE_CODENAME:-starlight}" ;;
 
     # Profile packages
     profile_mainnet) echo "mina-mainnet-profile" ;;
@@ -117,6 +121,12 @@ resolve_and_build_package() {
 
   if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet)$ ]]; then
     "build_${BASH_REMATCH[1]}_deb" "${BASH_REMATCH[2]}"
+    return
+  fi
+
+  # Archive and Rosetta runtimes for a hard fork, as the daemon has.
+  if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet)_(prefork)$ ]]; then
+    "build_${BASH_REMATCH[1]}_${BASH_REMATCH[3]}_deb" "${BASH_REMATCH[2]}"
     return
   fi
 

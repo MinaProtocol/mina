@@ -674,8 +674,8 @@ test_build_daemon_mainnet_prefork_deb() {
     safe_build build_daemon_prefork_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-mainnet-prefork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-prefork-mesa"
+    assert_eq "deb name" "mina-mainnet-prefork-starlight" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-prefork-starlight"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
@@ -694,13 +694,43 @@ test_build_daemon_devnet_prefork_deb() {
     safe_build build_daemon_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-prefork-mesa"
+    assert_eq "deb name" "mina-devnet-prefork-starlight" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-prefork-starlight"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     # Binaries in alternate directory
     assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/berkeley"
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+test_build_archive_prefork_deb() {
+    safe_build build_archive_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-prefork-starlight" "$CAPTURED_DEB_NAME"
+
+    # The pre-fork runtime directory, never the PATH.
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-replayer"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive-hardfork-toolbox"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+
+    # The SQL belongs to the post-fork side, which runs the upgrade.
+    assert_file_not_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_build_rosetta_prefork_deb() {
+    safe_build build_rosetta_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-prefork-starlight" "$CAPTURED_DEB_NAME"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-ocaml-signer"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta"
+
+    # A test tool, not part of a runtime.
+    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta-indexer-test"
 }
 
 ################################################################################
@@ -1313,6 +1343,8 @@ main() {
     # Prefork packages
     run_test test_build_daemon_mainnet_prefork_deb
     run_test test_build_daemon_devnet_prefork_deb
+    run_test test_build_archive_prefork_deb
+    run_test test_build_rosetta_prefork_deb
     run_test test_build_prefork_devnet_genesis_ledger_deb
     run_test test_build_prefork_mainnet_genesis_ledger_deb
 
