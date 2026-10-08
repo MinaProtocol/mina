@@ -74,7 +74,8 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
+            , commands =
+              [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems compatible branch"
             , key = "merged-to-proof-systems-compatible"
@@ -86,7 +87,8 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
+            , commands =
+              [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems develop branch"
             , key = "merged-to-proof-systems-develop"
