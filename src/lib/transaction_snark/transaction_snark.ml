@@ -292,7 +292,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           ~txn_global_slot ~(fee_payer_account : Account.t)
           ~(receiver_account : Account.t) ~(source_account : Account.t)
-          ({ payload; signature = _; signer = _ } : Transaction_union.t) =
+          ({ payload; signature = _; signer = _; fee_remainder = _ } :
+            Transaction_union.t ) =
         match payload.body.tag with
         | Fee_transfer | Coinbase ->
             (* Not user commands, return no failure. *)
@@ -2249,7 +2250,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
         fee_payment_root global_slot pending_coinbase_stack_init
         pending_coinbase_stack_before pending_coinbase_after state_body
-        ({ signer; signature; payload } as txn : Transaction_union.var) =
+        ({ signer; signature; payload; fee_remainder } as txn :
+          Transaction_union.var ) =
       let tag = payload.body.tag in
       let is_user_command =
         Transaction_union.Tag.Unpacked.is_user_command tag
@@ -2275,6 +2277,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         Transaction_union.Tag.Unpacked.is_fee_transfer tag
       in
       let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
+      let%bind () =
+        (* [fee_remainder] is witnessed rather than carried in the payload, so
+           nothing but this constrains it for the transaction kinds that do not
+           use it. Pin it to zero there, so that it cannot be used to move the
+           fee excess or the supply increase of any other transaction. *)
+        [%with_label_ "Fee remainder is zero unless this is a coinbase"]
+          (fun () ->
+            let zero = Fee.var_of_t Fee.zero in
+            let%bind remainder_if_not_coinbase =
+              Fee.Checked.if_ is_coinbase ~then_:zero ~else_:fee_remainder
+            in
+            Fee.Checked.assert_equal remainder_if_not_coinbase zero )
+      in
       let fee_token = payload.common.fee_token in
       let%bind fee_token_default =
         make_checked (fun () ->
@@ -2381,9 +2396,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                 current_global_slot pending_coinbase_stack_init
             in
             let%bind computed_pending_coinbase_stack_after =
-              let coinbase =
-                (Account_id.Checked.public_key receiver, payload.body.amount)
+              (* The stack records the minted coinbase, which is what the
+                 blockchain snark checks against the protocol's coinbase
+                 amount. The fee remainder is currency the block already
+                 collected, so it is not part of that. *)
+              let%bind minted =
+                Amount.Checked.sub payload.body.amount
+                  (Amount.Checked.of_fee fee_remainder)
               in
+              let coinbase = (Account_id.Checked.public_key receiver, minted) in
               let%bind stack' =
                 Pending_coinbase.Stack.Checked.push_coinbase coinbase
                   pending_coinbase_stack_with_state
@@ -3038,8 +3059,12 @@ module Make_str (A : Wire_types.Concrete) = struct
            - fee transfer:     - payload.body.amount - payload.common.fee
         *)
         let open Amount in
-        chain Signed.Checked.if_ is_coinbase
-          ~then_:(return (Signed.Checked.of_unsigned (var_of_t zero)))
+        let coinbase_excess =
+          (* A coinbase discharges the excess it pays out to its receiver. *)
+          Signed.Checked.negate
+            (Signed.Checked.of_unsigned (Checked.of_fee fee_remainder))
+        in
+        chain Signed.Checked.if_ is_coinbase ~then_:(return coinbase_excess)
           ~else_:
             (let user_command_excess =
                Signed.Checked.of_unsigned (Checked.of_fee payload.common.fee)
@@ -3067,8 +3092,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind supply_increase =
         [%with_label_ "Calculate supply increase"] (fun () ->
             let%bind expected_supply_increase =
+              (* [payload.body.amount] is everything the coinbase credits; the
+                 part taken from the fee excess already exists, so only the
+                 remainder is newly minted. *)
+              let%bind minted =
+                Amount.Checked.sub payload.body.amount
+                  (Amount.Checked.of_fee fee_remainder)
+              in
               Amount.Signed.Checked.if_ is_coinbase
-                ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
+                ~then_:(Amount.Signed.Checked.of_unsigned minted)
                 ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
             in
             let%bind amt0, `Overflow overflow0 =
@@ -3192,6 +3224,17 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               Fee_excess.assert_equal_checked target_fee_excess
                 statement.target.fee_excess )
+          (*Every fee payment of a block precedes its coinbase, and the coinbase
+            pays out whatever they left over, so a coinbase leaves no unsettled
+            fees behind it. This is what ties the remainder a coinbase claims to
+            the excess the block actually accumulated.*)
+        ; [%with_label_ "a coinbase settles the fee excess"] (fun () ->
+              let open Tick.Checked.Let_syntax in
+              let%bind excess_is_zero =
+                Fee_excess.equal_checked statement.target.fee_excess
+                  (Fee_excess.var_of_t Fee_excess.zero)
+              in
+              Boolean.Assert.any [ Boolean.not is_coinbase; excess_is_zero ] )
           (*A coinbase moves the recorded post-coinbase state on to where this
             transition ends; anything else carries it through untouched.*)
         ; [%with_label_ "post-coinbase state tracks the latest coinbase"]
