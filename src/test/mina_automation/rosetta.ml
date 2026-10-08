@@ -26,9 +26,8 @@ module Config = struct
     @ t.extra_args
 
   (* Rosetta refuses to start without MINA_ROSETTA_MAX_DB_POOL_SIZE. *)
-  let to_env t =
-    `Extend
-      [ ("MINA_ROSETTA_MAX_DB_POOL_SIZE", string_of_int t.max_db_pool_size) ]
+  let env_vars t =
+    [ ("MINA_ROSETTA_MAX_DB_POOL_SIZE", string_of_int t.max_db_pool_size) ]
 
   let create ?(graphql_uri = "http://127.0.0.1:3085/graphql") ?(port = 3087)
       ?(max_db_pool_size = 16) ?(extra_args = []) ~archive_uri () =
@@ -66,10 +65,12 @@ module Process = struct
     drain (Process.stderr t.process)
 end
 
-let start t =
+(** [env] adds to the pool-size setting Rosetta requires. *)
+let start ?(env = []) t =
   let%map _, process =
     Executor.run_in_background t.executor ~args:(Config.to_args t.config)
-      ~env:(Config.to_env t.config) ()
+      ~env:(`Extend (Config.env_vars t.config @ env))
+      ()
   in
   Process.{ process; config = t.config }
 

@@ -116,10 +116,10 @@ end
   @param t The configuration and executor for the archive process.
   @return A [Deferred.t] containing the archive process.
 *)
-let start t =
+let start ?env t =
   let open Deferred.Let_syntax in
   let args = Config.to_args t.config in
-  let%bind _, process = Executor.run_in_background t.executor ~args () in
+  let%bind _, process = Executor.run_in_background t.executor ~args ?env () in
   (* Callers that need to gate on archive readiness must use
      [Archive_healthcheck.wait_db_and_server_ready] rather than relying
      on this fixed sleep: on a slow agent the archive takes longer than

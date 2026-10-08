@@ -130,3 +130,37 @@ let free_port () =
   let port = Tcp.Server.listening_on server in
   let%map () = Tcp.Server.close server in
   port
+
+(* The helpers below take [exited], the result of the one [Process.wait] for
+   the process: [Process.wait] may be called only once per process. *)
+
+(** The exit status, or an error once [timeout] passes first. *)
+let exit_status_within ~timeout (exited : Unix.Exit_or_signal.t Deferred.t) =
+  match%map Clock.with_timeout timeout exited with
+  | `Result status ->
+      Ok status
+  | `Timeout ->
+      Or_error.errorf "process still running after %s"
+        (Time.Span.to_string_hum timeout)
+
+(** Kill the process unless it has already exited, and reap it. *)
+let kill_if_running process (exited : Unix.Exit_or_signal.t Deferred.t) =
+  if Deferred.is_determined exited then Deferred.unit
+  else (
+    ignore
+      ( Signal.send Signal.kill (`Pid (Process.pid process))
+        : [ `Ok | `No_such_process ] ) ;
+    exited >>| ignore )
+
+(** Append the process's stdout and stderr to [log_file], so neither pipe
+    fills and blocks the process. *)
+let log_output process ~log_file =
+  let drain reader =
+    don't_wait_for
+    @@ Pipe.iter (Reader.pipe reader) ~f:(fun chunk ->
+           Writer.with_file log_file ~append:true ~f:(fun writer ->
+               Writer.write_line writer chunk ;
+               Writer.flushed writer ) )
+  in
+  drain (Process.stdout process) ;
+  drain (Process.stderr process)
