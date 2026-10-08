@@ -29,63 +29,35 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
       exit 1
   | Ok pool ->
       [%log info] "Successfully created Caqti connection to Postgresql" ;
-      let make_add_block of_yojson add_block_aux ~json ~file =
-        match of_yojson json with
-        | Ok block -> (
-            match%map add_block_aux block with
-            | Ok () ->
-                if log_successes then
-                  [%log info] "Added block" ~metadata:[ ("file", `String file) ] ;
-                add_to_success_file file
-            | Error err ->
-                [%log error] "Error when adding block"
-                  ~metadata:
-                    [ ("file", `String file)
-                    ; ("error", `String (Caqti_error.show err))
-                    ] ;
-                add_to_failure_file file )
-        | Error err ->
+      let format : Block_json.format =
+        if precomputed then Precomputed else Extensional
+      in
+      let add_block ~json ~file =
+        match%map
+          Block_json.add ~format ~proof_cache_db ~genesis_constants
+            ~constraint_constants ~pool ~logger json
+        with
+        | Ok () ->
+            if log_successes then
+              [%log info] "Added block" ~metadata:[ ("file", `String file) ] ;
+            add_to_success_file file
+        | Error (Rejected err) ->
+            [%log error] "Error when adding block"
+              ~metadata:
+                [ ("file", `String file)
+                ; ("error", `String (Caqti_error.show err))
+                ] ;
+            add_to_failure_file file
+        | Error (Decode err) ->
             [%log error] "Could not create block from JSON"
               ~metadata:[ ("file", `String file); ("error", `String err) ] ;
-            return (add_to_failure_file file)
-      in
-      let add_precomputed_block =
-        (* allow use of older-versioned blocks *)
-        let of_yojson json =
-          match Mina_block.Precomputed.Stable.of_yojson_to_latest json with
-          | Ok block ->
-              Ok block
-          | Error err ->
-              Error (Error.to_string_hum err)
-        in
-        make_add_block of_yojson
-          (Processor.add_block_aux_precomputed ~proof_cache_db
-             ~genesis_constants ~constraint_constants ~pool
-             ~delete_older_than:None ~logger )
-      in
-      let add_extensional_block =
-        (* allow use of older-versioned blocks *)
-        let of_yojson json =
-          match
-            Archive_lib.Extensional.Block.Stable.of_yojson_to_latest json
-          with
-          | Ok block ->
-              Ok block
-          | Error err ->
-              Error (Error.to_string_hum err)
-        in
-        make_add_block of_yojson
-          (Processor.add_block_aux_extensional ~proof_cache_db
-             ~genesis_constants ~logger ~pool ~delete_older_than:None
-             ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+            add_to_failure_file file
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
               try
                 let json = Yojson.Safe.from_channel in_channel in
-                if precomputed then add_precomputed_block ~json ~file
-                else if extensional then add_extensional_block ~json ~file
-                else failwith "Internal error, bad flags"
+                add_block ~json ~file
               with
               | Yojson.Json_error err ->
                   [%log error] "Could not parse JSON from file"

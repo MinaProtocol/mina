@@ -552,3 +552,58 @@ let get_zkapp_or_ignore (item_opt : 'arg option)
 let get_opt_item (arg_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
   make_get_opt ~of_option:Fn.id ~f arg_opt
+
+(** A PostgreSQL connection URI: built from its parts, and printed safe to
+    log. *)
+module Connection_uri = struct
+  let make ~user ~password ~host ~port ~db =
+    Uri.make ~scheme:"postgres"
+      ~userinfo:(user ^ ":" ^ password)
+      ~host ~port ~path:("/" ^ db) ()
+
+  (* a libpq URI carries a password in its userinfo or in one of these *)
+  let secret_query_params = [ "password"; "sslpassword" ]
+
+  let redact_query (key, values) =
+    if List.mem secret_query_params (String.lowercase key) ~equal:String.equal
+    then (key, List.map values ~f:(fun _ -> "REDACTED"))
+    else (key, values)
+
+  (** The URI with every secret replaced. Anything logging a connection
+      string must go through this. *)
+  let redact uri =
+    let uri =
+      match Uri.password uri with
+      | None ->
+          uri
+      | Some _ ->
+          Uri.with_password uri (Some "REDACTED")
+    in
+    Uri.to_string
+      (Uri.with_query uri (List.map (Uri.query uri) ~f:redact_query))
+
+  let%test "the parts are assembled into a URI" =
+    String.equal
+      (Uri.to_string
+         (make ~user:"u" ~password:"p" ~host:"h" ~port:5432 ~db:"archive") )
+      "postgres://u:p@h:5432/archive"
+
+  let%test "a URI without a password is left alone" =
+    String.equal
+      (redact (Uri.of_string "postgres://u@h:5432/db"))
+      "postgres://u@h:5432/db"
+
+  let%test "a userinfo password is redacted" =
+    let out = redact (Uri.of_string "postgres://u:hunter2@h:5432/db") in
+    (not (String.is_substring out ~substring:"hunter2"))
+    && String.is_substring out ~substring:"REDACTED"
+
+  let%test "a query-string password is redacted too" =
+    let out =
+      redact
+        (Uri.of_string "postgres://u@h:5432/db?password=hunter2&sslmode=require")
+    in
+    (not (String.is_substring out ~substring:"hunter2"))
+    && String.is_substring out ~substring:"REDACTED"
+    && String.is_substring out ~substring:"sslmode=require"
+end

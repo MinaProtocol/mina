@@ -176,18 +176,19 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
        "--postgres-uri", "postgres://user@localhost:5432/archive"]
 ```
 
-## Relationship to missing-blocks-auditor
+## Relationship to missing-blocks-auditor and missing-blocks-guardian
 
-Both tools share SQL queries via the `archive_health_queries` library.
+The three tools share SQL queries via the `archive_health_queries` library.
 
 - **mina-archive-healthcheck**: Fast, lightweight probes for operational health.
   Answers "is the archive working right now?"
 - **mina-missing-blocks-auditor**: Deep integrity audit with bitmask exit codes.
   Answers "is the archive data complete and consistent?"
-  Paired with the guardian script for auto-repair.
+- **mina-missing-blocks-guardian**: The same audit (it links the auditor's
+  library), plus auto-repair from a block source (`single-run`, `daemon`).
 
-Use the healthcheck for k8s probes (every 10-30s) and the auditor for
-periodic deep checks (every 10min via the guardian daemon).
+Use the healthcheck for k8s probes (every 10-30s) and the guardian for
+periodic deep checks and repair (every 10min in `daemon` mode).
 
 ## Building
 

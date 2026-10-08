@@ -10,6 +10,7 @@
   caqti-async
   caqti
   async_kernel
+  uri
   ;; local libraries
   mina_base)
  (preprocess
