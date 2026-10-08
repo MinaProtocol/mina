@@ -46,17 +46,21 @@ let latest db name ~height =
       G.latest conn ~public_key:(public_key name) ~token
         ~height:(Int64.of_int height) )
 
-let add db ~genesis_height accounts =
+let add ?chunk_size db ~genesis_height accounts =
   with_conn db (fun conn ->
-      G.add conn ~genesis_height:(Int64.of_int genesis_height) accounts )
+      G.add ?chunk_size conn
+        ~genesis_height:(Int64.of_int genesis_height)
+        accounts )
 
 let outcome = function
   | `No_table ->
       "no table"
   | `Already_loaded ->
       "already loaded"
-  | `Added n ->
+  | `Added (n, 0) ->
       sprintf "added %d" n
+  | `Added (n, before) ->
+      sprintf "added %d after %d" n before
 
 let check_outcome what expected got =
   Alcotest.(check string) what expected (outcome got)
@@ -98,6 +102,40 @@ let write_and_read server_uri () =
       let%map nobody = latest db "carol" ~height:10 in
       check_row "not in any ledger" None nobody )
 
+(* An import that stopped after its first chunks: the next one writes only
+   the rest, in chunks, and the ledger then reads back whole. *)
+let interrupted server_uri () =
+  let accounts =
+    List.init 7 ~f:(fun i -> untimed (sprintf "account%d" i) ~balance:(i + 1))
+  in
+  (* the order the writer uses *)
+  let in_order =
+    List.sort accounts ~compare:(fun a b ->
+        let key x =
+          let r = G.row_of_account x in
+          (r.public_key, r.token)
+        in
+        [%compare: string * string] (key a) (key b) )
+  in
+  B.Db.with_fresh ~server_uri ~name:"test_genesis_accounts_resume" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      (* what an import interrupted after two chunks of two left *)
+      let%bind first =
+        add ~chunk_size:2 db ~genesis_height:1 (List.take in_order 4)
+      in
+      check_outcome "the interrupted import" "added 4" first ;
+      let%bind rest = add ~chunk_size:2 db ~genesis_height:1 accounts in
+      check_outcome "the next import" "added 3 after 4" rest ;
+      let%bind again = add ~chunk_size:2 db ~genesis_height:1 accounts in
+      check_outcome "once complete" "already loaded" again ;
+      Deferred.List.iteri ~how:`Sequential accounts ~f:(fun i account ->
+          let name = sprintf "account%d" i in
+          let%map.Deferred found = latest db name ~height:1 in
+          check_row name
+            (Some (1, G.row_of_account account))
+            (Or_error.ok_exn found) )
+      |> Deferred.ok )
+
 (* A database that never ran the schema upgrade: nothing is written and
    nothing is found, and neither is an error. *)
 let without_table server_uri () =
@@ -119,6 +157,8 @@ let () =
     [ ( "genesis_accounts"
       , [ Alcotest.test_case "write, read, and a later era" `Quick
             (run write_and_read)
+        ; Alcotest.test_case "an interrupted import continues" `Quick
+            (run interrupted)
         ; Alcotest.test_case "a database without the table" `Quick
             (run without_table)
         ] )
