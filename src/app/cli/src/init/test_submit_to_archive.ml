@@ -478,8 +478,12 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
   let signer_pk = Public_key.compress fee_payer_keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
+  (* [f] bumps [nonce_ref], so it must run in index order. [List.init] calls
+     [f] from the last index down, which hands the lowest nonces to the last
+     commands and the last block. *)
+  let init_in_order n ~f = Sequence.init n ~f |> Sequence.to_list in
   let generate_payments () =
-    List.init (n_payments + n_zkapp_txs) ~f:(fun i ->
+    init_in_order (n_payments + n_zkapp_txs) ~f:(fun i ->
         let command =
           if i < n_payments then (
             (* Creates a simple payment that initializes a new account *)
@@ -553,7 +557,7 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
         in
         valid_command )
   in
-  List.init n_blocks ~f:(fun _ -> generate_payments ())
+  init_in_order n_blocks ~f:(fun _ -> generate_payments ())
 
 let assert_max_cost_zkapp ~logger ~genesis_constants
     (zkapp_cmd : Zkapp_command.t) =

@@ -311,7 +311,7 @@ the CI apps cache instead:
 | `mina`, `mina-archive`, `mina-rosetta`, `libp2p_helper` | apps cache, via `buildkite/scripts/debian/restore-or-install.sh` |
 | `/var/lib/coda/<network>.json` | `genesis_ledgers/<network>.json` (the config deb copies this file verbatim) |
 | `/etc/mina/archive/create_schema.sql` | `src/app/archive/create_schema.sql` |
-| `/etc/mina/archive/{upgrade_to_mesa,downgrade_to_berkeley}.sql` | `src/app/archive/*.sql` |
+| `/etc/mina/archive/{upgrade,downgrade}.sql` | `src/app/archive/*.sql` |
 | postgres cluster baked into the image | a cluster created by the script |
 
 The process layout (rosetta online + offline, archive, daemon on localhost) is
