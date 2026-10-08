@@ -21,7 +21,7 @@ in  { step =
                     ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.OnlineTarGzDump
-                            "https://storage.googleapis.com/mina-archive-dumps/mainnet-archive-dump-2025-11-11_0000.sql.tar.gz"
+                            "https://storage.googleapis.com/mina-archive-dumps/mainnet-archive-dump-2026-10-06_0000.sql.tar.gz"
                         )
                     )
                     ContainerImages.minaToolchainBookworm.amd64

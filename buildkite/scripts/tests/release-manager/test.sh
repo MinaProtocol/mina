@@ -4,7 +4,6 @@
 # Tests publish and promote operations using dry-run mode (no actual AWS uploads)
 #
 # All tests are safe and do not make actual changes to repositories.
-# For E2E tests with real uploads, see test-e2e.sh
 
 set -eo pipefail
 
