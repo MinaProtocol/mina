@@ -1,0 +1,24 @@
+(test
+ (name test_rosetta_fork_balance)
+ (deps
+  ../../app/rosetta/rosetta.exe
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  cohttp
+  cohttp-async
+  core
+  core_kernel
+  uri
+  yojson
+  ;; local libraries
+  mina_automation.synthetic_archive
+  rosetta_client)
+ (preprocess
+  (pps ppx_version ppx_jane)))
