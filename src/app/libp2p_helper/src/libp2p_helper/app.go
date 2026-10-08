@@ -52,6 +52,14 @@ func (app *app) SetConnectionHandlers() {
 			app.updateConnectionMetrics()
 			app.writeMsg(mkPeerDisconnectedUpcall(c.RemotePeer().String()))
 		})
+		// Connections can be established before the handlers above are
+		// installed: the DHT dials its bootstrap peers as soon as it is
+		// constructed during configuration. Report those peers now, otherwise
+		// their connections would never be announced. A peer connecting
+		// concurrently may be reported twice, which consumers tolerate.
+		for _, p := range app.P2p.Host.Network().Peers() {
+			app.writeMsg(mkPeerConnectedUpcall(p.String()))
+		}
 	})
 }
 

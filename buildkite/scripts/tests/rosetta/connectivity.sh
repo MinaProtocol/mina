@@ -15,8 +15,9 @@
 #                    what the mina-${network}-config deb installs as
 #                    /var/lib/coda/${network}.json (scripts/debian/builder-helpers.sh,
 #                    copy_common_daemon_configs)
-#   archive schema-> src/app/archive/create_schema.sql
-#   upgrade/downgrade SQL -> src/app/archive/{upgrade_to_mesa,downgrade_to_berkeley}.sql
+#   archive data  -> the network's latest daily dump from mina-archive-dumps,
+#                    as src/app/rosetta/scripts/init-db.sh restored it
+#   upgrade/downgrade SQL -> src/app/archive/{upgrade,downgrade}.sql
 #                    (the image had them under /etc/mina/archive)
 #   postgres      -> a cluster created here, as the rosetta image's Dockerfile did
 #
@@ -105,6 +106,9 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
 export MINA_ROSETTA_ONLINE_PORT=${MINA_ROSETTA_ONLINE_PORT:=3087}
 export MINA_ROSETTA_OFFLINE_PORT=${MINA_ROSETTA_OFFLINE_PORT:=3088}
+# Required by mina-rosetta, which exits at startup without it; same default as
+# docker-start.sh.
+export MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE:=80}
 
 export MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper
 export MINA_LIBP2P_KEYPAIR_PATH="${MINA_LIBP2P_KEYPAIR_PATH:=$HOME/libp2p-keypair}"
@@ -157,16 +161,51 @@ sudo pg_createcluster --start -d "${POSTGRES_DATA_DIR}" \
   --createclusterconf ./src/app/rosetta/scripts/postgresql.conf "${POSTGRES_VERSION}" main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O "${POSTGRES_USERNAME}" "${POSTGRES_DBNAME}"
-psql -f ./src/app/archive/create_schema.sql "${PG_CONN}"
+
+# rosetta-sanity.sh asserts fixed historical blocks and transactions, so the
+# archive must start from the network's dump, not an empty schema. Same lookup
+# as src/app/rosetta/scripts/init-db.sh: newest daily dump in the last 5 days.
+MINA_ARCHIVE_DUMP_URL=${MINA_ARCHIVE_DUMP_URL:=https://storage.googleapis.com/mina-archive-dumps}
+DUMP_TIME=${DUMP_TIME:=0000}
+DUMP_NAME=""
+for i in 0 1 2 3 4; do
+  candidate="${MINA_NETWORK}-archive-dump-$(date -u -d "-${i} days" +%F)_${DUMP_TIME}"
+  if curl -sfI "${MINA_ARCHIVE_DUMP_URL}/${candidate}.sql.tar.gz" >/dev/null; then
+    DUMP_NAME="$candidate"
+    break
+  fi
+done
+if [[ -z "$DUMP_NAME" ]]; then
+  echo "No ${MINA_NETWORK} archive dump found in the last 5 days at ${MINA_ARCHIVE_DUMP_URL}"
+  exit 1
+fi
+echo "Restoring ${DUMP_NAME}"
+curl -sf "${MINA_ARCHIVE_DUMP_URL}/${DUMP_NAME}.sql.tar.gz" | tar -xz
+# The dump starts with CREATE DATABASE archive, which fails harmlessly on the
+# database created above, then \connect archive.
+psql -q -f "${DUMP_NAME}.sql" "${PG_CONN}" >/dev/null
+rm -f "${DUMP_NAME}.sql"
+psql "${PG_CONN}" -c "SELECT state_hash, height FROM blocks ORDER BY height DESC LIMIT 1"
 
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
+ROSETTA_PIDS=()
 for port in "$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT"; do
   mina-rosetta \
     --archive-uri "${PG_CONN}" \
     --graphql-uri "http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql" \
     --log-level "${LOG_LEVEL}" \
     --port "${port}" >>rosetta.log 2>&1 &
+  ROSETTA_PIDS+=("$!")
   sleep 5
+done
+# Fail now if rosetta exited at startup, rather than waiting out the whole sync
+# timeout for a server that is not there.
+for pid in "${ROSETTA_PIDS[@]}"; do
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "mina-rosetta (PID ${pid}) exited at startup:"
+    cat rosetta.log
+    exit 1
+  fi
 done
 
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
@@ -270,8 +309,8 @@ if [[ -n "$COMPATIBILITY_BRANCH" ]]; then
   echo "Running compatibility test with branch: $COMPATIBILITY_BRANCH"
 
   # In-repo copies of what the image shipped under /etc/mina/archive.
-  upgrade_script_path="./src/app/archive/upgrade_to_mesa.sql"
-  rollback_script_path="./src/app/archive/downgrade_to_berkeley.sql"
+  upgrade_script_path="./src/app/archive/upgrade.sql"
+  rollback_script_path="./src/app/archive/downgrade.sql"
 
   initial_blocks=$(psql "$PG_CONN" -t -c 'SELECT COUNT(*) FROM blocks;' | tr -d ' ')
 

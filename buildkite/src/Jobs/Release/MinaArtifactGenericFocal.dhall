@@ -25,6 +25,7 @@ in  Pipeline.build
           , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Packaging
+            , PipelineTag.Type.Generic
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
