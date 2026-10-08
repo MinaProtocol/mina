@@ -14,7 +14,7 @@ end
 module PathFinder = Executor.Make_PathFinder (Paths)
 
 let path () =
-  Deferred.map PathFinder.standalone_path ~f:(fun opt ->
+  Deferred.map (PathFinder.standalone_path ()) ~f:(fun opt ->
       Option.value_exn opt
         ~message:
           "Could not find standalone for missing block auditor. Missing block \
