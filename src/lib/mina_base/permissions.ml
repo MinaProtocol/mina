@@ -679,7 +679,9 @@ let%test_unit "json value" =
 module Hardfork = struct
   type t = Stable.Latest.t [@@deriving equal, sexp, compare]
 
-  let hardfork_txn_version = Mina_numbers.Txn_version.(succ current)
+  (* The next hard fork bumps the network protocol version only, so accounts
+     keep the current transaction version. *)
+  let hardfork_txn_version = Mina_numbers.Txn_version.current
 
   let user_default : t =
     { edit_state = Signature
