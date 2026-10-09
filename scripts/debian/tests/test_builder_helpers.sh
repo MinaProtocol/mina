@@ -172,6 +172,7 @@ assert_rosetta_binaries() {
     assert_file_captured "$captured_files" "usr/local/bin/rosetta-client"
     assert_file_captured "$captured_files" "usr/local/bin/mina-ocaml-signer"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-indexer-test"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-search-test"
 }
 
 assert_rosetta_configs() {
@@ -351,6 +352,7 @@ MOCKEXE
     create_mock_exe "default/src/app/rosetta/rosetta.exe"
     create_mock_exe "default/src/app/rosetta/ocaml-signer/signer.exe"
     create_mock_exe "default/src/app/rosetta/indexer_test/indexer_test.exe"
+    create_mock_exe "default/src/app/rosetta/search_test/rosetta_search_test.exe"
     create_mock_exe "default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe"
     create_mock_exe "default/src/app/rosetta/client/rosetta_client_cli.exe"
     create_mock_exe "default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe"

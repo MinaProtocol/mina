@@ -561,46 +561,46 @@ struct
 
             let f (T b : _ Branch_data.t) =
               let open Impls.Step in
-              let k_p =
-                lazy
-                  (let (T (typ, _conv, conv_inv)) = etyp in
-                   let%bind.Promise main =
-                     b.main ~step_domains:all_step_domains
-                   in
-                   run_in_sequence (fun () ->
-                       let main () () =
-                         let%map.Promise res = main () in
-                         Impls.Step.with_label "conv_inv" (fun () ->
-                             conv_inv res )
-                       in
-                       let constraint_builder =
-                         Impl.constraint_system_manual ~input_typ:Typ.unit
-                           ~return_typ:typ
-                       in
-                       let%map.Promise res =
-                         constraint_builder.run_circuit main
-                       in
-                       let cs = constraint_builder.finish_computation res in
-                       let cs_hash =
-                         Md5.to_hex (R1CS_constraint_system.digest cs)
-                       in
-                       ( Type_equal.Id.uid self.id
-                       , snark_keys_header
-                           { type_ = "step-proving-key"
-                           ; identifier = name ^ "-" ^ b.rule.identifier
-                           }
-                           cs_hash
-                       , b.index
-                       , cs ) ) )
+              let build_k_p () =
+                let (T (typ, _conv, conv_inv)) = etyp in
+                let%bind.Promise main = b.main ~step_domains:all_step_domains in
+                run_in_sequence (fun () ->
+                    let main () () =
+                      let%map.Promise res = main () in
+                      Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                    in
+                    let constraint_builder =
+                      Impl.constraint_system_manual ~input_typ:Typ.unit
+                        ~return_typ:typ
+                    in
+                    let%map.Promise res = constraint_builder.run_circuit main in
+                    let cs = constraint_builder.finish_computation res in
+                    let cs_hash =
+                      Md5.to_hex (R1CS_constraint_system.digest cs)
+                    in
+                    ( Type_equal.Id.uid self.id
+                    , snark_keys_header
+                        { type_ = "step-proving-key"
+                        ; identifier = name ^ "-" ^ b.rule.identifier
+                        }
+                        cs_hash
+                    , b.index
+                    , cs ) )
               in
+              let k_p = lazy (build_k_p ()) in
               let k_v =
                 match disk_keys with
                 | Some ks ->
                     Lazy.return (Promise.return ks.(b.index))
                 | None ->
                     lazy
+                      (* Unless the proving key has already been asked for,
+                         build the constraint system just for its digest, so
+                         that a process that only needs the verification key
+                         does not keep it. *)
                       (let%map.Promise id, _header, index, cs =
-                         Lazy.force k_p
+                         if Lazy.is_val k_p then Lazy.force k_p
+                         else build_k_p ()
                        in
                        let digest = R1CS_constraint_system.digest cs in
                        ( id
@@ -666,27 +666,31 @@ struct
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
       let self_id = Type_equal.Id.uid self.id in
-      let disk_key_prover =
-        lazy
-          (let%map.Promise wrap_main = Lazy.force wrap_main in
-           let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
-           let main x () = wrap_main (conv x) in
-           let cs =
-             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
-               main
-           in
-           let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-           ( self_id
-           , snark_keys_header
-               { type_ = "wrap-proving-key"; identifier = name }
-               cs_hash
-           , cs ) )
+      let build_disk_key_prover () =
+        let%map.Promise wrap_main = Lazy.force wrap_main in
+        let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+        let main x () = wrap_main (conv x) in
+        let cs =
+          constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit main
+        in
+        let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+        ( self_id
+        , snark_keys_header
+            { type_ = "wrap-proving-key"; identifier = name }
+            cs_hash
+        , cs )
       in
+      let disk_key_prover = lazy (build_disk_key_prover ()) in
       let disk_key_verifier =
         match disk_keys with
         | None ->
             lazy
-              (let%map.Promise id, _header, cs = Lazy.force disk_key_prover in
+              (* As for the step keys: don't keep the constraint system just
+                 for the verification key's digest. *)
+              (let%map.Promise id, _header, cs =
+                 if Lazy.is_val disk_key_prover then Lazy.force disk_key_prover
+                 else build_disk_key_prover ()
+               in
                let digest = R1CS_constraint_system.digest cs in
                ( id
                , snark_keys_header
