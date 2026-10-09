@@ -737,7 +737,7 @@ let create_blocks_with_diffs ~logger
         in
         let diff =
           (* Copied from archive_client.ml *)
-          Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values ~logger
+          Archive_rpc.Diff.Builder.breadcrumb_added ~precomputed_values ~logger
             breadcrumb
         in
         (Block.of_breadcrumb breadcrumb, diff :: diffs) )
@@ -813,7 +813,7 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
         [%log info] "Submit blocks to archive at port %d" port ;
         Deferred.List.iter diffs ~f:(fun diff ->
             (* Copied from archive_client.ml *)
-            Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t
+            Daemon_rpcs.Client.dispatch Archive_rpc.Rpc.t
               (Transition_frontier diff)
               { host = "127.0.0.1"; port }
             >>| Or_error.ok_exn )
@@ -831,10 +831,10 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
           Async.Writer.with_file file_path ~f:(fun writer ->
               List.iter diffs ~f:(fun diff ->
                   let archive_diff =
-                    Archive_lib.Diff.Transition_frontier diff
+                    Archive_rpc.Diff.Transition_frontier diff
                   in
                   let serialized =
-                    Bin_prot.Writer.to_bytes Archive_lib.Diff.bin_writer_t
+                    Bin_prot.Writer.to_bytes Archive_rpc.Diff.bin_writer_t
                       archive_diff
                   in
                   Async.Writer.write_bytes writer serialized ) ;

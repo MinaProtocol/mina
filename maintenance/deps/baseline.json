@@ -7,40 +7,40 @@
   ],
   "entrypoints": {
     "exe:app/archive:archive": {
-      "libs": 188,
+      "libs": 189,
       "opam": 51
     },
     "exe:app/archive_blocks:archive_blocks": {
-      "libs": 186,
-      "opam": 51
-    },
-    "exe:app/archive_hardfork_toolbox:archive_hardfork_toolbox": {
       "libs": 187,
       "opam": 51
     },
+    "exe:app/archive_hardfork_toolbox:archive_hardfork_toolbox": {
+      "libs": 188,
+      "opam": 51
+    },
     "exe:app/batch_txn_tool:batch_txn_tool": {
-      "libs": 235,
-      "opam": 60
+      "libs": 233,
+      "opam": 58
     },
     "exe:app/benchmarks:benchmarks": {
       "libs": 107,
       "opam": 33
     },
     "exe:app/best_tip_merger:best_tip_merger": {
-      "libs": 204,
+      "libs": 205,
       "opam": 54
     },
     "exe:app/cli/src:mina": {
-      "libs": 250,
-      "opam": 65
+      "libs": 248,
+      "opam": 63
     },
     "exe:app/cli/src:mina_mainnet_signatures": {
-      "libs": 251,
-      "opam": 65
+      "libs": 249,
+      "opam": 63
     },
     "exe:app/cli/src:mina_testnet_signatures": {
-      "libs": 251,
-      "opam": 65
+      "libs": 249,
+      "opam": 63
     },
     "exe:app/coverage_utils/display_summary:main": {
       "libs": 0,
@@ -63,7 +63,7 @@
       "opam": 51
     },
     "exe:app/extract_blocks:extract_blocks": {
-      "libs": 186,
+      "libs": 187,
       "opam": 51
     },
     "exe:app/generate_keypair:generate_keypair": {
@@ -71,8 +71,8 @@
       "opam": 49
     },
     "exe:app/graphql_schema_dump:graphql_schema_dump": {
-      "libs": 234,
-      "opam": 60
+      "libs": 232,
+      "opam": 58
     },
     "exe:app/heap_usage:heap_usage": {
       "libs": 206,
@@ -91,12 +91,12 @@
       "opam": 35
     },
     "exe:app/mina_graphql_client:mina_graphql_client_app": {
-      "libs": 235,
-      "opam": 60
+      "libs": 233,
+      "opam": 58
     },
     "exe:app/mina_healthcheck:mina_healthcheck": {
-      "libs": 236,
-      "opam": 60
+      "libs": 234,
+      "opam": 58
     },
     "exe:app/missing_blocks_auditor:missing_blocks_auditor": {
       "libs": 106,
@@ -107,7 +107,7 @@
       "opam": 6
     },
     "exe:app/replayer:replayer": {
-      "libs": 187,
+      "libs": 188,
       "opam": 51
     },
     "exe:app/rocksdb-scanner:rocksdb_scanner": {
@@ -123,15 +123,15 @@
       "opam": 11
     },
     "exe:app/rosetta/ocaml-signer:signer": {
-      "libs": 206,
+      "libs": 207,
       "opam": 54
     },
     "exe:app/rosetta/ocaml-signer:signer_mainnet_signatures": {
-      "libs": 206,
+      "libs": 207,
       "opam": 54
     },
     "exe:app/rosetta/ocaml-signer:signer_testnet_signatures": {
-      "libs": 206,
+      "libs": 207,
       "opam": 54
     },
     "exe:app/rosetta/search_bench:rosetta_search_bench": {
@@ -139,15 +139,15 @@
       "opam": 55
     },
     "exe:app/rosetta:rosetta": {
-      "libs": 204,
+      "libs": 205,
       "opam": 54
     },
     "exe:app/rosetta:rosetta_mainnet_signatures": {
-      "libs": 205,
+      "libs": 206,
       "opam": 54
     },
     "exe:app/rosetta:rosetta_testnet_signatures": {
-      "libs": 205,
+      "libs": 206,
       "opam": 54
     },
     "exe:app/runtime_genesis_ledger:runtime_genesis_ledger": {
@@ -155,8 +155,8 @@
       "opam": 49
     },
     "exe:app/test_executive:test_executive": {
-      "libs": 239,
-      "opam": 61
+      "libs": 237,
+      "opam": 59
     },
     "exe:app/validate_keypair:validate_keypair": {
       "libs": 179,
@@ -167,8 +167,8 @@
       "opam": 30
     },
     "exe:app/zkapp_test_transaction:zkapp_test_transaction": {
-      "libs": 234,
-      "opam": 60
+      "libs": 232,
+      "opam": 58
     },
     "exe:lib/blockchain_snark/tests/print_blockchain_snark_vk:print_blockchain_snark_vk": {
       "libs": 139,
@@ -231,8 +231,8 @@
       "opam": 4
     },
     "exe:lib/snark_worker/standalone:run_snark_worker": {
-      "libs": 233,
-      "opam": 60
+      "libs": 231,
+      "opam": 58
     },
     "exe:lib/transaction_snark/test/print_transaction_snark_vk:print_transaction_snark_vk": {
       "libs": 138,
@@ -247,12 +247,12 @@
       "opam": 37
     },
     "exe:test/archive/patch_archive_test:patch_archive_test": {
-      "libs": 248,
+      "libs": 249,
       "opam": 64
     },
     "exe:test/command_line_tests:command_line_tests": {
-      "libs": 250,
-      "opam": 64
+      "libs": 249,
+      "opam": 63
     },
     "exe:test/node_status_mock_server:node_status_mock_server": {
       "libs": 0,
