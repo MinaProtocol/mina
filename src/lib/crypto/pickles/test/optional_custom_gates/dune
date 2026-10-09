@@ -3,6 +3,7 @@
   test_fix_domains
   pickles_test_optional_custom_gates
   lookup_range_check)
+ (modules :standard \ test_mmap_cache)
  (libraries
   ;; opam libraries
   alcotest
@@ -51,6 +52,7 @@
   group_map
   snarky_curve
   key_cache
+  key_cache.native
   snark_keys_header
   tuple_lib
   promise
@@ -60,6 +62,35 @@
   ppx_version.runtime
   error_json
   pickles_optional_custom_gates_circuits)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+; test_mmap_cache refuses to run without MINA_USE_MMAP_CACHE, since otherwise
+; Pickles takes the MessagePack cache path and the test exercises nothing.
+
+(test
+ (name test_mmap_cache)
+ (modules test_mmap_cache)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  core
+  core_kernel
+  ;; local libraries
+  key_cache
+  key_cache.native
+  pickles
+  pickles.backend
+  pickles_types
+  snarky.backendless)
+ (action
+  (setenv
+   MINA_USE_MMAP_CACHE
+   1
+   (run %{test})))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
