@@ -37,17 +37,16 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
-(* Sanity: the env var must be set for this test to actually exercise the
-   mmap path. Without it, the legacy rmp_serde path is used and the test
-   passes for reasons unrelated to our code. *)
+(* Sanity: the mmap path must not be disabled, or the legacy rmp_serde path is
+   used and the test passes for reasons unrelated to our code. *)
 let () =
   match Sys.getenv_opt "MINA_USE_MMAP_CACHE" with
-  | Some ("1" | "true" | "yes") ->
-      ()
-  | _ ->
+  | Some ("0" | "false" | "no") ->
       failwith
-        "test_mmap_cache requires MINA_USE_MMAP_CACHE=1; the test is a no-op \
-         without it"
+        "test_mmap_cache requires the mmap cache; unset MINA_USE_MMAP_CACHE or \
+         set it to 1"
+  | _ ->
+      ()
 
 (* The cache directory is either picked afresh (phase 1, first invocation)
    or inherited from the environment (phase 2, re-exec'd child). Passing it

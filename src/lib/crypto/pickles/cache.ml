@@ -10,16 +10,15 @@ let should_dump_circuit_data () =
 
 (* The mmap-backed proving-key cache trades a MessagePack deserialization
    step for a POD file format that can be loaded in a single [mmap(2)]
-   syscall and ~one memcpy per field element. Enabled via the
-   [MINA_USE_MMAP_CACHE] environment variable during rollout; once we flip
-   the default, the old MessagePack path remains as a fallback until it is
-   retired. *)
+   syscall and ~one memcpy per field element. It is on by default; setting the
+   [MINA_USE_MMAP_CACHE] environment variable to [0], [false] or [no] selects
+   the old MessagePack path instead. *)
 let use_mmap_cache () =
   match Sys.getenv_opt "MINA_USE_MMAP_CACHE" with
-  | Some "true" | Some "1" | Some "yes" ->
-      true
-  | _ ->
+  | Some "false" | Some "0" | Some "no" ->
       false
+  | _ ->
+      true
 
 module Step = struct
   module Key = struct
@@ -55,7 +54,7 @@ module Step = struct
     , Kimchi_bindings.Protocol.VerifierIndex.Fp.t )
     Key_cache.Sync.Disk_storable.t
 
-  let storable =
+  let legacy_storable, storable =
     let read_legacy (header : Snark_keys_header.t) ~path ~cs =
       Or_error.try_with_join (fun () ->
           let open Or_error.Let_syntax in
@@ -105,13 +104,22 @@ module Step = struct
           let identifier = Key.Proving.to_string key in
           Kimchi_bindings.Protocol.Index.Fp.write_cached identifier t.index path )
     in
-    Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun ((_, header, _, cs) as key) ~path ->
-        if use_mmap_cache () then read_mmap key ~path ~cs
-        else read_legacy header ~path ~cs )
-      (fun ((_, header, _, cs) as key) t path ->
-        if use_mmap_cache () then write_mmap key t path
-        else write_legacy header cs t path )
+    (* The two formats never share a file: a process in one mode must not
+       overwrite, or fail to read, a key written in the other. *)
+    let file_name key =
+      if use_mmap_cache () then Key.Proving.to_string key ^ ".mmap"
+      else Key.Proving.to_string key
+    in
+    ( Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
+        (fun (_, header, _, cs) ~path -> read_legacy header ~path ~cs)
+        (fun (_, header, _, cs) t path -> write_legacy header cs t path)
+    , Key_cache.Sync.Disk_storable.simple file_name
+        (fun ((_, header, _, cs) as key) ~path ->
+          if use_mmap_cache () then read_mmap key ~path ~cs
+          else read_legacy header ~path ~cs )
+        (fun ((_, header, _, cs) as key) t path ->
+          if use_mmap_cache () then write_mmap key t path
+          else write_legacy header cs t path ) )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
@@ -141,6 +149,25 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
+  (* In mmap mode, a key missing from the mmap cache may still be available in
+     the legacy format (for example, keys installed with a package), so convert
+     it rather than generating it again. *)
+  let read_legacy_to_convert cache ~s_p k_p =
+    if use_mmap_cache () && phys_equal s_p storable then
+      Result.ok (Key_cache.Sync.read cache legacy_storable k_p)
+    else None
+
+  (* After writing a key to the mmap cache, read it back so that this process
+     holds the mapped copy rather than the heap copy that it just wrote. *)
+  let read_back_written cache ~s_p k_p (pk, dirty) =
+    if use_mmap_cache () then
+      match Key_cache.Sync.read cache s_p k_p with
+      | Ok (mapped, _) ->
+          (mapped, dirty)
+      | Error _ ->
+          (pk, dirty)
+    else (pk, dirty)
+
   let read_or_generate ~prev_challenges cache ?(s_p = storable)
       ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
     let open Impls.Step in
@@ -154,16 +181,21 @@ module Step = struct
          | Ok (pk, dirty) ->
              Common.time "step keypair create" (fun () -> (pk, dirty))
          | Error _e ->
-             let _, _, _, sys = k_p in
-             let r =
-               Common.time "stepkeygen" (fun () ->
-                   Keypair.generate ~prev_challenges sys ~lazy_mode )
+             let pk, dirty =
+               match read_legacy_to_convert cache ~s_p k_p with
+               | Some legacy ->
+                   legacy
+               | None ->
+                   let _, _, _, sys = k_p in
+                   let r =
+                     Common.time "stepkeygen" (fun () ->
+                         Keypair.generate ~prev_challenges sys ~lazy_mode )
+                   in
+                   Timer.clock __LOC__ ;
+                   (Keypair.pk r, `Generated_something)
              in
-             Timer.clock __LOC__ ;
-             ignore
-               ( Key_cache.Sync.write cache s_p k_p (Keypair.pk r)
-                 : unit Or_error.t ) ;
-             (Keypair.pk r, `Generated_something) )
+             ignore (Key_cache.Sync.write cache s_p k_p pk : unit Or_error.t) ;
+             read_back_written cache ~s_p k_p (pk, dirty) )
     in
     let vk =
       lazy
@@ -217,7 +249,7 @@ module Wrap = struct
   type vk_storable =
     (Key.Verification.t, Verification_key.t) Key_cache.Sync.Disk_storable.t
 
-  let storable =
+  let legacy_storable, storable =
     let read_legacy (header : Snark_keys_header.t) ~path ~cs =
       Or_error.try_with_join (fun () ->
           let open Or_error.Let_syntax in
@@ -266,13 +298,22 @@ module Wrap = struct
           let identifier = Key.Proving.to_string key in
           Kimchi_bindings.Protocol.Index.Fq.write_cached identifier t.index path )
     in
-    Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun ((_, header, cs) as key) ~path ->
-        if use_mmap_cache () then read_mmap key ~path ~cs
-        else read_legacy header ~path ~cs )
-      (fun ((_, header, cs) as key) t path ->
-        if use_mmap_cache () then write_mmap key t path
-        else write_legacy header cs t path )
+    (* The two formats never share a file: a process in one mode must not
+       overwrite, or fail to read, a key written in the other. *)
+    let file_name key =
+      if use_mmap_cache () then Key.Proving.to_string key ^ ".mmap"
+      else Key.Proving.to_string key
+    in
+    ( Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
+        (fun (_, header, cs) ~path -> read_legacy header ~path ~cs)
+        (fun (_, header, cs) t path -> write_legacy header cs t path)
+    , Key_cache.Sync.Disk_storable.simple file_name
+        (fun ((_, header, cs) as key) ~path ->
+          if use_mmap_cache () then read_mmap key ~path ~cs
+          else read_legacy header ~path ~cs )
+        (fun ((_, header, cs) as key) t path ->
+          if use_mmap_cache () then write_mmap key t path
+          else write_legacy header cs t path ) )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
@@ -308,6 +349,25 @@ module Wrap = struct
                          t ) ) )
               header path ) )
 
+  (* In mmap mode, a key missing from the mmap cache may still be available in
+     the legacy format (for example, keys installed with a package), so convert
+     it rather than generating it again. *)
+  let read_legacy_to_convert cache ~s_p k_p =
+    if use_mmap_cache () && phys_equal s_p storable then
+      Result.ok (Key_cache.Sync.read cache legacy_storable k_p)
+    else None
+
+  (* After writing a key to the mmap cache, read it back so that this process
+     holds the mapped copy rather than the heap copy that it just wrote. *)
+  let read_back_written cache ~s_p k_p (pk, dirty) =
+    if use_mmap_cache () then
+      match Key_cache.Sync.read cache s_p k_p with
+      | Ok (mapped, _) ->
+          (mapped, dirty)
+      | Error _ ->
+          (pk, dirty)
+    else (pk, dirty)
+
   let read_or_generate ~prev_challenges cache ?(s_p = storable)
       ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
     let module Vk = Verification_key in
@@ -322,15 +382,20 @@ module Wrap = struct
          | Ok (pk, d) ->
              (pk, d)
          | Error _e ->
-             let _, _, sys = k in
-             let r =
-               Common.time "wrapkeygen" (fun () ->
-                   Keypair.generate ~lazy_mode ~prev_challenges sys )
+             let pk, dirty =
+               match read_legacy_to_convert cache ~s_p k with
+               | Some legacy ->
+                   legacy
+               | None ->
+                   let _, _, sys = k in
+                   let r =
+                     Common.time "wrapkeygen" (fun () ->
+                         Keypair.generate ~lazy_mode ~prev_challenges sys )
+                   in
+                   (Keypair.pk r, `Generated_something)
              in
-             ignore
-               ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
-                 : unit Or_error.t ) ;
-             (Keypair.pk r, `Generated_something) )
+             ignore (Key_cache.Sync.write cache s_p k pk : unit Or_error.t) ;
+             read_back_written cache ~s_p k (pk, dirty) )
     in
     let vk =
       lazy

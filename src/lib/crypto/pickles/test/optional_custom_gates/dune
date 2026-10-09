@@ -2,7 +2,8 @@
  (names
   test_fix_domains
   pickles_test_optional_custom_gates
-  lookup_range_check)
+  lookup_range_check
+  test_mmap_cache_mixed)
  (modules :standard \ test_mmap_cache)
  (libraries
   ;; opam libraries
@@ -67,8 +68,9 @@
  (preprocess
   (pps ppx_version)))
 
-; test_mmap_cache refuses to run without MINA_USE_MMAP_CACHE, since otherwise
-; Pickles takes the MessagePack cache path and the test exercises nothing.
+; test_mmap_cache refuses to run with MINA_USE_MMAP_CACHE disabled, since then
+; Pickles takes the MessagePack cache path and the test exercises nothing, so
+; pin the variable rather than inherit it.
 
 (test
  (name test_mmap_cache)
