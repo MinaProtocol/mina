@@ -344,14 +344,15 @@ func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs in
 }
 
 // ComputeChainId computes the chain_id for the given config files using the
-// post-fork mina binary's `internal chain-id --from-config-hashes-only` command.
-// Returns empty string if the chain_id cannot be computed (e.g. config lacks hashes).
-func (t *HardforkTest) ComputeChainId(configFiles ...string) (string, error) {
-	args := []string{"internal", "chain-id"}
+// post-fork mina binary's `internal chain-id` command. It loads the genesis
+// and epoch ledgers from genesisDir the same way the post-fork daemon does at
+// boot, so a fork config whose ledger tarballs the post-fork binary cannot
+// find fails here instead of as a crashed node in the fork network.
+func (t *HardforkTest) ComputeChainId(genesisDir string, configFiles ...string) (string, error) {
+	args := []string{"internal", "chain-id", "--genesis-ledger-dir", genesisDir}
 	for _, f := range configFiles {
 		args = append(args, "--config-file", f)
 	}
-	args = append(args, "--from-config-hashes-only")
 	cmd := exec.Command(t.Config.ForkMinaExe, args...)
 	output, err := cmd.Output()
 	if err != nil {
@@ -361,7 +362,8 @@ func (t *HardforkTest) ComputeChainId(configFiles ...string) (string, error) {
 		}
 		return "", fmt.Errorf("failed to run mina internal chain-id: %w", err)
 	}
-	return strings.TrimSpace(string(output)), nil
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1]), nil
 }
 
 type MoveFileSpec struct {
@@ -418,9 +420,9 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		// the nested directory structure the post-fork daemon will use. The daemon
 		// loads its config-directory daemon.json first, then overlays --config-file
 		// args, so we pass both in the same order.
-		chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
+		chainId, err := t.ComputeChainId(filepath.Join(forkDataBase, "genesis"), forkConfigFile, networkDaemonConfig)
 		if err != nil {
-			return fmt.Errorf("failed to compute chain_id from fork config on node %s: %w", info.Name, err)
+			return fmt.Errorf("post-fork binary cannot load fork config and genesis ledgers of node %s: %w", info.Name, err)
 		}
 		t.Logger.Info("Computed chain_id for fork config on node %s: %s", info.Name, chainId)
 		chainStateDir := filepath.Join(nodeDir, chainId)
