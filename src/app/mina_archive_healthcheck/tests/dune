@@ -14,8 +14,17 @@
   core_unix
   stdio
   uri
-  yojson)
- (deps ../mina_archive_healthcheck.exe)
+  yojson
+  async
+  async_kernel
+  async_unix
+  ;; local libraries
+  mina_automation
+  mina_automation.synthetic_archive)
+ (deps
+  ../mina_archive_healthcheck.exe
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

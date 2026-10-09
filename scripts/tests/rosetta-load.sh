@@ -27,6 +27,14 @@ set -euo pipefail
 
 source "$(dirname "$0")/rosetta-helper.sh"
 
+# Floating-point arithmetic through awk: the CI toolchain image has no bc.
+# Timestamps are date +%s.%N, so keep the nanoseconds (awk's default %.6g
+# would print 1.79e+09).
+fp() { awk "BEGIN { printf \"%.9f\", $1 }"; }
+fp2() { awk "BEGIN { printf \"%.2f\", $1 }"; }
+fp_int() { awk "BEGIN { printf \"%d\", int($1) }"; }
+fp_true() { awk "BEGIN { exit !($1) }"; }
+
 ################################################################################
 # Configuration Constants
 ################################################################################
@@ -525,13 +533,13 @@ function print_load_test_statistics() {
     local is_final="${6:-false}"
     
     local elapsed_since_last
-    elapsed_since_last=$(echo "$now - $last_metric_time" | bc)
+    elapsed_since_last=$(fp "$now - $last_metric_time")
     local current_tps
-    current_tps=$(echo "scale=2; $requests_since_last_metric / $elapsed_since_last" | bc)
+    current_tps=$(fp2 "$requests_since_last_metric / $elapsed_since_last")
     local total_elapsed
-    total_elapsed=$(echo "$now - $start_time" | bc)
+    total_elapsed=$(fp "$now - $start_time")
     local average_tps
-    average_tps=$(echo "scale=2; $total_requests / $total_elapsed" | bc)
+    average_tps=$(fp2 "$total_requests / $total_elapsed")
     
     if [[ "$is_final" == "true" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') - 🏁 FINAL STATISTICS:"
@@ -585,7 +593,7 @@ function assert_memory_usage_within_thresholds() {
     local postgres_memory
     postgres_memory=$(ps -u postgres -o rss= | awk '{sum+=$1} END {print sum/1024}')
     if [[ -n "$postgres_memory" ]]; then
-        if (( $(echo "$postgres_memory > $postgres_threshold" | bc -l) )); then
+        if fp_true "$postgres_memory > $postgres_threshold"; then
             echo "❌ MEMORY THRESHOLD EXCEEDED: PostgreSQL using ${postgres_memory} MB (threshold: ${postgres_threshold} MB)"
             echo "Load test terminated due to excessive memory usage."
             exit 1
@@ -596,7 +604,7 @@ function assert_memory_usage_within_thresholds() {
     local rosetta_memory
     rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta) -o rss= | awk '{sum+=$1} END {print sum/1024}')
     if [[ -n "$rosetta_memory" ]]; then
-        if (( $(echo "$rosetta_memory > $rosetta_threshold" | bc -l) )); then
+        if fp_true "$rosetta_memory > $rosetta_threshold"; then
             echo "❌ MEMORY THRESHOLD EXCEEDED: Mina-rosetta using ${rosetta_memory} MB (threshold: ${rosetta_threshold} MB)"
             echo "Load test terminated due to excessive memory usage."
             exit 1
@@ -647,13 +655,13 @@ function analyze_metric_array() {
 
     # Calculate p95 (95th percentile)
     local p95_index
-    p95_index=$(echo "scale=0; ($count * 0.95) / 1" | bc)
+    p95_index=$(fp_int "($count * 0.95) / 1")
     p95_index=${p95_index%.*}
     local p95="${sorted[$p95_index]}"
 
     # Calculate p99 (99th percentile)
     local p99_index
-    p99_index=$(echo "scale=0; ($count * 0.99) / 1" | bc)
+    p99_index=$(fp_int "($count * 0.99) / 1")
     p99_index=${p99_index%.*}
     local p99="${sorted[$p99_index]}"
 
@@ -895,8 +903,8 @@ function run_all_tests_custom_intervals() {
         # Check duration-based stop condition
         if [[ -n "$DURATION" ]]; then
             local elapsed
-            elapsed=$(echo "$now - $start_time" | bc)
-            if (( $(echo "$elapsed >= $DURATION" | bc -l) )); then
+            elapsed=$(fp "$now - $start_time")
+            if fp_true "$elapsed >= $DURATION"; then
                 echo "Duration limit reached (${DURATION}s). Stopping load test."
                 print_load_test_statistics "$now" "$start_time" "$total_requests" "$requests_since_last_metric" "$last_metric_time" "true"
 
@@ -925,21 +933,21 @@ function run_all_tests_custom_intervals() {
         fi
 
         # Execute network status test if scheduled
-        if (( $(echo "$now >= $status_next" | bc -l) )); then
+        if fp_true "$now >= $status_next"; then
             test_network_status "$1" || exit $?
-            status_next=$(echo "$now + $status_interval" | bc)
+            status_next=$(fp "$now + $status_interval")
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
         
         # Execute network options test if scheduled
-        if (( $(echo "$now >= $options_next" | bc -l) )); then
+        if fp_true "$now >= $options_next"; then
             test_network_options "$1" || exit $?
-            options_next=$(echo "$now + $options_interval" | bc)
+            options_next=$(fp "$now + $options_interval")
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
         
         # Execute block retrieval test if scheduled
-        if (( $(echo "$now >= $block_next" | bc -l) )); then
+        if fp_true "$now >= $block_next"; then
             local block_hash
             block_hash=$(pick_random "${__test_data[blocks]}")
             declare -A tmp_data
@@ -947,41 +955,41 @@ function run_all_tests_custom_intervals() {
             tmp_data[id]="${__test_data[id]}"
             tmp_data[address]="${__test_data[address]}"
             test_block tmp_data || exit $?
-            block_next=$(echo "$now + $block_interval" | bc)
+            block_next=$(fp "$now + $block_interval")
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
         
         # Execute account balance test if scheduled
-        if (( $(echo "$now >= $account_balance_next" | bc -l) )); then
+        if fp_true "$now >= $account_balance_next"; then
             local account
             account=$(pick_random "${__test_data[accounts]}")
             declare -A tmp_data
             tmp_data[account]="$account"
             test_account_balance tmp_data || exit $?
-            account_balance_next=$(echo "$now + $account_balance_interval" | bc)
+            account_balance_next=$(fp "$now + $account_balance_interval")
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
         
         # Execute payment transaction test if scheduled
-        if (( $(echo "$now >= $payment_tx_next" | bc -l) )); then
+        if fp_true "$now >= $payment_tx_next"; then
             local payment_tx
             payment_tx=$(pick_random "${__test_data[payment_transactions]}")
             declare -A tmp_data
             tmp_data[payment_transaction]="$payment_tx"
             test_payment_transaction tmp_data || exit $?
-            payment_tx_next=$(echo "$now + $payment_tx_interval" | bc)
+            payment_tx_next=$(fp "$now + $payment_tx_interval")
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
         
         # Execute zkApp transaction test if scheduled
-        if (( $(echo "$now >= $zkapp_tx_next" | bc -l) )); then
+        if fp_true "$now >= $zkapp_tx_next"; then
             local zkapp_tx
             zkapp_tx=$(pick_random "${__test_data[zkapp_transactions]}")
             declare -A tmp_data
             #shellcheck disable=SC2034
             tmp_data[zkapp_transaction]="$zkapp_tx"
             test_zkapp_transaction tmp_data || exit $?
-            zkapp_tx_next=$(echo "$now + $zkapp_tx_interval" | bc)
+            zkapp_tx_next=$(fp "$now + $zkapp_tx_interval")
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
 
@@ -990,7 +998,7 @@ function run_all_tests_custom_intervals() {
         requests_since_last_metric=$((requests_since_last_metric + requests_this_iteration))
 
         # Print performance statistics every X seconds
-        if (( $(echo "$now - $last_metric_time >= $STATS_REPORTING_INTERVAL" | bc -l) )); then
+        if fp_true "$now - $last_metric_time >= $STATS_REPORTING_INTERVAL"; then
             print_load_test_statistics "$now" "$start_time" "$total_requests" "$requests_since_last_metric" "$last_metric_time"
             last_metric_time=$now
             requests_since_last_metric=0

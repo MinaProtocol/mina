@@ -2,7 +2,12 @@ open Core
 open Async
 open Archive_hardfork_toolbox_lib
 open Caqti_request.Infix
+module B = Synthetic_archive
 
+type chain_status = B.chain_status = Canonical | Orphaned | Pending
+
+(* A block of a test scenario. Block ids must run 1, 2, 3, ... in list
+   order, since some tests pass block ids to the code under test. *)
 module Block = struct
   type t =
     { id : int
@@ -12,8 +17,8 @@ module Block = struct
     ; height : int
     ; global_slot_since_genesis : int
     ; global_slot_since_hard_fork : int
-    ; protocol_version_id : int
-    ; chain_status : string
+    ; protocol_version : int * int * int
+    ; chain_status : chain_status
     }
 end
 
@@ -33,7 +38,8 @@ module TestDb = struct
     | None ->
         Uri.of_string conn_str
     | Some db_name ->
-        Uri.of_string (sprintf "%s/%s" conn_str db_name)
+        (* replaces any database in conn_str, keeps query parameters *)
+        Uri.with_path (Uri.of_string conn_str) ("/" ^ db_name)
 
   let connect_pool uri =
     match Mina_caqti.connect_pool uri with
@@ -46,130 +52,6 @@ module TestDb = struct
     let uri = uri_for conn_str db_name in
     let%bind.Deferred.Or_error pool = connect_pool uri in
     f pool
-
-  let drop_database_if_exists conn_str db_name =
-    let sql_string = sprintf "DROP DATABASE IF EXISTS %s" db_name in
-    let mutation = Caqti_type.(unit ->. unit) sql_string in
-    with_pool conn_str (fun pool ->
-        Deferred.Or_error.try_with (fun () ->
-            Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.exec mutation () ) ) )
-
-  let create_database conn_str db_name =
-    let sql_string = sprintf "CREATE DATABASE %s" db_name in
-    let mutation = Caqti_type.(unit ->. unit) sql_string in
-    with_pool conn_str (fun pool ->
-        Deferred.Or_error.try_with (fun () ->
-            Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.exec mutation () ) ) )
-
-  (* This should always be in sync with src/app/archive/create_schema.sql *)
-  let create_test_schema conn_str db_name =
-    let chain_status_type_schema =
-      {sql|
-          CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending')
-        |sql}
-    in
-    let protocol_versions_schema =
-      {sql|
-          CREATE TABLE protocol_versions (
-            id serial NOT NULL,
-            transaction int NOT NULL,
-            network int NOT NULL,
-            patch int NOT NULL,
-            CONSTRAINT protocol_versions_pkey PRIMARY KEY (id),
-            UNIQUE (transaction,network,patch)
-          )
-        |sql}
-    in
-    let blocks_schema =
-      {sql|
-          CREATE TABLE blocks (
-            id serial NOT NULL,
-            state_hash text NOT NULL,
-            parent_id integer NULL,
-            parent_hash text NOT NULL,
-            height bigint NOT NULL,
-            global_slot_since_hard_fork bigint NOT NULL,
-            global_slot_since_genesis bigint NOT NULL,
-            protocol_version_id integer NOT NULL,
-            chain_status chain_status_type NOT NULL,
-            CONSTRAINT blocks_pkey PRIMARY KEY (id)
-          )
-        |sql}
-    in
-    let mutations =
-      [ chain_status_type_schema; protocol_versions_schema; blocks_schema ]
-      |> List.map ~f:Caqti_type.(unit ->. unit)
-    in
-    with_pool conn_str ~db_name (fun pool ->
-        Deferred.Or_error.try_with (fun () ->
-            Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Deferred.List.fold mutations ~init:(Ok ())
-                  ~f:(fun last_result this_mutation ->
-                    match last_result with
-                    | Ok () ->
-                        Conn.exec this_mutation ()
-                    | e ->
-                        Deferred.return e ) ) ) )
-
-  let insert_protocol_versions conn_str db_name versions =
-    let query =
-      Caqti_type.(t3 int int int ->. unit)
-        {sql|
-          INSERT INTO protocol_versions
-            (transaction, network, patch)
-          VALUES (?, ?, ?)
-        |sql}
-    in
-    with_pool conn_str ~db_name (fun pool ->
-        Deferred.Or_error.List.iter versions
-          ~f:(fun (transaction, network, patch) ->
-            Deferred.Or_error.try_with (fun () ->
-                Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                    Conn.exec query (transaction, network, patch) ) ) ) )
-
-  let insert_blocks conn_str db_name blocks =
-    with_pool conn_str ~db_name (fun pool ->
-        Deferred.Or_error.List.iter blocks ~f:(fun block ->
-            let Block.
-                  { id
-                  ; state_hash
-                  ; parent_id
-                  ; parent_hash
-                  ; height
-                  ; global_slot_since_genesis
-                  ; global_slot_since_hard_fork
-                  ; protocol_version_id
-                  ; chain_status
-                  } =
-              block
-            in
-            let query =
-              ( Caqti_type.(
-                  t3
-                    (t4 int string (option int) string)
-                    (t4 int int int int) string)
-              ->. Caqti_type.unit )
-                {sql|
-                  INSERT INTO blocks
-                    (id, state_hash, parent_id, parent_hash, height,
-                    global_slot_since_genesis, global_slot_since_hard_fork,
-                    protocol_version_id, chain_status)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                |sql}
-            in
-            let params =
-              ( (id, state_hash, parent_id, parent_hash)
-              , ( height
-                , global_slot_since_genesis
-                , global_slot_since_hard_fork
-                , protocol_version_id )
-              , chain_status )
-            in
-            Deferred.Or_error.try_with (fun () ->
-                Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                    Conn.exec query params ) ) ) )
 
   let get_all_blocks conn_str db_name =
     let query =
@@ -212,8 +94,8 @@ module TestScenarios = struct
           ; height = 1
           ; global_slot_since_genesis = 0
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 2
           ; state_hash = "B"
@@ -222,8 +104,8 @@ module TestScenarios = struct
           ; height = 2
           ; global_slot_since_genesis = 1
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 3
           ; state_hash = "C"
@@ -232,8 +114,8 @@ module TestScenarios = struct
           ; height = 3
           ; global_slot_since_genesis = 2
           ; global_slot_since_hard_fork = 2
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 4
           ; state_hash = "D"
@@ -242,8 +124,8 @@ module TestScenarios = struct
           ; height = 4
           ; global_slot_since_genesis = 3
           ; global_slot_since_hard_fork = 3
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 5
           ; state_hash = "E"
@@ -252,8 +134,8 @@ module TestScenarios = struct
           ; height = 5
           ; global_slot_since_genesis = 4
           ; global_slot_since_hard_fork = 4
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ]
     ; expected =
@@ -277,8 +159,8 @@ module TestScenarios = struct
           ; height = 1
           ; global_slot_since_genesis = 0
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 1
-          ; chain_status = "canonical"
+          ; protocol_version = (1, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 2
           ; state_hash = "B"
@@ -287,8 +169,8 @@ module TestScenarios = struct
           ; height = 2
           ; global_slot_since_genesis = 1
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 1
-          ; chain_status = "canonical"
+          ; protocol_version = (1, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 3
           ; state_hash = "C"
@@ -297,8 +179,8 @@ module TestScenarios = struct
           ; height = 3
           ; global_slot_since_genesis = 2
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 4
           ; state_hash = "D"
@@ -307,8 +189,8 @@ module TestScenarios = struct
           ; height = 4
           ; global_slot_since_genesis = 3
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ; { id = 5
           ; state_hash = "E"
@@ -317,8 +199,8 @@ module TestScenarios = struct
           ; height = 5
           ; global_slot_since_genesis = 4
           ; global_slot_since_hard_fork = 2
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ]
     ; expected =
@@ -342,8 +224,8 @@ module TestScenarios = struct
           ; height = 1
           ; global_slot_since_genesis = 0
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 2
           ; state_hash = "B"
@@ -352,8 +234,8 @@ module TestScenarios = struct
           ; height = 2
           ; global_slot_since_genesis = 1
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 3
           ; state_hash = "C"
@@ -362,8 +244,8 @@ module TestScenarios = struct
           ; height = 3
           ; global_slot_since_genesis = 2
           ; global_slot_since_hard_fork = 2
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 4
           ; state_hash = "D"
@@ -372,8 +254,8 @@ module TestScenarios = struct
           ; height = 4
           ; global_slot_since_genesis = 3
           ; global_slot_since_hard_fork = 3
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ; { id = 5
           ; state_hash = "E"
@@ -382,8 +264,8 @@ module TestScenarios = struct
           ; height = 5
           ; global_slot_since_genesis = 4
           ; global_slot_since_hard_fork = 4
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ]
     ; expected =
@@ -407,8 +289,8 @@ module TestScenarios = struct
           ; height = 1
           ; global_slot_since_genesis = 0
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 2
           ; state_hash = "B"
@@ -417,8 +299,8 @@ module TestScenarios = struct
           ; height = 2
           ; global_slot_since_genesis = 1
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 2
-          ; chain_status = "orphaned"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Orphaned
           }
         ; { id = 3
           ; state_hash = "C"
@@ -427,8 +309,8 @@ module TestScenarios = struct
           ; height = 3
           ; global_slot_since_genesis = 2
           ; global_slot_since_hard_fork = 2
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 4
           ; state_hash = "D"
@@ -437,8 +319,8 @@ module TestScenarios = struct
           ; height = 4
           ; global_slot_since_genesis = 3
           ; global_slot_since_hard_fork = 3
-          ; protocol_version_id = 2
-          ; chain_status = "orphaned"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Orphaned
           }
         ; { id = 5
           ; state_hash = "E"
@@ -447,8 +329,8 @@ module TestScenarios = struct
           ; height = 5
           ; global_slot_since_genesis = 4
           ; global_slot_since_hard_fork = 4
-          ; protocol_version_id = 2
-          ; chain_status = "orphaned"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Orphaned
           }
         ]
     ; expected =
@@ -472,8 +354,8 @@ module TestScenarios = struct
           ; height = 1
           ; global_slot_since_genesis = 0
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 2
           ; state_hash = "B"
@@ -482,8 +364,8 @@ module TestScenarios = struct
           ; height = 2
           ; global_slot_since_genesis = 1
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ; { id = 3
           ; state_hash = "C"
@@ -492,8 +374,8 @@ module TestScenarios = struct
           ; height = 3
           ; global_slot_since_genesis = 2
           ; global_slot_since_hard_fork = 2
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 4
           ; state_hash = "D"
@@ -502,8 +384,8 @@ module TestScenarios = struct
           ; height = 4
           ; global_slot_since_genesis = 3
           ; global_slot_since_hard_fork = 3
-          ; protocol_version_id = 2
-          ; chain_status = "orphaned"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Orphaned
           }
         ]
     ; expected =
@@ -526,8 +408,8 @@ module TestScenarios = struct
           ; height = 1
           ; global_slot_since_genesis = 0
           ; global_slot_since_hard_fork = 0
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 2
           ; state_hash = "B"
@@ -536,8 +418,8 @@ module TestScenarios = struct
           ; height = 2
           ; global_slot_since_genesis = 1
           ; global_slot_since_hard_fork = 1
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ; { id = 3
           ; state_hash = "C"
@@ -546,8 +428,8 @@ module TestScenarios = struct
           ; height = 3
           ; global_slot_since_genesis = 2
           ; global_slot_since_hard_fork = 2
-          ; protocol_version_id = 2
-          ; chain_status = "canonical"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Canonical
           }
         ; { id = 4
           ; state_hash = "D"
@@ -556,8 +438,8 @@ module TestScenarios = struct
           ; height = 4
           ; global_slot_since_genesis = 3
           ; global_slot_since_hard_fork = 3
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ; { id = 5
           ; state_hash = "E"
@@ -566,8 +448,8 @@ module TestScenarios = struct
           ; height = 5
           ; global_slot_since_genesis = 4
           ; global_slot_since_hard_fork = 4
-          ; protocol_version_id = 2
-          ; chain_status = "pending"
+          ; protocol_version = (2, 0, 0)
+          ; chain_status = Pending
           }
         ]
     ; expected =
@@ -600,22 +482,41 @@ let get_postgres_uri () =
         "POSTGRES_URI environment variable is not set. Please set it to run \
          the tests."
 
+let add_block scenario ~built position (b : Block.t) =
+  if b.id <> position + 1 then
+    failwithf "block %s: id %d, but ids must be 1, 2, 3, ... in list order"
+      b.state_hash b.id () ;
+  let block =
+    B.block scenario ~state_hash:b.state_hash
+      ?parent:(Option.map b.parent_id ~f:(Hashtbl.find_exn built))
+      ~parent_hash:b.parent_hash
+      ~global_slot_since_genesis:b.global_slot_since_genesis
+      ~global_slot_since_hard_fork:b.global_slot_since_hard_fork
+      ~protocol_version:b.protocol_version ~name:b.state_hash ~height:b.height
+      b.chain_status
+  in
+  Hashtbl.set built ~key:b.id ~data:block
+
+let setup_db db_name (blocks : Block.t list) =
+  let open Deferred.Or_error.Let_syntax in
+  let scenario = B.create () in
+  List.iteri blocks ~f:(add_block scenario ~built:(Int.Table.create ())) ;
+  let conn_str = get_postgres_uri () in
+  let%bind db =
+    B.Db.create ~server_uri:(Uri.of_string conn_str) ~name:db_name ()
+  in
+  let%map (_ : B.built) = B.materialize scenario db in
+  conn_str
+
 let test_convert_scenario
     ({ name; blocks; expected; target_hash; protocol_version } :
       TestScenarios.scenario ) () =
   let open Deferred.Or_error.Let_syntax in
   (* Create test database *)
   let db_name = sprintf "test_%s" name in
-  let conn_str = get_postgres_uri () in
-  let%bind () = TestDb.drop_database_if_exists conn_str db_name in
-  let%bind () = TestDb.create_database conn_str db_name in
-  let%bind () = TestDb.create_test_schema conn_str db_name in
-  let%bind () =
-    TestDb.insert_protocol_versions conn_str db_name [ (1, 0, 0); (2, 0, 0) ]
-  in
-  let%bind () = TestDb.insert_blocks conn_str db_name blocks in
+  let%bind conn_str = setup_db db_name blocks in
   (* Run conversion *)
-  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let postgres_uri = TestDb.uri_for conn_str (Some db_name) in
   let%bind () =
     Logic.convert_chain_to_canonical ~postgres_uri
       ?target_block_hash:(Some target_hash)
@@ -651,8 +552,8 @@ let auto_detect_blocks : Block.t list =
     ; height = 1
     ; global_slot_since_genesis = 0
     ; global_slot_since_hard_fork = 0
-    ; protocol_version_id = 1
-    ; chain_status = "canonical"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Canonical
     }
   ; { id = 2
     ; state_hash = "B"
@@ -661,8 +562,8 @@ let auto_detect_blocks : Block.t list =
     ; height = 2
     ; global_slot_since_genesis = 1
     ; global_slot_since_hard_fork = 1
-    ; protocol_version_id = 1
-    ; chain_status = "pending"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Pending
     }
   ; { id = 3
     ; state_hash = "C"
@@ -671,8 +572,8 @@ let auto_detect_blocks : Block.t list =
     ; height = 3
     ; global_slot_since_genesis = 2
     ; global_slot_since_hard_fork = 2
-    ; protocol_version_id = 1
-    ; chain_status = "pending"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Pending
     }
   ; { id = 4
     ; state_hash = "F"
@@ -681,8 +582,8 @@ let auto_detect_blocks : Block.t list =
     ; height = 4
     ; global_slot_since_genesis = 3
     ; global_slot_since_hard_fork = 0
-    ; protocol_version_id = 2
-    ; chain_status = "canonical"
+    ; protocol_version = (2, 0, 0)
+    ; chain_status = Canonical
     }
   ; { id = 5
     ; state_hash = "G"
@@ -691,22 +592,10 @@ let auto_detect_blocks : Block.t list =
     ; height = 5
     ; global_slot_since_genesis = 4
     ; global_slot_since_hard_fork = 1
-    ; protocol_version_id = 2
-    ; chain_status = "canonical"
+    ; protocol_version = (2, 0, 0)
+    ; chain_status = Canonical
     }
   ]
-
-let setup_db db_name blocks =
-  let open Deferred.Or_error.Let_syntax in
-  let conn_str = get_postgres_uri () in
-  let%bind () = TestDb.drop_database_if_exists conn_str db_name in
-  let%bind () = TestDb.create_database conn_str db_name in
-  let%bind () = TestDb.create_test_schema conn_str db_name in
-  let%bind () =
-    TestDb.insert_protocol_versions conn_str db_name [ (1, 0, 0); (2, 0, 0) ]
-  in
-  let%bind () = TestDb.insert_blocks conn_str db_name blocks in
-  return conn_str
 
 let check_blocks conn_str db_name ~name expected =
   let open Deferred.Or_error.Let_syntax in
@@ -728,7 +617,7 @@ let test_auto_detect_latest_boundary () =
   let name = "test_auto_detect_latest_boundary" in
   let db_name = sprintf "test_%s" name in
   let%bind conn_str = setup_db db_name auto_detect_blocks in
-  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let postgres_uri = TestDb.uri_for conn_str (Some db_name) in
   let%bind () =
     Logic.convert_chain_to_canonical ~postgres_uri ~stop_at_slot:None
       ~dry_run:false ()
@@ -748,7 +637,7 @@ let test_dry_run_writes_nothing () =
   let name = "test_dry_run_writes_nothing" in
   let db_name = sprintf "test_%s" name in
   let%bind conn_str = setup_db db_name auto_detect_blocks in
-  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let postgres_uri = TestDb.uri_for conn_str (Some db_name) in
   let%bind () =
     Logic.convert_chain_to_canonical ~postgres_uri ~stop_at_slot:None
       ~dry_run:true ()
@@ -776,8 +665,8 @@ let same_protocol_version_blocks : Block.t list =
     ; height = 1
     ; global_slot_since_genesis = 0
     ; global_slot_since_hard_fork = 0
-    ; protocol_version_id = 1
-    ; chain_status = "canonical"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Canonical
     }
   ; { id = 2
     ; state_hash = "B"
@@ -786,8 +675,8 @@ let same_protocol_version_blocks : Block.t list =
     ; height = 2
     ; global_slot_since_genesis = 1
     ; global_slot_since_hard_fork = 1
-    ; protocol_version_id = 1
-    ; chain_status = "pending"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Pending
     }
   ; { id = 3
     ; state_hash = "C"
@@ -796,8 +685,8 @@ let same_protocol_version_blocks : Block.t list =
     ; height = 3
     ; global_slot_since_genesis = 2
     ; global_slot_since_hard_fork = 2
-    ; protocol_version_id = 1
-    ; chain_status = "pending"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Pending
     }
   ; { id = 4
     ; state_hash = "L"
@@ -806,8 +695,8 @@ let same_protocol_version_blocks : Block.t list =
     ; height = 4
     ; global_slot_since_genesis = 3
     ; global_slot_since_hard_fork = 3
-    ; protocol_version_id = 1
-    ; chain_status = "pending"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Pending
     }
   ; { id = 5
     ; state_hash = "F"
@@ -816,8 +705,8 @@ let same_protocol_version_blocks : Block.t list =
     ; height = 4
     ; global_slot_since_genesis = 4
     ; global_slot_since_hard_fork = 0
-    ; protocol_version_id = 1
-    ; chain_status = "canonical"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Canonical
     }
   ; { id = 6
     ; state_hash = "G"
@@ -826,8 +715,8 @@ let same_protocol_version_blocks : Block.t list =
     ; height = 5
     ; global_slot_since_genesis = 5
     ; global_slot_since_hard_fork = 1
-    ; protocol_version_id = 1
-    ; chain_status = "canonical"
+    ; protocol_version = (1, 0, 0)
+    ; chain_status = Canonical
     }
   ]
 
@@ -836,7 +725,7 @@ let test_same_protocol_version_fork () =
   let name = "test_same_protocol_version_fork" in
   let db_name = sprintf "test_%s" name in
   let%bind conn_str = setup_db db_name same_protocol_version_blocks in
-  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let postgres_uri = TestDb.uri_for conn_str (Some db_name) in
   let%bind () =
     Logic.convert_chain_to_canonical ~postgres_uri ~stop_at_slot:None
       ~dry_run:false ()
@@ -900,7 +789,7 @@ let test_summary_counts () =
   let orphaned_leftover_blocks =
     List.map same_protocol_version_blocks ~f:(fun block ->
         if String.equal block.Block.state_hash "L" then
-          { block with Block.chain_status = "orphaned" }
+          { block with Block.chain_status = Orphaned }
         else block )
   in
   check ~name:"summary_counts_rerun" ~blocks:orphaned_leftover_blocks

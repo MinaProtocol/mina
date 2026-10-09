@@ -208,7 +208,8 @@ let parse_lexbuf (lexbuf : Lexing.lexbuf) =
          *)
          Yojson.Safe.read_t yojson_parsebuffer lexbuf )
 
-let write_with_header ~expected_max_size_log2 ~append_data header filename =
+let write_with_header_in_place ~expected_max_size_log2 ~append_data header
+    filename =
   (* In order to write the correct length here, we provide the maximum expected
      size and store that in the initial header. Once the data has been written,
      we record the length and then modify the 'length' field to hold the
@@ -279,6 +280,24 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
   (* Output the true length *)
   Out_channel.output_string out_channel true_length_string ;
   Out_channel.close out_channel
+
+(* Write to a fresh file beside [filename] and rename it into place, so that a
+   reader (or a process that has the file mapped) never sees it truncated or
+   partially written.
+*)
+let write_with_header ~expected_max_size_log2 ~append_data header filename =
+  let tmp =
+    sprintf "%s.tmp-%08x" filename
+      (Stdlib.Random.State.bits (Stdlib.Random.State.make_self_init ()))
+  in
+  match
+    write_with_header_in_place ~expected_max_size_log2 ~append_data header tmp
+  with
+  | () ->
+      Stdlib.Sys.rename tmp filename
+  | exception e ->
+      (try Stdlib.Sys.remove tmp with Sys_error _ -> ()) ;
+      raise e
 
 let read_with_header ~read_data filename =
   let open Or_error.Let_syntax in

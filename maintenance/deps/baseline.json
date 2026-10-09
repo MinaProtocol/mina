@@ -134,6 +134,10 @@
       "libs": 206,
       "opam": 54
     },
+    "exe:app/rosetta/search_bench:rosetta_search_bench": {
+      "libs": 204,
+      "opam": 55
+    },
     "exe:app/rosetta:rosetta": {
       "libs": 204,
       "opam": 54
@@ -237,6 +241,10 @@
     "exe:lib/transaction_snark/test/zkapp_fuzzy:zkapp_fuzzy": {
       "libs": 144,
       "opam": 40
+    },
+    "exe:test/archive/archive_memory_bench:archive_memory_bench": {
+      "libs": 105,
+      "opam": 37
     },
     "exe:test/archive/patch_archive_test:patch_archive_test": {
       "libs": 248,

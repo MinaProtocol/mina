@@ -24,6 +24,7 @@ in  Pipeline.build
           , generic = True
           , tags =
             [ PipelineTag.Type.Packaging
+            , PipelineTag.Type.Generic
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet

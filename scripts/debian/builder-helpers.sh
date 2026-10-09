@@ -44,30 +44,30 @@ source "${SCRIPTPATH}/../export-git-env-vars.sh"
 
 
 # SUGGESTED_DEPS should only be used for Suggests, not Depends.
-SUGGESTED_DEPS="jq, curl, wget"
+SUGGESTED_DEPS="jq, wget"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce, libpq5 "
 
 case "${MINA_DEB_CODENAME}" in
   noble)
     SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
-    ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc, curl"
+    ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2, curl"
     ;;
   jammy)
     SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, liblmdb0"
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
-    ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc, curl"
+    ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2, curl"
   ;;
   bookworm)
     SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, liblmdb0"
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
-    ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc, curl"
+    ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2, curl"
     ;;
   bullseye|focal)
     SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, liblmdb0"
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc, curl"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2, curl"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -524,6 +524,8 @@ build_rosetta_generic_deb() {
     "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+  cp ./default/src/app/rosetta/search_test/rosetta_search_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-search-test"
 
   build_deb "${package_name}"
 }
