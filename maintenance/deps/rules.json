@@ -48,6 +48,11 @@
       "from": "lib:lib/mina_caqti:*",
       "to": "lib:app/*",
       "why": "The Caqti helpers must not depend on applications."
+    },
+    {
+      "from": "lib:lib/genesis_ledger_helper:*",
+      "to": "lib:lib/cli_lib:*",
+      "why": "genesis_ledger_helper never references Cli_lib, but the edge drags the daemon CLI into the whole archive toolchain."
     }
   ],
   "pending": [
@@ -65,11 +70,6 @@
       "from": "exe:app/validate_keypair:*",
       "to": "lib:lib/transaction_snark:*",
       "why": "Same as generate_keypair: one symbol from cli_lib, 176 libraries of cost."
-    },
-    {
-      "from": "lib:lib/genesis_ledger_helper:*",
-      "to": "lib:lib/cli_lib:*",
-      "why": "genesis_ledger_helper never references Cli_lib, but the edge drags the daemon CLI into the whole archive toolchain."
     }
   ]
 }

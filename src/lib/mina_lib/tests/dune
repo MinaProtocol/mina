@@ -20,6 +20,7 @@
   mina_lib
   logger
   precomputed_values
+  test_genesis_ledger
   genesis_constants
   cli_lib
   child_processes

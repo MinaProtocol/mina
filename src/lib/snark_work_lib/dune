@@ -16,6 +16,7 @@
   mina_state
   mina_wire_types
   one_or_two
+  perf_histograms
   ppx_version.runtime
   signature_lib
   transaction_snark)
