@@ -1,4 +1,4 @@
-let name = "local"
+let name = "docker"
 
 module Network = Docker_network
 module Network_config = Mina_docker.Network_config

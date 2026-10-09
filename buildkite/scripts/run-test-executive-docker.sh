@@ -51,11 +51,6 @@ MINA_ARCHIVE_DOCKER_NAME="mina-archive"
 MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:${GITHASH}-${MINA_DEB_CODENAME}-devnet-generic"
 ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:${GITHASH}-${MINA_DEB_CODENAME}-devnet"
 
-if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
-  echo "Skipping $TEST_NAME"
-  exit 0
-fi
-
 git config --global --add safe.directory /workdir
 
 # Free docker disk before loading the (~GB-scale) daemon/archive images.
@@ -124,7 +119,7 @@ fi
   done ) &
 
 export MINA_PROFILE="devnet"
-mina-test-executive local "$TEST_NAME" \
+mina-test-executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   | tee "$TEST_NAME.local.test.log" \

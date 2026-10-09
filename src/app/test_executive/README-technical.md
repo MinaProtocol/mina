@@ -8,7 +8,7 @@ reliability, payment processing, and ZkApp functionality.
 ## Features
 
 - Modular test architecture with pluggable test implementations
-- Supports multiple test execution engines (currently local Docker-based)
+- Supports two test execution engines: `docker` (nodes in Docker containers) and `native` (nodes as processes on the host)
 - Comprehensive test suite covering various aspects of the Mina protocol
 - Detailed test reporting with color-coded error categorization
 - Live monitoring of node status during test execution
@@ -19,8 +19,9 @@ reliability, payment processing, and ZkApp functionality.
 - OCaml development environment
 - Mina codebase
 - OPAM package dependencies for Mina
-- Docker (for local engine tests)
-- Docker Compose (for local engine tests)
+- Docker (for `docker` engine tests)
+- Docker Compose (for `docker` engine tests)
+- PostgreSQL, `psql`, `pg_dump` and `jq` (for `native` engine tests with archive nodes)
 
 ## Compilation
 
@@ -33,12 +34,12 @@ dune build src/app/test_executive/test_executive.exe
 ## Usage
 
 ```
-_build/default/src/app/test_executive/test_executive.exe local TEST_NAME --mina-image MINA_IMAGE [--archive-image ARCHIVE_IMAGE] [--debug]
+_build/default/src/app/test_executive/test_executive.exe docker TEST_NAME --mina-image MINA_IMAGE [--archive-image ARCHIVE_IMAGE] [--debug]
 ```
 
 ### Arguments:
 
-- `local`: Currently the only supported engine
+- `docker` or `native`: the engine. For `native`, `--mina-image` and `--archive-image` are paths to the `mina` and `mina-archive` binaries; see `docs/tests.md`
 - `TEST_NAME`: Name of the test to run (see available tests below)
 - `--mina-image`: Docker image for Mina nodes (required)
 - `--archive-image`: Docker image for archive nodes (required for tests using archive nodes)
@@ -64,7 +65,7 @@ _build/default/src/app/test_executive/test_executive.exe local TEST_NAME --mina-
 ### Example:
 
 ```
-_build/default/src/app/test_executive/test_executive.exe local payments \
+_build/default/src/app/test_executive/test_executive.exe docker payments \
   --mina-image gcr.io/o1labs-192920/mina-daemon:1.3.0 \
   --archive-image gcr.io/o1labs-192920/mina-archive:1.3.0
 ```
@@ -82,7 +83,8 @@ The Test Executive uses a modular architecture with several key components:
    defining the test configuration and execution logic.
 
 2. **Test Engine**: The engine handles deployment and management of the test environment.
-   Currently, only the `local` engine is supported, which uses Docker for test execution.
+   The `docker` engine runs every node in Docker. The `native` engine runs `mina` and
+   `mina-archive` processes on the host; it is for local runs (`make intgtest-native`).
 
 3. **Domain-Specific Language (DSL)**: The DSL provides high-level abstractions for
    interacting with the test network, such as waiting for conditions, sending transactions,

@@ -40,7 +40,7 @@ CACHE_ROOT="${CACHE_ROOT:-/var/storagebox/docker-cache}"
 # The images are never pushed anywhere, but they still have to carry the
 # registry-prefixed name, because that is the name their consumer asks docker
 # for. scripts/docker/helper.sh builds the .deb-based images as
-# "${DOCKER_REGISTRY}/${SERVICE}:${TAG}" and run-test-executive-local.sh passes
+# "${DOCKER_REGISTRY}/${SERVICE}:${TAG}" and run-test-executive-docker.sh passes
 # that same full reference to test_executive. A bare "mina-daemon-nix:tag" would
 # load fine and then be invisible under the name the swarm looks up, sending it
 # to the registry for an image that was never pushed.
