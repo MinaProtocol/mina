@@ -11,9 +11,11 @@
   uri
   ;; local libraries
   archive_lib
+  currency
   mina_automation
   mina_base
   mina_caqti
+  mina_numbers
   pickles_types
   signature_lib)
  (instrumentation

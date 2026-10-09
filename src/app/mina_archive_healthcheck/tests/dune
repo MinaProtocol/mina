@@ -24,7 +24,8 @@
  (deps
   ../mina_archive_healthcheck.exe
   %{project_root}/app/archive/create_schema.sql
-  %{project_root}/app/archive/upgrade.sql)
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
  (instrumentation
   (backend bisect_ppx))
  (preprocess

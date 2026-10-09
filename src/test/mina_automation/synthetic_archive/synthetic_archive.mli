@@ -33,6 +33,14 @@ module Db : sig
 
   val drop : t -> unit Deferred.Or_error.t
 
+  (** Run one of the archive's schema scripts on [t], e.g. [`Upgrade] then
+      [`Rollback] for the schema of an archive from before an upgrade. A dune
+      test must declare the script as a dependency. *)
+  val run_script :
+       t
+    -> [ `CreateSchema | `DropTables | `Upgrade | `Rollback ]
+    -> unit Deferred.Or_error.t
+
   (** The server [MINA_TEST_POSTGRES] names, as CI sets it. A test that needs
       a database calls this first: without the variable it exits with status
       2 and a message, so a missing server is never a silent pass. *)
@@ -162,6 +170,21 @@ val coinbase_hash : coinbase -> string
 
 (** Record that [block] created [account], charging [fee]. *)
 val account_created : ?fee:int -> t -> block -> account -> unit
+
+(** A vesting schedule, in nanomina and slots. *)
+type timing =
+  { initial_minimum_balance : int
+  ; cliff_time : int
+  ; cliff_amount : int
+  ; vesting_period : int
+  ; vesting_increment : int
+  }
+
+(** The state [block] recorded for [account], written as the archive writes
+    it: an [accounts_accessed] row, with a schedule of zeros when there is no
+    [timing]. [nonce] defaults to 0. *)
+val account_state :
+  ?nonce:int -> ?timing:timing -> t -> block -> account -> balance:int -> unit
 
 (** What [materialize] wrote, for tests that need database ids. *)
 type built

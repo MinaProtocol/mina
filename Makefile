@@ -313,6 +313,48 @@ build-intgtest: ocaml_checks ## Build integration test tools
 		src/app/logproc/logproc.exe \
 		&& echo "✅ Build complete"
 
+# Native integration tests: run one test_executive test on this host, with
+# mina and mina-archive built from this checkout and no Docker. A full test
+# network does not fit in one CI pod, so this runs only locally.
+#
+# Tests with archive nodes need a PostgreSQL server at INTGTEST_POSTGRES_URI
+# (server and credentials, no database). The role must be allowed to create
+# databases: the engine creates and drops one per archive node. They also run
+# psql, pg_dump and jq from PATH.
+INTGTEST_PROFILE ?= devnet
+INTGTEST_POSTGRES_URI ?= postgres://$(PG_USER):$(PG_PW)@$(PG_HOST):$(PG_PORT)
+INTGTEST_BIN_DIR ?= $(TMPDIR)/mina-intgtest-bin
+INTGTEST_LIBP2P_HELPER ?= $(or $(MINA_LIBP2P_HELPER_PATH),$(CURDIR)/src/app/libp2p_helper/result/bin/libp2p_helper)
+
+.PHONY: intgtest-native
+intgtest-native: SHELL := /bin/bash
+intgtest-native: ocaml_checks libp2p_helper ## Run integration test TEST on this host without Docker (e.g. TEST=payments)
+	$(call check_env_var,TEST)
+	$(info 🏗️  Building native integration test binaries with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/test_executive/test_executive.exe \
+		src/app/logproc/logproc.exe \
+		src/app/cli/src/mina.exe \
+		src/app/archive/archive.exe \
+		src/app/replayer/replayer.exe \
+		--profile=$(DUNE_PROFILE)
+	@# The tests call the replayer by its package name.
+	@mkdir -p $(INTGTEST_BIN_DIR) && \
+		ln -sf $(CURDIR)/_build/default/src/app/replayer/replayer.exe $(INTGTEST_BIN_DIR)/mina-replayer
+	@echo "🧪 Running integration test $(TEST) on the native engine with MINA_PROFILE=$(INTGTEST_PROFILE)"
+	@set -o pipefail && \
+	env PATH=$(INTGTEST_BIN_DIR):$$PATH \
+		MINA_PROFILE=$(INTGTEST_PROFILE) \
+		MINA_LIBP2P_HELPER_PATH=$(INTGTEST_LIBP2P_HELPER) \
+		$(CURDIR)/_build/default/src/app/test_executive/test_executive.exe native $(TEST) \
+		--mina-image $(CURDIR)/_build/default/src/app/cli/src/mina.exe \
+		--archive-image $(CURDIR)/_build/default/src/app/archive/archive.exe \
+		--postgres-uri $(INTGTEST_POSTGRES_URI) \
+		| tee $(TEST).native.test.log \
+		| $(CURDIR)/_build/default/src/app/logproc/logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])'
+
 .PHONY: build-rosetta-lib-encodings
 build-rosetta-lib-encodings: ocaml_checks ## Test Rosetta library encodings
 	$(info 🏗️  Building Rosetta library encodings with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))

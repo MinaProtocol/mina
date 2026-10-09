@@ -38,6 +38,10 @@ let db_tests server_uri =
       (run Db_lifecycle.test_with_fresh_drops_on_raise)
   ; Alcotest.test_case "mixed-case names are exact" `Quick
       (run Db_lifecycle.test_mixed_case_name)
+  ; Alcotest.test_case "account states as the archive writes them" `Quick
+      (run Account_states.test)
+  ; Alcotest.test_case "schema scripts on a built database" `Quick
+      (run Account_states.test_run_script)
   ]
 
 let () =

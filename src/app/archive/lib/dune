@@ -76,6 +76,8 @@
   with_hash
   zkapp_command_builder)
  (inline_tests
+  (deps
+   (env_var MINA_TEST_POSTGRES))
   (flags -verbose -show-counts))
  (modes native)
  (instrumentation
