@@ -103,6 +103,7 @@ let minimalDirtyWhen =
 let bookwormDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
+        , S.strictlyStart (S.contains "mk/")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
         , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
         , S.exactly "scripts/patch-archive-test" "sh"

@@ -19,6 +19,7 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/check-graphql-schema" "sh"
           , S.strictly (S.contains "Makefile")
+          , S.strictlyStart (S.contains "mk/")
           ]
         , path = "Test"
         , name = "CheckGraphQLSchema"

@@ -27,6 +27,7 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src/")
           , S.strictlyStart (S.contains "maintenance/deps")
           , S.strictly (S.contains "Makefile")
+          , S.strictlyStart (S.contains "mk/")
           , S.exactly "buildkite/src/Jobs/Lint/Deps" "dhall"
           ]
         , path = "Lint"
