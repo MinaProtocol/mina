@@ -149,9 +149,8 @@ test_find_closest_ancestor() {
   assert_equals "develop" "$(closest master "")" \
     "find_closest_ancestor: a strictly closer branch beats the preference"
 
-  # A listed branch with no origin ref (deleted upstream) has no merge-base;
-  # it must not read as distance 0 and win over the real base of a PR that is
-  # a commit ahead of it.
+  # A listed branch with no origin ref has no merge-base; it is skipped, so it
+  # does not read as distance 0 and win over the real base of the PR.
   (
     cd "$repo"
     git checkout -q --detach origin/compatible

@@ -264,75 +264,46 @@ let test_postgres_env = "MINA_TEST_POSTGRES"
 let current_epoch_ms () =
   Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
 
-let quote_ident s =
-  "\"" ^ String.substr_replace_all s ~pattern:"\"" ~with_:"\"\"" ^ "\""
+module B = Synthetic_archive
 
-let admin_uri raw_uri =
-  let uri = Uri.of_string raw_uri in
-  match Uri.path uri with
-  | "" | "/" ->
-      Uri.with_path uri "/postgres" |> Uri.to_string
-  | _ ->
-      raw_uri
-
-let database_uri raw_uri db_name =
-  Uri.with_path (Uri.of_string raw_uri) ("/" ^ db_name) |> Uri.to_string
-
-let random_db_name () =
-  sprintf "mina_archive_healthcheck_%d_%06d"
-    (Core_unix.getpid () |> Pid.to_int)
-    (Random.int 1_000_000)
-
-let run_psql_exn ~uri sql =
-  let code, out, err =
-    run_program ~prog:"psql"
-      [ "-v"; "ON_ERROR_STOP=1"; "-qAt"; "-d"; uri; "-c"; sql ]
-  in
-  if code <> 0 then
-    Alcotest.failf "psql failed with exit %d\nsql=%s\nstdout=%s\nstderr=%s" code
-      sql out err ;
-  out
-
-let create_blocks_schema_sql =
-  {sql|
-    CREATE TABLE blocks (
-      id serial PRIMARY KEY,
-      height bigint NOT NULL,
-      timestamp text NOT NULL,
-      parent_id int
-    );
-  |sql}
-
-let with_test_db f =
+(* [scenario] adds blocks to the builder, which writes them into a fresh
+   archive on the real schema; that is all the probes read. *)
+let with_test_db ?(scenario = fun (_ : B.t) -> ()) f =
   match Sys.getenv test_postgres_env with
   | None ->
       printf "Skipping DB-backed healthcheck tests: $%s is not set\n%!"
         test_postgres_env
   | Some raw_uri ->
-      let admin_uri = admin_uri raw_uri in
-      let db_name = random_db_name () in
-      let db_ident = quote_ident db_name in
-      let test_uri = database_uri raw_uri db_name in
-      let created = ref false in
+      let s = B.create () in
+      scenario s ;
+      let run f = Async.Thread_safe.block_on_async_exn f |> Or_error.ok_exn in
+      let db =
+        run (fun () ->
+            B.Db.create ~server_uri:(Uri.of_string raw_uri)
+              ~name:
+                (Mina_automation.Psql.random_db_name
+                   ~prefix:"test_mina_archive_healthcheck" )
+              () )
+      in
+      (* a failed materialize must not leave the database behind either *)
       Exn.protect
         ~f:(fun () ->
-          ignore
-            (run_psql_exn ~uri:admin_uri
-               (sprintf "CREATE DATABASE %s" db_ident) ) ;
-          created := true ;
-          f test_uri )
-        ~finally:(fun () ->
-          if !created then
-            ignore
-              (run_program ~prog:"psql"
-                 [ "-v"
-                 ; "ON_ERROR_STOP=1"
-                 ; "-qAt"
-                 ; "-d"
-                 ; admin_uri
-                 ; "-c"
-                 ; sprintf "DROP DATABASE IF EXISTS %s" db_ident
-                 ] ) )
+          let (_ : B.built) = run (fun () -> B.materialize s db) in
+          f (Uri.to_string db.uri) )
+        ~finally:(fun () -> run (fun () -> B.Db.drop db))
+
+(* a root at height 10 with an orphaned fork sibling, and a block at 12 whose
+   parent at 11 is missing: two rows at height 10 but one height *)
+let gap_at_height_11 s =
+  let timestamp = current_epoch_ms () in
+  let root = B.block s ~name:"root" ~height:10 ~timestamp Canonical in
+  let (_ : B.block) =
+    B.block s ~name:"fork_sibling" ~height:10 ~timestamp Orphaned
+  in
+  let (_ : B.block) =
+    B.block s ~name:"tip" ~height:12 ~parent:root ~timestamp Canonical
+  in
+  ()
 
 let run_success_json ~postgres_uri ~sub ?(extra_args = []) () =
   let label = sprintf "%s --json (test DB)" sub in
@@ -455,19 +426,7 @@ let test_wait_dead_pg_json ~db_only () =
   check_error_constructor ~label envelope.error "Db_unreachable"
 
 let test_success_envelopes_against_db () =
-  with_test_db (fun postgres_uri ->
-      ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
-      let timestamp = Int64.to_string (current_epoch_ms ()) in
-      ignore
-        (run_psql_exn ~uri:postgres_uri
-           (sprintf
-              {sql|
-                INSERT INTO blocks (height, timestamp, parent_id) VALUES
-                  (10, '%s', NULL),
-                  (10, '%s', NULL),
-                  (12, '%s', 1);
-              |sql}
-              timestamp timestamp timestamp ) ) ;
+  with_test_db ~scenario:gap_at_height_11 (fun postgres_uri ->
       let label, json = run_success_json ~postgres_uri ~sub:"db-ready" () in
       let envelope =
         of_yojson_exn ~label Envelope.db_ready_success_of_yojson json
@@ -539,19 +498,7 @@ let test_success_envelopes_against_db () =
         0 envelope.unparented_blocks )
 
 let test_missing_blocks_counts_distinct_heights () =
-  with_test_db (fun postgres_uri ->
-      ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
-      let timestamp = Int64.to_string (current_epoch_ms ()) in
-      ignore
-        (run_psql_exn ~uri:postgres_uri
-           (sprintf
-              {sql|
-                INSERT INTO blocks (height, timestamp, parent_id) VALUES
-                  (10, '%s', NULL),
-                  (10, '%s', NULL),
-                  (12, '%s', 1);
-              |sql}
-              timestamp timestamp timestamp ) ) ;
+  with_test_db ~scenario:gap_at_height_11 (fun postgres_uri ->
       let label, json =
         run_failure_json ~postgres_uri ~sub:"missing-blocks"
           ~extra_args:[ "--window"; "3"; "--max-missing"; "0" ]
@@ -568,7 +515,6 @@ let test_missing_blocks_counts_distinct_heights () =
 
 let test_ready_empty_db_omits_delay () =
   with_test_db (fun postgres_uri ->
-      ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
       let label, json =
         run_failure_json ~postgres_uri ~sub:"ready"
           ~extra_args:
@@ -617,20 +563,14 @@ let one_hour_ms = 3_600_000L
 
 (* A tip an hour old: what a database restored from a dump, or a slow
    block period, looks like to the probe. *)
-let insert_stale_blocks ~postgres_uri =
-  ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
-  let timestamp =
-    Int64.to_string (Int64.( - ) (current_epoch_ms ()) one_hour_ms)
+(* a two-block chain whose tip is an hour old *)
+let stale_chain s =
+  let timestamp = Int64.( - ) (current_epoch_ms ()) one_hour_ms in
+  let root = B.block s ~name:"root" ~height:10 ~timestamp Canonical in
+  let (_ : B.block) =
+    B.block s ~name:"tip" ~height:11 ~parent:root ~timestamp Canonical
   in
-  ignore
-    (run_psql_exn ~uri:postgres_uri
-       (sprintf
-          {sql|
-            INSERT INTO blocks (height, timestamp, parent_id) VALUES
-              (10, '%s', NULL),
-              (11, '%s', 1);
-          |sql}
-          timestamp timestamp ) )
+  ()
 
 let readiness_args =
   [ "--window"
@@ -644,8 +584,7 @@ let readiness_args =
   ]
 
 let test_ready_skip_block_recency_stale_tip () =
-  with_test_db (fun postgres_uri ->
-      insert_stale_blocks ~postgres_uri ;
+  with_test_db ~scenario:stale_chain (fun postgres_uri ->
       (* Without the flag the stale tip alone makes it NOT READY ... *)
       let label, json =
         run_failure_json ~postgres_uri ~sub:"ready" ~extra_args:readiness_args
@@ -683,8 +622,7 @@ let test_ready_skip_block_recency_stale_tip () =
           label envelope.delay_seconds )
 
 let test_wait_skip_block_recency_stale_tip () =
-  with_test_db (fun postgres_uri ->
-      insert_stale_blocks ~postgres_uri ;
+  with_test_db ~scenario:stale_chain (fun postgres_uri ->
       let label, json =
         run_success_json ~postgres_uri ~sub:"wait"
           ~extra_args:
@@ -705,7 +643,6 @@ let test_wait_skip_block_recency_stale_tip () =
 (* Skipping the age check does not make an empty archive ready. *)
 let test_ready_skip_block_recency_empty_db () =
   with_test_db (fun postgres_uri ->
-      ignore (run_psql_exn ~uri:postgres_uri create_blocks_schema_sql) ;
       let label, json =
         run_failure_json ~postgres_uri ~sub:"ready"
           ~extra_args:("--skip-block-recency" :: readiness_args)

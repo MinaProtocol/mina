@@ -306,7 +306,7 @@ find_closest_ancestor() {
   closest_branch=""
   min_distance=""
   for branch in "${MAINLINE_BRANCHES[@]}"; do
-    # a branch deleted upstream has no merge-base; "..HEAD" would count as 0
+    # no merge-base (e.g. no origin ref): skip, an empty ancestor counts as 0
     if ! ancestor=$(git merge-base "$CURRENT_COMMIT" "origin/$branch" 2>/dev/null); then
       echo "Branch $branch: skipped, no merge-base with origin/$branch" >&2
       continue
