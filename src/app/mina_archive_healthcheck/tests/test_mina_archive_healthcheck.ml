@@ -3,9 +3,9 @@
    These always exercise the subcommands that don't require a running
    archive PostgreSQL: --help at the top level and per-subcommand, plus
    the single-JSON-record contract for each subcommand against a
-   non-routable [postgres://...:1/...] URI.  When [MINA_TEST_POSTGRES]
-   is set, they also create temporary DBs for success-path envelope and
-   query-regression coverage.
+   non-routable [postgres://...:1/...] URI.  The success-path envelope and
+   query-regression tests create temporary DBs on the server named by
+   [MINA_TEST_POSTGRES], and fail when it is not set.
 
    The dead-PG URI deliberately points at a port that no local service
    listens on (127.0.0.1:1), so the connect attempt fails fast with
@@ -259,8 +259,6 @@ let all_subcommands =
   ; "wait"
   ]
 
-let test_postgres_env = "MINA_TEST_POSTGRES"
-
 let current_epoch_ms () =
   Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
 
@@ -269,28 +267,24 @@ module B = Synthetic_archive
 (* [scenario] adds blocks to the builder, which writes them into a fresh
    archive on the real schema; that is all the probes read. *)
 let with_test_db ?(scenario = fun (_ : B.t) -> ()) f =
-  match Sys.getenv test_postgres_env with
-  | None ->
-      printf "Skipping DB-backed healthcheck tests: $%s is not set\n%!"
-        test_postgres_env
-  | Some raw_uri ->
-      let s = B.create () in
-      scenario s ;
-      let run f = Async.Thread_safe.block_on_async_exn f |> Or_error.ok_exn in
-      let db =
-        run (fun () ->
-            B.Db.create ~server_uri:(Uri.of_string raw_uri)
-              ~name:
-                (Mina_automation.Psql.random_db_name
-                   ~prefix:"test_mina_archive_healthcheck" )
-              () )
-      in
-      (* a failed materialize must not leave the database behind either *)
-      Exn.protect
-        ~f:(fun () ->
-          let (_ : B.built) = run (fun () -> B.materialize s db) in
-          f (Uri.to_string db.uri) )
-        ~finally:(fun () -> run (fun () -> B.Db.drop db))
+  let server_uri = B.Db.test_server_uri () in
+  let s = B.create () in
+  scenario s ;
+  let run f = Async.Thread_safe.block_on_async_exn f |> Or_error.ok_exn in
+  let db =
+    run (fun () ->
+        B.Db.create ~server_uri
+          ~name:
+            (Mina_automation.Psql.random_db_name
+               ~prefix:"test_mina_archive_healthcheck" )
+          () )
+  in
+  (* a failed materialize must not leave the database behind either *)
+  Exn.protect
+    ~f:(fun () ->
+      let (_ : B.built) = run (fun () -> B.materialize s db) in
+      f (Uri.to_string db.uri) )
+    ~finally:(fun () -> run (fun () -> B.Db.drop db))
 
 (* a root at height 10 with an orphaned fork sibling, and a block at 12 whose
    parent at 11 is missing: two rows at height 10 but one height *)

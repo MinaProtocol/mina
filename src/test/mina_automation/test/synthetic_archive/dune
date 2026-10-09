@@ -2,7 +2,8 @@
  (name test_synthetic_archive)
  (deps
   %{project_root}/app/archive/create_schema.sql
-  %{project_root}/app/archive/upgrade.sql)
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
  (libraries
   ;; opam libraries
   alcotest
