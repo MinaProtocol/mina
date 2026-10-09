@@ -59,6 +59,22 @@ type coinbase =
 
 type account_created = { created_in : block; created : account; fee : int }
 
+type timing =
+  { initial_minimum_balance : int
+  ; cliff_time : int
+  ; cliff_amount : int
+  ; vesting_period : int
+  ; vesting_increment : int
+  }
+
+(* the state of an account a block's accounts_accessed row records *)
+type account_state =
+  { state_of : account
+  ; state_balance : int
+  ; state_nonce : int
+  ; state_timing : timing option
+  }
+
 type t =
   { producer : account  (** creates every block without a [creator] *)
   ; mutable accounts : account list
@@ -67,6 +83,7 @@ type t =
   ; mutable zkapp_commands : zkapp_command list
   ; mutable coinbases : coinbase list
   ; mutable accounts_created : account_created list
+  ; mutable account_states : (block * account_state) list
   ; nonces : int String.Table.t
   ; mutable materialized : bool
   }
@@ -93,6 +110,7 @@ let create () =
   ; zkapp_commands = []
   ; coinbases = []
   ; accounts_created = []
+  ; account_states = []
   ; nonces = String.Table.create ()
   ; materialized = false
   }
@@ -231,3 +249,14 @@ let zkapp_command_hash c = c.zkapp_hash
 let account_created ?(fee = 1_000_000_000) t block account =
   t.accounts_created <-
     t.accounts_created @ [ { created_in = block; created = account; fee } ]
+
+let account_state ?(nonce = 0) ?timing t block account ~balance =
+  t.account_states <-
+    t.account_states
+    @ [ ( block
+        , { state_of = account
+          ; state_balance = balance
+          ; state_nonce = nonce
+          ; state_timing = timing
+          } )
+      ]

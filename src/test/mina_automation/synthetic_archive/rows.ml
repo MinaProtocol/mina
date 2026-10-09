@@ -514,6 +514,48 @@ let write_account_created w { created_in; created; fee } =
     ; creation_fee = Int.to_string fee
     }
 
+(* the ledger account a state describes *)
+let account_of_state
+    { state_of
+    ; state_balance = balance
+    ; state_nonce = nonce
+    ; state_timing = timing
+    } =
+  let account_id =
+    Mina_base.Account_id.create
+      (Signature_lib.Public_key.Compressed.of_base58_check_exn state_of.pk)
+      Mina_base.Token_id.default
+  in
+  let balance = Currency.Balance.of_nanomina_int_exn balance in
+  let account =
+    match timing with
+    | None ->
+        Mina_base.Account.create account_id balance
+    | Some tm ->
+        Mina_base.Account.create_timed account_id balance
+          ~initial_minimum_balance:
+            (Currency.Balance.of_nanomina_int_exn tm.initial_minimum_balance)
+          ~cliff_time:
+            (Mina_numbers.Global_slot_since_genesis.of_int tm.cliff_time)
+          ~cliff_amount:(Currency.Amount.of_nanomina_int_exn tm.cliff_amount)
+          ~vesting_period:
+            (Mina_numbers.Global_slot_span.of_int tm.vesting_period)
+          ~vesting_increment:
+            (Currency.Amount.of_nanomina_int_exn tm.vesting_increment)
+        |> Or_error.ok_exn
+  in
+  { account with nonce = Mina_base.Account.Nonce.of_int nonce }
+
+(* written by the archive's own accounts_accessed writer, with the rows it
+   needs: token symbol, voting for, timing (zeros when untimed), permissions *)
+let write_account_state w (block, state) =
+  (* no read a test makes depends on the ledger index *)
+  let ledger_index = 0 in
+  P.Accounts_accessed.add_if_doesn't_exist w.conn (block_id w block)
+    (ledger_index, account_of_state state)
+  >>| Mina_caqti.ok_exn ~ctx:("state of " ^ state.state_of.account_name)
+  >>| fun (_ : int * int) -> ()
+
 (* --- the whole scenario ------------------------------------------------------ *)
 
 let write_all w (scenario : Scenario.t) =
@@ -527,8 +569,12 @@ let write_all w (scenario : Scenario.t) =
   let%bind () =
     Deferred.List.iter ~how:`Sequential scenario.coinbases ~f:(write_coinbase w)
   in
-  Deferred.List.iter ~how:`Sequential scenario.accounts_created
-    ~f:(write_account_created w)
+  let%bind () =
+    Deferred.List.iter ~how:`Sequential scenario.accounts_created
+      ~f:(write_account_created w)
+  in
+  Deferred.List.iter ~how:`Sequential scenario.account_states
+    ~f:(write_account_state w)
 
 (** Writes [scenario] into the database at [uri] and returns the database
     ids of what it wrote. *)

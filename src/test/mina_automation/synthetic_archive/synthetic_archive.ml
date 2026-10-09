@@ -45,6 +45,8 @@ module Db = struct
     let%map () = if upgrade then load_script db `Upgrade else return () in
     db
 
+  let run_script = load_script
+
   let test_server_env = "MINA_TEST_POSTGRES"
 
   let test_server_uri () =
