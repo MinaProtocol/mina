@@ -71,9 +71,9 @@ let command_run =
        let%bind.Deferred () =
          if settle_pending_blocks then
            Deferred.map
-             (Archive_lib.Pending_blocks.settle_uri ~logger postgres.value)
+             (Archive_lib.Settle_pending_blocks.run_uri ~logger postgres.value)
              ~f:(function
-             | Ok (_ : Archive_lib.Pending_blocks.t) ->
+             | Ok (_ : Archive_lib.Settle_pending_blocks.t) ->
                  ()
              | Error e ->
                  failwithf "Could not settle pending blocks: %s"
@@ -171,11 +171,13 @@ let command_settle_pending_blocks =
      fun () ->
        let logger = Logger.create () in
        match%map.Deferred
-         Archive_lib.Pending_blocks.settle_uri ~dry_run ~logger postgres.value
+         Archive_lib.Settle_pending_blocks.run_uri ~dry_run ~logger
+           postgres.value
        with
        | Ok t ->
            print_endline
-             (Yojson.Safe.to_string (Archive_lib.Pending_blocks.to_yojson t))
+             (Yojson.Safe.to_string
+                (Archive_lib.Settle_pending_blocks.to_yojson t) )
        | Error e ->
            failwithf "Could not settle pending blocks: %s" (Caqti_error.show e)
              () )

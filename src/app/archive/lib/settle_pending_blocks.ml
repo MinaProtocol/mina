@@ -96,7 +96,7 @@ let orphan_decided_query =
       SELECT count(*)::int FROM orphaned
     |sql}
 
-let settle_in_transaction (module Conn : Mina_caqti.CONNECTION) =
+let run_in_transaction (module Conn : Mina_caqti.CONNECTION) =
   let open Deferred.Result.Let_syntax in
   let%bind fork =
     match%bind Conn.find_opt fork_genesis_query () with
@@ -120,10 +120,10 @@ let settle_in_transaction (module Conn : Mina_caqti.CONNECTION) =
 
 (** Settle the pending blocks in one transaction. With [~dry_run:true] the
     transaction is rolled back: the counts are what a run would change. *)
-let settle ?(dry_run = false) (module Conn : Mina_caqti.CONNECTION) =
+let run ?(dry_run = false) (module Conn : Mina_caqti.CONNECTION) =
   let open Deferred.Result.Let_syntax in
   let%bind () = Conn.start () in
-  match%bind.Deferred settle_in_transaction (module Conn) with
+  match%bind.Deferred run_in_transaction (module Conn) with
   | Error e ->
       let%bind.Deferred (_ : (unit, _) Result.t) = Conn.rollback () in
       Deferred.Result.fail e
@@ -155,11 +155,11 @@ let log ~logger ~dry_run t =
        $orphaned_decided at decided heights orphaned"
       ~metadata
 
-(** [settle] on its own connection to [postgres_uri], logged. *)
-let settle_uri ?(dry_run = false) ~logger postgres_uri =
+(** [run] on its own connection to [postgres_uri], logged. *)
+let run_uri ?(dry_run = false) ~logger postgres_uri =
   let open Deferred.Result.Let_syntax in
   let%bind (module Conn) = Mina_caqti.connect postgres_uri in
-  let%bind.Deferred result = settle ~dry_run (module Conn) in
+  let%bind.Deferred result = run ~dry_run (module Conn) in
   let%bind.Deferred () = Conn.disconnect () in
   let%map t = Deferred.return result in
   log ~logger ~dry_run t ; t

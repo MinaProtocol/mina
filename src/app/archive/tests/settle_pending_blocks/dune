@@ -1,5 +1,5 @@
 (test
- (name test_pending_blocks)
+ (name test_settle_pending_blocks)
  (deps
   ../../archive.exe
   %{project_root}/app/archive/create_schema.sql
