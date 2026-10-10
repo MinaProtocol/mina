@@ -139,7 +139,7 @@
       "opam": 55
     },
     "exe:app/rosetta/search_test:rosetta_search_test": {
-      "libs": 251,
+      "libs": 252,
       "opam": 64
     },
     "exe:app/rosetta:rosetta": {
@@ -251,11 +251,11 @@
       "opam": 37
     },
     "exe:test/archive/patch_archive_test:patch_archive_test": {
-      "libs": 249,
+      "libs": 250,
       "opam": 64
     },
     "exe:test/command_line_tests:command_line_tests": {
-      "libs": 251,
+      "libs": 252,
       "opam": 64
     },
     "exe:test/node_status_mock_server:node_status_mock_server": {

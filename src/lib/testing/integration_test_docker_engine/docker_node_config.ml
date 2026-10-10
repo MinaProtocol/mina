@@ -146,7 +146,8 @@ module Base_node_config = struct
 
   let to_list t =
     Mina_automation_args.Daemon_args.to_list
-      { Mina_automation_args.Daemon_args.log_level = Some t.log_level
+      { Mina_automation_args.Daemon_args.default with
+        log_level = Some t.log_level
       ; log_snark_work_gossip = Some t.log_snark_work_gossip
       ; log_txn_pool_gossip = Some t.log_txn_pool_gossip
       ; generate_genesis_proof = Some t.generate_genesis_proof
