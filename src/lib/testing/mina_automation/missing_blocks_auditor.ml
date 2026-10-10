@@ -11,7 +11,7 @@ module Paths = struct
   let official_name = "mina-missing-blocks-auditor"
 end
 
-module PathFinder = Executor.Make_PathFinder (Paths)
+module PathFinder = Mina_automation_process.Executor.Make_PathFinder (Paths)
 
 let path () =
   Deferred.map (PathFinder.standalone_path ()) ~f:(fun opt ->

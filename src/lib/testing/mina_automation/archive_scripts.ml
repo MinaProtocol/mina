@@ -24,7 +24,9 @@ let installed_dir = "/etc/mina/archive"
 let possible_locations = [ installed_dir; source_dir ]
 
 (** The script under the working directory or on [PATH], if any. *)
-let filepath t = Utils.possible_locations ~file:(file t) possible_locations
+let filepath t =
+  Mina_automation_process.Host.possible_locations ~file:(file t)
+    possible_locations
 
 (* the nearest [source_dir] above [dir] *)
 let rec find_in_source_tree ~file dir =

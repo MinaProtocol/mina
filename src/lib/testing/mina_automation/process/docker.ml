@@ -3,7 +3,6 @@ Module to run docker command in given image.
 *)
 
 open Core
-open Mina_automation_process
 open Async
 open Printf
 

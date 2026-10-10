@@ -18,7 +18,7 @@ module Paths = struct
   let official_name = "mina-archive-healthcheck"
 end
 
-module PathFinder = Executor.Make_PathFinder (Paths)
+module PathFinder = Mina_automation_process.Executor.Make_PathFinder (Paths)
 
 let exit_status_to_string = function
   | Ok () ->
