@@ -343,59 +343,73 @@ let tents
                 " "
                 (Artifact.profileTents spec.artifacts # networkTents)
 
-let build_artifacts
-    : PackagingSpec.Type -> Command.Type
+let debianTokens
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
+      ->  Text/concatSep
+            " "
+            (List/map Artifact.Type Text Artifact.toDebianToken spec.artifacts)
+
+let CacheHops =
+    -- The writes that hand a step's result to the next step. They exist only
+    -- because every Buildkite step runs on its own agent, so they belong to the
+    -- step wrapper, not to the builder.
+      { apps =
+              \(codename : Text)
+          ->  \(variant : Text)
+          ->  Cmd.run
+                "./buildkite/scripts/apps/write_to_cache.sh ${codename} ${variant}"
+      , appsBuildManifest =
+              \(codename : Text)
+          ->  \(treeVariant : Text)
+          ->  Cmd.run
+                "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${codename} ${treeVariant}"
+      , debian =
+              \(codename : Text)
+          ->  Cmd.run "./buildkite/scripts/debian/write_to_cache.sh ${codename}"
+      }
+
+let artifactCommands
+    : PackagingSpec.Type -> List Cmd.Type
     =     \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
-          let debianTokens =
-                Text/concatSep
-                  " "
-                  ( List/map
-                      Artifact.Type
-                      Text
-                      Artifact.toDebianToken
-                      spec.artifacts
-                  )
+          in  Toolchain.select
+                Toolchain.Spec::{
+                , mode = spec.toolchainSelectMode
+                , debVersion = spec.debVersion
+                , arch = spec.arch
+                , submodules = True
+                }
+                (   [ "AWS_ACCESS_KEY_ID"
+                    , "AWS_SECRET_ACCESS_KEY"
+                    , "MINA_BRANCH=\$BUILDKITE_BRANCH"
+                    , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+                    , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                             spec.debVersion}"
+                    , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                    , Network.foldMinaBuildMainnetEnv nets
+                    , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                    , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
+                    , "MINA_DEB_RELEASE=${DebianChannel.effective spec.channel}"
+                    ]
+                  # BuildFlags.buildEnvs spec.buildFlags
+                  # spec.extraBuildEnvs
+                  # DebianVersions.overrideEnvs
+                )
+                "${spec.buildScript} ${debianTokens spec} ${tents spec}"
 
-          let appsCacheWrite =
-                Cmd.run
-                  "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                  spec.debVersion} ${appsVariant
-                                                                                       spec}"
+let build_artifacts
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  let codename = DebianVersions.lowerName spec.debVersion
 
           in  Command.build
                 Command.Config::{
                 , commands =
-                      Toolchain.select
-                        Toolchain.Spec::{
-                        , mode = spec.toolchainSelectMode
-                        , debVersion = spec.debVersion
-                        , arch = spec.arch
-                        , submodules = True
-                        }
-                        (   [ "AWS_ACCESS_KEY_ID"
-                            , "AWS_SECRET_ACCESS_KEY"
-                            , "MINA_BRANCH=\$BUILDKITE_BRANCH"
-                            , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
-                            , "MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                                     spec.debVersion}"
-                            , "ARCHITECTURE=${Arch.lowerName spec.arch}"
-                            , Network.foldMinaBuildMainnetEnv nets
-                            , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
-                            , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
-                            , "MINA_DEB_RELEASE=${DebianChannel.effective
-                                                    spec.channel}"
-                            ]
-                          # BuildFlags.buildEnvs spec.buildFlags
-                          # spec.extraBuildEnvs
-                          # DebianVersions.overrideEnvs
-                        )
-                        "${spec.buildScript} ${debianTokens} ${tents spec}"
-                    # [ Cmd.run
-                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                            spec.debVersion}"
-                      , appsCacheWrite
+                      artifactCommands spec
+                    # [ CacheHops.debian codename
+                      , CacheHops.apps codename (appsVariant spec)
                       ]
                 , label = "Debian: Build ${labelSuffix spec}"
                 , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
@@ -450,32 +464,32 @@ let appsJobName
       -- single network-less app job.
       \(spec : PackagingSpec.Type) -> "${genericBuildName spec}Apps"
 
+let appsCommands
+    : AppsSpec.Type -> List Cmd.Type
+    =     \(spec : AppsSpec.Type)
+      ->  Toolchain.select
+            Toolchain.Spec::{
+            , mode = spec.toolchainSelectMode
+            , debVersion = spec.debVersion
+            , arch = spec.arch
+            , submodules = True
+            }
+            (appsBuildEnvs spec)
+            "./buildkite/scripts/build-artifact.sh"
+
 let build_apps
     : AppsSpec.Type -> Command.Type
     =     \(spec : AppsSpec.Type)
-      ->  let appsCacheWrite =
-                Cmd.run
-                  "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                  spec.debVersion} ${appsSpecVariant
-                                                                                       spec}"
+      ->  let codename = DebianVersions.lowerName spec.debVersion
 
           in  Command.build
                 Command.Config::{
                 , commands =
-                      Toolchain.select
-                        Toolchain.Spec::{
-                        , mode = spec.toolchainSelectMode
-                        , debVersion = spec.debVersion
-                        , arch = spec.arch
-                        , submodules = True
-                        }
-                        (appsBuildEnvs spec)
-                        "./buildkite/scripts/build-artifact.sh"
-                    # [ appsCacheWrite
-                      , Cmd.run
-                          "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
-                                                                                         spec.debVersion} ${appsSpecTreeVariant
-                                                                                                              spec}"
+                      appsCommands spec
+                    # [ CacheHops.apps codename (appsSpecVariant spec)
+                      , CacheHops.appsBuildManifest
+                          codename
+                          (appsSpecTreeVariant spec)
                       ]
                 , label = "Build apps: ${appsLabelSuffix spec}"
                 , key = "build-apps"
@@ -488,13 +502,6 @@ let build_apps
                     }
                   ]
                 }
-
-let debianTokens
-    : PackagingSpec.Type -> Text
-    =     \(spec : PackagingSpec.Type)
-      ->  Text/concatSep
-            " "
-            (List/map Artifact.Type Text Artifact.toDebianToken spec.artifacts)
 
 let buildDebianFromApps
     : PackagingSpec.Type -> Text -> List Cmd.Type
@@ -584,9 +591,7 @@ let build_debian
             Command.Config::{
             , commands =
                   buildDebianFromApps spec "${debianTokens spec} ${tents spec}"
-                # [ Cmd.run
-                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                        spec.debVersion}"
+                # [ CacheHops.debian (DebianVersions.lowerName spec.debVersion)
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
@@ -989,4 +994,8 @@ in  { onlyDebianPipeline = onlyDebianPipeline
     , buildDebian = build_debian
     , buildDebianFromApps = buildDebianFromApps
     , debianTokens = debianTokens
+    , CacheHops = CacheHops
+    , appsCommands = appsCommands
+    , artifactCommands = artifactCommands
+    , dockerCommands = docker_commands
     }
