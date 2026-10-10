@@ -22,10 +22,10 @@ let transactions_impl ~get_transactions ~constraint_constants header
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      { header : Header.Stable.V3.t
-      ; body : Staged_ledger_diff.Body.Stable.V2.t
+      { header : Header.Stable.V4.t
+      ; body : Staged_ledger_diff.Body.Stable.V3.t
       }
     [@@deriving fields, sexp]
 

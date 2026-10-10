@@ -537,31 +537,6 @@ let signed_amount =
           ~resolve:(fun _ amount -> Currency.Amount.Signed.magnitude amount)
       ] )
 
-let fee_excess : (Mina_lib.t, Fee_excess.t option) typ =
-  let module M = Fee_excess.Poly in
-  obj "FeeExcess" ~doc:"Fee excess divided into left, right components"
-    ~fields:(fun _ ->
-      [ field "feeTokenLeft"
-          ~args:Arg.[]
-          ~doc:"Token id for left component of fee excess"
-          ~typ:(non_null token_id)
-          ~resolve:(fun _ ({ fee_token_l; _ } : _ M.t) -> fee_token_l)
-      ; field "feeExcessLeft"
-          ~args:Arg.[]
-          ~doc:"Fee for left component of fee excess" ~typ:(non_null signed_fee)
-          ~resolve:(fun _ ({ fee_excess_l; _ } : _ M.t) -> fee_excess_l)
-      ; field "feeTokenRight"
-          ~args:Arg.[]
-          ~doc:"Token id for right component of fee excess"
-          ~typ:(non_null token_id)
-          ~resolve:(fun _ ({ fee_token_r; _ } : _ M.t) -> fee_token_r)
-      ; field "feeExcessRight"
-          ~args:Arg.[]
-          ~doc:"Fee for right component of fee excess"
-          ~typ:(non_null signed_fee)
-          ~resolve:(fun _ ({ fee_excess_r; _ } : _ M.t) -> fee_excess_r)
-      ] )
-
 let work_statement =
   obj "WorkDescription"
     ~doc:
@@ -587,7 +562,7 @@ let work_statement =
           ~args:Arg.[]
           ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
             target.second_pass_ledger )
-      ; field "feeExcess" ~typ:(non_null fee_excess)
+      ; field "feeExcess" ~typ:(non_null signed_fee)
           ~doc:
             "Total transaction fee that is not accounted for in the transition \
              from source ledger to target ledger"
@@ -846,7 +821,7 @@ let snarked_ledger_state :
           ~resolve:(fun _ ({ supply_increase; _ } : _ M.t) -> supply_increase)
       ; field "feeExcess"
           ~args:Arg.[]
-          ~typ:(non_null fee_excess)
+          ~typ:(non_null signed_fee)
           ~resolve:(fun _ ({ fee_excess; _ } : _ M.t) -> fee_excess)
       ; field "sokDigest"
           ~args:Arg.[]

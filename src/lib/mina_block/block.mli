@@ -5,12 +5,12 @@ open Mina_transaction
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V3 : sig
+  module V4 : sig
     type t [@@deriving sexp, equal]
 
-    val header : t -> Header.Stable.V3.t
+    val header : t -> Header.Stable.V4.t
 
-    val body : t -> Staged_ledger_diff.Body.Stable.V2.t
+    val body : t -> Staged_ledger_diff.Body.Stable.V3.t
 
     val transactions :
          constraint_constants:Genesis_constants.Constraint_constants.t

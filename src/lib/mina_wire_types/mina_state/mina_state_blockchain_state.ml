@@ -27,7 +27,7 @@ module Poly = struct
 end
 
 module Value = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       ( Mina_base.Staged_ledger_hash.V1.t
       , Mina_base.Frozen_ledger_hash.V1.t
@@ -36,7 +36,7 @@ module Value = struct
       , Consensus.Body_reference.V1.t
       , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
-      , Mina_base.Fee_excess.V1.t
+      , Mina_base.Fee_excess.V2.t
       , unit )
       Poly.V2.t
   end

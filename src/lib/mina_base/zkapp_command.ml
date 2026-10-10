@@ -293,7 +293,7 @@ let all_account_updates_list (t : (_, _, _) with_forest) :
     ~of_account_update:Fn.id t
 
 let fee_excess (t : (_, _, _) with_forest) =
-  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
+  Currency.Fee.Signed.of_unsigned (fee t)
 
 (* always `Accessed` for fee payer *)
 let account_access_statuses (t : (_, _, _) with_forest)

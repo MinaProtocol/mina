@@ -109,16 +109,8 @@ query pendingSnarkWork {
       source_second_pass_ledger_hash: sourceSecondPassLedgerHash
       target_second_pass_ledger_hash: targetSecondPassLedgerHash
       fee_excess: feeExcess {
-        feeTokenLeft
-        feeExcessLeft {
-          sign
-          feeMagnitude
-        }
-        feeTokenRight
-        feeExcessRight {
-          sign
-          feeMagnitude
-        }
+        sign
+        feeMagnitude
       }
       supply_increase : supplyIncrease
       work_id: workId

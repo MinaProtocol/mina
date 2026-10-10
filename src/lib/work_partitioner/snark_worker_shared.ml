@@ -8,11 +8,11 @@ module Zkapp_command_inputs = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Zkapp_command_segment.Witness.Stable.V2.t
+        ( Zkapp_command_segment.Witness.Stable.V3.t
         * Zkapp_command_segment.Basic.Stable.V1.t
-        * Statement.With_sok.Stable.V2.t )
+        * Statement.With_sok.Stable.V3.t )
         Nonempty_list.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
