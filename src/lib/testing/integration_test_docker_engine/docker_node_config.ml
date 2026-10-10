@@ -41,10 +41,10 @@ module Base_node_config = struct
     ; log_snark_work_gossip : bool
     ; log_txn_pool_gossip : bool
     ; generate_genesis_proof : bool
-    ; client_port : string
-    ; rest_port : string
-    ; external_port : string
-    ; metrics_port : string
+    ; client_port : int
+    ; rest_port : int
+    ; external_port : int
+    ; metrics_port : int
     ; runtime_config_path : string option
     ; libp2p_key_path : string
     ; libp2p_secret : string
@@ -109,10 +109,10 @@ module Base_node_config = struct
     ; log_txn_pool_gossip = true
     ; generate_genesis_proof = true
     ; log_level = "Debug"
-    ; client_port = PortManager.mina_internal_client_port |> Int.to_string
-    ; rest_port = PortManager.mina_internal_rest_port |> Int.to_string
-    ; metrics_port = PortManager.mina_internal_metrics_port |> Int.to_string
-    ; external_port = PortManager.mina_internal_external_port |> Int.to_string
+    ; client_port = PortManager.mina_internal_client_port
+    ; rest_port = PortManager.mina_internal_rest_port
+    ; metrics_port = PortManager.mina_internal_metrics_port
+    ; external_port = PortManager.mina_internal_external_port
     ; libp2p_key_path = container_libp2p_key_path
     ; libp2p_secret = ""
     ; start_filtered_logs
@@ -123,10 +123,10 @@ module Base_node_config = struct
        from these env vars. The native engine passes ports as CLI flags
        instead, and these values are dynamic (per node), so they cannot live in
        the shared static list below. *)
-    [ ("DAEMON_REST_PORT", t.rest_port)
-    ; ("DAEMON_CLIENT_PORT", t.client_port)
-    ; ("DAEMON_METRICS_PORT", t.metrics_port)
-    ; ("DAEMON_EXTERNAL_PORT", t.external_port)
+    [ ("DAEMON_REST_PORT", Int.to_string t.rest_port)
+    ; ("DAEMON_CLIENT_PORT", Int.to_string t.client_port)
+    ; ("DAEMON_METRICS_PORT", Int.to_string t.metrics_port)
+    ; ("DAEMON_EXTERNAL_PORT", Int.to_string t.external_port)
       (* The engine runs with full proofs (proof.level = Full in the injected
          runtime config). Node_config resolves the "compile-time" proof level at
          runtime from MINA_PROFILE (highest priority) ->
@@ -145,48 +145,65 @@ module Base_node_config = struct
     @ [ ("LIBP2P_ENABLE_MDNS", "true") ]
 
   let to_list t =
-    let base_args =
+    Mina_automation_args.Daemon_args.to_list
+      { Mina_automation_args.Daemon_args.log_level = Some t.log_level
+      ; log_snark_work_gossip = Some t.log_snark_work_gossip
+      ; log_txn_pool_gossip = Some t.log_txn_pool_gossip
+      ; generate_genesis_proof = Some t.generate_genesis_proof
+      ; client_port = Some t.client_port
+      ; rest_port = Some t.rest_port
+      ; external_port = Some t.external_port
+      ; metrics_port = Some t.metrics_port
+      ; libp2p_keypair = Some t.libp2p_key_path
+      ; log_json = true
+      ; insecure_rest_server = true
+      ; external_ip = Some "0.0.0.0"
+      ; config_files = Option.to_list t.runtime_config_path
+      ; peers = Option.to_list t.peer
+      ; start_filtered_logs = t.start_filtered_logs
+      }
+
+  let%test_unit "to_list keeps the daemon arguments" =
+    let t =
+      default ~runtime_config_path:(Some "/cfg.json") ~peer:(Some "/ip4/peer")
+        ~start_filtered_logs:[ "evt" ]
+    in
+    let actual = to_list t in
+    let expected =
       [ "-log-level"
-      ; t.log_level
+      ; "Debug"
       ; "-log-snark-work-gossip"
-      ; Bool.to_string t.log_snark_work_gossip
+      ; "true"
       ; "-log-txn-pool-gossip"
-      ; Bool.to_string t.log_txn_pool_gossip
+      ; "true"
       ; "-generate-genesis-proof"
-      ; Bool.to_string t.generate_genesis_proof
+      ; "true"
       ; "-client-port"
-      ; t.client_port
+      ; "8301"
       ; "-rest-port"
-      ; t.rest_port
+      ; "3085"
       ; "-external-port"
-      ; t.external_port
+      ; "10101"
       ; "-metrics-port"
-      ; t.metrics_port
+      ; "10001"
       ; "--libp2p-keypair"
-      ; t.libp2p_key_path
+      ; "/root/keys/libp2p_key"
       ; "-log-json"
       ; "--insecure-rest-server"
       ; "-external-ip"
       ; "0.0.0.0"
+      ; "-config-file"
+      ; "/cfg.json"
+      ; "-peer"
+      ; "/ip4/peer"
+      ; "--start-filtered-logs"
+      ; "evt"
       ]
     in
-    let peer_args =
-      match t.peer with Some peer -> [ "-peer"; peer ] | None -> []
-    in
-    let start_filtered_logs_args =
-      List.concat
-        (List.map t.start_filtered_logs ~f:(fun log ->
-             [ "--start-filtered-logs"; log ] ) )
-    in
-    let runtime_config_path =
-      match t.runtime_config_path with
-      | Some path ->
-          [ "-config-file"; path ]
-      | None ->
-          []
-    in
-    List.concat
-      [ base_args; runtime_config_path; peer_args; start_filtered_logs_args ]
+    if not (List.equal String.equal actual expected) then
+      failwithf "unexpected daemon arguments: %s"
+        (String.concat ~sep:" " actual)
+        ()
 end
 
 module Block_producer_config = struct
