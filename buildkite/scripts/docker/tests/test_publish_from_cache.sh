@@ -84,11 +84,32 @@ t_pushes_primary_and_tags_the_rest () {
 }
 
 t_refuses_a_tag_holding_another_image () {
-  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet
+  # Archives go in name order: archive, daemon, rosetta. The run stops at the
+  # refused one; what came before it is published, what comes after is not.
   archive pkg mina-archive reg/mina-archive:1.0.0-devnet
-  run STUB_PUBLISHED="reg/mina-archive:1.0.0-devnet=sha256:other"
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet
+  archive pkg mina-rosetta reg/mina-rosetta:1.0.0-devnet
+  run STUB_PUBLISHED="reg/mina-daemon:1.0.0-devnet=sha256:other"
   expect "must refuse" test $RC -ne 0
-  expect "nothing may be pushed once one tag is refused" not grep -q "^push" "$CALLS"
+  expect "the archive before the refusal is published" called "push reg/mina-archive:1.0.0-devnet"
+  expect "the refused tag must not be pushed" not called "push reg/mina-daemon:1.0.0-devnet"
+  expect "nothing after the refusal may be pushed" not called "push reg/mina-rosetta:1.0.0-devnet"
+}
+
+t_publishes_one_archive_at_a_time () {
+  # Each image is loaded, pushed and dropped before the next one is loaded, so
+  # the local store never holds more than the image being pushed.
+  archive pkg mina-archive reg/mina-archive:1.0.0-devnet
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet
+  run
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "first image not dropped" called "image rm --no-prune reg/mina-archive:1.0.0-devnet"
+  expect "second image not dropped with both tags" \
+    called "image rm --no-prune reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet"
+  expect "second load must come after the first push" \
+    test "$(grep -n -m1 '^load' "$CALLS" | cut -d: -f1)" -lt "$(grep -n -m1 '^push reg/mina-archive' "$CALLS" | cut -d: -f1)"
+  expect "second load must come after the first push" \
+    test "$(grep -n '^load' "$CALLS" | sed -n 2p | cut -d: -f1)" -gt "$(grep -n -m1 '^push reg/mina-archive' "$CALLS" | cut -d: -f1)"
 }
 
 t_skips_a_tag_already_holding_this_image () {
@@ -134,6 +155,7 @@ t_dry_run_pushes_nothing () {
 }
 
 for t in t_pushes_primary_and_tags_the_rest t_refuses_a_tag_holding_another_image \
+         t_publishes_one_archive_at_a_time \
          t_skips_a_tag_already_holding_this_image t_force_overwrites \
          t_nothing_to_publish_fails t_reads_the_generic_build_too \
          t_read_cache_root_names_the_packaging_build t_dry_run_pushes_nothing; do
