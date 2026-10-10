@@ -2,7 +2,7 @@
 Module for psql tool automation. One can use it to create database schema
 *)
 
-open Integration_test_lib
+open Mina_automation_process
 open Core
 open Async
 
@@ -61,7 +61,7 @@ let create_credential_arg ~connection ?db () =
 
 let run_command ~connection command =
   let creds = create_credential_arg ~connection () in
-  Util.run_cmd_or_error "." psql (creds @ [ "-c"; command; "-t" ])
+  Cmd.run_cmd_or_error "." psql (creds @ [ "-c"; command; "-t" ])
   >>| Result.map ~f:String.strip
 
 (** [run_command_exn ~connection command] runs a SQL command using psql with the given connection. 
@@ -77,12 +77,12 @@ let script_args ~connection ?db script =
   create_credential_arg ~connection ?db () @ [ "-f"; script ]
 
 let run_script ~connection ?db script =
-  Util.run_cmd_exn "." psql (script_args ~connection ?db script @ [ "-a" ])
+  Cmd.run_cmd_exn "." psql (script_args ~connection ?db script @ [ "-a" ])
 
 (** Like [run_script], but stops at the first failing statement and returns
     the failure instead of raising. *)
 let run_script_or_error ~connection ?db script =
-  Util.run_cmd_or_error "." psql
+  Cmd.run_cmd_or_error "." psql
     (script_args ~connection ?db script @ [ "-v"; "ON_ERROR_STOP=1"; "-q" ])
   >>| Result.ignore_m
 
