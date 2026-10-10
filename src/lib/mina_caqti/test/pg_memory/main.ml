@@ -127,11 +127,9 @@ type scenario =
    [Caqti_type.t2] product built at runtime and hidden behind an existential,
    so the same code drives helpers over tables of any generated width.
 
-   [insert_multi_into_col] renders its values into the SQL text as
-   single-quoted literals without escaping, so generated tokens stay
-   alphanumeric. The iteration index is prefixed to every value that must be
-   unique: a collision would silently turn an INSERT into a SELECT hit and
-   change what is being measured. *)
+   The iteration index is prefixed to every value that must be unique: a
+   collision would silently turn an INSERT into a SELECT hit and change what is
+   being measured. *)
 
 type col_ty = Text | Int
 
@@ -295,15 +293,12 @@ let insert_multi_scenario ~shape_idx =
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
   ; step =
       (fun ~table conn i ->
-        (* a varying number of values per call: the rendered VALUES list is a
-           different length every time, which is the realistic shape and keeps
-           the SQL text varying independently of request identity *)
+        (* a varying number of values per call, which is the realistic shape *)
         let values =
           generate ~scenario:name ~iteration:i gen_tokens
           |> List.mapi ~f:(fun j v -> sprintf "v-%d-%d-%s" i j v)
         in
-        Mina_caqti.insert_multi_into_col ~table_name:table
-          ~col:("v", Caqti_type.string) conn values
+        Mina_caqti.insert_multi_into_col ~table_name:table ~col:"v" conn values
         >>| Mina_caqti.ok_exn ~ctx:name
         >>| ignore )
   }

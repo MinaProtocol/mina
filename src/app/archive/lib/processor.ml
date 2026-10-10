@@ -1534,9 +1534,9 @@ module Zkapp_events = struct
 
      1. flatten to all field strings and insert them (zkapp_field keeps its
         UNIQUE(field) constraint, so this step still dedups by content);
-     2. for each event (a field array), render its field ids as an int[] literal
-        and insert them all into zkapp_field_array in one query, taking the
-        returned ids POSITIONALLY (in VALUES order) — NO content dedup, since
+     2. for each event (a field array), insert its field ids as an int[] into
+        zkapp_field_array in one batch, taking the returned ids POSITIONALLY
+        (in event order) — NO content dedup, since
         zkapp_field_array.element_ids has no UNIQUE/index (a btree over the
         unbounded int[] overflows Postgres' 2704-byte key limit for max-cost
         zkApps);
@@ -1561,7 +1561,7 @@ module Zkapp_events = struct
         if not @@ List.is_empty fields then
           let%map field_map =
             Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
-              ~col:("field", Caqti_type.string)
+              ~col:"field"
               (module Conn)
               fields
             >>| String.Map.of_alist_exn
@@ -1571,17 +1571,11 @@ module Zkapp_events = struct
           (* no fields => a non-empty list of empty events; each maps to {} *)
           return @@ List.map field_list_list ~f:(fun _ -> [])
       in
-      (* this conversion should be done by caqti using `typ`, FIX this in the future *)
-      let field_array_list =
-        List.map field_id_list_list ~f:(fun id_list ->
-            List.map id_list ~f:Int.to_string
-            |> String.concat ~sep:", " |> sprintf "{%s}" )
-      in
       let%bind field_array_ids =
-        Mina_caqti.insert_multi_into_col_no_dedup
-          ~table_name:"zkapp_field_array" ~col:"element_ids"
+        Mina_caqti.insert_int_arrays_no_dedup ~table_name:"zkapp_field_array"
+          ~col:"element_ids"
           (module Conn)
-          field_array_list
+          (List.map field_id_list_list ~f:Array.of_list)
       in
       let element_ids = Array.of_list field_array_ids in
       let%map id =
