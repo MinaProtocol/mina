@@ -1,4 +1,4 @@
-open Integration_test_lib
+open Mina_automation_process
 open Async
 open Core
 
@@ -17,14 +17,14 @@ let possible_locations ~file possible_locations =
   possible_locations @ paths
   |> List.find_map ~f:(fun folder -> exists_at_path folder file)
 
-let wget ~url ~target = Util.run_cmd_exn "." "wget" [ "-c"; url; "-O"; target ]
+let wget ~url ~target = Cmd.run_cmd_exn "." "wget" [ "-c"; url; "-O"; target ]
 
 let sed ~search ~replacement ~input =
-  Util.run_cmd_exn "." "sed"
+  Cmd.run_cmd_exn "." "sed"
     [ "-i"; "-e"; Printf.sprintf "s/%s/%s/g" search replacement; input ]
 
 let untar ~archive ~output =
-  Util.run_cmd_exn "." "tar" [ "-xf"; archive; "-C"; output ]
+  Cmd.run_cmd_exn "." "tar" [ "-xf"; archive; "-C"; output ]
 
 let precomputed_blocks_comparator left right =
   let scan_height name = Scanf.sscanf name "%_s@-%d-%_s" Fn.id in
@@ -88,7 +88,7 @@ let get_memory_usage_mib pid =
   @param process The process name whose instances' memory usage should be calculated
   @return A deferred float representing the total memory usage in mebibytes
 
-  @raise If the 'ps' command fails to execute, an exception will be raised by [Util.run_cmd_exn] *)
+  @raise If the 'ps' command fails to execute, an exception will be raised by [Cmd.run_cmd_exn] *)
 let get_memory_usage_mib_of_user_process process =
   (* Use 'ps' to get the memory usage of all processes with the given name *)
   (* The command 'ps -eo comm,rss' lists the command name and RSS in kilobytes *)
@@ -104,7 +104,7 @@ let get_memory_usage_mib_of_user_process process =
      ps 3892
   *)
   let%bind output =
-    Util.run_cmd_exn "." "ps" [ "-eo"; "comm,rss"; "--no-headers" ]
+    Cmd.run_cmd_exn "." "ps" [ "-eo"; "comm,rss"; "--no-headers" ]
   in
   let lines = String.split_lines output in
   let total_memory_mb =

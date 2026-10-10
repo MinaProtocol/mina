@@ -2,7 +2,7 @@
 Core module to run any defined app on various contexts
 *)
 
-open Integration_test_lib
+open Mina_automation_process
 open Core_kernel
 open Async
 
@@ -88,11 +88,11 @@ module Make (P : AppPaths) = struct
       if String.is_empty prefix then app else prefix ^ "/" ^ app
     in
     log_executed_command full_path ;
-    Util.create_process_exn ?env "." full_path args ()
+    Cmd.create_process_exn ?env "." full_path args ()
     |> Deferred.map ~f:(fun process -> (full_path, process))
 
   let output_or_hard_error ~prog ~args output =
-    match%map Util.check_cmd_output ~prog ~args output with
+    match%map Cmd.check_cmd_output ~prog ~args output with
     | Ok output ->
         output
     | Error error ->
