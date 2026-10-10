@@ -70,4 +70,7 @@ dune runtest src/test/mina_automation/test/synthetic_archive
 # the same server ($MINA_TEST_POSTGRES)
 dune runtest src/app/mina_archive_healthcheck
 
+# Inline tests of the missing blocks auditor and guardian libraries.
+dune runtest src/app/missing_blocks_auditor src/app/missing_blocks_guardian
+
 ./buildkite/scripts/upload-partial-coverage-data.sh ${command_key} "dev"

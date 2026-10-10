@@ -118,3 +118,20 @@ let get_memory_usage_mib_of_user_process process =
     |> fun kb -> kb /. 1024.0
   in
   Deferred.return total_memory_mb
+
+(** What a finished process produced: its exit code (128 + the signal number
+    when a signal killed it) and its output. *)
+type process_outcome = { exit_code : int; stdout : string; stderr : string }
+
+let collect_outcome process =
+  let%map output = Process.collect_output_and_wait process in
+  let exit_code =
+    match output.exit_status with
+    | Ok () ->
+        0
+    | Error (`Exit_non_zero code) ->
+        code
+    | Error (`Signal signal) ->
+        128 + Signal.to_system_int signal
+  in
+  { exit_code; stdout = output.stdout; stderr = output.stderr }
