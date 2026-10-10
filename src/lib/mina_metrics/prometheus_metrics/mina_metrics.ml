@@ -749,28 +749,6 @@ module Network = struct
 
   let surfix = "_five_slots"
 
-  let get_some_initial_peers_rpcs_sent =
-    let help = "# of Get_some_initial_peers rpc requests sent" in
-    let name = "get_some_initial_peers_rpcs_sent" in
-    ( Counter.v name ~help ~namespace ~subsystem
-    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
-
-  let get_some_initial_peers_rpcs_received =
-    let help = "# of Get_some_initial_peers rpc requests received" in
-    let name = "get_some_initial_peers_rpcs_received" in
-    ( Counter.v name ~help ~namespace ~subsystem
-    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
-
-  let get_some_initial_peers_rpc_requests_failed : Counter.t =
-    let help = "# of Get_some_initial_peers rpc requests failed" in
-    Counter.v "get_some_initial_peers_rpc_requests_failed" ~help ~namespace
-      ~subsystem
-
-  let get_some_initial_peers_rpc_responses_failed : Counter.t =
-    let help = "# of Get_some_initial_peers rpc requests failed to respond" in
-    Counter.v "get_some_initial_peers_rpc_responses_failed" ~help ~namespace
-      ~subsystem
-
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent =
     let help =
       "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
@@ -848,7 +826,7 @@ module Network = struct
     , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
 
   let get_transition_chain_rpc_requests_failed : Counter.t =
-    let help = "# of Get_some_initial_peers rpc requests failed" in
+    let help = "# of Get_transition_chain rpc requests failed" in
     Counter.v "get_transition_chain_rpc_requests_failed" ~help ~namespace
       ~subsystem
 
