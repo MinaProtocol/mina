@@ -64,7 +64,7 @@ echo "Database setup complete, accessible via $MINA_TEST_POSTGRES . Running arch
 dune runtest src/app/archive
 
 # Synthetic_archive: the shared test archive builder, against the same DB server
-dune runtest src/test/mina_automation/test/synthetic_archive
+dune runtest src/lib/testing/mina_automation/test/synthetic_archive
 
 # A running Rosetta asked for a balance after a hard fork
 dune runtest src/test/rosetta_fork_balance
