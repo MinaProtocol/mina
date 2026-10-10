@@ -69,6 +69,7 @@
   mina_graphql
   graphql_lib
   integers
+  mina_automation.process
   transition_handler
   snark_worker
   one_or_two

@@ -1,0 +1,17 @@
+(library
+ (name mina_automation_process)
+ (public_name mina_automation.process)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  ;; local libraries
+  logger
+  timeout_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))
