@@ -3,7 +3,7 @@ Module to run docker command in given image.
 *)
 
 open Core
-open Integration_test_lib
+open Mina_automation_process
 open Async
 open Printf
 
@@ -37,7 +37,7 @@ module Requests = struct
   let default = { unix_socket = "/var/run/docker.sock"; curl_app = "curl" }
 
   let post t ~json ~path =
-    Util.run_cmd_exn "." t.curl_app
+    Cmd.run_cmd_exn "." t.curl_app
       [ "--unix-socket"
       ; t.unix_socket
       ; "-H"
@@ -50,11 +50,11 @@ module Requests = struct
       ]
 
   let post_no_data t ~path =
-    Util.run_cmd_exn "." t.curl_app
+    Cmd.run_cmd_exn "." t.curl_app
       [ "--unix-socket"; t.unix_socket; "-X"; "POST"; path ]
 
   let get t ~path =
-    Util.run_cmd_exn "." t.curl_app
+    Cmd.run_cmd_exn "." t.curl_app
       [ "--unix-socket"; t.unix_socket; Printf.sprintf path ]
 end
 
