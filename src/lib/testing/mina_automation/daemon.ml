@@ -263,60 +263,29 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     ?peer_list_url ?node_status_url ?node_error_url ?simplified_node_stats
     ?(start_filtered_logs = default_init_log_filters) t =
   let open Deferred.Let_syntax in
-  let base_args =
-    [ "daemon"
-    ; "--seed"
-    ; "--demo-mode"
-    ; "--insecure-rest-server"
-    ; "--working-dir"
-    ; "."
-    ; "--client-port"
-    ; string_of_int t.config.client_port
-    ; "--rest-port"
-    ; string_of_int t.config.rest_port
-    ; "--config-directory"
-    ; t.config.dirs.conf
-    ; "--genesis-ledger-dir"
-    ; t.config.dirs.genesis
-    ; "--external-ip"
-    ; "0.0.0.0"
-    ; "--libp2p-keypair"
-    ; Config.libp2p_keypair_folder t.config
-    ]
-  in
-  let opt_arg key value_opt =
-    match value_opt with None -> [] | Some value -> [ key; value ]
-  in
-  let bool_flag key value_opt =
-    match value_opt with
-    | Some true ->
-        [ key; "true" ]
-    | Some false ->
-        [ key; "false" ]
-    | None ->
-        []
-  in
-  let config_file_args =
-    match config_files with
-    | None ->
-        []
-    | Some files ->
-        List.concat_map files ~f:(fun f -> [ "--config-file"; f ])
-  in
-  let start_filtered_log_args =
-    List.concat_map start_filtered_logs ~f:(fun f ->
-        [ "--start-filtered-logs"; f ] )
-  in
   let args =
-    base_args
-    @ opt_arg "--hardfork-handling" hardfork_handling
-    @ opt_arg "--block-producer-key" block_producer_key
-    @ opt_arg "--node-status-url" node_status_url
-    @ opt_arg "--node-error-url" node_error_url
-    @ bool_flag "--simplified-node-stats" simplified_node_stats
-    @ config_file_args
-    @ opt_arg "--peer-list-url" peer_list_url
-    @ start_filtered_log_args
+    "daemon"
+    :: Mina_automation_args.Daemon_args.to_list
+         { Mina_automation_args.Daemon_args.default with
+           seed = true
+         ; demo_mode = true
+         ; insecure_rest_server = true
+         ; working_dir = Some "."
+         ; client_port = Some t.config.client_port
+         ; rest_port = Some t.config.rest_port
+         ; config_directory = Some t.config.dirs.conf
+         ; genesis_ledger_dir = Some t.config.dirs.genesis
+         ; external_ip = Some "0.0.0.0"
+         ; libp2p_keypair = Some (Config.libp2p_keypair_folder t.config)
+         ; hardfork_handling
+         ; block_producer_key
+         ; node_status_url
+         ; node_error_url
+         ; simplified_node_stats
+         ; config_files = Option.value config_files ~default:[]
+         ; peer_list_url
+         ; start_filtered_logs
+         }
   in
   [%log debug] "Starting daemon" ;
 
