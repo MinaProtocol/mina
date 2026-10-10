@@ -1,0 +1,10 @@
+(library
+ (name mina_automation_args)
+ (public_name mina_automation.args)
+ (libraries
+  ;; opam libraries
+  core_kernel)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
