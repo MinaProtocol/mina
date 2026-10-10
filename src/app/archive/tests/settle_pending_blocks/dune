@@ -1,0 +1,25 @@
+(test
+ (name test_settle_pending_blocks)
+ (deps
+  ../../archive.exe
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  uri
+  ;; local libraries
+  archive_lib
+  mina_automation.synthetic_archive
+  mina_caqti)
+ (preprocess
+  (pps ppx_version ppx_jane)))
