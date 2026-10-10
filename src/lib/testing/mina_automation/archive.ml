@@ -10,15 +10,14 @@ module Config = struct
     { config_file : String.t; postgres_uri : String.t; server_port : int }
 
   let to_args t =
-    [ "run"
-    ; "--config-file"
-    ; t.config_file
-    ; "--postgres-uri"
-    ; t.postgres_uri
-    ; "--server-port"
-    ; string_of_int t.server_port
-    ; "--log-json"
-    ]
+    "run"
+    :: Mina_automation_args.Archive_args.to_list
+         { (Mina_automation_args.Archive_args.create
+              ~postgres_uri:t.postgres_uri ~server_port:t.server_port )
+           with
+           config_file = Some t.config_file
+         ; log_json = true
+         }
 
   let create ~config_file ~postgres_uri ~server_port =
     { config_file; postgres_uri; server_port }
