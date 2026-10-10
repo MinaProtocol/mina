@@ -556,6 +556,22 @@ let write_account_state w (block, state) =
   >>| Mina_caqti.ok_exn ~ctx:("state of " ^ state.state_of.account_name)
   >>| fun (_ : int * int) -> ()
 
+(* by the archive's own genesis ledger writer, one ledger per height *)
+let write_genesis_accounts w genesis_accounts =
+  List.map genesis_accounts ~f:(fun g -> (g.genesis_height, g.genesis_state))
+  |> Int.Map.of_alist_multi |> Map.to_alist
+  |> Deferred.List.iter ~how:`Sequential ~f:(fun (height, states) ->
+         P.Genesis_accounts.add w.conn ~genesis_height:(Int64.of_int height)
+           (List.map states ~f:account_of_state)
+         >>| Mina_caqti.ok_exn ~ctx:(sprintf "genesis ledger at %d" height)
+         >>| function
+         | `Added _ ->
+             ()
+         | `No_table ->
+             failwith "the archive has no genesis_accounts table"
+         | `Already_loaded ->
+             failwithf "a genesis ledger at %d was already written" height () )
+
 (* --- the whole scenario ------------------------------------------------------ *)
 
 let write_all w (scenario : Scenario.t) =
@@ -573,8 +589,11 @@ let write_all w (scenario : Scenario.t) =
     Deferred.List.iter ~how:`Sequential scenario.accounts_created
       ~f:(write_account_created w)
   in
-  Deferred.List.iter ~how:`Sequential scenario.account_states
-    ~f:(write_account_state w)
+  let%bind () =
+    Deferred.List.iter ~how:`Sequential scenario.account_states
+      ~f:(write_account_state w)
+  in
+  write_genesis_accounts w scenario.genesis_accounts
 
 (** Writes [scenario] into the database at [uri] and returns the database
     ids of what it wrote. *)
