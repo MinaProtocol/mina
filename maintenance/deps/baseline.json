@@ -159,7 +159,7 @@
       "opam": 49
     },
     "exe:app/test_executive:test_executive": {
-      "libs": 241,
+      "libs": 242,
       "opam": 61
     },
     "exe:app/validate_keypair:validate_keypair": {

@@ -62,48 +62,72 @@ module Base_node_config = struct
     }
 
   let to_cmd_args t ~(ports : Node_ports.t) ~libp2p_key_path =
-    let base_args =
+    Mina_automation_args.Daemon_args.to_list
+      { Mina_automation_args.Daemon_args.log_level = Some t.log_level
+      ; log_snark_work_gossip = Some t.log_snark_work_gossip
+      ; log_txn_pool_gossip = Some t.log_txn_pool_gossip
+      ; generate_genesis_proof = Some t.generate_genesis_proof
+      ; client_port = Some ports.client_port
+      ; rest_port = Some ports.rest_port
+      ; external_port = Some ports.external_port
+      ; metrics_port = Some ports.metrics_port
+      ; libp2p_keypair = Some libp2p_key_path
+      ; log_json = true
+      ; insecure_rest_server = true
+      ; external_ip = Some "0.0.0.0"
+      ; config_files = Option.to_list t.runtime_config_path
+      ; peers = Option.to_list t.peer
+      ; start_filtered_logs = t.start_filtered_logs
+      }
+
+  let%test_unit "to_cmd_args keeps the daemon arguments" =
+    let t =
+      default ~runtime_config_path:(Some "/cfg.json") ~peer:(Some "/ip4/peer")
+        ~start_filtered_logs:[ "evt" ] ()
+    in
+    let ports =
+      { Node_ports.rest_port = 1
+      ; client_port = 2
+      ; metrics_port = 3
+      ; external_port = 4
+      }
+    in
+    let actual = to_cmd_args t ~ports ~libp2p_key_path:"/key" in
+    let expected =
       [ "-log-level"
-      ; t.log_level
+      ; "Debug"
       ; "-log-snark-work-gossip"
-      ; Bool.to_string t.log_snark_work_gossip
+      ; "true"
       ; "-log-txn-pool-gossip"
-      ; Bool.to_string t.log_txn_pool_gossip
+      ; "true"
       ; "-generate-genesis-proof"
-      ; Bool.to_string t.generate_genesis_proof
+      ; "true"
       ; "-client-port"
-      ; Int.to_string ports.client_port
+      ; "2"
       ; "-rest-port"
-      ; Int.to_string ports.rest_port
+      ; "1"
       ; "-external-port"
-      ; Int.to_string ports.external_port
+      ; "4"
       ; "-metrics-port"
-      ; Int.to_string ports.metrics_port
+      ; "3"
       ; "--libp2p-keypair"
-      ; libp2p_key_path
+      ; "/key"
       ; "-log-json"
       ; "--insecure-rest-server"
       ; "-external-ip"
       ; "0.0.0.0"
+      ; "-config-file"
+      ; "/cfg.json"
+      ; "-peer"
+      ; "/ip4/peer"
+      ; "--start-filtered-logs"
+      ; "evt"
       ]
     in
-    let peer_args =
-      match t.peer with Some peer -> [ "-peer"; peer ] | None -> []
-    in
-    let start_filtered_logs_args =
-      List.concat
-        (List.map t.start_filtered_logs ~f:(fun log ->
-             [ "--start-filtered-logs"; log ] ) )
-    in
-    let runtime_config_path =
-      match t.runtime_config_path with
-      | Some path ->
-          [ "-config-file"; path ]
-      | None ->
-          []
-    in
-    List.concat
-      [ base_args; runtime_config_path; peer_args; start_filtered_logs_args ]
+    if not (List.equal String.equal actual expected) then
+      failwithf "unexpected daemon arguments: %s"
+        (String.concat ~sep:" " actual)
+        ()
 
   (* Shared with the docker engine; see
      [Integration_test_lib.Local_engine_common.node_env_vars]. *)
