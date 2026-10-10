@@ -362,12 +362,36 @@ module Network_manager = struct
     ; log_file
     }
 
+  let archive_cmd_args ~postgres_connection_uri ~server_port
+      ~runtime_config_path =
+    "run"
+    :: Mina_automation_args.Archive_args.to_list
+         { (Mina_automation_args.Archive_args.create
+              ~postgres_uri:postgres_connection_uri ~server_port )
+           with
+           config_file = runtime_config_path
+         }
+
+  let%test_unit "archive_cmd_args keeps the archive arguments" =
+    let actual =
+      archive_cmd_args ~postgres_connection_uri:"postgres://db"
+        ~server_port:3086 ~runtime_config_path:(Some "/cfg.json")
+    in
+    let expected =
+      [ "run"
+      ; "-postgres-uri"
+      ; "postgres://db"
+      ; "-server-port"
+      ; "3086"
+      ; "-config-file"
+      ; "/cfg.json"
+      ]
+    in
+    if not (List.equal String.equal actual expected) then
+      failwithf "unexpected archive args: %s" (String.concat ~sep:" " actual) ()
+
   (* Archive nodes run the [mina-archive] binary, whose CLI does NOT accept the
-     daemon's flags (client/rest/external/metrics ports, libp2p keypair, etc.).
-     Build the command line directly here, mirroring
-     [integration_test_docker_engine]'s [Archive_node_config.create_cmd]:
-     [mina-archive run -postgres-uri ... -server-port ...] plus an optional
-     [-config-file]. *)
+     daemon's flags (client/rest/external/metrics ports, libp2p keypair, etc.). *)
   let build_archive_node_config ~working_dir ~service_name ~ports
       ~runtime_config_path ~mina_archive_binary ~postgres_connection_uri
       ~server_port =
@@ -375,22 +399,10 @@ module Network_manager = struct
       create_node_config_dir ~working_dir ~node_name:service_name
     in
     let libp2p_key_path = config_dir ^/ "libp2p_key" in
-    let base_args =
-      [ "run"
-      ; "-postgres-uri"
-      ; postgres_connection_uri
-      ; "-server-port"
-      ; Int.to_string server_port
-      ]
+    let cmd_args =
+      archive_cmd_args ~postgres_connection_uri ~server_port
+        ~runtime_config_path
     in
-    let config_file_args =
-      match runtime_config_path with
-      | Some path ->
-          [ "-config-file"; path ]
-      | None ->
-          []
-    in
-    let cmd_args = List.concat [ base_args; config_file_args ] in
     let log_file = working_dir ^/ service_name ^ ".log" in
     { Native_network.Node.config =
         { network_keypair = None
