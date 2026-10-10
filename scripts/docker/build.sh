@@ -26,7 +26,16 @@ source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 # variable, so one trap cleans up whichever branch ran -- including on the early
 # `exit 1` paths and on a failed docker build, where a tail-of-script rm would be
 # skipped and leak the file. Expands to a no-op rm when no temp file was made.
-trap 'rm -f "${TEMP_DOCKERFILE:-}"' EXIT
+#
+# The same trap removes a half-written cache archive, and the job-private tag
+# of the base image (see --base-cache-dir).
+cleanup () {
+  rm -f "${TEMP_DOCKERFILE:-}" "${PARTIAL_ARCHIVE:-}"
+  if [[ -n "${JOB_BASE_REF:-}" ]]; then
+    docker rmi "${JOB_BASE_REF}" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -51,6 +60,7 @@ function usage() {
   echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
+  echo "      --owned-refs-file     (Optional) Append the local image refs this run created to the file, for remove-owned-images.sh"
   echo "      --image-ref-file      (Optional) Write the local image ID (sha256:...) of the built image to this file"
   echo "      --build-cache-dir     (Optional) Save the image, with the tags it is published under, to <dir>/<service>/<tag>.tar.zst"
   echo "      --base-cache-dir      (Optional) Load the -generic base of a layered image from <dir>/<image>/<tag>.tar.zst when it is not local"
@@ -89,6 +99,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --image-ref-file) IMAGE_REF_FILE="$2"; shift;;
   --build-cache-dir) BUILD_CACHE_DIR="$2"; shift;;
   --base-cache-dir) BASE_CACHE_DIR="$2"; shift;;
+  --owned-refs-file) OWNED_REFS_FILE="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --custom-suffix) export CUSTOM_SUFFIX="$2"; shift;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
@@ -471,24 +482,38 @@ if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCK
     # --base-cache-dir: the base was built in this release and never pushed,
     # so it comes from the build cache (see --build-cache-dir) unless this
     # agent already has it.
-    if [[ -n "${BASE_CACHE_DIR:-}" ]] && ! docker image inspect "${_dep_ref}" >/dev/null 2>&1; then
+    #
+    # The FROM names a tag private to this job, not the shared one: a job of
+    # the same build on this agent that loaded the base removes the shared tag
+    # when it ends (see --owned-refs-file). If that happens between the check
+    # and the tag below, load the base again.
+    if [[ -n "${BASE_CACHE_DIR:-}" ]]; then
       _dep_archive="${BASE_CACHE_DIR}/${_dep_image_name}/${_dep_tag}.tar.zst"
-      if [[ ! -f "${_dep_archive}" ]]; then
-        echo "ERROR: base image ${_dep_ref} is neither local nor in the build cache at ${_dep_archive}"
-        exit 1
+      _job_repo="job-${BUILDKITE_JOB_ID:-$$}"
+      if ! docker image inspect "${_dep_ref}" >/dev/null 2>&1 \
+        || ! docker tag "${_dep_ref}" "${_job_repo}/${_dep_image_name}:${_dep_tag}" 2>/dev/null; then
+        if [[ ! -f "${_dep_archive}" ]]; then
+          echo "ERROR: base image ${_dep_ref} is neither local nor in the build cache at ${_dep_archive}"
+          exit 1
+        fi
+        ensure_zstd
+        echo "Loading base image ${_dep_ref} from ${_dep_archive}"
+        zstd -dc "${_dep_archive}" | docker load
+        docker tag "${_dep_ref}" "${_job_repo}/${_dep_image_name}:${_dep_tag}"
+        if [[ -n "${OWNED_REFS_FILE:-}" ]]; then
+          echo "${_dep_ref}" >> "${OWNED_REFS_FILE}"
+        fi
       fi
-      ensure_zstd
-      echo "Loading base image ${_dep_ref} from ${_dep_archive}"
-      zstd -dc "${_dep_archive}" | docker load
-    fi
-    if docker image inspect "${_dep_ref}" >/dev/null 2>&1; then
+      JOB_BASE_REF="${_job_repo}/${_dep_image_name}:${_dep_tag}"
+      DOCKER_REPO_ARG="--build-arg docker_repo=${_job_repo}"
+    elif docker image inspect "${_dep_ref}" >/dev/null 2>&1; then
       # A local base must not be redirected through gar-cache.
       DOCKER_REPO_ARG="--build-arg docker_repo=${DOCKER_REGISTRY}"
     else
       _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
       DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
     fi
-    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _dep_ref _dep_archive _rewritten_repo
+    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _dep_ref _dep_archive _job_repo _rewritten_repo
 fi
 
 # FORCE_DOCKER_OVERWRITE — when set (to any non-empty value), allows pushing a
@@ -524,6 +549,10 @@ docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG
 # local image store is not stable on agents shared between concurrent jobs.
 docker tag "$TAG" "$HASHTAG"
 
+if [[ -n "${OWNED_REFS_FILE:-}" ]]; then
+  printf '%s\n' "$TAG" "$HASHTAG" >> "${OWNED_REFS_FILE}"
+fi
+
 # The ID, not a tag: a tag in a daemon shared with concurrent jobs can be
 # re-pointed by another build of the same tag.
 if [[ -n "${IMAGE_REF_FILE:-}" ]]; then
@@ -541,7 +570,10 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
   mkdir -p "$(dirname "${FULL_IMAGE_PATH}")"
   echo "Saving built image to CI cache at ${FULL_IMAGE_PATH}"
-  docker save "$TAG" "$HASHTAG" | zstd -T0 -3 > "${FULL_IMAGE_PATH}"
+  # Write then rename: a reader never sees a partial archive.
+  PARTIAL_ARCHIVE="${FULL_IMAGE_PATH}.partial.$$"
+  docker save "$TAG" "$HASHTAG" | zstd -T0 -3 > "${PARTIAL_ARCHIVE}"
+  mv -f "${PARTIAL_ARCHIVE}" "${FULL_IMAGE_PATH}"
 fi
 
 # --build-cache-dir: the image as the publish stage will push it. Named by its
@@ -557,8 +589,9 @@ if [[ -n "${BUILD_CACHE_DIR:-}" ]]; then
   mkdir -p "$(dirname "${BUILD_CACHE_PATH}")"
   echo "Saving ${PUBLISH_TAGS[*]} to ${BUILD_CACHE_PATH}"
   # Write then rename: a reader never sees a partial archive.
-  docker save "${PUBLISH_TAGS[@]}" | zstd -T0 -3 > "${BUILD_CACHE_PATH}.partial.$$"
-  mv -f "${BUILD_CACHE_PATH}.partial.$$" "${BUILD_CACHE_PATH}"
+  PARTIAL_ARCHIVE="${BUILD_CACHE_PATH}.partial.$$"
+  docker save "${PUBLISH_TAGS[@]}" | zstd -T0 -3 > "${PARTIAL_ARCHIVE}"
+  mv -f "${PARTIAL_ARCHIVE}" "${BUILD_CACHE_PATH}"
 fi
 
 if [[ "$DOCKER_ACTION" == "push" ]]; then
