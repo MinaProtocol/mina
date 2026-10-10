@@ -540,24 +540,38 @@ module Archive_node_config = struct
     ; target = Base_node_config.container_entrypoint_path
     }
 
-  let create_cmd config =
-    let base_args =
+  let cmd ~postgres_uri ~server_port ~runtime_config_path =
+    "mina-archive" :: "run"
+    :: Mina_automation_args.Archive_args.to_list
+         { (Mina_automation_args.Archive_args.create ~postgres_uri ~server_port) with
+           config_file = runtime_config_path
+         }
+
+  let%test_unit "cmd keeps the archive arguments" =
+    let actual =
+      cmd ~postgres_uri:"postgres://db" ~server_port:3086
+        ~runtime_config_path:(Some "/cfg.json")
+    in
+    let expected =
       [ "mina-archive"
       ; "run"
       ; "-postgres-uri"
-      ; Postgres_config.to_connection_uri config.postgres_config.config
+      ; "postgres://db"
       ; "-server-port"
-      ; Int.to_string config.server_port
+      ; "3086"
+      ; "-config-file"
+      ; "/cfg.json"
       ]
     in
-    let runtime_config_path =
-      match config.base_config.runtime_config_path with
-      | Some path ->
-          [ "-config-file"; path ]
-      | None ->
-          []
-    in
-    List.concat [ base_args; runtime_config_path ]
+    if not (List.equal String.equal actual expected) then
+      failwithf "unexpected archive args: %s" (String.concat ~sep:" " actual) ()
+
+  let create_cmd config =
+    cmd
+      ~postgres_uri:
+        (Postgres_config.to_connection_uri config.postgres_config.config)
+      ~server_port:config.server_port
+      ~runtime_config_path:config.base_config.runtime_config_path
 
   let create_docker_config ~image ~entrypoint ~ports ~volumes ~environment
       ~config =
