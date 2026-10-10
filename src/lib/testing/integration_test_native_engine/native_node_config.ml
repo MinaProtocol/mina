@@ -11,38 +11,11 @@ module Node_ports = struct
 end
 
 module PortManager = struct
-  type t = { mutable available_ports : int list }
+  type t = Mina_automation_process.Ports.t
 
-  let create ~min_port ~max_port =
-    { available_ports = List.range min_port max_port }
+  let create = Mina_automation_process.Ports.create
 
-  (* [port_is_free port] is true when a TCP socket can bind [port] on the
-     loopback address. Anything already listening there (a daemon leaked by an
-     earlier run, a host service) makes the bind fail. The socket is closed
-     again at once, so another process can still take the port before the
-     node binds it. *)
-  let port_is_free port =
-    let socket =
-      Core.Unix.socket ~domain:PF_INET ~kind:SOCK_STREAM ~protocol:0 ()
-    in
-    Exn.protect
-      ~f:(fun () ->
-        try
-          Core.Unix.setsockopt socket SO_REUSEADDR true ;
-          Core.Unix.bind socket
-            ~addr:(ADDR_INET (Core.Unix.Inet_addr.localhost, port)) ;
-          true
-        with Core.Unix.Unix_error _ -> false )
-      ~finally:(fun () -> Core.Unix.close socket)
-
-  (** Allocate the next port in the range that is free now. *)
-  let rec allocate_port t =
-    match t.available_ports with
-    | [] ->
-        failwith "No available ports"
-    | port :: rest ->
-        t.available_ports <- rest ;
-        if port_is_free port then port else allocate_port t
+  let allocate_port = Mina_automation_process.Ports.allocate
 
   (** Allocate 4 ports for a mina node: rest, client, metrics, external *)
   let allocate_ports_for_node t =

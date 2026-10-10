@@ -42,6 +42,7 @@
   ;; local libraries
   key_gen
   integration_test_lib
+  mina_automation.process
   graphql_lib
   mina_runtime_config
   mina_base
