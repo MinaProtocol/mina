@@ -43,7 +43,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules logic sql utils change_plan)
+ (modules logic sql utils)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
