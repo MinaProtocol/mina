@@ -16,25 +16,11 @@ module PortManager = struct
 
   let postgres_internal_port = 5432
 
-  type t =
-    { mutable available_ports : int list
-    ; mutable used_ports : int list
-    ; min_port : int
-    ; max_port : int
-    }
+  type t = Mina_automation_process.Ports.t
 
-  let create ~min_port ~max_port =
-    let available_ports = List.range min_port max_port in
-    { available_ports; used_ports = []; min_port; max_port }
+  let create = Mina_automation_process.Ports.create
 
-  let allocate_port t =
-    match t.available_ports with
-    | [] ->
-        failwith "No available ports"
-    | port :: rest ->
-        t.available_ports <- rest ;
-        t.used_ports <- port :: t.used_ports ;
-        port
+  let allocate_port = Mina_automation_process.Ports.allocate
 
   let allocate_ports_for_node t =
     let rest_port_source = allocate_port t in
@@ -46,13 +32,6 @@ module PortManager = struct
     ; { published = client_port_source; target = mina_internal_client_port }
     ; { published = metrics_port_source; target = mina_internal_metrics_port }
     ]
-
-  let release_port t port =
-    t.used_ports <- List.filter t.used_ports ~f:(fun p -> p <> port) ;
-    t.available_ports <- port :: t.available_ports
-
-  let get_latest_used_port t =
-    match t.used_ports with [] -> failwith "No used ports" | port :: _ -> port
 end
 
 module Base_node_config = struct

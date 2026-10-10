@@ -34,6 +34,7 @@
   yojson
   ;; local libraries
   integration_test_lib
+  mina_automation.process
   mina_runtime_config
   mina_base
   genesis_constants
