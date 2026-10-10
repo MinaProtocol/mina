@@ -56,7 +56,7 @@ module Paths = struct
   let official_name = "mina-extract-blocks"
 end
 
-module Executor = Executor.Make (Paths)
+module Executor = Mina_automation_process.Executor.Make (Paths)
 
 type t = Executor.t
 

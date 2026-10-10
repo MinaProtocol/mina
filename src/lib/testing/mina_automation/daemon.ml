@@ -12,7 +12,7 @@ module Paths = struct
   let official_name = "mina"
 end
 
-module Executor = Executor.Make (Paths)
+module Executor = Mina_automation_process.Executor.Make (Paths)
 
 let logger = Logger.create ()
 
@@ -173,7 +173,7 @@ module Process = struct
     @param t The daemon instance containing the process to be killed.
     @return A deferred result indicating the success or failure of the operation.
   *)
-  let force_kill t = Utils.force_kill t.process
+  let force_kill t = Mina_automation_process.Host.force_kill t.process
 end
 
 let expected_init_event_id =

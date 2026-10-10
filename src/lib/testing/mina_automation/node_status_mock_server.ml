@@ -25,7 +25,7 @@ module Paths = struct
   let official_name = "mina-node-status-mock-server"
 end
 
-module Executor = Executor.Make (Paths)
+module Executor = Mina_automation_process.Executor.Make (Paths)
 
 (* ------------------------------------------------------------------
    HTTP helpers — thin wrappers around [Cohttp_async.Client].
@@ -113,6 +113,6 @@ let collected_status ~port =
 
 (** [stop t] kills the mock-server process. *)
 let stop t =
-  let%map result = Utils.force_kill t.process in
+  let%map result = Mina_automation_process.Host.force_kill t.process in
   let (_ : [> `Exited of int | `Sig_killed ]) = Or_error.ok_exn result in
   ()

@@ -56,7 +56,7 @@ Usability module for running any application published as a docker.
 Example of usage:
 
 ```
-  open Mina_automation
+  open Mina_automation_process
 
   let client = Docker.Client.default in
   let logs = Docker.Client.run_cmd_in_image t ~image:"gcr.io....-mina-archive-blocks" ~cmd:"mina-archive blocks ..." ~workdir:"/workdir" ~volume:"/home/darek/work/mina:/workdir" ~network:"localhost" 

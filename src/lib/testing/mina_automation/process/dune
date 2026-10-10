@@ -10,8 +10,9 @@
   core_kernel
   ;; local libraries
   logger
-  timeout_lib)
+  timeout_lib
+  yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane)))
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson)))
