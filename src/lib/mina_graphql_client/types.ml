@@ -13,6 +13,7 @@ type best_chain_block =
   ; height : Mina_numbers.Length.t
   ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
   ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
+  ; timestamp : Block_time.t  (** utcDate of the block *)
   }
 
 type account_data =

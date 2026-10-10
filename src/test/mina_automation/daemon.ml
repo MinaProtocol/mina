@@ -50,6 +50,14 @@ module Client = struct
     in
     ()
 
+  (** [status t] is [mina client status --json]; it does not fail when the
+      daemon does not answer, the output says so instead. *)
+  let status t =
+    Executor.run t.executor ~ignore_failure:true
+      ~args:
+        [ "client"; "status"; "--json"; "-daemon-port"; sprintf "%d" t.port ]
+      ()
+
   let ledger_hash t ~ledger_file =
     Executor.run t.executor
       ~args:[ "ledger"; "hash"; "--ledger-file"; ledger_file ]
@@ -130,13 +138,15 @@ module Config = struct
     let mina_log t = t.conf ^/ "mina.log"
   end
 
+  (** [config], [runtime_config] and [genesis_ledger] are [None] for a daemon
+      that gets its runtime config from a file (see [of_dirs]). *)
   type t =
     { client_port : int
     ; rest_port : int
     ; dirs : ConfigDirs.t
-    ; config : Test_config.t
-    ; runtime_config : Runtime_config.t
-    ; genesis_ledger : Genesis_ledger.t
+    ; config : Test_config.t option
+    ; runtime_config : Runtime_config.t option
+    ; genesis_ledger : Genesis_ledger.t option
     }
 
   let create ?(client_port = 8031) ?(rest_port = 3085) ~(dirs : ConfigDirs.t)
@@ -150,7 +160,26 @@ module Config = struct
       (dirs.conf ^/ "daemon.json")
       (Runtime_config.to_yojson runtime_config) ;
 
-    { client_port; rest_port; dirs; config; runtime_config; genesis_ledger }
+    { client_port
+    ; rest_port
+    ; dirs
+    ; config = Some config
+    ; runtime_config = Some runtime_config
+    ; genesis_ledger = Some genesis_ledger
+    }
+
+  (** [of_dirs ~dirs ()] is a config that writes no runtime config: the
+      daemon is given one with [Daemon.start ~config_files], e.g. a network's
+      genesis_ledgers/<network>.json. *)
+  let of_dirs ?(client_port = 8031) ?(rest_port = 3085) ~(dirs : ConfigDirs.t)
+      () =
+    { client_port
+    ; rest_port
+    ; dirs
+    ; config = None
+    ; runtime_config = None
+    ; genesis_ledger = None
+    }
 
   let default () =
     create ~dirs:ConfigDirs.default
@@ -259,30 +288,35 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
+(** [seed], [demo_mode] and [external_ip] default to a standalone test node;
+    a daemon that joins a network passes [~seed:false ~demo_mode:false
+    ?external_ip:None] and a [peer_list_file]. *)
 let start ?hardfork_handling ?block_producer_key ?config_files ?env
-    ?peer_list_url ?node_status_url ?node_error_url ?simplified_node_stats
+    ?peer_list_url ?peer_list_file ?node_status_url ?node_error_url
+    ?simplified_node_stats ?archive_address ?log_level ?(seed = true)
+    ?(demo_mode = true) ?(external_ip = Some "0.0.0.0")
     ?(start_filtered_logs = default_init_log_filters) t =
   let open Deferred.Let_syntax in
   let base_args =
-    [ "daemon"
-    ; "--seed"
-    ; "--demo-mode"
-    ; "--insecure-rest-server"
-    ; "--working-dir"
-    ; "."
-    ; "--client-port"
-    ; string_of_int t.config.client_port
-    ; "--rest-port"
-    ; string_of_int t.config.rest_port
-    ; "--config-directory"
-    ; t.config.dirs.conf
-    ; "--genesis-ledger-dir"
-    ; t.config.dirs.genesis
-    ; "--external-ip"
-    ; "0.0.0.0"
-    ; "--libp2p-keypair"
-    ; Config.libp2p_keypair_folder t.config
-    ]
+    [ "daemon" ]
+    @ (if seed then [ "--seed" ] else [])
+    @ (if demo_mode then [ "--demo-mode" ] else [])
+    @ [ "--insecure-rest-server"
+      ; "--working-dir"
+      ; "."
+      ; "--client-port"
+      ; string_of_int t.config.client_port
+      ; "--rest-port"
+      ; string_of_int t.config.rest_port
+      ; "--config-directory"
+      ; t.config.dirs.conf
+      ; "--genesis-ledger-dir"
+      ; t.config.dirs.genesis
+      ; "--libp2p-keypair"
+      ; Config.libp2p_keypair_folder t.config
+      ]
+    @ Option.value_map external_ip ~default:[] ~f:(fun ip ->
+          [ "--external-ip"; ip ] )
   in
   let opt_arg key value_opt =
     match value_opt with None -> [] | Some value -> [ key; value ]
@@ -316,6 +350,9 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     @ bool_flag "--simplified-node-stats" simplified_node_stats
     @ config_file_args
     @ opt_arg "--peer-list-url" peer_list_url
+    @ opt_arg "--peer-list-file" peer_list_file
+    @ opt_arg "--archive-address" archive_address
+    @ opt_arg "--log-level" log_level
     @ start_filtered_log_args
   in
   [%log debug] "Starting daemon" ;

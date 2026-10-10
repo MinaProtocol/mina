@@ -1,0 +1,21 @@
+(executable
+ (name rosetta_connectivity_test)
+ (modes native)
+ (libraries
+  ;; opam libraries
+  core
+  async
+  async_kernel
+  async_unix
+  async.async_command
+  uri
+  ;; local libraries
+  block_time
+  logger
+  mina_automation
+  mina_graphql_client
+  rosetta_load)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

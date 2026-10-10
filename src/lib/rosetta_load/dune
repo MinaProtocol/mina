@@ -1,0 +1,23 @@
+(library
+ (name rosetta_load)
+ (public_name rosetta_load)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  async
+  async_kernel
+  async_unix
+  async.async_command
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  uri
+  yojson
+  ;; local libraries
+  mina_caqti
+  rosetta_client)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

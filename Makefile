@@ -232,6 +232,7 @@ build-mina: ocaml_checks reformat-diff libp2p_helper build ## Build mina apps
 		src/app/rosetta/ocaml-signer/signer.exe \
 		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
 		src/app/rosetta/client/rosetta_client_cli.exe \
+		src/app/rosetta/load/rosetta_load_cli.exe \
 		&& echo "✅ Build complete"
 
 .PHONY: build-archive
@@ -270,6 +271,7 @@ build-test-utils: ocaml_checks reformat-diff ## Build test utilities
 		src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
 		src/app/rosetta/indexer_test/indexer_test.exe \
 		src/app/rosetta/search_test/rosetta_search_test.exe \
+		src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe \
 		src/app/ledger_export_bench/ledger_export_benchmark.exe \
 		src/app/disk_caching_stats/disk_caching_stats.exe \
 		src/app/heap_usage/heap_usage.exe \
@@ -301,6 +303,7 @@ build-rosetta: ocaml_checks ## Build Rosetta API components
 		src/app/rosetta/ocaml-signer/signer.exe \
 		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
 		src/app/rosetta/client/rosetta_client_cli.exe \
+		src/app/rosetta/load/rosetta_load_cli.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 

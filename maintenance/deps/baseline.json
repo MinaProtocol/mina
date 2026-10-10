@@ -122,6 +122,10 @@
       "libs": 4,
       "opam": 11
     },
+    "exe:app/rosetta/load:rosetta_load_cli": {
+      "libs": 108,
+      "opam": 39
+    },
     "exe:app/rosetta/ocaml-signer:signer": {
       "libs": 206,
       "opam": 54
@@ -257,6 +261,10 @@
     "exe:test/node_status_mock_server:node_status_mock_server": {
       "libs": 0,
       "opam": 6
+    },
+    "exe:test/rosetta_connectivity_test:rosetta_connectivity_test": {
+      "libs": 250,
+      "opam": 65
     }
   },
   "opam_packages": [
