@@ -190,6 +190,16 @@ let generateStep =
 
           let imageRefFile = "docker-image-id"
 
+          let ownedRefsFile =
+              -- The images this job built or loaded. The EXIT trap removes
+              -- them from the agent after the verify, and also when the job
+              -- fails; disk-cleanup.sh keeps every tagged image.
+                "docker-owned-refs"
+
+          let removeOwnedImages =
+                    "trap './buildkite/scripts/docker/remove-owned-images.sh ${ownedRefsFile}' EXIT"
+                ++  " && "
+
           let verifies =
               -- The check runs on the image this step built, never a pulled
               -- one, so it does not depend on the image being pushed.
@@ -307,10 +317,12 @@ let generateStep =
                       , None = ""
                       }
                       spec.base_cache_dir
+                ++  " --owned-refs-file ${ownedRefsFile}"
 
           let commands =
                 [ Cmd.run
-                    (     exportMinaDebCmd
+                    (     removeOwnedImages
+                      ++  exportMinaDebCmd
                       ++  " && "
                       ++  exportBranchNameCmd
                       ++  " && "
