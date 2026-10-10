@@ -2,7 +2,6 @@
 Core module to run any defined app on various contexts
 *)
 
-open Mina_automation_process
 open Core_kernel
 open Async
 
@@ -50,7 +49,7 @@ module Make_PathFinder (P : AppPaths) = struct
         Deferred.return (Some built_name)
     | _ -> (
         match%bind
-          Deferred.List.find_map ~f:(exists_at_path P.official_name) Utils.paths
+          Deferred.List.find_map ~f:(exists_at_path P.official_name) Host.paths
         with
         | Some _ ->
             Deferred.return (Some P.official_name)
@@ -132,7 +131,7 @@ module Make (P : AppPaths) = struct
             match%bind
               Deferred.List.find_map
                 ~f:(PathFinder.exists_at_path PathFinder.Paths.official_name)
-                Utils.paths
+                Host.paths
             with
             | Some prefix ->
                 f_debian ~args ~prefix ?env ()

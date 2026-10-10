@@ -69,7 +69,7 @@ module Paths = struct
   let official_name = "mina-replayer"
 end
 
-module Executor = Executor.Make (Paths)
+module Executor = Mina_automation_process.Executor.Make (Paths)
 
 let default = Executor.AutoDetect
 
