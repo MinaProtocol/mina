@@ -6,8 +6,8 @@
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
 --       deliberately when a newer toolkit is wanted. minaReleaseToolkitVersion
---       must match it: the same version's release .deb provides release-manager
---       on the agent host (buildkite/scripts/release/release-manager.sh).
+--       must match it: buildkite/scripts/toolkit.sh reads it to fetch the same
+--       version's release .deb (pin its sha256 there when bumping).
 -- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
 --       built from THIS branch: develop's pins carry v0.14 and will not build
 --       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
@@ -62,6 +62,6 @@
 , postgres = "docker.io/library/postgres:17-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "docker.io/minaprotocol/nixos:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.6"
-, minaReleaseToolkitVersion = "0.0.6"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.7"
+, minaReleaseToolkitVersion = "0.0.7"
 }

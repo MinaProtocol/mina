@@ -64,7 +64,7 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-if ! ./buildkite/scripts/cache/manager.sh read "$SRC" "$TMP_DIR" >&2; then
+if ! ./buildkite/scripts/toolkit.sh buildkite-cache-manager read "$SRC" "$TMP_DIR" >&2; then
   echo "restore_app: ${SRC} not found in cache" >&2
   exit 1
 fi
