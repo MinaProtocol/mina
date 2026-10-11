@@ -16,7 +16,7 @@ module Paths = struct
   let official_name = "mina-healthcheck"
 end
 
-module Executor = Executor.Make (Paths)
+module Executor = Mina_automation_process.Executor.Make (Paths)
 
 (** Result for binary checks that only report pass/fail. *)
 type check_result = { healthy : bool; exit_code : int }

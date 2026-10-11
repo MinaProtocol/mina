@@ -2,21 +2,6 @@ open Mina_automation_process
 open Async
 open Core
 
-let paths =
-  Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH")
-
-let possible_locations ~file possible_locations =
-  let exists_at_path folder file =
-    match Sys.file_exists (folder ^/ file) with
-    | `Yes ->
-        Some (folder ^/ file)
-    | _ ->
-        None
-  in
-
-  possible_locations @ paths
-  |> List.find_map ~f:(fun folder -> exists_at_path folder file)
-
 let wget ~url ~target = Cmd.run_cmd_exn "." "wget" [ "-c"; url; "-O"; target ]
 
 let sed ~search ~replacement ~input =
@@ -41,18 +26,6 @@ let dedup_and_sort_archive_files files : string list =
   files
   |> List.dedup_and_sort ~compare:(fun left right ->
          precomputed_blocks_comparator left right )
-
-let force_kill process =
-  Process.send_signal process Core.Signal.kill ;
-  match%map Process.wait process with
-  | Ok () ->
-      Ok (`Exited 0)
-  | Error (`Exit_non_zero exit_code) ->
-      Ok (`Exited exit_code)
-  | Error (`Signal signal) when Signal.(equal signal kill) ->
-      Ok `Sig_killed
-  | Error (`Signal signal) ->
-      Or_error.errorf "Process exited with signal %s" (Signal.to_string signal)
 
 (** [get_memory_usage_mib pid] retrieves the memory usage in mebibytes for the process
   with the given [pid].

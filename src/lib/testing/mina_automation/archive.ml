@@ -36,7 +36,7 @@ module Paths = struct
 end
 
 module Scripts = Archive_scripts
-module Executor = Executor.Make (Paths)
+module Executor = Mina_automation_process.Executor.Make (Paths)
 
 type t = { config : Config.t; executor : Executor.t }
 
@@ -53,7 +53,7 @@ module Process = struct
     @param t The process to be killed.
     @return A deferred result indicating the success or failure of the operation.
   *)
-  let force_kill t = Utils.force_kill t.process
+  let force_kill t = Mina_automation_process.Host.force_kill t.process
 
   (** [start_logging t ~log_file] starts logging the stdout of the given process [t].
     It creates a logger and asynchronously iterates over the stdout pipe of the process,
