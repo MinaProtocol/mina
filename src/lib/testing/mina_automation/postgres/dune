@@ -1,0 +1,17 @@
+(library
+ (name mina_automation_postgres)
+ (public_name mina_automation.postgres)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  uri
+  ;; mina libraries
+  mina_automation.process)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
