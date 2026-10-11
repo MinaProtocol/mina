@@ -16,22 +16,8 @@ module Credentials = struct
     }
 end
 
-let create_db_script () =
-  match%bind Sys.file_exists "src/app/archive/create_schema.sql" with
-  | `Yes ->
-      Deferred.return "src/app/archive/create_schema.sql"
-  | _ -> (
-      match%bind
-        Sys.file_exists "_build/default/src/archive/create_schema.sql"
-      with
-      | `Yes ->
-          Deferred.return "_build/default/src/archive/create_schema.sql"
-      | _ -> (
-          match%bind Sys.file_exists "/etc/mina/archive/create_schema.sql" with
-          | `Yes ->
-              Deferred.return "/etc/mina/archive/create_schema.sql"
-          | _ ->
-              failwith "cannot find create db script" ) )
+(** The archive schema script of the code under test. *)
+let create_db_script () = Archive_scripts.find `CreateSchema >>| Or_error.ok_exn
 
 type connection = Conn_str of string | Credentials of Credentials.t
 
