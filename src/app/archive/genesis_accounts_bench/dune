@@ -25,5 +25,7 @@
   mina_ledger
   precomputed_values
   runtime_config)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane ppx_mina)))
