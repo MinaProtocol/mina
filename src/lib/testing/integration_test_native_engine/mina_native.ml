@@ -229,6 +229,38 @@ module Network_manager = struct
      different in each profile. [MINA_CONFIG_FILE] points at a file that does
      not exist, so the binary reports its profile defaults and does not read a
      daemon.json from the home directory. *)
+  (* Nodes run with their config directory as working directory, so each
+     binary is resolved once, here: a path becomes absolute, a bare name is
+     looked up on [PATH]. *)
+  let resolve_binary ~cwd name =
+    if String.mem name '/' then
+      let path = if Filename.is_relative name then cwd ^/ name else name in
+      match Core.Sys.file_exists path with
+      | `Yes ->
+          Ok path
+      | `No | `Unknown ->
+          Or_error.errorf "binary %s does not exist" path
+    else
+      match Mina_automation_process.Host.possible_locations ~file:name [] with
+      | Some path ->
+          Ok path
+      | None ->
+          Or_error.errorf "binary %s is not on PATH" name
+
+  let%test_unit "resolve_binary" =
+    let ok = function Ok p -> p | Error e -> Error.raise e in
+    let file = Core.Filename.temp_file "resolve_binary" "" in
+    let dir = Filename.dirname file and base = Filename.basename file in
+    assert (String.equal (ok (resolve_binary ~cwd:"/x" file)) file) ;
+    assert (
+      String.equal
+        (ok (resolve_binary ~cwd:dir ("./" ^ base)))
+        (dir ^/ "./" ^ base) ) ;
+    assert (String.is_suffix (ok (resolve_binary ~cwd:"/x" "sh")) ~suffix:"/sh") ;
+    assert (Result.is_error (resolve_binary ~cwd:"/x" "no/such/binary")) ;
+    assert (Result.is_error (resolve_binary ~cwd:"/x" "no-such-binary-xyz")) ;
+    Core.Unix.unlink file
+
   let check_binary_profile ~logger ~working_dir ~mina_binary =
     let open Malleable_error.Let_syntax in
     let (module G) = Genesis_constants.profiled () in
@@ -301,6 +333,22 @@ module Network_manager = struct
       setup_working_dir ~logger ~working_dir ~network_config
     in
     let%bind.Deferred () = write_keys ~logger ~working_dir ~network_config in
+    let%bind network_config =
+      let cwd = Core.Sys.getcwd () in
+      let local = network_config.local in
+      let%bind mina_binary =
+        Malleable_error.or_hard_error (resolve_binary ~cwd local.mina_binary)
+      in
+      let%map mina_archive_binary =
+        if network_config.num_archive_nodes > 0 then
+          Malleable_error.or_hard_error
+            (resolve_binary ~cwd local.mina_archive_binary)
+        else Malleable_error.return local.mina_archive_binary
+      in
+      { network_config with
+        local = { local with mina_binary; mina_archive_binary }
+      }
+    in
     let%bind () =
       check_binary_profile ~logger ~working_dir
         ~mina_binary:network_config.local.mina_binary
