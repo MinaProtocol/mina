@@ -103,7 +103,7 @@ cp "${built_debs[@]}" "${DEB_STAGE}/"
 LEGACY_ARG=()
 if [[ -n "$LEGACY_VERSION" ]]; then
   echo "--- Reading legacy (prefork) debian packages from the CI cache"
-  ./buildkite/scripts/cache/manager.sh read --root legacy/debians \
+  ./buildkite/scripts/toolkit.sh buildkite-cache-manager read --root legacy/debians \
     "${MINA_DEB_CODENAME}/*" "${DEB_STAGE}"
   LEGACY_ARG=(--deb-legacy-version "$LEGACY_VERSION")
 fi

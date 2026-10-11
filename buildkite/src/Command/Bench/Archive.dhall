@@ -33,7 +33,7 @@ let makeArchiveBench =
                   [ { name = "ArchiveNodeTest", key = "archive-node-test" } ]
                 , preCommands =
                   [ Cmd.run
-                      "./buildkite/scripts/cache/manager.sh read archive-node-test/archive.perf ."
+                      "./buildkite/scripts/toolkit.sh buildkite-cache-manager read archive-node-test/archive.perf ."
                   ]
                 , scope = scope
                 , extraArgs = "--input-file archive.perf"

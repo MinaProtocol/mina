@@ -3,7 +3,7 @@
 # Where a test gets the .deb files it exercises.
 #
 # Sourced, not executed. Provides two functions that every deb-consuming test
-# should use instead of calling `cache/manager.sh read` directly:
+# should use instead of calling `buildkite-cache-manager read` directly:
 #
 #   fetch_deb <dest-dir> <cache-path-glob>
 #   fetch_legacy_deb <dest-dir> <cache-path-glob>
@@ -55,12 +55,12 @@ fetch_deb() {
     if [[ -n "${LOCAL_DEB_SOURCE_DIR:-}" ]]; then
         _fetch_deb_local "$dest" "$pattern"
     else
-        ./buildkite/scripts/cache/manager.sh read --root "${ROOT:-${BUILDKITE_BUILD_ID}}" "$pattern" "$dest"
+        ./buildkite/scripts/toolkit.sh buildkite-cache-manager read --root "${ROOT:-${BUILDKITE_BUILD_ID}}" "$pattern" "$dest"
     fi
 }
 
 fetch_legacy_deb() {
     local dest="$1" pattern="$2"
 
-    ./buildkite/scripts/cache/manager.sh read --root "legacy" "$pattern" "$dest"
+    ./buildkite/scripts/toolkit.sh buildkite-cache-manager read --root "legacy" "$pattern" "$dest"
 }
