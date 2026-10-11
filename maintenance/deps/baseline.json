@@ -138,6 +138,10 @@
       "libs": 204,
       "opam": 55
     },
+    "exe:app/rosetta/search_test:rosetta_search_test": {
+      "libs": 250,
+      "opam": 64
+    },
     "exe:app/rosetta:rosetta": {
       "libs": 204,
       "opam": 54
