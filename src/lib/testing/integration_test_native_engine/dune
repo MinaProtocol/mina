@@ -35,6 +35,7 @@
   ;; local libraries
   integration_test_lib
   mina_automation.args
+  mina_automation.postgres
   mina_automation.process
   mina_runtime_config
   mina_base

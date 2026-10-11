@@ -185,66 +185,70 @@ module Node = struct
   let postgres_admin_uri uri =
     Uri.with_path (Uri.of_string uri) "/postgres" |> Uri.to_string
 
-  (* Locate the archive schema. Prefer the in-repo copy when the test runs
-     from a source checkout; else use the copy installed by the mina-archive
-     debian package. The path is made absolute, because [psql] runs in [/]. *)
-  let archive_schema_file () =
-    let candidates =
-      [ Core.Sys.getcwd () ^/ "src/app/archive/create_schema.sql"
-      ; "/etc/mina/archive/create_schema.sql"
-      ]
-    in
-    Deferred.List.find candidates ~f:(fun path ->
-        match%map Sys.file_exists path with `Yes -> true | _ -> false )
-
   let provision_archive_db ~logger uri =
     let open Malleable_error.Let_syntax in
-    let db_name = postgres_db_name uri in
-    let admin_uri = postgres_admin_uri uri in
-    [%log info] "Creating archive database %s" db_name ;
+    let db = postgres_db_name uri in
+    let admin =
+      Mina_automation_postgres.Psql.Conn_str (postgres_admin_uri uri)
+    in
+    let lift d = Deferred.bind d ~f:Malleable_error.or_hard_error in
+    [%log info] "Creating archive database %s" db ;
     let%bind _ =
-      Util.run_cmd_or_hard_error "/" "psql"
-        [ admin_uri
-        ; "-v"
-        ; "ON_ERROR_STOP=1"
-        ; "-c"
-        ; sprintf {|DROP DATABASE IF EXISTS "%s";|} db_name
-        ; "-c"
-        ; sprintf {|CREATE DATABASE "%s";|} db_name
-        ]
+      lift
+        (Mina_automation_postgres.Psql.drop_db_if_exists ~connection:admin ~db)
+    in
+    let%bind _ =
+      lift (Mina_automation_postgres.Psql.create_empty_db ~connection:admin ~db)
     in
     let%bind schema =
-      match%bind.Deferred archive_schema_file () with
-      | Some schema ->
-          Malleable_error.return schema
-      | None ->
-          Malleable_error.hard_error_string
-            "could not locate create_schema.sql to initialise the archive \
-             database"
+      lift (Mina_automation_postgres.Archive_scripts.find `CreateSchema)
     in
-    [%log info] "Loading archive schema %s into database %s" schema db_name ;
-    let%map _ =
-      Util.run_cmd_or_hard_error "/" "psql"
-        [ uri; "-v"; "ON_ERROR_STOP=1"; "-f"; schema ]
-    in
-    ()
+    [%log info] "Loading archive schema %s into database %s" schema db ;
+    lift
+      (Mina_automation_postgres.Psql.run_script_or_error
+         ~connection:(Conn_str uri) schema )
 
   let drop_archive_db ~logger uri =
-    let db_name = postgres_db_name uri in
-    let admin_uri = postgres_admin_uri uri in
-    [%log info] "Dropping archive database %s" db_name ;
+    let db = postgres_db_name uri in
+    [%log info] "Dropping archive database %s" db ;
     match%map.Deferred
-      Monitor.try_with ~here:[%here] (fun () ->
-          Util.run_cmd_exn "/" "psql"
-            [ admin_uri
-            ; "-c"
-            ; sprintf {|DROP DATABASE IF EXISTS "%s";|} db_name
-            ] )
+      Mina_automation_postgres.Psql.drop_db_if_exists
+        ~connection:(Conn_str (postgres_admin_uri uri))
+        ~db
     with
     | Ok _ ->
         ()
     | Error _ ->
-        [%log warn] "Failed to drop archive database %s" db_name
+        [%log warn] "Failed to drop archive database %s" db
+
+  (* Runs only when [MINA_TEST_POSTGRES] names a server URI. *)
+  let%test_unit "provision_archive_db loads the archive schema" =
+    match Core.Sys.getenv "MINA_TEST_POSTGRES" with
+    | None ->
+        ()
+    | Some server ->
+        Thread_safe.block_on_async_exn (fun () ->
+            let logger = Logger.null () in
+            let db =
+              Mina_automation_postgres.Psql.random_db_name
+                ~prefix:"native_engine_test"
+            in
+            let uri = server ^ "/" ^ db in
+            let%bind result = provision_archive_db ~logger uri in
+            let%bind tables =
+              Mina_automation_postgres.Psql.run_command
+                ~connection:(Conn_str uri)
+                "SELECT count(*) FROM information_schema.tables WHERE \
+                 table_schema = 'public'"
+            in
+            let%map () = drop_archive_db ~logger uri in
+            ( match result with
+            | Ok _ ->
+                ()
+            | Error _ ->
+                failwith "provision_archive_db failed" ) ;
+            let tables = Int.of_string (Or_error.ok_exn tables) in
+            if tables = 0 then failwith "no archive tables" )
 
   let recreate_config_dir ~logger ~fresh_state config_dir =
     let%bind.Deferred () =
