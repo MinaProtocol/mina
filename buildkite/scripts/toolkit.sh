@@ -40,12 +40,14 @@ esac
 
 writable_dir() { [[ -d "$1" && -w "$1" ]]; }
 
+# One directory per uid: the host agent and containers (root, opam) share
+# /shared, and one user's copy need not be readable or writable by another.
 if [[ -n "${MINA_RELEASE_TOOLKIT_DIR:-}" ]]; then
   BASE="$MINA_RELEASE_TOOLKIT_DIR"
 elif writable_dir /shared; then
-  BASE=/shared/mina-release-toolkit
+  BASE="/shared/mina-release-toolkit-$(id -u)"
 elif writable_dir /var/buildkite/shared; then
-  BASE=/var/buildkite/shared/mina-release-toolkit
+  BASE="/var/buildkite/shared/mina-release-toolkit-$(id -u)"
 else
   BASE="${XDG_CACHE_HOME:-$HOME/.cache}/mina-release-toolkit"
 fi
