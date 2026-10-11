@@ -6,8 +6,7 @@ against the live chain.
 It only puts tools together:
 
 - `Mina_automation` (`src/test/mina_automation`) fills the archive database
-  (`Archive_db`), and starts and stops the daemon, archive, Rosetta and
-  missing-blocks guardian.
+  (`Archive_db`), and starts and stops the daemon, archive and Rosetta.
 - `Rosetta_load` (`src/lib/rosetta_load`) sends the sanity calls and the load
   run through `Rosetta_client`. The same checks run standalone against any
   Rosetta with `mina-rosetta-load` (`src/app/rosetta/load`).
@@ -17,9 +16,8 @@ It only puts tools together:
 1. **Setup.** It restores the network's newest public dump (at most 5 days
    old) from `mina-archive-dumps` into the database `--postgres-uri` names.
    The caller provides that database, empty, on a running server. Then it
-   starts two Rosetta instances (online and offline), an archive node, a daemon
-   that joins the network, and the missing-blocks guardian. The guardian fills
-   the gap between the dump and the daemon's first block.
+   starts two Rosetta instances (online and offline), an archive node and a
+   daemon that joins the network.
 2. **Sync.** It waits until Rosetta reports `Synced` and the daemon's best tip
    is less than 4 hours old.
 3. **Sanity.** It sends one call per endpoint, about a random canonical
@@ -39,7 +37,7 @@ logs go to `--artifacts-dir`.
 
 Run it from the repository root. Each service binary is taken from
 `_build/default` when it is there, else from `PATH` by its installed name
-(`mina`, `mina-archive`, `mina-rosetta`, `mina-missing-blocks-guardian`).
+(`mina`, `mina-archive`, `mina-rosetta`).
 
 ```sh
 docker run -d --name rosetta-pg -p 127.0.0.1:5433:5432 \
@@ -55,9 +53,7 @@ MINA_PROFILE=devnet \
   --compatibility
 ```
 
-Build with `DUNE_PROFILE=devnet` (or `mainnet`). The guardian needs
-`mina-missing-blocks-auditor` and `mina-archive-blocks` on `PATH`; use
-`--no-backfill` to run without it.
+Build with `DUNE_PROFILE=devnet` (or `mainnet`).
 
 ## Tuning
 

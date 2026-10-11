@@ -1,9 +1,6 @@
-(* Brings up what the mina-rosetta image used to run
-   (src/app/rosetta/scripts/docker-start.sh): an archive database restored from
-   the network's latest public dump, two rosetta instances, an archive node, a
-   daemon that joins the network, and the missing-blocks guardian that fills the
-   gap between the dump and the daemon's first block. Every service comes from
-   [Mina_automation]. *)
+(* Brings up an archive database restored from the network's latest public
+   dump, two rosetta instances, an archive node and a daemon that joins the
+   network. Every service comes from [Mina_automation]. *)
 
 open Core
 open Async
@@ -20,7 +17,6 @@ module Config = struct
     ; postgres_uri : Uri.t
           (** an existing, empty database; the caller sets up the server *)
     ; archive_dump : [ `Latest | `None | `File of string ]
-    ; backfill : bool
     ; graphql_port : int
     ; client_port : int
     ; archive_port : int
@@ -75,7 +71,7 @@ let prepare_database (config : Config.t) =
       | `File file ->
           `Dump file
       | `Latest ->
-          (* the newest dump of the last five days, as init-db.sh did *)
+          (* the newest dump of the last five days *)
           `Latest_public_dump (Network.to_string config.network, 4) )
     ~workdir:config.workdir
     ~log_file:(Config.log config "dump-restore.log")
@@ -145,32 +141,11 @@ let start_daemon t =
   t.daemon <- Some daemon ;
   add_service t ~name:"daemon" process.process
 
-let start_guardian t =
-  let config = t.config in
-  let%map process =
-    Missing_blocks_guardian.run_in_background Missing_blocks_guardian.default
-      ~config:
-        { archive_uri = config.postgres_uri
-        ; precomputed_blocks =
-            Uri.of_string
-              "https://storage.googleapis.com/mina_network_block_data"
-        ; network = Network.to_string config.network
-        ; run_mode = Daemon { interval = Time.Span.of_hr 1. }
-        ; missing_blocks_auditor = "mina-missing-blocks-auditor"
-        ; archive_blocks = "mina-archive-blocks"
-        ; block_format = `Precomputed
-        }
-  in
-  add_service t ~name:"guardian" process
-
 let start_services t =
   let open Deferred.Or_error.Let_syntax in
   let%bind () = Deferred.ok (start_rosettas t) in
   let%bind () = Deferred.ok (start_archive t) in
   let%bind () = start_daemon t in
-  let%bind () =
-    if t.config.backfill then Deferred.ok (start_guardian t) else return ()
-  in
   let%bind () = Deferred.ok (after (Time.Span.of_sec 30.)) in
   match exited_service t with
   | None ->
@@ -199,8 +174,8 @@ let rosetta_client t =
     t.config.network
 
 (* The daemon can call itself synced while it serves a best tip from hours ago;
-   insist the tip is recent before trusting the rosetta sync status. The bash
-   test used the same 4 h bound (80 slots at 3 min). *)
+   insist the tip is recent before trusting the rosetta sync status. The bound
+   is 4 h (80 slots at 3 min). *)
 let best_tip_age config =
   match%map
     Mina_graphql_client.Client.get_best_chain ~max_length:1 ~num_tries:1

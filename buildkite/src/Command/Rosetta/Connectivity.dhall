@@ -71,16 +71,12 @@ let Spec =
 let bareBinaries =
     -- The test app plus everything it starts. Restoring every binary here
     -- makes restore-or-install.sh skip the deb install, so anything the test
-    -- calls must be listed. The guardian's helpers (auditor, archive-blocks)
-    -- back-fill the gap between the archive dump and the daemon's first block;
-    -- the healthcheck waits for the database.
+    -- calls must be listed. The healthcheck waits for the database.
           "rosetta_connectivity_test.exe:mina-rosetta-connectivity-test"
       ++  ",mina.exe:mina"
       ++  ",archive.exe:mina-archive"
       ++  ",mina_archive_healthcheck.exe:mina-archive-healthcheck"
       ++  ",rosetta.exe:mina-rosetta"
-      ++  ",missing_blocks_auditor.exe:mina-missing-blocks-auditor"
-      ++  ",archive_blocks.exe:mina-archive-blocks"
       ++  ",libp2p_helper:libp2p_helper"
 
 let debs =
@@ -96,7 +92,6 @@ let envExports =
       ->  [ "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
           , "MINA_PROFILE=${Profiles.lowerName spec.profile}"
           , "APPS_BARE_BINARIES=${bareBinaries}"
-          , "APPS_BARE_SCRIPTS=scripts/archive/missing-blocks-guardian.sh:mina-missing-blocks-guardian"
           ]
 
 let connectivityScript =
@@ -160,7 +155,6 @@ let pipeline
                       "dhall"
                   , S.strictlyStart
                       (S.contains "buildkite/scripts/tests/rosetta")
-                  , S.exactly "scripts/archive/missing-blocks-guardian" "sh"
                   , S.exactly "buildkite/scripts/debian/restore-or-install" "sh"
                   , S.strictlyStart (S.contains "buildkite/scripts/apps")
                   , S.strictlyStart (S.contains "genesis_ledgers")

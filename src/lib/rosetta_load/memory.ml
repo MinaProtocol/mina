@@ -1,6 +1,5 @@
 (* Resident memory of the services under load, sampled during the run and
-   reported, never checked: the old bash limits (postgres 3000 MiB, rosetta
-   300 MiB) were never calibrated. *)
+   reported, never checked: there is no calibrated limit to check against. *)
 
 open Core
 open Async

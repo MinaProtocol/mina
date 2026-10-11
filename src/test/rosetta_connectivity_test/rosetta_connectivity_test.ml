@@ -67,9 +67,6 @@ let () =
          ~doc:
            "latest|none|FILE seed the archive from the network's newest public \
             dump, start empty, or restore a local .sql"
-     and no_backfill =
-       flag "--no-backfill" no_arg
-         ~doc:" do not run the missing-blocks guardian"
      and sync_timeout =
        flag "--sync-timeout" (optional_with_default 900 int) ~doc:"SECONDS"
      and new_block_timeout =
@@ -112,7 +109,6 @@ let () =
          ; artifacts_dir
          ; postgres_uri = Uri.of_string postgres_uri
          ; archive_dump
-         ; backfill = not no_backfill
          ; graphql_port
          ; client_port
          ; archive_port

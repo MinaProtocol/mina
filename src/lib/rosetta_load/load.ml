@@ -15,8 +15,7 @@ module Config = struct
     ; sample_size : int
     }
 
-  (* The bash load test's schedule (one call every 10, 10, 2, 1, 2 and 1 s).
-     Well under what one rosetta serves: a search takes ~1 s of postgres time,
+  (* One call every 10, 10, 2, 1, 2 and 1 s. Well under what one rosetta serves: a search takes ~1 s of postgres time,
      and at ~20 requests/s the queue grows without bound, so latency would
      measure the queue instead of rosetta. *)
   let default_rates : (Endpoint.t * float) list =
@@ -267,8 +266,8 @@ let print_report result =
   printf "\n%!"
 
 (* One InfluxDB line, sent to the bench database by
-   buildkite/scripts/bench/send.sh. The memory fields keep the names the bash
-   load test used, so existing dashboards still find them. *)
+   buildkite/scripts/bench/send.sh. The memory field names are the ones the
+   bench dashboards query. *)
 let influx_line result ~network ~branch ~commit =
   let escape = String.substr_replace_all ~pattern:" " ~with_:"\\ " in
   let latency_fields =
