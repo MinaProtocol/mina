@@ -411,8 +411,26 @@ SVCEOF
 
     # genesis ledgers
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
-    echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
-    echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
+    # Each genesis config names a genesis and an epoch ledger tarball (the
+    # epoch ledger twice: staking == next). LEDGER_TARBALLS_DIR holds them
+    # as <s3_data_hash>/<name>, with "tarball:<name>" as content.
+    export LEDGER_TARBALLS_DIR="${TEST_TMPDIR}/ledger-tarballs"
+    local network name genesis_hash epoch_hash
+    for network in mainnet devnet; do
+        for name in "genesis_ledger_${network}.tar.gz" "epoch_ledger_${network}.tar.gz"; do
+            local h
+            h=$(printf 'tarball:%s' "$name" | openssl dgst -sha3-256 -r | cut -d' ' -f1)
+            mkdir -p "${LEDGER_TARBALLS_DIR}/${h}"
+            printf 'tarball:%s' "$name" > "${LEDGER_TARBALLS_DIR}/${h}/${name}"
+            case "$name" in genesis_*) genesis_hash="$h" ;; *) epoch_hash="$h" ;; esac
+        done
+        cat > "${PROJECT_ROOT}/genesis_ledgers/${network}.json" << EOF
+{"genesis": "${network}",
+ "ledger": {"hash": "x", "s3_data_hash": "${genesis_hash}"},
+ "epoch_data": {"staking": {"hash": "y", "s3_data_hash": "${epoch_hash}"},
+                "next": {"hash": "y", "s3_data_hash": "${epoch_hash}"}}}
+EOF
+    done
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -636,6 +654,12 @@ test_build_daemon_mainnet_config_deb() {
     # Should NOT have binaries
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
+    # Ledger tarballs of the genesis config, under their S3 names
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/genesis_ledger_mainnet.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/epoch_ledger_mainnet.tar.gz"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/genesis_ledger_mainnet.tar.gz" "tarball:genesis_ledger_mainnet.tar.gz"
+
     # Verify genesis content
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" "mainnet"
 
@@ -671,6 +695,30 @@ test_build_daemon_devnet_config_deb() {
 ################################################################################
 # Tests: Prefork packages
 ################################################################################
+
+# A tarball whose SHA3-256 is not the config's s3_data_hash fails the build.
+test_config_deb_rejects_bad_ledger_tarball() {
+    local dir="${TEST_TMPDIR}/bad-ledger-tarballs"
+    rm -rf "$dir"
+    cp -r "$LEDGER_TARBALLS_DIR" "$dir"
+    local f
+    for f in "$dir"/*/genesis_ledger_devnet.tar.gz; do printf 'corrupt' > "$f"; done
+    LEDGER_TARBALLS_DIR="$dir" safe_build build_daemon_config_deb devnet
+}
+
+# A tarball missing from LEDGER_TARBALLS_DIR fails the build.
+test_config_deb_rejects_missing_ledger_tarball() {
+    local dir="${TEST_TMPDIR}/missing-ledger-tarballs"
+    rm -rf "$dir"
+    cp -r "$LEDGER_TARBALLS_DIR" "$dir"
+    rm -f "$dir"/*/epoch_ledger_devnet.tar.gz
+    LEDGER_TARBALLS_DIR="$dir" safe_build build_daemon_config_deb devnet
+}
+
+# Without LEDGER_TARBALLS_DIR the config deb is not built.
+test_config_deb_requires_ledger_tarballs_dir() {
+    LEDGER_TARBALLS_DIR="" safe_build build_daemon_config_deb devnet
+}
 
 test_build_daemon_mainnet_prefork_deb() {
     safe_build build_daemon_prefork_deb mainnet || { log_fail "build exited non-zero"; return; }
@@ -1043,6 +1091,8 @@ test_build_daemon_devnet_hardfork_config_deb() {
     # Ledger tarballs copied
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger1.tar.gz"
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger2.tar.gz"
+    # ... and not the ones of the pre-fork config
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/genesis_ledger_devnet.tar.gz"
 
     # Old genesis ledger backup
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.old.json"
@@ -1340,6 +1390,11 @@ main() {
     # Archive packages
     run_test test_build_archive_devnet_deb
     run_test test_build_archive_mainnet_deb
+
+    # Ledger tarballs in the config packages
+    run_test_expect_fail test_config_deb_rejects_bad_ledger_tarball
+    run_test_expect_fail test_config_deb_rejects_missing_ledger_tarball
+    run_test_expect_fail test_config_deb_requires_ledger_tarballs_dir
 
     # Hardfork config packages
     run_test test_build_daemon_devnet_hardfork_config_deb

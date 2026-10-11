@@ -644,6 +644,40 @@ build_profile_generic_tent_deb() {
 ## END PROFILE-GENERIC TENT PACKAGE ##
 
 ## CONFIG PACKAGE ##
+# Puts the ledger tarballs of the network's genesis config into
+# /var/lib/coda, where the daemon finds them before it downloads them from
+# S3. The tarballs are not downloaded here: LEDGER_TARBALLS_DIR holds each one
+# as <s3_data_hash>/<file name in S3>. Every copy is checked against the
+# config's s3_data_hash.
+copy_ledger_tarballs() {
+  local network="$1"
+  local config="../genesis_ledgers/${network}.json"
+  local dir="${LEDGER_TARBALLS_DIR:?LEDGER_TARBALLS_DIR is not set; it must hold the ledger tarballs of ${config}}"
+  local hashes s3_data_hash files dest
+
+  hashes=$(jq -r '[.ledger, .epoch_data.staking?, .epoch_data.next?][]
+    | .s3_data_hash? // empty' "${config}" | sort -u)
+  if [[ -z "${hashes}" ]]; then
+    echo "No s3_data_hash in ${config}" >&2
+    exit 1
+  fi
+
+  for s3_data_hash in ${hashes}; do
+    files=("${dir}/${s3_data_hash}"/*.tar.gz)
+    if [[ ${#files[@]} -ne 1 || ! -f "${files[0]}" ]]; then
+      echo "Expected one ledger tarball in ${dir}/${s3_data_hash}" >&2
+      exit 1
+    fi
+    dest="${BUILDDIR}/var/lib/coda/${files[0]##*/}"
+    echo "Ledger tarball ${files[0]}"
+    cp "${files[0]}" "${dest}"
+    if [[ "$(openssl dgst -sha3-256 -r "${dest}" | cut -d' ' -f1)" != "${s3_data_hash}" ]]; then
+      echo "${files[0]}: SHA3-256 is not ${s3_data_hash}" >&2
+      exit 1
+    fi
+  done
+}
+
 build_daemon_config_deb() {
 
   local network="$1"
@@ -665,6 +699,7 @@ build_daemon_config_deb() {
      "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_configs "${network}"
+  copy_ledger_tarballs "${network}"
 
   # The config package owns mina.service so that exactly one co-installed
   # package ships it, with the correct per-network seed peer URL.

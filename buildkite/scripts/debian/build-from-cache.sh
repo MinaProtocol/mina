@@ -37,6 +37,12 @@ echo " Includes mina daemon, archive-node, rosetta"
 echo "--- Building debian packages"
 export BRANCH_NAME="$BUILDKITE_BRANCH"
 
+# The config debs take the ledger tarballs from the CI cache, not from S3
+# (see copy_ledger_tarballs in scripts/debian/builder-helpers.sh).
+if [[ -d /var/storagebox ]]; then
+  export LEDGER_TARBALLS_DIR="${LEDGER_TARBALLS_DIR:-/var/storagebox/ledger-tarballs}"
+fi
+
 # Deduplicate package arguments, preserving order. The pipeline emits one build
 # token per artifact, but several artifacts can map to the same network-agnostic
 # package (e.g. every per-network daemon maps to the single `daemon_generic`
