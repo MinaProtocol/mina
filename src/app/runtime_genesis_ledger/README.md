@@ -60,6 +60,8 @@ $ runtime_genesis_ledger --config-file PATH --genesis-dir DIR --hash-output-file
 
 ### Required Parameters
 
+Except with `--print-tarball-names` (see below), all three are required.
+
 - `--config-file PATH`: Path to the JSON configuration file defining the genesis
   accounts and other parameters.
 
@@ -74,6 +76,21 @@ $ runtime_genesis_ledger --config-file PATH --genesis-dir DIR --hash-output-file
 - `--ignore-missing`: If provided, missing fields in account definitions will be
   ignored and replaced with default values. Otherwise, missing fields will cause
   errors.
+
+### Ledger Tar File Names
+
+```shell
+$ MINA_PROFILE=mainnet runtime_genesis_ledger --config-file genesis_ledgers/mainnet.json --print-tarball-names
+genesis_ledger_8f90b767….tar.gz 68f5a0c1…
+epoch_ledger_7ceaa196….tar.gz d32def35…
+epoch_ledger_cd423fcd….tar.gz 39ffe872…
+```
+
+Prints one `<file name> <s3_data_hash>` line for each ledger of the config
+that has a `hash` and an `s3_data_hash`, and exits. The daemon searches for
+these names in `/var/lib/coda`, and downloads them from
+`$MINA_LEDGER_S3_BUCKET` when they are not there. `s3_data_hash` is the
+SHA3-256 of the file. `--genesis-dir` and `--hash-output-file` are not needed.
 
 ### Configuration File Format
 

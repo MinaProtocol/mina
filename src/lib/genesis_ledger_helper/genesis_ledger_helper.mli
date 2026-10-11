@@ -39,6 +39,10 @@ exception Genesis_state_initialization_error
 val sha3_hash : string -> string Deferred.t
 
 module Ledger : sig
+  (** The name of the tar file of the ledger with root hash [hash] (base58),
+      as [init_from_config_file] searches for it locally and in S3. *)
+  val hash_filename_stable : string -> ledger_name_prefix:string -> string
+
   (** Create a genesis ledger database [tar.gz] file in [genesis_dir] from the
       contents of the directory at [ledger_dirname] and return a [string] path
       to the resulting file. The tar file name is of the form

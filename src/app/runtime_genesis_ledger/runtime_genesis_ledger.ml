@@ -163,6 +163,37 @@ let load_config_exn config_file =
   , Option.map ~f:extract_accounts_exn staking_ledger
   , Option.map ~f:extract_accounts_exn next_ledger )
 
+(* One "<file name> <s3_data_hash>" line for each ledger of the config: the
+   names the daemon searches for in /var/lib/coda before it downloads from
+   S3. A ledger without a hash or an s3_data_hash is skipped. *)
+let print_tarball_names ~config_file () =
+  let%map config_json =
+    Deferred.Or_error.ok_exn
+    @@ Genesis_ledger_helper.load_config_json config_file
+  in
+  let config =
+    Runtime_config.of_yojson config_json
+    |> Result.map_error ~f:(fun err ->
+           Failure ("Could not parse configuration: " ^ err) )
+    |> Result.ok_exn
+  in
+  let print ~ledger_name_prefix (ledger : Runtime_config.Ledger.t) =
+    match (ledger.hash, ledger.s3_data_hash) with
+    | Some hash, Some s3_data_hash ->
+        printf "%s %s\n"
+          (Genesis_ledger_helper.Ledger.hash_filename_stable hash
+             ~ledger_name_prefix )
+          s3_data_hash
+    | _ ->
+        ()
+  in
+  Option.iter config.ledger ~f:(print ~ledger_name_prefix:"genesis_ledger") ;
+  Option.iter config.epoch_data
+    ~f:(fun ({ staking; next } : Runtime_config.Epoch_data.t) ->
+      print ~ledger_name_prefix:"epoch_ledger" staking.ledger ;
+      Option.iter next ~f:(fun next ->
+          print ~ledger_name_prefix:"epoch_ledger" next.ledger ) )
+
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
     ~pad_app_state ~identity_conversion ~prefork_genesis_config () =
@@ -262,9 +293,9 @@ let () =
                   "Dir where the genesis ledger and genesis proof is to be \
                    saved (default: %s)"
                   Cache_dir.autogen_path )
-             (required string)
+             (optional string)
          and hash_output_file =
-           flag "--hash-output-file" (required string)
+           flag "--hash-output-file" (optional string)
              ~doc:
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
@@ -296,7 +327,20 @@ let () =
                 slot_reduction_update re-base, and ignore \
                 --prefork-genesis-config. Default (flag absent): apply the \
                 Berkeley -> Mesa conversion."
+         and print_tarball_names_only =
+           flag "--print-tarball-names" no_arg
+             ~doc:
+               "Print the ledger tar file name and s3_data_hash of each ledger \
+                of the config, one per line, and exit. --genesis-dir and \
+                --hash-output-file are not needed."
          in
-         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~identity_conversion
-           ~prefork_genesis_config) )
+         if print_tarball_names_only then print_tarball_names ~config_file
+         else
+           let required name =
+             Option.value_exn ~message:(name ^ " is required")
+           in
+           main ~constraint_constants ~config_file
+             ~genesis_dir:(required "--genesis-dir" genesis_dir)
+             ~hash_output_file:(required "--hash-output-file" hash_output_file)
+             ~ignore_missing_fields ~pad_app_state ~identity_conversion
+             ~prefork_genesis_config) )
