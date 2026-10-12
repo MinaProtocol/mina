@@ -43,5 +43,27 @@ module Stable = struct
     include Register (T)
   end
 
+  module V4 = struct
+    module T = struct
+      type query = unit
+
+      type response = Spec.Partitioned.Stable.V2.t option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      (* A V2 spec cannot describe the work the daemon now hands out, so a
+         worker on this version is told there is none. *)
+      let response_of_callee_model = Fn.const None
+
+      let caller_model_of_response =
+        Option.map ~f:Spec.Partitioned.Stable.V2.to_latest
+    end
+
+    include T
+    include Register (T)
+  end
+
   module Latest = V5
 end]

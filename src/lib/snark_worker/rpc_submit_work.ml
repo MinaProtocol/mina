@@ -57,5 +57,27 @@ module Stable = struct
     include Register (T)
   end
 
+  module V3 = struct
+    module T = struct
+      type query = Result.Partitioned.Stable.V1.t
+
+      type response = [ `SpecUnmatched | `Removed | `Ok ]
+
+      let query_of_caller_model (_ : Result.Partitioned.Stable.Latest.t) : query
+          =
+        failwith
+          "Rpc_submit_work.Stable.V3: a latest result cannot be submitted as V1"
+
+      let callee_model_of_query = Result.Partitioned.Stable.V1.to_latest
+
+      let response_of_callee_model = Fn.id
+
+      let caller_model_of_response = Fn.id
+    end
+
+    include T
+    include Register (T)
+  end
+
   module Latest = V4
 end]
