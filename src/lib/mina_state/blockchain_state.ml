@@ -100,6 +100,23 @@ module Value = struct
           ledger_proof_statement =
             Snarked_ledger_state.Stable.V2.to_latest t.ledger_proof_statement
         }
+
+      let to_input
+          ({ staged_ledger_hash
+           ; genesis_ledger_hash
+           ; timestamp
+           ; body_reference
+           ; ledger_proof_statement
+           } :
+            t ) =
+        let open Random_oracle.Input.Chunked in
+        List.reduce_exn ~f:append
+          [ Staged_ledger_hash.to_input staged_ledger_hash
+          ; Frozen_ledger_hash.to_input genesis_ledger_hash
+          ; Snarked_ledger_state.Stable.V2.to_input ledger_proof_statement
+          ; Block_time.to_input timestamp
+          ; Consensus.Body_reference.to_input body_reference
+          ]
     end
   end]
 end

@@ -80,6 +80,8 @@ module Value : sig
       [@@deriving sexp, equal, compare, hash, yojson]
 
       val to_latest : t -> V3.t
+
+      val to_input : t -> Field.t Random_oracle.Input.Chunked.t
     end
   end]
 end
