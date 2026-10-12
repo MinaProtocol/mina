@@ -443,10 +443,6 @@ let glue_sync_ledger :
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
       ~logger:t.logger ~trust_system:t.trust_system
       ~get:(fun (peer : Peer.t) qs ->
-        List.iter qs ~f:(fun (h, _) ->
-            if
-              not (Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r))
-            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
         let%map rs =
           query_peer' ~how:`Parallel ~heartbeat_timeout
             ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
@@ -469,16 +465,46 @@ let glue_sync_ledger :
                            match r with Ok r -> Some (q, r) | Error _ -> None )
                       ) ) ) )
       ()
+    >>| fun downloader -> (downloader, root_hash_r, root_hash_w)
   in
   don't_wait_for
-    (let%bind downloader = downloader in
-     Linear_pipe.iter_unordered ~max_concurrency:400 query_reader ~f:(fun q ->
-         match%bind
+    (let%bind downloader, root_hash_r, root_hash_w = downloader in
+     (* Once the sync ledger moves to a new target, queries for the old one
+        are never answered by peers that have moved on with it, and the sync
+        ledger ignores their answers anyway. So on a change of target, cancel
+        them and point the downloader's knowledge at the new target; otherwise
+        they would hold every in-flight slot and the new target's queries would
+        never be sent. *)
+     let is_current (h, _) =
+       Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r)
+     in
+     let in_flight = Sl_downloader.Key.Hash_set.create () in
+     let throttle =
+       Throttle.create ~continue_on_error:true ~max_concurrent_jobs:400
+     in
+     let download q =
+       if not (is_current q) then Deferred.unit
+       else (
+         Hash_set.add in_flight q ;
+         let%bind result =
            Sl_downloader.Job.result
              (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
-         with
+         in
+         Hash_set.remove in_flight q ;
+         match result with
          | Error _ ->
              Deferred.unit
          | Ok (a, _) ->
              Linear_pipe.write_if_open response_writer
-               (fst q, snd q, { a with data = snd a.data }) ) )
+               (fst q, snd q, { a with data = snd a.data }) )
+     in
+     Linear_pipe.iter query_reader ~f:(fun q ->
+         let%map () =
+           if is_current q then Deferred.unit
+           else
+             let%map () = Broadcast_pipe.Writer.write root_hash_w (fst q) in
+             Hash_set.to_list in_flight
+             |> List.filter ~f:(Fn.non is_current)
+             |> List.iter ~f:(Sl_downloader.cancel downloader)
+         in
+         don't_wait_for (Throttle.enqueue throttle (fun () -> download q)) ) )
