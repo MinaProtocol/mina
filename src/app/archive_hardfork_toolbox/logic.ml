@@ -72,6 +72,7 @@ let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
   Archive_lib.Processor.add_genesis_accounts ~logger
     ~runtime_config_opt:(Some runtime_config) ~genesis_constants ~chunks_length
     ~constraint_constants pool
+  |> Deferred.ignore_m
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let pool = connect postgres_uri in

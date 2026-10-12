@@ -580,15 +580,42 @@ let%test_module "Archive node unit tests" =
       let%bind before = count_accounts_accessed genesis_block_id in
       (* The bug: the fork genesis block has no accounts_accessed rows. *)
       [%test_result: int] ~expect:0 before ;
-      let%bind () =
+      let%bind genesis =
         Processor.add_genesis_accounts ~logger
           ~runtime_config_opt:(Some runtime_config) ~genesis_constants
           ~chunks_length:100 ~constraint_constants pool
       in
-      let%map after = count_accounts_accessed genesis_block_id in
+      let%bind after = count_accounts_accessed genesis_block_id in
       (* The fix: every fork genesis ledger account is now attached to the
          fork genesis block. *)
-      [%test_result: int] ~expect:num_accounts after
+      [%test_result: int] ~expect:num_accounts after ;
+      (* genesis_accounts is left to the background write *)
+      let count_genesis_accounts () =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Conn.find
+                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
+                   "SELECT COUNT(*) FROM genesis_accounts WHERE genesis_height \
+                    = 101" )
+                () )
+            pool
+        with
+        | Ok count ->
+            count
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let%bind written = count_genesis_accounts () in
+      [%test_result: int] ~expect:0 written ;
+      let genesis_height, ledger_accounts = Option.value_exn genesis in
+      [%test_result: int64] ~expect:101L genesis_height ;
+      let%bind () =
+        Processor.write_genesis_accounts ~logger pool ~genesis_height
+          ledger_accounts
+      in
+      let%map written = count_genesis_accounts () in
+      [%test_result: int] ~expect:num_accounts written
 
     (*
     let%test_unit "Block: read and write with pruning" =

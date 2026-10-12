@@ -4972,13 +4972,15 @@ module Genesis_accounts = struct
           `Added (total - already, already)
 end
 
-(* [add_genesis_accounts] is called when starting the archive process *)
+(* [add_genesis_accounts] is called when starting the archive process. It
+   returns the genesis height and ledger accounts, for [write_genesis_accounts]
+   to keep once the archive accepts blocks. *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
   match runtime_config_opt with
   | None ->
-      Deferred.unit
+      return None
   | Some runtime_config -> (
       let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
@@ -5010,7 +5012,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
          Since we're bootstrapping, I guess? *)
       (* TODO: figure out whether we need to add genesis accounts to accounts_created *)
       let add_accounts () =
-        let%bind.Deferred.Result ledger_hash, genesis_block_id =
+        let%bind.Deferred.Result ledger_hash, genesis_block_id, genesis_height =
           Mina_caqti.Pool.use
             (fun (module Conn : Mina_caqti.CONNECTION) ->
               let%bind.Deferred.Result genesis_block_id =
@@ -5020,10 +5022,10 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                   ~constraint_constants:precomputed_values.constraint_constants
                   genesis_block ~accounts_accessed:[] ~accounts_created:[]
               in
-              let%bind.Deferred.Result { ledger_hash; _ } =
+              let%bind.Deferred.Result { ledger_hash; height; _ } =
                 Block.load (module Conn) ~id:genesis_block_id
               in
-              return (Ok (ledger_hash, genesis_block_id)) )
+              return (Ok (ledger_hash, genesis_block_id, height)) )
             pool
         in
         let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
@@ -5066,9 +5068,12 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               | Some acct ->
                   (index, acct) )
         in
-        let%bind list_of_results =
+        let accounts =
           List.map account_ids ~f:(fun acct_id ->
               acccount_with_index_of_id ~ledger acct_id )
+        in
+        let%bind list_of_results =
+          accounts
           |> List.chunks_of ~length:chunks_length
           |> Deferred.List.mapi ~f:(fun i batch ->
                  match%bind
@@ -5094,7 +5099,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
 
         return
           ( List.find list_of_results ~f:(fun result -> Result.is_error result)
-          |> Option.value ~default:(Result.Ok ()) )
+          |> Option.value ~default:(Result.Ok ())
+          |> Result.map ~f:(fun () ->
+                 (genesis_height, List.map accounts ~f:snd) ) )
       in
       match%map
         retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
@@ -5103,8 +5110,39 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
           [%log warn] "genesis accounts could not be added"
             ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
           failwith "Failed to add genesis accounts"
-      | Ok () ->
-          () )
+      | Ok genesis ->
+          Some genesis )
+
+(* Keep the genesis ledger in [genesis_accounts]. Run in the background: the
+   archive accepts blocks meanwhile, and an interrupted write continues at the
+   next start. *)
+let write_genesis_accounts ~logger pool ~genesis_height accounts =
+  let metadata = [ ("height", `String (Int64.to_string genesis_height)) ] in
+  match%map
+    Mina_caqti.Pool.use
+      (fun conn -> Genesis_accounts.add conn ~genesis_height accounts)
+      pool
+  with
+  | Error e ->
+      [%log error]
+        "Could not write the genesis ledger at height $height to \
+         genesis_accounts; it continues at the next start: $error"
+        ~metadata:(("error", `String (Caqti_error.show e)) :: metadata)
+  | Ok `No_table ->
+      [%log warn]
+        "The archive database has no genesis_accounts table; run upgrade.sql \
+         so that balance queries can read the genesis ledger"
+        ~metadata
+  | Ok `Already_loaded ->
+      ()
+  | Ok (`Added (count, resumed_after)) ->
+      [%log info]
+        "Wrote $count genesis ledger accounts at height $height, after \
+         $resumed_after written before"
+        ~metadata:
+          ( ("count", `Int count)
+          :: ("resumed_after", `Int resumed_after)
+          :: metadata )
 
 (* The metrics server is created before the RPC handlers are installed, rather
    than alongside the polling loop that fills the gauges, because the handlers
@@ -5191,7 +5229,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () =
+      let%bind genesis =
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt ~chunks_length
       in
@@ -5274,6 +5312,9 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       |> don't_wait_for ;
       (* NOTE: this is depended on by archive fixture, so whenever updating this message, consider updating the fixture as well *)
       [%log info] "Archive process ready. Clients can now connect" ;
+      Option.iter genesis ~f:(fun (genesis_height, accounts) ->
+          write_genesis_accounts ~logger pool ~genesis_height accounts
+          |> don't_wait_for ) ;
       Async.never ()
 
 module For_test = struct
