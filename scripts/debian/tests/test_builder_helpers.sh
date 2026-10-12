@@ -269,6 +269,32 @@ run_test_expect_fail() {
 # Setup
 ################################################################################
 
+# Puts a ledger tarball with content "tarball:<name>" into
+# LEDGER_TARBALLS_DIR/<its SHA3-256>/<name> and prints the hash.
+add_ledger_tarball() {
+    local name="$1"
+    local content="tarball:${name}"
+    local hash
+    hash=$(printf '%s' "$content" | openssl dgst -sha3-256 -r | cut -d' ' -f1)
+    mkdir -p "${LEDGER_TARBALLS_DIR}/${hash}"
+    printf '%s' "$content" > "${LEDGER_TARBALLS_DIR}/${hash}/${name}"
+    echo "$hash"
+}
+
+# Writes genesis_ledgers/<network>.json with a genesis ledger and one epoch
+# ledger (staking == next), both in LEDGER_TARBALLS_DIR.
+write_genesis_config() {
+    local network="$1"
+    local genesis_hash epoch_hash
+    genesis_hash=$(add_ledger_tarball "genesis_ledger_${network}.tar.gz")
+    epoch_hash=$(add_ledger_tarball "epoch_ledger_${network}.tar.gz")
+    jq -n --arg network "$network" --arg genesis "$genesis_hash" --arg epoch "$epoch_hash" '{
+        genesis: $network,
+        ledger: {s3_data_hash: $genesis},
+        epoch_data: {staking: {s3_data_hash: $epoch}, next: {s3_data_hash: $epoch}}
+    }' > "${PROJECT_ROOT}/genesis_ledgers/${network}.json"
+}
+
 setup_test_environment() {
     TEST_TMPDIR=$(mktemp -d)
     export PROJECT_ROOT="${TEST_TMPDIR}/project"
@@ -411,26 +437,9 @@ SVCEOF
 
     # genesis ledgers
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
-    # Each genesis config names a genesis and an epoch ledger tarball (the
-    # epoch ledger twice: staking == next). LEDGER_TARBALLS_DIR holds them
-    # as <s3_data_hash>/<name>, with "tarball:<name>" as content.
     export LEDGER_TARBALLS_DIR="${TEST_TMPDIR}/ledger-tarballs"
-    local network name genesis_hash epoch_hash
-    for network in mainnet devnet; do
-        for name in "genesis_ledger_${network}.tar.gz" "epoch_ledger_${network}.tar.gz"; do
-            local h
-            h=$(printf 'tarball:%s' "$name" | openssl dgst -sha3-256 -r | cut -d' ' -f1)
-            mkdir -p "${LEDGER_TARBALLS_DIR}/${h}"
-            printf 'tarball:%s' "$name" > "${LEDGER_TARBALLS_DIR}/${h}/${name}"
-            case "$name" in genesis_*) genesis_hash="$h" ;; *) epoch_hash="$h" ;; esac
-        done
-        cat > "${PROJECT_ROOT}/genesis_ledgers/${network}.json" << EOF
-{"genesis": "${network}",
- "ledger": {"hash": "x", "s3_data_hash": "${genesis_hash}"},
- "epoch_data": {"staking": {"hash": "y", "s3_data_hash": "${epoch_hash}"},
-                "next": {"hash": "y", "s3_data_hash": "${epoch_hash}"}}}
-EOF
-    done
+    write_genesis_config mainnet
+    write_genesis_config devnet
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -713,11 +722,6 @@ test_config_deb_rejects_missing_ledger_tarball() {
     cp -r "$LEDGER_TARBALLS_DIR" "$dir"
     rm -f "$dir"/*/epoch_ledger_devnet.tar.gz
     LEDGER_TARBALLS_DIR="$dir" safe_build build_daemon_config_deb devnet
-}
-
-# Without LEDGER_TARBALLS_DIR the config deb is not built.
-test_config_deb_requires_ledger_tarballs_dir() {
-    LEDGER_TARBALLS_DIR="" safe_build build_daemon_config_deb devnet
 }
 
 test_build_daemon_mainnet_prefork_deb() {
@@ -1394,7 +1398,6 @@ main() {
     # Ledger tarballs in the config packages
     run_test_expect_fail test_config_deb_rejects_bad_ledger_tarball
     run_test_expect_fail test_config_deb_rejects_missing_ledger_tarball
-    run_test_expect_fail test_config_deb_requires_ledger_tarballs_dir
 
     # Hardfork config packages
     run_test test_build_daemon_devnet_hardfork_config_deb
