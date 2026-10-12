@@ -26,6 +26,13 @@ module Stable : sig
 
     val to_latest : t -> t
   end
+
+  module V2 : sig
+    type t =
+      (Single_spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Poly.Stable.V1.t
+
+    val to_latest : t -> V3.t
+  end
 end]
 
 type t = (Single_spec.t, Ledger_proof.Cached.t) Poly.t

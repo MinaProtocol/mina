@@ -152,6 +152,21 @@ module Pre_diff_with_at_most_two_coinbase = struct
 
       let to_latest = Fn.id
     end
+
+    module V3 = struct
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_two.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest (t : t) : Latest.t =
+        { t with
+          completed_works =
+            List.map t.completed_works
+              ~f:Transaction_snark_work.Stable.V2.to_latest
+        }
+    end
   end]
 
   type t =
@@ -185,6 +200,21 @@ module Pre_diff_with_at_most_one_coinbase = struct
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V3 = struct
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_one.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest (t : t) : Latest.t =
+        { t with
+          completed_works =
+            List.map t.completed_works
+              ~f:Transaction_snark_work.Stable.V2.to_latest
+        }
     end
   end]
 
@@ -245,6 +275,18 @@ module Diff = struct
 
       let coinbase = coinbase
     end
+
+    module V3 = struct
+      type t =
+        Pre_diff_with_at_most_two_coinbase.Stable.V3.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest ((two, one) : t) : Latest.t =
+        ( Pre_diff_with_at_most_two_coinbase.Stable.V3.to_latest two
+        , Option.map one
+            ~f:Pre_diff_with_at_most_one_coinbase.Stable.V3.to_latest )
+    end
   end]
 
   type t =
@@ -295,6 +337,23 @@ module Stable = struct
       (fst t.diff).completed_works
       @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
             d.completed_works )
+  end
+
+  module V3 = struct
+    type t = { diff : Diff.Stable.V3.t } [@@deriving equal, sexp, yojson]
+
+    let to_latest ({ diff } : t) : Latest.t =
+      { diff = Diff.Stable.V3.to_latest diff }
+
+    let empty_diff : t =
+      { diff =
+          ( { completed_works = []
+            ; commands = []
+            ; coinbase = At_most_two.Zero
+            ; internal_command_statuses = []
+            }
+          , None )
+      }
   end
 end]
 

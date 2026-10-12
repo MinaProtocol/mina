@@ -9,6 +9,14 @@ module Stable : sig
 
     val hashes : t -> State_hash.State_hashes.t
   end
+
+  module V3 : sig
+    type t
+
+    val hashes : t -> State_hash.State_hashes.t
+
+    val to_latest : t -> V4.t
+  end
 end]
 
 type t [@@deriving to_yojson]

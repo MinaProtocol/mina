@@ -42,6 +42,43 @@ module Poly : sig
         }
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
     end
+
+    module V2 : sig
+      type ( 'staged_ledger_hash
+           , 'snarked_ledger_hash
+           , 'local_state
+           , 'time
+           , 'body_reference
+           , 'signed_amount
+           , 'pending_coinbase_stack
+           , 'fee_excess
+           , 'sok_digest )
+           t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V2.t =
+        { staged_ledger_hash : 'staged_ledger_hash
+        ; genesis_ledger_hash : 'snarked_ledger_hash
+        ; ledger_proof_statement :
+            ( 'snarked_ledger_hash
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'local_state )
+            Snarked_ledger_state.Poly.Stable.V2.t
+        ; timestamp : 'time
+        ; body_reference : 'body_reference
+        }
+      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+    end
   end]
 end
 
@@ -63,6 +100,23 @@ module Value : sig
       [@@deriving sexp, equal, compare, hash, yojson]
 
       val to_latest : t -> t
+    end
+
+    module V2 : sig
+      type t =
+        ( Staged_ledger_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Local_state.Stable.V1.t
+        , Block_time.Stable.V1.t
+        , Consensus.Body_reference.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , unit )
+        Poly.Stable.V2.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      val to_latest : t -> V3.t
     end
   end]
 end

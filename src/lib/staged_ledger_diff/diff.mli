@@ -80,6 +80,16 @@ module Pre_diff_with_at_most_two_coinbase : sig
       val to_latest : t -> t
     end
 
+    module V3 : sig
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_two.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      val to_latest : t -> V4.t
+    end
+
     module Latest = V4
   end
 end
@@ -97,6 +107,16 @@ module Pre_diff_with_at_most_one_coinbase : sig
       [@@deriving equal, sexp, yojson]
 
       val to_latest : t -> t
+    end
+
+    module V3 : sig
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_one.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      val to_latest : t -> V4.t
     end
 
     module Latest = V4
@@ -123,6 +143,14 @@ module Diff : sig
       val to_latest : t -> t
     end
 
+    module V3 : sig
+      type t =
+        Pre_diff_with_at_most_two_coinbase.Stable.V3.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
+
+      val to_latest : t -> V4.t
+    end
+
     module Latest = V4
   end
 
@@ -145,6 +173,15 @@ module Stable : sig
     val empty_diff : t
 
     val completed_works : t -> Transaction_snark_work.Stable.Latest.t list
+  end
+
+  module V3 : sig
+    type t = { diff : Diff.Stable.V3.t }
+    [@@deriving bin_io, equal, sexp, version, yojson]
+
+    val to_latest : t -> V4.t
+
+    val empty_diff : t
   end
 
   module Latest = V4

@@ -556,6 +556,28 @@ module Diff_versioned = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t =
+        | Add_solved_work of
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+        | Empty
+      [@@deriving equal]
+
+      let to_latest : t -> Latest.t = function
+        | Add_solved_work (statements, priced_proof) ->
+            Add_solved_work
+              ( Transaction_snark_work.Statement.Stable.V2.to_latest statements
+              , { priced_proof with
+                  proof =
+                    One_or_two.Stable.V1.to_latest
+                      Ledger_proof.Stable.V2.to_latest priced_proof.proof
+                } )
+        | Empty ->
+            Empty
+    end
   end]
 
   type t = Resource_pool.Diff.Cached.t =

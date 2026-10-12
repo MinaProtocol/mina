@@ -91,6 +91,33 @@ module type Full = sig
           }
         [@@deriving compare, equal, hash, sexp, yojson]
       end
+
+      module V2 : sig
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'sok_digest
+             , 'local_state )
+             t =
+          { source :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state )
+              Registers.Stable.V1.t
+          ; target :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state )
+              Registers.Stable.V1.t
+          ; connecting_ledger_left : 'ledger_hash
+          ; connecting_ledger_right : 'ledger_hash
+          ; supply_increase : 'amount
+          ; fee_excess : 'fee_excess
+          ; sok_digest : 'sok_digest
+          }
+        [@@deriving compare, equal, hash, sexp, yojson]
+      end
     end]
 
     val with_empty_local_state :
@@ -177,6 +204,20 @@ module type Full = sig
         Poly.Stable.V3.t
       [@@deriving compare, equal, hash, sexp, yojson]
     end
+
+    module V2 : sig
+      type t =
+        ( Frozen_ledger_hash.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , unit
+        , Local_state.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving compare, equal, hash, sexp, yojson]
+
+      val to_latest : t -> V3.t
+    end
   end]
 
   type var =
@@ -227,6 +268,20 @@ module type Full = sig
           , Local_state.Stable.V1.t )
           Poly.Stable.V3.t
         [@@deriving compare, equal, hash, sexp, yojson]
+      end
+
+      module V2 : sig
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        val to_latest : t -> V3.t
       end
     end]
 

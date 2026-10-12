@@ -24,6 +24,32 @@ module Poly = struct
       ; body_reference : 'body_reference
       }
   end
+
+  module V2 = struct
+    type ( 'staged_ledger_hash
+         , 'snarked_ledger_hash
+         , 'local_state
+         , 'time
+         , 'body_reference
+         , 'signed_amount
+         , 'pending_coinbase_stack
+         , 'fee_excess
+         , 'sok_digest )
+         t =
+      { staged_ledger_hash : 'staged_ledger_hash
+      ; genesis_ledger_hash : 'snarked_ledger_hash
+      ; ledger_proof_statement :
+          ( 'snarked_ledger_hash
+          , 'signed_amount
+          , 'pending_coinbase_stack
+          , 'fee_excess
+          , 'sok_digest
+          , 'local_state )
+          Mina_state_snarked_ledger_state.Poly.V2.t
+      ; timestamp : 'time
+      ; body_reference : 'body_reference
+      }
+  end
 end
 
 module Value = struct

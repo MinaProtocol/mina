@@ -18,6 +18,16 @@ module Statement : sig
 
       include Hashable.S_binable with type t := t
     end
+
+    module V2 : sig
+      type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
+
+      include Comparable.S with type t := t
+
+      include Hashable.S_binable with type t := t
+
+      val to_latest : t -> V3.t
+    end
   end
   with type V3.t = t
 
@@ -40,6 +50,12 @@ module Info : sig
   module Stable : sig
     module V3 : sig
       type t [@@deriving compare, to_yojson, version, sexp, bin_io]
+    end
+
+    module V2 : sig
+      type t [@@deriving compare, to_yojson, version, sexp, bin_io]
+
+      val to_latest : t -> V3.t
     end
   end
   with type V3.t = t
@@ -86,6 +102,16 @@ module Stable : sig
     val proofs : t -> Ledger_proof.t One_or_two.t
 
     val to_latest : t -> t
+  end
+
+  module V2 : sig
+    type t [@@deriving bin_io, equal, sexp, version, yojson]
+
+    val fee : t -> Fee.Stable.V1.t
+
+    val prover : t -> Public_key.Compressed.Stable.V1.t
+
+    val to_latest : t -> V3.t
   end
 
   module Latest = V3

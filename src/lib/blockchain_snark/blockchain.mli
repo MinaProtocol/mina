@@ -8,6 +8,12 @@ module Stable : sig
   module V4 : sig
     type t [@@deriving sexp, yojson]
   end
+
+  module V3 : sig
+    type t [@@deriving sexp, yojson]
+
+    val to_latest : t -> V4.t
+  end
 end]
 
 val create : state:Protocol_state.Value.t -> proof:Proof.t -> t
