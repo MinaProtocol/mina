@@ -25,9 +25,10 @@ ENV MINA_CREATE_GENESIS_DEB=mina-create-${network}-prefork-genesis-ledger
 
 # Install the prefork genesis ledger package (hardfork-aware layer).
 # Installed DIRECTLY from the local build context, like the rest of the mina debs.
-# install-mina-debs.sh and the staged _debs (at /opt/mina-local-debs) are inherited
-# from the mina-daemon stage, so no extra COPY is needed here; this stage only adds
-# the (legacy-versioned) create-prefork-genesis package on top.
-RUN echo "Installing prefork genesis package with version $deb_legacy_version for network $network" \
+# install-mina-debs.sh is inherited from the mina-daemon stage; the staged _debs are
+# bind-mounted again for this install step only. This stage only adds the
+# (legacy-versioned) create-prefork-genesis package on top.
+RUN --mount=type=bind,source=_debs,target=/opt/mina-local-debs \
+  echo "Installing prefork genesis package with version $deb_legacy_version for network $network" \
   && /usr/local/bin/install-mina-debs.sh \
        "${MINA_CREATE_GENESIS_DEB}=${deb_legacy_version}"
