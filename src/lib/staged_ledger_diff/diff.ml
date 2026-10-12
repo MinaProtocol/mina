@@ -1,6 +1,39 @@
 open Core_kernel
 open Mina_base
 
+module At_most_two = struct
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
+      [@@deriving equal, compare, sexp, yojson]
+    end
+  end]
+
+  type 'a t = 'a Stable.Latest.t =
+    | Zero
+    | One of 'a option
+    | Two of ('a * 'a option) option
+  [@@deriving equal, compare, sexp, yojson]
+
+  let increase t ws =
+    match (t, ws) with
+    | Zero, [] ->
+        Ok (One None)
+    | Zero, [ a ] ->
+        Ok (One (Some a))
+    | One _, [] ->
+        Ok (Two None)
+    | One _, [ a ] ->
+        Ok (Two (Some (a, None)))
+    | One _, [ a; a' ] ->
+        Ok (Two (Some (a', Some a)))
+    | _ ->
+        Or_error.error_string "Error incrementing coinbase parts"
+end
+
 module At_most_one = struct
   [%%versioned
   module Stable = struct
@@ -56,6 +89,16 @@ module Pre_diff_two = struct
         }
       [@@deriving equal, compare, sexp, yojson]
     end
+
+    module V2 = struct
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Ft.Stable.V1.t At_most_two.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        }
+      [@@deriving equal, compare, sexp, yojson]
+    end
   end]
 
   type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
@@ -88,6 +131,16 @@ module Pre_diff_one = struct
         ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
         ; padding : Signature_lib.Public_key.Compressed.Stable.V1.t option
+        }
+      [@@deriving equal, compare, sexp, yojson]
+    end
+
+    module V2 = struct
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
       [@@deriving equal, compare, sexp, yojson]
     end
@@ -125,6 +178,35 @@ module Pre_diff_with_at_most_two_coinbase = struct
 
       let to_latest = Fn.id
     end
+
+    module V3 = struct
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_two.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest
+          ({ completed_works; commands; coinbase; internal_command_statuses } :
+            t ) : Latest.t =
+        { completed_works =
+            List.map completed_works
+              ~f:Transaction_snark_work.Stable.V2.to_latest
+        ; commands
+        ; coinbase =
+            ( match coinbase with
+            | Zero ->
+                Zero
+            | One ft ->
+                One ft
+            | Two _ ->
+                failwith
+                  "Pre_diff_with_at_most_two_coinbase.Stable.V3.to_latest: a \
+                   block may carry at most one coinbase" )
+        ; internal_command_statuses
+        ; padding = None
+        }
+    end
   end]
 
   type t =
@@ -158,6 +240,26 @@ module Pre_diff_with_at_most_one_coinbase = struct
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V3 = struct
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_one.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest
+          ({ completed_works; commands; coinbase; internal_command_statuses } :
+            t ) : Latest.t =
+        { completed_works =
+            List.map completed_works
+              ~f:Transaction_snark_work.Stable.V2.to_latest
+        ; commands
+        ; coinbase
+        ; internal_command_statuses
+        ; padding = None
+        }
     end
   end]
 
@@ -218,6 +320,18 @@ module Diff = struct
 
       let coinbase = coinbase
     end
+
+    module V3 = struct
+      type t =
+        Pre_diff_with_at_most_two_coinbase.Stable.V3.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
+      [@@deriving equal, sexp, yojson]
+
+      let to_latest ((two, one) : t) : Latest.t =
+        ( Pre_diff_with_at_most_two_coinbase.Stable.V3.to_latest two
+        , Option.map one
+            ~f:Pre_diff_with_at_most_one_coinbase.Stable.V3.to_latest )
+    end
   end]
 
   type t =
@@ -269,6 +383,23 @@ module Stable = struct
       (fst t.diff).completed_works
       @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
             d.completed_works )
+  end
+
+  module V3 = struct
+    type t = { diff : Diff.Stable.V3.t } [@@deriving equal, sexp, yojson]
+
+    let to_latest ({ diff } : t) : Latest.t =
+      { diff = Diff.Stable.V3.to_latest diff }
+
+    let empty_diff : t =
+      { diff =
+          ( { completed_works = []
+            ; commands = []
+            ; coinbase = At_most_two.Zero
+            ; internal_command_statuses = []
+            }
+          , None )
+      }
   end
 end]
 

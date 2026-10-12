@@ -41,6 +41,16 @@ module Stable : sig
 
     val sok_message : t -> Mina_base.Sok_message.t
   end
+
+  module V2 : sig
+    type t =
+      (Single_spec.Stable.V2.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+    [@@deriving sexp, yojson]
+
+    val to_latest : t -> V3.t
+
+    val sok_message : t -> Mina_base.Sok_message.t
+  end
 end]
 
 type t = (Single_spec.t, Sub_zkapp_spec.t) Poly.t

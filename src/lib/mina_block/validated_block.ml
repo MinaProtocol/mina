@@ -15,6 +15,17 @@ module Stable = struct
 
     let hashes (t, _) = With_hash.hash t
   end
+
+  module V3 = struct
+    type t =
+      Block.Stable.V3.t State_hash.With_state_hashes.Stable.V1.t
+      * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+
+    let to_latest ((block, hashes) : t) : Latest.t =
+      (With_hash.map block ~f:Block.Stable.V3.to_latest, hashes)
+
+    let hashes (t, _) = With_hash.hash t
+  end
 end]
 
 type t =

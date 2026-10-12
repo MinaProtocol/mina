@@ -1,6 +1,21 @@
 open Core_kernel
 open Mina_base
 
+module At_most_two : sig
+  type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
+  [@@deriving equal, compare, sexp, yojson]
+
+  module Stable : sig
+    module V1 : sig
+      type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
+      [@@deriving equal, compare, sexp, yojson, bin_io, version]
+    end
+  end
+  with type 'a V1.t = 'a t
+
+  val increase : 'a t -> 'a list -> 'a t Or_error.t
+end
+
 module At_most_one : sig
   type 'a t = Zero | One of 'a option
   [@@deriving equal, compare, sexp, yojson]
@@ -29,6 +44,16 @@ module Pre_diff_two : sig
         }
       [@@deriving equal, compare, sexp, yojson]
     end
+
+    module V2 : sig
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        }
+      [@@deriving equal, compare, sexp, yojson]
+    end
   end]
 
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
@@ -44,6 +69,16 @@ module Pre_diff_one : sig
         ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
         ; padding : Signature_lib.Public_key.Compressed.Stable.V1.t option
+        }
+      [@@deriving equal, compare, sexp, yojson]
+    end
+
+    module V2 : sig
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
       [@@deriving equal, compare, sexp, yojson]
     end
@@ -67,6 +102,16 @@ module Pre_diff_with_at_most_two_coinbase : sig
       val to_latest : t -> t
     end
 
+    module V3 : sig
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_two.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      val to_latest : t -> V4.t
+    end
+
     module Latest = V4
   end
 end
@@ -84,6 +129,16 @@ module Pre_diff_with_at_most_one_coinbase : sig
       [@@deriving equal, sexp, yojson]
 
       val to_latest : t -> t
+    end
+
+    module V3 : sig
+      type t =
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        Pre_diff_one.Stable.V2.t
+      [@@deriving equal, sexp, yojson]
+
+      val to_latest : t -> V4.t
     end
 
     module Latest = V4
@@ -110,6 +165,14 @@ module Diff : sig
       val to_latest : t -> t
     end
 
+    module V3 : sig
+      type t =
+        Pre_diff_with_at_most_two_coinbase.Stable.V3.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
+
+      val to_latest : t -> V4.t
+    end
+
     module Latest = V4
   end
 
@@ -132,6 +195,15 @@ module Stable : sig
     val empty_diff : t
 
     val completed_works : t -> Transaction_snark_work.Stable.Latest.t list
+  end
+
+  module V3 : sig
+    type t = { diff : Diff.Stable.V3.t }
+    [@@deriving bin_io, equal, sexp, version, yojson]
+
+    val to_latest : t -> V4.t
+
+    val empty_diff : t
   end
 
   module Latest = V4

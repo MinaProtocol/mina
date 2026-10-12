@@ -28,6 +28,20 @@ module Stable = struct
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
   end
+
+  module V1 = struct
+    type ('ledger, 'pending_coinbase_stack, 'local_state) t =
+          ( 'ledger
+          , 'pending_coinbase_stack
+          , 'local_state )
+          Mina_wire_types.Mina_state.Registers.V1.t =
+      { first_pass_ledger : 'ledger
+      ; second_pass_ledger : 'ledger
+      ; pending_coinbase_stack : 'pending_coinbase_stack
+      ; local_state : 'local_state
+      }
+    [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
+  end
 end]
 
 let gen =

@@ -29,6 +29,14 @@ module Stable = struct
             with type t := t
              and type 'a creator := 'a Creatable.creator )
   end
+
+  module V2 = struct
+    type t = { staged_ledger_diff : Diff.Stable.V3.t }
+    [@@deriving equal, fields, sexp]
+
+    let to_latest ({ staged_ledger_diff } : t) : Latest.t =
+      Latest.create (Diff.Stable.V3.to_latest staged_ledger_diff)
+  end
 end]
 
 type t = { staged_ledger_diff : Diff.t } [@@deriving fields]
