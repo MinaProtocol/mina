@@ -8,6 +8,12 @@ module Common : sig
     module V4 : sig
       type t
     end
+
+    module V3 : sig
+      type t
+
+      val to_latest : t -> V4.t
+    end
   end]
 
   type t
@@ -63,6 +69,20 @@ module Limited : sig
              list
         -> t
     end
+
+    module V4 : sig
+      type t
+
+      val common : t -> Common.Stable.V3.t
+
+      val protocol_states :
+           t
+        -> Mina_state.Protocol_state.Value.Stable.V3.t
+           Mina_base.State_hash.With_state_hashes.Stable.V1.t
+           list
+
+      val to_latest : t -> V5.t
+    end
   end]
 
   type t [@@deriving to_yojson]
@@ -111,6 +131,18 @@ module Minimal : sig
       val scan_state : t -> Staged_ledger.Scan_state.Stable.V4.t
 
       val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+    end
+
+    module V3 : sig
+      type t
+
+      val hash : t -> State_hash.t
+
+      val of_limited : common:Common.Stable.V3.t -> State_hash.Stable.V1.t -> t
+
+      val common : t -> Common.Stable.V3.t
+
+      val to_latest : t -> V4.t
     end
   end]
 

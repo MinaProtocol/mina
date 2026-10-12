@@ -92,6 +92,21 @@ module Root_transition = struct
 
         let to_latest = Fn.id
       end
+
+      module V5 = struct
+        type t =
+          { new_root : Root_data.Limited.Stable.V4.t
+          ; garbage : Node_list.Lite.Stable.V1.t
+          ; just_emitted_a_proof : bool
+          }
+
+        let to_latest ({ new_root; garbage; just_emitted_a_proof } : t) :
+            Latest.t =
+          { new_root = Root_data.Limited.Stable.V4.to_latest new_root
+          ; garbage
+          ; just_emitted_a_proof
+          }
+      end
     end]
   end
 
@@ -105,6 +120,12 @@ module Root_transition = struct
           type t = Lite_binable.Stable.V6.t
 
           let to_latest = Fn.id
+        end
+
+        module V5 = struct
+          type t = Lite_binable.Stable.V5.t
+
+          let to_latest = Lite_binable.Stable.V5.to_latest
         end
       end]
     end
@@ -139,6 +160,13 @@ module Root_transition = struct
         include Binable.Of_binable (Binable_arg.Stable.V6) (T_nonbinable)
 
         let to_latest = Fn.id
+      end
+
+      module V5 = struct
+        type t = Binable_arg.Stable.V5.t [@@deriving bin_io, version]
+
+        let to_latest (t : t) : Latest.t =
+          Latest.T_nonbinable.of_binable (Binable_arg.Stable.V5.to_latest t)
       end
     end]
   end
