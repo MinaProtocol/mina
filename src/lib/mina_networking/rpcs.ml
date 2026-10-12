@@ -282,48 +282,6 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Register (T')
   end
 
-  module V3 = struct
-    module T = struct
-      type query = State_hash.Stable.V1.t
-
-      type response =
-        ( Staged_ledger.Scan_state.Stable.V3.t
-        * Ledger_hash.Stable.V1.t
-        * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V3.t list )
-        option
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      (* A peer on this version cannot be sent the latest types, so it is
-         answered as if nothing were known. *)
-      let response_of_callee_model = Fn.const None
-
-      let caller_model_of_response =
-        Option.map
-          ~f:(fun (scan_state, ledger_hash, pending_coinbase, protocol_states)
-             ->
-            ( Staged_ledger.Scan_state.Stable.V3.to_latest scan_state
-            , ledger_hash
-            , pending_coinbase
-            , List.map protocol_states
-                ~f:Mina_state.Protocol_state.Value.Stable.V3.to_latest ) )
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
   let receipt_trust_action_message hash =
     ( "Staged ledger and pending coinbases at hash: $hash"
     , [ ("hash", State_hash.to_yojson hash) ] )
@@ -543,36 +501,6 @@ module Get_transition_chain = struct
       let response_of_callee_model = ident
 
       let caller_model_of_response = ident
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  module V2 = struct
-    module T = struct
-      type query = State_hash.Stable.V1.t list [@@deriving sexp]
-
-      type response = Mina_block.Stable.V3.t list option
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      (* A peer on this version cannot be sent the latest types, so it is
-         answered as if nothing were known. *)
-      let response_of_callee_model = Fn.const None
-
-      let caller_model_of_response =
-        Option.map ~f:(List.map ~f:Mina_block.Stable.V3.to_latest)
     end
 
     module T' =
@@ -880,36 +808,6 @@ module Get_completed_snarks = struct
     include Register (T')
   end
 
-  module V1 = struct
-    module T = struct
-      type query = unit [@@deriving sexp]
-
-      type response = Transaction_snark_work.Stable.V2.t list option
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      (* A peer on this version cannot be sent the latest types, so it is
-         answered as if nothing were known. *)
-      let response_of_callee_model = Fn.const None
-
-      let caller_model_of_response =
-        Option.map ~f:(List.map ~f:Transaction_snark_work.Stable.V2.to_latest)
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
   let receipt_trust_action_message query =
     ("Get_completed_snarks query", [ ("query", query_to_yojson query) ])
 
@@ -1005,47 +903,6 @@ module Get_ancestry = struct
       let response_of_callee_model = ident
 
       let caller_model_of_response = ident
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  module V3 = struct
-    module T = struct
-      type query =
-        ( Consensus.Data.Consensus_state.Value.Stable.V3.t
-        , State_hash.Stable.V1.t )
-        With_hash.Stable.V1.t
-      [@@deriving sexp]
-
-      type response =
-        ( Mina_block.Stable.V3.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
-        Proof_carrying_data.Stable.V1.t
-        option
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      (* A peer on this version cannot be sent the latest types, so it is
-         answered as if nothing were known. *)
-      let response_of_callee_model = Fn.const None
-
-      let caller_model_of_response =
-        Option.map ~f:(fun pcd ->
-            Proof_carrying_data.map pcd ~f:Mina_block.Stable.V3.to_latest
-            |> Proof_carrying_data.map_proof ~f:(fun (hashes, block) ->
-                   (hashes, Mina_block.Stable.V3.to_latest block) ) )
     end
 
     module T' =
@@ -1253,43 +1110,6 @@ module Get_best_tip = struct
       let response_of_callee_model = ident
 
       let caller_model_of_response = ident
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  module V3 = struct
-    module T = struct
-      type query = unit [@@deriving sexp]
-
-      type response =
-        ( Mina_block.Stable.V3.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
-        Proof_carrying_data.Stable.V1.t
-        option
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      (* A peer on this version cannot be sent the latest types, so it is
-         answered as if nothing were known. *)
-      let response_of_callee_model = Fn.const None
-
-      let caller_model_of_response =
-        Option.map ~f:(fun pcd ->
-            Proof_carrying_data.map pcd ~f:Mina_block.Stable.V3.to_latest
-            |> Proof_carrying_data.map_proof ~f:(fun (hashes, block) ->
-                   (hashes, Mina_block.Stable.V3.to_latest block) ) )
     end
 
     module T' =
