@@ -38,8 +38,7 @@
   mina_transaction)
  (library_flags -linkall)
  (inline_tests
-  (flags -verbose -show-counts)
-  (deps proof_cache.json))
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_mina))
  (instrumentation

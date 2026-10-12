@@ -10,12 +10,6 @@ module Impl = Pickles.Impls.Step
 
 let%test_module "multisig_account" =
   ( module struct
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
     let signature_kind = Mina_signature_kind.Testnet
 
     module M_of_n_predicate = struct
@@ -219,7 +213,7 @@ let%test_module "multisig_account" =
                   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
                   }
                 in
-                Pickles.compile () ~cache:Cache_dir.cache ~proof_cache
+                Pickles.compile () ~cache:Cache_dir.cache
                   ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
@@ -481,11 +475,4 @@ let%test_module "multisig_account" =
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               Async.Thread_safe.block_on_async_exn (fun () ->
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
-
-    let () =
-      match Sys.getenv "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
   end )
