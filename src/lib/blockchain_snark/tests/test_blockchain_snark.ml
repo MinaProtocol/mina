@@ -27,10 +27,10 @@ type circuit_stats =
   }
 
 let dev_expected_values =
-  { constraints = 9266
+  { constraints = 9224
   ; public_input_size = 1
-  ; auxiliary_input_size = 31987
-  ; digest = "81ef2a46071ad8c4c5380461808ec15a"
+  ; auxiliary_input_size = 31502
+  ; digest = "2fc00002b83351a820ceea0ed10fd3a8"
   }
 
 let devnet_expected_values =
