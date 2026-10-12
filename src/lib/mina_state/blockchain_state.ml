@@ -6,6 +6,43 @@ open Currency
 module Poly = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type ( 'staged_ledger_hash
+           , 'snarked_ledger_hash
+           , 'local_state
+           , 'time
+           , 'body_reference
+           , 'signed_amount
+           , 'pending_coinbase_stack
+           , 'fee_excess
+           , 'sok_digest )
+           t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V3.t =
+        { staged_ledger_hash : 'staged_ledger_hash
+        ; genesis_ledger_hash : 'snarked_ledger_hash
+        ; ledger_proof_statement :
+            ( 'snarked_ledger_hash
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'local_state )
+            Snarked_ledger_state.Poly.Stable.V3.t
+        ; timestamp : 'time
+        ; body_reference : 'body_reference
+        }
+      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+    end
+
     module V2 = struct
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -71,11 +108,11 @@ module Value = struct
         , Local_state.Stable.V1.t
         , Block_time.Stable.V1.t
         , Consensus.Body_reference.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Amount.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
         , unit )
-        Poly.Stable.V2.t
+        Poly.Stable.V3.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
@@ -95,10 +132,20 @@ module Value = struct
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
-      let to_latest (t : t) : Latest.t =
-        { t with
-          ledger_proof_statement =
-            Snarked_ledger_state.Stable.V2.to_latest t.ledger_proof_statement
+      let to_latest
+          ({ staged_ledger_hash
+           ; genesis_ledger_hash
+           ; ledger_proof_statement
+           ; timestamp
+           ; body_reference
+           } :
+            t ) : Latest.t =
+        { staged_ledger_hash
+        ; genesis_ledger_hash
+        ; ledger_proof_statement =
+            Snarked_ledger_state.Stable.V2.to_latest ledger_proof_statement
+        ; timestamp
+        ; body_reference
         }
     end
   end]
@@ -110,7 +157,7 @@ type var =
   , Local_state.Checked.t
   , Block_time.Checked.t
   , Consensus.Body_reference.var
-  , Currency.Amount.Signed.var
+  , Currency.Amount.var
   , Pending_coinbase.Stack.var
   , Fee_excess.var
   , unit )
@@ -181,11 +228,12 @@ let set_timestamp t timestamp = { t with Poly.timestamp }
 let negative_one
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(consensus_constants : Consensus.Constants.t) ~genesis_ledger_hash
-    ~genesis_body_reference : Value.t =
+    ~genesis_total_currency ~genesis_body_reference : Value.t =
   { staged_ledger_hash =
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
-  ; ledger_proof_statement = Snarked_ledger_state.genesis ~genesis_ledger_hash
+  ; ledger_proof_statement =
+      Snarked_ledger_state.genesis ~genesis_ledger_hash ~genesis_total_currency
   ; timestamp = consensus_constants.genesis_state_timestamp
   ; body_reference = genesis_body_reference
   }

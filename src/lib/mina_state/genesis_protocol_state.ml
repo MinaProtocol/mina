@@ -28,6 +28,7 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
         (Blockchain_state.genesis ~constraint_constants ~consensus_constants
            ~genesis_ledger_hash:
              (Consensus.Genesis_data.Hashed.hash genesis_ledger)
+           ~genesis_total_currency:genesis_ledger.total_currency
            ~genesis_body_reference )
       ~consensus_state:genesis_consensus_state ~constants:protocol_constants
   in
