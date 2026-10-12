@@ -27,25 +27,8 @@ let global_slot = Mina_numbers.Global_slot_since_genesis.of_int 5
 
 (* Only used to fill the [txn_state_view] argument; payments ignore it. *)
 let txn_state_view : Zkapp_precondition.Protocol_state.View.t =
-  let h = Frozen_ledger_hash.empty_hash in
-  let len = Mina_numbers.Length.zero in
-  let a = Currency.Amount.zero in
-  let epoch_data =
-    { Epoch_data.Poly.ledger =
-        { Epoch_ledger.Poly.hash = h; total_currency = a }
-    ; seed = h
-    ; start_checkpoint = h
-    ; lock_checkpoint = h
-    ; epoch_length = len
-    }
-  in
-  { snarked_ledger_hash = h
-  ; blockchain_length = len
-  ; min_window_density = len
-  ; total_currency = a
-  ; global_slot_since_genesis = global_slot
-  ; staking_epoch_data = epoch_data
-  ; next_epoch_data = epoch_data
+  { Mina_transaction_logic.For_tests.view with
+    global_slot_since_genesis = global_slot
   }
 
 let keypairs_from ~offset n =
