@@ -451,8 +451,8 @@ let%test_module "Archive node unit tests" =
     (* Regression test for the [tokens_value_key] (UNIQUE on [tokens.value])
        violation. A custom token can already be present in [tokens] with an
        owner set (inserted while processing a block). A later code path that
-       does not populate [Token_owners] -- notably [add_genesis_accounts] at
-       archive startup with --config-file -- re-adds the same token as
+       does not populate [Token_owners] -- such as the genesis ledger write the
+       archive once did at start-up with --config-file -- re-adds the same token as
        ownerless. The no-owner branch of [Token.add_if_doesn't_exist] must
        reuse the existing row; before the fix it selected by the full
        {value; NULL; NULL} tuple, missed the owned row, and the subsequent
@@ -479,17 +479,14 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
-    (* Regression test for the hardfork "fork genesis" bug that breaks Rosetta
-       balance reconciliation at the fork boundary. A hard fork restarts the
-       chain at a genesis block whose [blockchain_length] is [fork.blockchain_length
-       + 1] (not 1). When such a block is present in the archive but was ingested
-       WITHOUT its ledger accounts (e.g. the archive was never (re)started with
-       the fork [--config-file]), [accounts_accessed] is empty for it, so Rosetta
-       reports zero balances at the fork block. [add_genesis_accounts] -- run
-       at archive start-up with that config -- must backfill the full fork
-       genesis ledger onto that existing block. *)
-    let%test_unit "Accounts_accessed: add_genesis_accounts backfills the fork \
-                   genesis ledger onto an existing fork genesis block" =
+    (* A hard fork restarts the chain at a genesis block whose
+       [blockchain_length] is [fork.blockchain_length + 1] (not 1). Start-up
+       with the fork [--config-file] adds that block, with no
+       [accounts_accessed] rows, and returns its ledger; [write_genesis_accounts]
+       keeps the ledger in [genesis_accounts] once the archive accepts
+       blocks. *)
+    let%test_unit "add_genesis_block: the fork genesis block, its ledger for \
+                   genesis_accounts" =
       let pool = Lazy.force conn_pool_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
@@ -523,81 +520,12 @@ let%test_module "Archive node unit tests" =
         ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
         }
       in
-      (* Derive the precomputed values (and hence the exact fork genesis block)
-         the same way [add_genesis_accounts] does internally, so the block we
-         insert below is the very block it will later look up and backfill. *)
-      let (module G) = Genesis_constants.profiled () in
-      let%bind precomputed_values =
-        match%map
-          Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
-            ~cli_proof_level:None runtime_config
-        with
-        | Ok precomputed_values ->
-            precomputed_values
-        | Error err ->
-            failwithf "init_from_config_file: %s" (Error.to_string_hum err) ()
-      in
-      let genesis_block =
-        let With_hash.{ data = block; hash = the_hash }, _ =
-          Mina_block.genesis ~precomputed_values
-        in
-        With_hash.{ data = block; hash = the_hash }
-      in
-      let count_accounts_accessed block_id =
+      let count query =
         match%map
           Mina_caqti.Pool.use
             (fun (module Conn : Mina_caqti.CONNECTION) ->
               Conn.find
-                (Mina_caqti.find_req Caqti_type.int Caqti_type.int
-                   "SELECT COUNT(*) FROM accounts_accessed WHERE block_id = ?" )
-                block_id )
-            pool
-        with
-        | Ok count ->
-            count
-        | Error e ->
-            failwith @@ Caqti_error.show e
-      in
-      (* Reproduce the production state: the fork genesis block is present in the
-         archive but was ingested with NO ledger accounts attached. *)
-      let%bind genesis_block_id =
-        match%map
-          Mina_caqti.Pool.use
-            (fun (module Conn : Mina_caqti.CONNECTION) ->
-              Processor.Block.add_if_doesn't_exist
-                (module Conn)
-                ~logger
-                ~constraint_constants:precomputed_values.constraint_constants
-                genesis_block ~accounts_accessed:[] ~accounts_created:[] )
-            pool
-        with
-        | Ok genesis_block_id ->
-            genesis_block_id
-        | Error e ->
-            failwith @@ Caqti_error.show e
-      in
-      let%bind before = count_accounts_accessed genesis_block_id in
-      (* The bug: the fork genesis block has no accounts_accessed rows. *)
-      [%test_result: int] ~expect:0 before ;
-      let%bind genesis =
-        Processor.add_genesis_accounts ~logger
-          ~runtime_config_opt:(Some runtime_config) ~genesis_constants
-          ~chunks_length:100 ~constraint_constants pool
-      in
-      let%bind after = count_accounts_accessed genesis_block_id in
-      (* The fix: every fork genesis ledger account is now attached to the
-         fork genesis block. *)
-      [%test_result: int] ~expect:num_accounts after ;
-      (* genesis_accounts is left to the background write *)
-      let count_genesis_accounts () =
-        match%map
-          Mina_caqti.Pool.use
-            (fun (module Conn : Mina_caqti.CONNECTION) ->
-              Conn.find
-                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
-                   "SELECT COUNT(*) FROM genesis_accounts WHERE genesis_height \
-                    = 101" )
+                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int query)
                 () )
             pool
         with
@@ -606,13 +534,28 @@ let%test_module "Archive node unit tests" =
         | Error e ->
             failwith @@ Caqti_error.show e
       in
-      let%bind written = count_genesis_accounts () in
-      [%test_result: int] ~expect:0 written ;
+      let%bind genesis =
+        Processor.add_genesis_block ~logger
+          ~runtime_config_opt:(Some runtime_config) ~genesis_constants
+          ~constraint_constants pool
+      in
       let genesis_height, ledger_accounts = Option.value_exn genesis in
       [%test_result: int64] ~expect:101L genesis_height ;
+      [%test_result: int] ~expect:num_accounts (List.length ledger_accounts) ;
+      let%bind accessed =
+        count
+          "SELECT COUNT(*) FROM accounts_accessed aa JOIN blocks b ON b.id = \
+           aa.block_id WHERE b.height = 101"
+      in
+      [%test_result: int] ~expect:0 accessed ;
+      let count_genesis_accounts () =
+        count "SELECT COUNT(*) FROM genesis_accounts WHERE genesis_height = 101"
+      in
+      let%bind written = count_genesis_accounts () in
+      [%test_result: int] ~expect:0 written ;
       let%bind () =
-        Processor.write_genesis_accounts ~logger pool ~genesis_height
-          ledger_accounts
+        Processor.write_genesis_accounts ~chunk_size:2 ~logger pool
+          ~genesis_height ledger_accounts
       in
       let%map written = count_genesis_accounts () in
       [%test_result: int] ~expect:num_accounts written

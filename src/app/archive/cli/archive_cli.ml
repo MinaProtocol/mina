@@ -40,11 +40,10 @@ let command_run =
      and chunks_length =
        flag "--chunks-length" ~aliases:[ "-chunks-length" ]
          ~doc:
-           "int The number of accounts to insert from the database in one \
-            transaction, when processing genesis ledger. This is to prevent \
-            Postgres Out of Memory errors when handling very big genesis file. \
-            Default is 100."
-         (optional_with_default 100 int)
+           "int The number of accounts per statement and transaction when the \
+            archive writes the genesis ledger to genesis_accounts. Default is \
+            5000."
+         (optional_with_default 5000 int)
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->

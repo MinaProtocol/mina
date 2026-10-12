@@ -4972,11 +4972,12 @@ module Genesis_accounts = struct
           `Added (total - already, already)
 end
 
-(* [add_genesis_accounts] is called when starting the archive process. It
-   returns the genesis height and ledger accounts, for [write_genesis_accounts]
-   to keep once the archive accepts blocks. *)
-let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t) ~chunks_length
+(* [add_genesis_block] is called when starting the archive process. It adds
+   the genesis block of the runtime config and returns its height and ledger
+   accounts, for [write_genesis_accounts] to keep once the archive accepts
+   blocks. *)
+let add_genesis_block ~logger ~(runtime_config_opt : Runtime_config.t option)
+    ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
   match runtime_config_opt with
   | None ->
@@ -4998,129 +4999,66 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
       in
-      let%bind account_ids =
-        let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
-        Account_id.Set.to_list account_id_set
-      in
       let genesis_block =
         let With_hash.{ data = block; hash = the_hash }, _ =
           Mina_block.genesis ~precomputed_values
         in
         With_hash.{ data = block; hash = the_hash }
       in
-      (* NOTE: it's fine for accounts_accessed to be added non-atomically.
-         Since we're bootstrapping, I guess? *)
-      (* TODO: figure out whether we need to add genesis accounts to accounts_created *)
-      let add_accounts () =
-        let%bind.Deferred.Result ledger_hash, genesis_block_id, genesis_height =
-          Mina_caqti.Pool.use
-            (fun (module Conn : Mina_caqti.CONNECTION) ->
-              let%bind.Deferred.Result genesis_block_id =
-                Block.add_if_doesn't_exist
-                  (module Conn)
-                  ~logger
-                  ~constraint_constants:precomputed_values.constraint_constants
-                  genesis_block ~accounts_accessed:[] ~accounts_created:[]
-              in
-              let%bind.Deferred.Result { ledger_hash; height; _ } =
-                Block.load (module Conn) ~id:genesis_block_id
-              in
-              return (Ok (ledger_hash, genesis_block_id, height)) )
-            pool
-        in
-        let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
-        let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
-        if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
-          [%log info]
-            "Archived genesis block ledger hash equals actual genesis ledger \
-             hash"
-            ~metadata:
-              [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash) ]
-        else (
-          [%log error]
-            "Archived genesis block ledger hash different than actual genesis \
-             ledger hash"
-            ~metadata:
-              [ ("archived_ledger_hash", Ledger_hash.to_yojson db_ledger_hash)
-              ; ("actual_ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
-              ] ;
-          exit 1 ) ;
-        let open Deferred.Let_syntax in
-        let genesis_accounts_count = List.length account_ids in
-        [%log info] "Archiving genesis accounts"
-          ~metadata:[ ("count", `Int genesis_accounts_count) ] ;
-
-        let acccount_with_index_of_id ~ledger acct_id =
-          match Mina_ledger.Ledger.location_of_account ledger acct_id with
-          | None ->
-              [%log error] "Could not get location for account"
-                ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
-              failwith "Could not get location for genesis account"
-          | Some loc -> (
-              let index =
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id
-              in
-              match Mina_ledger.Ledger.get ledger loc with
-              | None ->
-                  [%log error] "Could not get account, given a location"
-                    ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
-                  failwith "Could not get genesis account, given a location"
-              | Some acct ->
-                  (index, acct) )
-        in
-        let accounts =
-          List.map account_ids ~f:(fun acct_id ->
-              acccount_with_index_of_id ~ledger acct_id )
-        in
-        let%bind list_of_results =
-          accounts
-          |> List.chunks_of ~length:chunks_length
-          |> Deferred.List.mapi ~f:(fun i batch ->
-                 match%bind
-                   Pool.use
-                     (fun (module Conn : CONNECTION) ->
-                       Accounts_accessed.add_accounts_if_don't_exist
-                         (module Conn)
-                         genesis_block_id batch )
-                     pool
-                 with
-                 | Ok _ ->
-                     [%log trace] "Archived batch of account %d of %d"
-                       (i * chunks_length) genesis_accounts_count ;
-                     return (Result.Ok ())
-                 | Error err ->
-                     [%log error] "Could not add batch of genesis account"
-                       ~metadata:
-                         [ ("batch number", `Int i)
-                         ; ("error", `String (Caqti_error.show err))
-                         ] ;
-                     return (Result.Error err) )
-        in
-
-        return
-          ( List.find list_of_results ~f:(fun result -> Result.is_error result)
-          |> Option.value ~default:(Result.Ok ())
-          |> Result.map ~f:(fun () ->
-                 (genesis_height, List.map accounts ~f:snd) ) )
+      let add_block () =
+        Mina_caqti.Pool.use
+          (fun (module Conn : Mina_caqti.CONNECTION) ->
+            let%bind.Deferred.Result genesis_block_id =
+              Block.add_if_doesn't_exist
+                (module Conn)
+                ~logger
+                ~constraint_constants:precomputed_values.constraint_constants
+                genesis_block ~accounts_accessed:[] ~accounts_created:[]
+            in
+            let%map.Deferred.Result { ledger_hash; height; _ } =
+              Block.load (module Conn) ~id:genesis_block_id
+            in
+            (ledger_hash, height) )
+          pool
       in
-      match%map
-        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+      match%bind
+        retry ~f:add_block ~logger ~error_str:"add_genesis_block" 3
       with
       | Error e ->
-          [%log warn] "genesis accounts could not be added"
+          [%log warn] "The genesis block could not be added"
             ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
-          failwith "Failed to add genesis accounts"
-      | Ok genesis ->
-          Some genesis )
+          failwith "Failed to add the genesis block"
+      | Ok (ledger_hash, genesis_height) ->
+          let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
+          let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
+          if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
+            [%log info]
+              "Archived genesis block ledger hash equals actual genesis ledger \
+               hash"
+              ~metadata:
+                [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash) ]
+          else (
+            [%log error]
+              "Archived genesis block ledger hash different than actual \
+               genesis ledger hash"
+              ~metadata:
+                [ ("archived_ledger_hash", Ledger_hash.to_yojson db_ledger_hash)
+                ; ( "actual_ledger_hash"
+                  , Ledger_hash.to_yojson actual_ledger_hash )
+                ] ;
+            exit 1 ) ;
+          let%map accounts = Mina_ledger.Ledger.to_list ledger in
+          Some (genesis_height, accounts) )
 
 (* Keep the genesis ledger in [genesis_accounts]. Run in the background: the
    archive accepts blocks meanwhile, and an interrupted write continues at the
    next start. *)
-let write_genesis_accounts ~logger pool ~genesis_height accounts =
+let write_genesis_accounts ?chunk_size ~logger pool ~genesis_height accounts =
   let metadata = [ ("height", `String (Int64.to_string genesis_height)) ] in
   match%map
     Mina_caqti.Pool.use
-      (fun conn -> Genesis_accounts.add conn ~genesis_height accounts)
+      (fun conn ->
+        Genesis_accounts.add ?chunk_size conn ~genesis_height accounts )
       pool
   with
   | Error e ->
@@ -5230,8 +5168,8 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Deferred.unit
   | Ok pool ->
       let%bind genesis =
-        add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt ~chunks_length
+        add_genesis_block pool ~logger ~genesis_constants ~constraint_constants
+          ~runtime_config_opt
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than
@@ -5313,7 +5251,8 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       (* NOTE: this is depended on by archive fixture, so whenever updating this message, consider updating the fixture as well *)
       [%log info] "Archive process ready. Clients can now connect" ;
       Option.iter genesis ~f:(fun (genesis_height, accounts) ->
-          write_genesis_accounts ~logger pool ~genesis_height accounts
+          write_genesis_accounts ~chunk_size:chunks_length ~logger pool
+            ~genesis_height accounts
           |> don't_wait_for ) ;
       Async.never ()
 
