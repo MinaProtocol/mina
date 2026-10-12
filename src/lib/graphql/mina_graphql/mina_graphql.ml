@@ -1046,8 +1046,9 @@ module Mutations = struct
     let scheduler_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
       Uuid.Table.create ()
 
-    (* The accounts of each createAccounts job, so that a repeated request with
-       the handle of a running job can return them again. *)
+    (* The accounts of each running createAccounts job, so that a repeated
+       request with the handle of a running job can return them again. The job
+       removes its entry when it ends, together with its scheduler_tbl entry. *)
     let created_accounts_tbl : Keypair.t list Uuid.Table.t =
       Uuid.Table.create ()
 
@@ -1493,7 +1494,8 @@ module Mutations = struct
                     Deferred.unit ) )
       in
       let%map () = run batches in
-      Uuid.Table.remove scheduler_tbl uuid
+      Uuid.Table.remove scheduler_tbl uuid ;
+      Uuid.Table.remove created_accounts_tbl uuid
 
     let create_accounts =
       io_field "createAccounts"
