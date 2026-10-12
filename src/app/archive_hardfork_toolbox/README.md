@@ -102,50 +102,29 @@ archive_hardfork_toolbox validate-fork \
 - `--fork-state-hash`: Hash of the fork state
 - `--fork-slot`: Global slot since genesis of the fork block
 
-### convert-chain-to-canonical
+### settle-pending-blocks
 
-Marks the chain leading to a target block as `canonical` (and orphans the competing
-blocks of that protocol version). This is the post-fork repair step for the pre-fork
-tail: at a hard fork the last ~k pre-fork blocks (including the fork block's parent)
-are left `pending` because the canonical watermark jumps to the fork genesis and never
-walks back below it. This command finalizes them.
+At a hard fork the canonical watermark is about k blocks behind the fork block,
+so the end of the old chain stays `pending`. This command makes the chain to the
+fork block `canonical`, orphans the rest of the ended chain, and orphans the
+pending blocks at heights that already have a canonical block. The archive does
+the same when it adds a fork genesis (or the fork block that genesis waits
+for); use this command on an archive that did not.
 
-**Usage (auto-detect the latest boundary):**
 ```bash
-archive_hardfork_toolbox convert-chain-to-canonical \
+archive_hardfork_toolbox settle-pending-blocks \
   --postgres-uri "postgresql://user:pass@host:port/db" \
   --dry-run
-```
-With no target/protocol flags it auto-detects the latest hard-fork boundary — the
-parent of the highest block with `global_slot_since_hard_fork = 0` — and uses that
-block's protocol version. Run with `--dry-run` first to review the change plan and
-summary, then re-run without it to apply.
-
-If the fork does **not** bump the protocol version (some emergency hard forks), the
-post-fork chain shares the protocol version with the pre-fork chain. The command
-detects the fork boundary and leaves blocks at or beyond it untouched, so the
-post-fork chain is never orphaned.
-
-**Usage (explicit target):**
-```bash
-archive_hardfork_toolbox convert-chain-to-canonical \
-  --postgres-uri "postgresql://user:pass@host:port/db" \
-  --protocol-version "3.0.0" \
-  --target-block-hash "3NKx..."
 ```
 
 **Parameters:**
 - `--postgres-uri`: URI for connecting to the archive database
-- `--target-block-hash`: State hash of the block that should remain canonical (default: parent of the latest hard-fork block)
-- `--fork-height`: Height of the block that should remain canonical (alternative to `--target-block-hash`)
-- `--protocol-version`: Protocol version `<transaction>.<network>.<patch>` (default: the target block's own protocol version)
-- `--stop-at-slot`: If provided, stops marking blocks older than this global slot since genesis
-- `--dry-run`: Print the blocks that would change and a summary without writing any changes
-- `--json`: Emit the change plan as JSON (target, fork block, boundary slot, summary, and a per-block `changes` array) instead of the human-readable table
+- `--fork-genesis-hash`: State hash of the fork genesis (default: the newest fork genesis)
+- `--dry-run`: Report what would change, then roll back
 
-To repair an earlier boundary (e.g. on a network with more than one hard fork), pass
-`--protocol-version` and `--target-block-hash`/`--fork-height` explicitly instead of
-relying on auto-detection, which always targets the latest boundary.
+Prints JSON: `dry_run`, and `result` with `genesis_id`, `boundary` (`Settled` with
+`canonicalized`/`orphaned` counts, `No_fork_block`, or `No_canonical_ancestor`) and
+`orphaned_decided`. Running it again changes nothing.
 
 ## Typical Workflow
 
@@ -158,7 +137,7 @@ relying on auto-detection, which always targets the latest boundary.
 
 3. **Post-fork validation**: Use `validate-fork` to ensure the fork block and its ancestry remain intact
 
-4. **Post-fork tail repair**: Use `convert-chain-to-canonical` (with `--dry-run` first) to finalize the pre-fork tail that would otherwise stay `pending`
+4. **Post-fork tail repair**: Use `settle-pending-blocks` (with `--dry-run` first) if the pre-fork tail is still `pending`
 
 ## Database Connection
 
