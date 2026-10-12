@@ -63,6 +63,9 @@ source ./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password
 echo "Database setup complete, accessible via $MINA_TEST_POSTGRES . Running archive node unit tests..."
 dune runtest src/app/archive
 
+# Synthetic_archive: the shared test archive builder, against the same DB server
+dune runtest src/test/mina_automation/test/synthetic_archive
+
 # Hermetic CLI smoke tests for mina-archive-healthcheck: --help shape
 # and the single-JSON-record contract on the dead-PG error path.  These
 # don't need MINA_TEST_POSTGRES (they exercise only failure paths) but

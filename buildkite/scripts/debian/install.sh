@@ -115,13 +115,20 @@ fi
 # instead parsed as the 'package/release' selector syntax (package "debs" from
 # release "foo.deb"), which fails with "Unable to locate package debs".
 ABS_DEB_FOLDER="$(cd "$LOCAL_DEB_FOLDER" && pwd)"
+# Only the .debs for this machine's architecture (plus arch-independent ones).
+# The fetch globs (e.g. "${i}_${VERSION}_*", or "*" with FORCE_VERSION) also
+# match the arm64 builds the cache holds next to the amd64 ones, and handing
+# apt-get both makes it pull arm64 dependencies and fail with "held broken
+# packages".
+DEB_ARCH="$(dpkg --print-architecture)"
 deb_files=()
 while IFS= read -r -d '' f; do
   deb_files+=("$f")
-done < <(find "$ABS_DEB_FOLDER" -maxdepth 1 -name '*.deb' -print0)
+done < <(find "$ABS_DEB_FOLDER" -maxdepth 1 \( -name "*_${DEB_ARCH}.deb" -o -name '*_all.deb' \) -print0)
 
 if [ "${#deb_files[@]}" -eq 0 ]; then
-  echo "No .deb files were downloaded into '$LOCAL_DEB_FOLDER'. Nothing to install."
+  echo "No ${DEB_ARCH} .deb files were downloaded into '$LOCAL_DEB_FOLDER'. Nothing to install."
+  ls -la "$LOCAL_DEB_FOLDER"
   exit 1
 fi
 

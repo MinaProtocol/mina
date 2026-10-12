@@ -21,6 +21,7 @@ in  Pipeline.build
           [ S.exactly "scripts/debian/builder-helpers" "sh"
           , S.strictlyStart (S.contains "scripts/debian/tests")
           , S.exactly "scripts/export-git-env-vars" "sh"
+          , S.exactly "buildkite/scripts/debian/select_release_packages" "sh"
           , S.exactly "buildkite/src/Jobs/Test/BuilderHelpersTest" "dhall"
           ]
         , path = "Test"
@@ -48,6 +49,16 @@ in  Pipeline.build
               [ Cmd.run "./scripts/debian/tests/test_build_parallel.sh" ]
             , label = "Debian parallel-build tests"
             , key = "build-parallel-tests"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "./scripts/debian/tests/test_select_release_packages.sh"
+              ]
+            , label = "Release package selection tests"
+            , key = "select-release-packages-tests"
             , target = Size.Small
             , docker = None Docker.Type
             }

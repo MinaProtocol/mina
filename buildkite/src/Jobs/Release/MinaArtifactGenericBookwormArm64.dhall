@@ -27,6 +27,7 @@ in  Pipeline.build
           , arch = Arch.Type.Arm64
           , tags =
             [ PipelineTag.Type.Packaging
+            , PipelineTag.Type.Generic
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet

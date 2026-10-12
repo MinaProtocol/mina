@@ -16,20 +16,24 @@ NUM_PAYMENTS=110
 # characteristics of archive node operation similar to mainnet.
 # If this value is changed, it's important to update the runtime config json in the ledger
 # archive below.
-DUMP_SQL="mainnet-archive-dump-2025-11-11_0000.sql"
+DUMP_SQL="mainnet-archive-dump-2026-10-06_0000.sql"
 DUMP_ARCHIVE="mainnet-archive-dump.tar.gz"
 ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/$DUMP_SQL.tar.gz"
 
 # Ledger generated from a recent mainnet's ledger with all of the stake split more or
 # less equally among two accounts (one whale key with small balance, and one plain key).
 # with lots of delegations to it and 100mln MINA balance).
-# Generated with: scripts/generate-ledger-hf-dryrun.sh -p 1 -k 1 --output-dir new-ledger
+# Generated with the binaries of the branch under test (ledger file names depend on
+# the account format, so a ledger made before a hard fork does not load after it):
+#   EPOCH=<current mainnet epoch> scripts/generate-ledger-hf-dryrun.sh --profile mainnet \
+#     -p 1 -k 1 --pad-app-state --mina-binary ... --runtime-genesis-ledger-binary ...
+# Keys are renamed to bp1/plain1 and the ledger tars go under ledgers/.
 #
 # After generation, `runtime-config.json` was manually extended with `proof` section
 # containing the fork config. This fork config was populated with data of the most recent
 # block extract from the archive dump via SQL:
 # `select state_hash, height, global_slot_since_genesis from blocks ORDER BY height DESC LIMIT 1`
-LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger.tar"
+LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger-mesa.tar"
 
 # Local paths
 LEDGER_ARCHIVE="ledger.tar"

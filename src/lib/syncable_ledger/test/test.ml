@@ -357,6 +357,67 @@ module Make_test_content_length (Input : Input_intf) = struct
             false )
 end
 
+(* A malicious peer can answer a [Num_accounts] sync query with a count whose
+   [ceil_log2] exceeds the tree depth. Before the fix, [handle_num_accounts] fed
+   that to [complete_with_empties], which starts above the tree height and loops
+   effectively forever, hanging the syncer (and this test). The count is now
+   range-checked and rejected, the [Num_accounts] query is requeued, and a
+   subsequent honest answer lets the sync complete. Instantiated against a single
+   healthy context (unlike [Make_test_edge_cases], which also covers degenerate
+   subtree depths that legitimately produce failing answers). *)
+module Make_test_num_accounts_dos (Input : Input_intf) = struct
+  open Input
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  let num_accts = 20
+
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
+  let%test "out-of-range num_accounts is rejected without hanging" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    let injected = ref false in
+    don't_wait_for
+      (Linear_pipe.iter qr ~f:(fun (root_hash, query) ->
+           match query with
+           | Syncable_ledger.Query.Num_accounts when not !injected ->
+               injected := true ;
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local
+                     (Syncable_ledger.Answer.Num_accounts
+                        (Int.max_value, desired_root) ) )
+           | _ ->
+               let%bind answ =
+                 Sync_responder.answer_query sr (Envelope.Incoming.local query)
+               in
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local (Or_error.ok_exn answ) ) ) ) ;
+    match
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+              true ) )
+    with
+    | `Ok mt ->
+        Root_hash.equal desired_root (Ledger.merkle_root mt)
+    | `Target_changed _ ->
+        false
+end
+
 module Root_hash = struct
   include Merkle_ledger_tests.Test_stubs.Hash
 
@@ -515,6 +576,9 @@ module Db = struct
       (struct
         let num_accts = 20
       end)
+
+  module TestDB16_Num_accounts_dos =
+    Make_test_num_accounts_dos (DB16_subtree_depths86)
 
   module TestDB16_1024 =
     Make_test

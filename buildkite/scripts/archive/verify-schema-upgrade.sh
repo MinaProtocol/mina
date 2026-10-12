@@ -30,7 +30,7 @@ set -euo pipefail
 
 # --- Constants ---
 POSTGRES_CONTAINER="postgres-schema-test-$$"
-POSTGRES_IMAGE="postgres:12.4-alpine"
+POSTGRES_IMAGE="postgres:17-alpine"
 PG_USER="postgres"
 PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -118,6 +118,7 @@ create_db() {
 #   - DEFAULT <integer> clauses (upgrade sets runtime-dependent defaults)
 #   - Sequence setval calls (differ due to data inserts during upgrade)
 #   - Comments and blank lines (timestamps, pg_dump version)
+#   - \restrict / \unrestrict lines (random per-dump key, pg_dump >= 17.6)
 dump_and_normalize() {
     local db="$1"
     local output_file="$2"
@@ -128,6 +129,7 @@ dump_and_normalize() {
         -U "$PG_USER" "$db" \
     | grep -v '^--' \
     | grep -v '^$' \
+    | grep -Ev '^\\(un)?restrict ' \
     | awk '/^CREATE TYPE.*migration_status/{skip=1} skip && /\);/{skip=0; next} !skip' \
     | sed -E 's/ DEFAULT [0-9]+//g' \
     | sed '/^SELECT pg_catalog.setval/d' \

@@ -350,4 +350,6 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
             [%log error] ~metadata
               "Dropping blocks because libp2p validation expired" ;
             Error () )
-      else Deferred.Result.fail () )
+      else (
+        Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Ignore ;
+        Deferred.Result.fail () ) )

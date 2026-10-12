@@ -21,6 +21,7 @@ let Filter
       | Publish
       | PackagingAmd64Devnet
       | PackagingAmd64Mainnet
+      | PackagingAmd64Generic
       | Rosetta
       | Hardfork
       | AllDockersAndDebians
@@ -69,6 +70,8 @@ let tags
               [ Tag.Type.Packaging, Tag.Type.Devnet, Tag.Type.Amd64 ]
             , PackagingAmd64Mainnet =
               [ Tag.Type.Packaging, Tag.Type.Mainnet, Tag.Type.Amd64 ]
+            , PackagingAmd64Generic =
+              [ Tag.Type.Packaging, Tag.Type.Generic, Tag.Type.Amd64 ]
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
@@ -227,6 +230,7 @@ let show
             , Publish = "Publish"
             , PackagingAmd64Devnet = "PackagingAmd64Devnet"
             , PackagingAmd64Mainnet = "PackagingAmd64Mainnet"
+            , PackagingAmd64Generic = "PackagingAmd64Generic"
             , Rosetta = "Rosetta"
             , Hardfork = "Hardfork"
             , AllDockersAndDebians = "AllDockersAndDebians"

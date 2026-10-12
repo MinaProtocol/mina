@@ -172,6 +172,7 @@ assert_rosetta_binaries() {
     assert_file_captured "$captured_files" "usr/local/bin/rosetta-client"
     assert_file_captured "$captured_files" "usr/local/bin/mina-ocaml-signer"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-indexer-test"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-search-test"
 }
 
 assert_rosetta_configs() {
@@ -351,6 +352,7 @@ MOCKEXE
     create_mock_exe "default/src/app/rosetta/rosetta.exe"
     create_mock_exe "default/src/app/rosetta/ocaml-signer/signer.exe"
     create_mock_exe "default/src/app/rosetta/indexer_test/indexer_test.exe"
+    create_mock_exe "default/src/app/rosetta/search_test/rosetta_search_test.exe"
     create_mock_exe "default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe"
     create_mock_exe "default/src/app/rosetta/client/rosetta_client_cli.exe"
     create_mock_exe "default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
@@ -904,6 +906,8 @@ test_build_daemon_devnet_generic_deb() {
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    # The daemon downloads ledger tarballs with curl.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "curl"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     # The plain generic already carries the mina-generic name, so it needs no
     # Provides (only the flavored variants provide the virtual name).
@@ -931,6 +935,8 @@ test_build_daemon_mainnet_generic_deb() {
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    # The daemon downloads ledger tarballs with curl.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "curl"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     # The generic package is network-agnostic: it carries no network-specific
     # Replaces/Breaks (it neither replaces nor conflicts with mina-<network> or
@@ -1217,8 +1223,8 @@ test_build_archive_devnet_suffix_naming() {
 
 # Noble codename dep strings (mirrors the 'noble' case in builder-helpers.sh)
 NOBLE_SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
-NOBLE_DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
-NOBLE_ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+NOBLE_DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc, curl"
+NOBLE_ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2, curl"
 
 test_codename_noble_deps() {
     # Save current deps
@@ -1251,6 +1257,7 @@ test_codename_noble_archive_deps() {
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "curl"
 
     ARCHIVE_DEPS="${saved_archive}"
 }

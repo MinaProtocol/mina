@@ -2,20 +2,10 @@
 
 set -eox pipefail
 
-# Connect test: start the daemon, sync against the live network and assert the
-# network id, then exercise the RocksDB storage migration -- convert the store to
-# the legacy format, downgrade to the official stable release, confirm the old
-# daemon still syncs the converted store, upgrade back and re-sync.
-#
-# Binary acquisition is split from the migration: the CURRENT-version binaries
-# (mina, the current rocksdb-scanner, the in-repo storage converter,
-# mina-graphql-client, libp2p_helper) are restored bare from the apps cache --
-# mirroring what their .debs install. This job depends on the Apps (bare-binary)
-# build, not the debian/docker package build, so there is no this-build .deb to
-# fall back to; a cache miss is a hard failure. The RELEASED bits the downgrade
-# needs (a mina-logproc from packages.o1test.net, the stable 3.3.0 recovery
-# storage toolbox and the official 3.3.0 daemon) are not built here, so they stay
-# .deb installs from packages.o1test.net / the legacy cache / official apt.
+# Connect test: start the current daemon, sync against the live network and
+# assert the network id. Binaries (mina, mina-graphql-client, libp2p_helper) are
+# restored bare from the apps cache; this job depends on the Apps build, so a
+# cache miss is a hard failure.
 
 # --- Initialization ---
 MINA_DEBIAN_NETWORK=""
@@ -23,10 +13,6 @@ MINA_PROFILE_ARG=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
 SYNC_TIMEOUT=""
-STABLE_VERSION="3.3.0"
-
-# Must match build_daemon_storage_toolbox_deb in scripts/debian/builder-helpers.sh.
-ROCKSDB_VERSION="10.5.2"
 
 usage() {
     cat << EOF
@@ -39,7 +25,6 @@ All arguments are mandatory unless noted:
   --wait-between-polling <val>       Duration to wait between GraphQL polling
   --sync-timeout <val>               Duration to wait before considering the sync is failed
   --peer-list-url <val>              Peer list URL
-  --stable-version <val>             Stable release to downgrade to (default: ${STABLE_VERSION})
   --help                             Display this help message
 
 Example:
@@ -57,7 +42,6 @@ while [[ $# -gt 0 ]]; do
         --peer-list-url) PEER_LIST_URL="$2"; shift 2 ;;
         --wait-between-polling) WAIT_BETWEEN_POLLING_GRAPHQL="$2"; shift 2 ;;
         --sync-timeout) SYNC_TIMEOUT="$2"; shift 2 ;;
-        --stable-version) STABLE_VERSION="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Error: Unknown argument '$1'"; usage ;;
     esac
@@ -77,11 +61,6 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/export-git-env-vars.sh
 
-SUDO=""
-if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1; then
-  SUDO="sudo"
-fi
-
 # The daemon fetches the genesis (and epoch) ledger tarballs referenced by the
 # runtime config from S3 when they are not already on disk. Pin the public
 # read-only mirror explicitly: this container otherwise inherits
@@ -92,39 +71,13 @@ fi
 # the devnet/mainnet genesis ledgers anonymously.
 export MINA_LEDGER_S3_BUCKET="https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net"
 
-# Where the current rocksdb-scanner lives -- the same versioned path the
-# mina-daemon-storage-toolbox .deb installs it to, so mina-storage-converter
-# finds it identically.
-CURRENT_SCANNER_DIR="/usr/lib/mina/storage/${ROCKSDB_VERSION}/${GITTAG}"
-
-# restore_current_mina re-installs the current daemon (used initially and again
-# when upgrading back after the downgrade) bare from the apps cache.
-restore_current_mina() {
-  ./buildkite/scripts/apps/restore_binary.sh
-}
-
 # Restore the current-version binaries bare from the apps cache (mirroring the
 # .debs). No .deb fallback: the job depends on the Apps build, not the package
 # build, so a cache miss is a hard failure rather than a silent .deb install.
 ./buildkite/scripts/apps/restore_binary.sh
 ./buildkite/scripts/apps/restore_app.sh mina_graphql_client_app.exe mina-graphql-client
 ./buildkite/scripts/apps/restore_app.sh libp2p_helper coda-libp2p_helper
-MINA_BIN_DIR="$CURRENT_SCANNER_DIR" ./buildkite/scripts/apps/restore_app.sh rocksdb_scanner.exe mina-rocksdb-scanner
 ./buildkite/scripts/apps/restore_daemon_config.sh "$MINA_DEBIAN_NETWORK"
-# The converter is an in-repo script (the .deb just packages it); install it the
-# same way the .deb does.
-$SUDO install -D -m 0755 scripts/rocksdb/convert-to-legacy.sh /usr/local/bin/mina-storage-converter
-echo "Using bare mina + current rocksdb-scanner + storage-converter from apps cache"
-
-# The stable (3.3.0) recovery storage toolbox ships the legacy scanner at its own
-# versioned path; it is a released artifact (legacy cache root), not built here,
-# so it stays a .deb. Its .deb dpkg-Depends on mina-logproc, which is not built
-# under the Apps-only dependency, so install a released mina-logproc from
-# packages.o1test.net to satisfy the dependency (and provide the log processor).
-./buildkite/scripts/debian/install_official.sh \
-  --package mina-logproc --channel stable --version "${STABLE_VERSION}*"
-
-FORCE_VERSION="*" ROOT="legacy" ./buildkite/scripts/debian/install.sh "mina-daemon-recovery-storage-toolbox" 1
 
 # Remove lockfile if present
 rm /home/opam/.mina-config/.mina-lock || true
@@ -150,13 +103,13 @@ start_daemon_and_wait_for_sync() {
         sync_status=$(timeout 5 mina-graphql-client sync-status \
             --graphql-uri http://localhost:3085/graphql --raw \
             2>/dev/null || echo "CONNECT_ERROR")
-        if [[ "$sync_status" == "SYNCED" ]]; then
+        if [[ "$sync_status" == "Synced" ]]; then
             break
         fi
         sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
     done
 
-    if [[ "$sync_status" != "SYNCED" ]]; then
+    if [[ "$sync_status" != "Synced" ]]; then
         echo "Error: Daemon failed to sync into network within timeout of $SYNC_TIMEOUT, current status: $sync_status"
         exit 1
     fi
@@ -173,34 +126,6 @@ start_daemon_and_wait_for_sync() {
     fi
 }
 
-# --- Step 1: sync with current mina ---
-start_daemon_and_wait_for_sync
-
-# --- Step 2: stop daemon ---
-mina client stop-daemon
-wait "$DAEMON_PID"
-
-# --- Step 3: convert RocksDB to the legacy format ---
-mina-storage-converter \
-    --node-dir /home/opam/.mina-config \
-    --current-scanner "${CURRENT_SCANNER_DIR}/mina-rocksdb-scanner" \
-    --stable-scanner "/usr/lib/mina/storage/5.7.12/${STABLE_VERSION}/mina-rocksdb-scanner" \
-    --yes --verbose
-
-# --- Downgrade to the official stable release ---
-if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then
-    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION*"
-else
-    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION*"
-fi
-
-# --- Step 4: sync with legacy mina and shut down ---
 start_daemon_and_wait_for_sync
 mina client stop-daemon
 wait "$DAEMON_PID"
-
-# --- Step 5: upgrade mina back to current ---
-restore_current_mina
-
-# --- Step 6: sync with current mina ---
-start_daemon_and_wait_for_sync

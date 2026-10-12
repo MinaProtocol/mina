@@ -316,9 +316,13 @@ let remove_node' t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
-  | Wait_for_parent _ ->
-      (* cache invalidation for this case is handled explicitly in the super catchup fstm *)
-      ()
+  | Wait_for_parent (c, vc) ->
+      Option.value_map ~default:ignore
+        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
+      if not (Cached.was_consumed c) then
+        ignore
+          ( Cached.invalidate_with_failure c
+            : Mina_block.almost_valid_block Envelope.Incoming.t )
   | To_download _job ->
       (* TODO: Cancel job somehow *)
       ()
@@ -362,6 +366,8 @@ let prune t ~root_hash =
   in
   List.iter to_remove ~f:(remove_node' t)
 
+let clear t = Hashtbl.data t.nodes |> List.iter ~f:(remove_node' t)
+
 let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
   List.iter ds ~f:(function
     | E (New_node (Full b)) ->
@@ -375,9 +381,9 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
             ~metadata:
               [ ("hash", State_hash.to_yojson h); ("tree", to_yojson t) ]
             "catchup $tree invariant broken: new root $hash not present. Diffs \
-             may have been applied out of order. This may lead to a memory \
-             leak" ;
-          () )
+             may have been applied out of order. Clearing catchup state to \
+             avoid retaining stale jobs" ;
+          clear t )
     | E (Best_tip_changed _) ->
         () )
 

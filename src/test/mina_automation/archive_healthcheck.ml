@@ -30,7 +30,7 @@ let exit_status_to_string = function
 
 let run args =
   let open Deferred.Let_syntax in
-  let%bind prog = PathFinder.standalone_path_exn in
+  let%bind prog = PathFinder.standalone_path_exn () in
   let%bind proc = Process.create_exn ~prog ~args () in
   let%map output = Process.collect_output_and_wait proc in
   match output.exit_status with

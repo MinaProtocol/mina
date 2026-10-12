@@ -84,6 +84,8 @@ let readFromCache
                           ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
                           ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
                           ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
+                          ++  " && ./buildkite/scripts/debian/select_release_packages.sh"
+                          ++  " ${debsFolder}/${lower} ${debsFolder}_excluded/${lower}"
                         )
             )
             spec.codenames
@@ -118,7 +120,7 @@ let publishCmd
                 , useRoot = True
                 }
                 (     "gpg --import /var/secrets/debian/key.gpg && "
-                  ++  "release-manager publish"
+                  ++  "LANG=C.UTF-8 LC_ALL=C.UTF-8 release-manager publish"
                   ++  " --source-folder ${debsFolder}"
                   ++  " --codenames ${codenames}"
                   ++  " --channel ${DebianChannel.effective spec.channel}"

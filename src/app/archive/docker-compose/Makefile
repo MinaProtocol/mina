@@ -1,18 +1,21 @@
 .PHONY: devnet mainnet clean stop logs status health
 
+# Podman does not read .env on its own; pass it once it exists.
+COMPOSE_ENV = $(if $(wildcard .env),--env-file .env)
+
 devnet:
 	cp example.devnet.env .env
-	docker compose up -d
+	docker compose --env-file .env up -d
 
 mainnet:
 	cp example.mainnet.env .env
-	docker compose up -d
+	docker compose --env-file .env up -d
 
 stop:
-	docker compose down
+	docker compose $(COMPOSE_ENV) down
 
 clean:
-	docker compose down -v
+	docker compose $(COMPOSE_ENV) down -v
 	@echo ""
 	@echo "Containers + volumes removed."
 	@echo ""
@@ -25,18 +28,18 @@ clean:
 	@echo "  docker run --rm -v \"\$$(pwd)\":/work alpine rm -rf /work/archive /work/mina_node"
 
 logs:
-	docker compose logs -f
+	docker compose $(COMPOSE_ENV) logs -f
 
 status:
-	docker compose ps -a
+	docker compose $(COMPOSE_ENV) ps -a
 
 health:
 	@echo "=== Postgres ==="
-	@docker compose exec -T postgres psql -U postgres -d archive -tAc "SELECT count(*) FROM blocks" 2>/dev/null && echo "OK" || echo "FAIL"
+	@docker compose $(COMPOSE_ENV) exec -T postgres psql -U postgres -d archive -tAc "SELECT count(*) FROM blocks" 2>/dev/null && echo "OK" || echo "FAIL"
 	@echo ""
 	@echo "=== Mina Node (GraphQL) ==="
 	@curl -sf http://localhost:3085/graphql -H 'Content-Type: application/json' \
 		-d '{"query":"{ syncStatus }"}' 2>/dev/null | head -c 200 && echo "" || echo "FAIL - not reachable"
 	@echo ""
 	@echo "=== Container Status ==="
-	@docker compose ps --format "table {{.Name}}\t{{.Status}}"
+	@docker compose $(COMPOSE_ENV) ps --format "table {{.Name}}\t{{.Status}}"

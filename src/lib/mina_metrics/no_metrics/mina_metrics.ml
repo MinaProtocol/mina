@@ -601,11 +601,16 @@ let server :
 module Archive = struct
   type t
 
+  module Ingest_duration_histogram = Histogram
+
   let unparented_blocks : t -> Gauge.t = fun _ -> ()
 
   let max_block_height : t -> Gauge.t = fun _ -> ()
 
   let missing_blocks : t -> Gauge.t = fun _ -> ()
+
+  let ingest_duration_ms : t -> string -> Ingest_duration_histogram.t =
+   fun _ _ -> ()
 
   let create_archive_server :
       ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t

@@ -74,6 +74,18 @@ let max_delay_flag =
            default_max_delay )
       (optional_with_default default_max_delay int))
 
+let skip_block_recency_flag =
+  Command.Param.(
+    flag "--skip-block-recency"
+      ~doc:
+        " Leave the block-recency check out of the verdict; --max-delay is \
+         then ignored.  The other checks still apply, including that the \
+         archive holds at least one block.  For readiness probes where an old \
+         tip is not a fault: a database restored from a dump, or blocks \
+         arriving more than --max-delay apart.  Run block-recency on its own \
+         to watch freshness."
+      no_arg)
+
 let max_missing_flag =
   Command.Param.(
     flag "--max-missing"
@@ -166,6 +178,9 @@ module Metrics = struct
     | Readiness of
         { block_height : int
         ; delay_seconds : int64 option
+        ; recency_checked : bool
+              (** [false] under --skip-block-recency: [delay_seconds] is
+                  reported but not judged *)
         ; missing_blocks : int
         ; unparented_blocks : int
         }
@@ -197,9 +212,17 @@ module Metrics = struct
         ; ("max_unparented", `Int max_unparented)
         ]
     | Readiness
-        { block_height; delay_seconds; missing_blocks; unparented_blocks } ->
+        { block_height
+        ; delay_seconds
+        ; recency_checked
+        ; missing_blocks
+        ; unparented_blocks
+        } ->
         [ ("block_height", `Int block_height) ]
         @ optional_json_field "delay_seconds" int64_json delay_seconds
+        (* Only when skipped, so the default envelope is unchanged. *)
+        @ ( if recency_checked then []
+          else [ ("block_recency_skipped", `Bool true) ] )
         @ [ ("missing_blocks", `Int missing_blocks)
           ; ("unparented_blocks", `Int unparented_blocks)
           ]
@@ -220,10 +243,16 @@ module Metrics = struct
         sprintf "%d unparented blocks (max: %d)" unparented_blocks
           max_unparented
     | Readiness
-        { block_height; delay_seconds; missing_blocks; unparented_blocks } ->
+        { block_height
+        ; delay_seconds
+        ; recency_checked
+        ; missing_blocks
+        ; unparented_blocks
+        } ->
         let delay =
           Option.value_map delay_seconds ~default:"n/a" ~f:(fun delay ->
               sprintf "%Lds" delay )
+          ^ if recency_checked then "" else " (not checked)"
         in
         sprintf "height=%d delay=%s missing=%d unparented=%d" block_height delay
           missing_blocks unparented_blocks
@@ -472,21 +501,28 @@ let delay_of_timestamp ~now latest_ts =
           Ok (Int64.( / ) (Int64.( - ) now ts_ms) 1000L, Int64.( > ) ts_ms now)
       )
 
+let age_problems ~max_delay ~delay_seconds ~in_future =
+  if in_future then [ "latest block timestamp is in the future" ]
+  else if Int64.( > ) delay_seconds (Int64.of_int max_delay) then
+    [ sprintf "block delay %Lds > %ds" delay_seconds max_delay ]
+  else []
+
+(* [max_delay = None] (--skip-block-recency) drops only the age of the
+   tip from the verdict: an empty archive or an unreadable timestamp is
+   still a problem. *)
 let recency_status ~now ~max_delay latest_ts =
   match delay_of_timestamp ~now latest_ts with
   | Error failure ->
       (None, [ Failure.to_string failure ], Some failure)
   | Ok (delay_seconds, in_future) ->
       let problems =
-        if in_future then [ "latest block timestamp is in the future" ]
-        else if Int64.( > ) delay_seconds (Int64.of_int max_delay) then
-          [ sprintf "block delay %Lds > %ds" delay_seconds max_delay ]
-        else []
+        Option.value_map max_delay ~default:[] ~f:(fun max_delay ->
+            age_problems ~max_delay ~delay_seconds ~in_future )
       in
       (Some delay_seconds, problems, None)
 
 let evaluate_recency ~now ~max_delay latest_ts : evaluation =
-  match recency_status ~now ~max_delay latest_ts with
+  match recency_status ~now ~max_delay:(Some max_delay) latest_ts with
   | None, _, Some failure ->
       (None, Error failure)
   | Some delay_seconds, problems, _ ->
@@ -514,7 +550,8 @@ let evaluate_unparented_blocks ~max_unparented unparented_blocks : evaluation =
   , threshold_failure problems )
 
 (* Every signal is evaluated, so the report lists all breached
-   thresholds rather than only the first. *)
+   thresholds rather than only the first.  [max_delay = None] skips the
+   age check (see [recency_status]). *)
 let evaluate_readiness ~now ~max_delay ~max_missing ~max_unparented
     (block_height, latest_ts, missing_blocks, unparented_blocks) : evaluation =
   let delay_seconds, recency_problems, _ =
@@ -532,7 +569,12 @@ let evaluate_readiness ~now ~max_delay ~max_missing ~max_unparented
   in
   ( Some
       (Metrics.Readiness
-         { block_height; delay_seconds; missing_blocks; unparented_blocks } )
+         { block_height
+         ; delay_seconds
+         ; recency_checked = Option.is_some max_delay
+         ; missing_blocks
+         ; unparented_blocks
+         } )
   , threshold_failure problems )
 
 let db_ready_command =
@@ -621,11 +663,13 @@ let ready_command =
     (let%map_open.Command postgres_uri = postgres_uri_flag
      and json = json_flag
      and max_delay = max_delay_flag
+     and skip_block_recency = skip_block_recency_flag
      and max_missing = max_missing_flag
      and max_unparented = max_unparented_flag
      and window = missing_blocks_width_flag in
      fun () ->
        setup_logging ~json ;
+       let max_delay = Option.some_if (not skip_block_recency) max_delay in
        let%bind report =
          probe ~postgres_uri ~kind:Report.Readiness
            ~evaluate:(fun answer ->
@@ -693,6 +737,7 @@ let wait_command =
     (let%map_open.Command postgres_uri = postgres_uri_flag
      and json = json_flag
      and max_delay = max_delay_flag
+     and skip_block_recency = skip_block_recency_flag
      and max_missing = max_missing_flag
      and max_unparented = max_unparented_flag
      and window = missing_blocks_width_flag
@@ -729,6 +774,7 @@ let wait_command =
      in
      fun () ->
        setup_logging ~json ;
+       let max_delay = Option.some_if (not skip_block_recency) max_delay in
        let kind = Report.Wait { db_only } in
        let start = Time.now () in
        let deadline = Time.add start (Time.Span.of_int_sec timeout) in

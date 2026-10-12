@@ -506,7 +506,18 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
       (optional string)
-      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
+      ~doc:
+        "PATH Deprecated, use --precomputed-blocks-dir. Append every \
+         precomputed block as one JSON line to this file. The file grows \
+         without limit and nothing rotates it"
+  and precomputed_blocks_dir =
+    flag "--precomputed-blocks-dir"
+      ~aliases:[ "precomputed-blocks-dir" ]
+      (optional string)
+      ~doc:
+        "DIR Write each precomputed block to its own file in this directory, \
+         named <network>-<height>-<state-hash>.json, the same name the \
+         precomputed block bucket uses. The directory must exist"
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
@@ -1475,11 +1486,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~is_archive_rocksdb ~work_reassignment_wait
                  ~archive_process_location ~log_block_creation
                  ~precomputed_values ~start_time ?precomputed_blocks_path
-                 ~log_precomputed_blocks ~start_filtered_logs
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~stop_time_interval ~node_status_url
-                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 ~precomputed_blocks_dir ~log_precomputed_blocks
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~stop_time_interval
+                 ~node_status_url ~graphql_control_port:itn_graphql_port
+                 ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  ~itn_features ~compile_config ~hardfork_handling
                  ~ledger_backing () )
@@ -1553,12 +1565,23 @@ let daemon logger ~itn_features =
        (setup_daemon logger ~itn_features
           ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun setup_daemon () ->
-         (* Immediately disable updating the time offset. *)
-         Block_time.Controller.disable_setting_offset () ;
-         let%bind mina = setup_daemon () in
-         let%bind () = Mina_lib.start mina in
-         [%log info] "Daemon ready. Clients can now connect" ;
-         Async.never () ) )
+         match%bind
+           Monitor.try_with (fun () ->
+               (* Immediately disable updating the time offset. *)
+               Block_time.Controller.disable_setting_offset () ;
+               let%bind mina = setup_daemon () in
+               let%map () = Mina_lib.start mina in
+               [%log info] "Daemon ready. Clients can now connect" )
+         with
+         | Ok _ ->
+             Async.never ()
+         | Error exn ->
+             let exn_json =
+               Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get exn)
+             in
+             [%log fatal] "Unhandled Async exception: $exn"
+               ~metadata:[ ("exn", exn_json) ] ;
+             exit 1 ) )
 
 let replay_blocks logger ~itn_features =
   let replay_flag =
@@ -2262,25 +2285,33 @@ let print_version_help coda_exe version =
 let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
-  Random.self_init () ;
-  let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
-  let logger = Logger.create ~itn_features () in
-  don't_wait_for (ensure_testnet_id_still_good logger) ;
-  (* Turn on snark debugging in prod for now *)
-  Snarky_backendless.Snark.set_eval_constraints true ;
-  (* intercept command-line processing for "version", because we don't
-     use the Jane Street scripts that generate their version information
-  *)
-  (let is_version_cmd s =
-     List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
-   in
-   match Sys.get_argv () with
-   | [| _mina_exe; version |] when is_version_cmd version ->
-       Mina_version.print_version ()
-   | _ ->
-       Command.run
-         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~itn_features) ) ) ;
-  Core.exit 0
+  try
+    Random.self_init () ;
+    let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
+    let logger = Logger.create ~itn_features () in
+    don't_wait_for (ensure_testnet_id_still_good logger) ;
+    (* Turn on snark debugging in prod for now *)
+    Snarky_backendless.Snark.set_eval_constraints true ;
+    (* intercept command-line processing for "version", because we don't
+       use the Jane Street scripts that generate their version information
+    *)
+    (let is_version_cmd s =
+       List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
+     in
+     match Sys.get_argv () with
+     | [| _mina_exe; version |] when is_version_cmd version ->
+         Mina_version.print_version ()
+     | _ ->
+         Command.run
+           (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
+              (mina_commands logger ~itn_features) ) ) ;
+    Core.exit 0
+  with exn ->
+    let logger = Logger.create () in
+    let exn_json =
+      Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get exn)
+    in
+    [%log fatal] "Unhandled top level exception: $exn"
+      ~metadata:[ ("exn", exn_json) ]
 
 let linkme = ()

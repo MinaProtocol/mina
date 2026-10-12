@@ -34,6 +34,12 @@ mina-archive-healthcheck missing-blocks --postgres-uri postgres://... --max-miss
 # Combined readiness check
 mina-archive-healthcheck ready --postgres-uri postgres://... --max-delay 360 --max-missing 10
 
+# Readiness without the block-recency check: for a database restored
+# from a dump, or blocks that arrive more than --max-delay apart. The
+# archive must still be reachable, hold at least one block, and pass the
+# missing / unparented checks. Watch freshness with block-recency.
+mina-archive-healthcheck ready --postgres-uri postgres://... --skip-block-recency
+
 # Wait for archive to become ready (init container / CI)
 mina-archive-healthcheck wait --postgres-uri postgres://... --timeout 600 --interval 10
 
@@ -63,6 +69,7 @@ Flags are accepted per-subcommand.
 | `--postgres-uri` | `-p` | (required) | PostgreSQL connection URI |
 | `--json` | `-j` | off | Output as JSON instead of text |
 | `--max-delay` | | 360 | Max seconds since last block |
+| `--skip-block-recency` | | off | Leave the block-recency check out of the verdict; `--max-delay` is then ignored (ready and wait only) |
 | `--max-missing` | | 10 | Max acceptable missing blocks |
 | `--max-unparented` | | 5 | Max acceptable unparented blocks |
 | `--window` | | 2000 | Block window for missing blocks check |
@@ -142,6 +149,24 @@ readinessProbe:
   initialDelaySeconds: 60
   periodSeconds: 30
 ```
+
+With `--max-delay`, a healthy archive stays NotReady while its newest
+block is older than the limit: after a restore from a dump (the tip is as
+old as the dump), or when blocks arrive more than `--max-delay` apart. If
+readiness should only mean "can this archive serve traffic", pass
+`--skip-block-recency` instead, and alert on `block-recency` separately:
+
+```yaml
+readinessProbe:
+  exec:
+    command: ["mina-archive-healthcheck", "ready",
+              "--postgres-uri", "$(ARCHIVE_URI)",
+              "--skip-block-recency"]
+```
+
+The JSON output then still reports `delay_seconds` and adds
+`"block_recency_skipped": true`; a NOT READY text line shows
+`delay=…s (not checked)`. Without the flag the output is unchanged.
 
 ## Docker integration
 

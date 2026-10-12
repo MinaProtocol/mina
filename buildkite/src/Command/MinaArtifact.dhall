@@ -46,6 +46,8 @@ let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
 
+let DockerCommand = ./Docker/Type.dhall
+
 let BaseImage = ../Constants/Docker/BaseImage.dhall
 
 let Artifact = ../Constants/Artifact/Artifacts.dhall
@@ -72,7 +74,6 @@ let PackagingSpec =
           , arch : Arch.Type
           , deb_legacy_version : Text
           , deb_legacy_githash_config : Text
-          , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
           , generic : Bool
           , suffix : Optional Text
@@ -96,7 +97,6 @@ let PackagingSpec =
           , deb_legacy_version = "3.5.0-mainnet-stop-slot-8110ede"
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
-          , docker_publish = DockerPublish.Type.Essential
           , docker_repo = DockerRepo.Type.InternalEurope
           , generic = False
           , if_ = None B/If
@@ -519,6 +519,47 @@ let appsFromAnotherBuild
       -- packaging-only pipeline does. See restore_build_tree.sh.
       Some env:MINA_APPS_CACHE_ROOT as Text ? None Text
 
+let genericFromAnotherBuild
+    : Optional Text
+    =
+      -- Set when MINA_GENERIC_CACHE_ROOT names the build that made the
+      -- network-less packages (the PackagingAmd64Generic stage). The network
+      -- jobs then read those .debs from it (read_all_from_cache.sh) and take the
+      -- generic image from the registry, so neither is built a second time with
+      -- the same version.
+      Some env:MINA_GENERIC_CACHE_ROOT as Text ? None Text
+
+let buildCacheDir
+    : Text -> Text
+    =
+      -- Packaging never pushes. It writes its images here (build.sh
+      -- --build-cache-dir), and the publish stage pushes them after the gate
+      -- (publish_from_cache.sh), as it publishes the debians.
+      \(build : Text) -> "/var/storagebox/${build}/docker-images"
+
+let ownBuildCacheDir = buildCacheDir "\\\${BUILDKITE_BUILD_ID}"
+
+let genericBuildCacheDir
+    : Text
+    =
+      -- The -generic images: built by this build, or by the generic stage
+      -- when MINA_GENERIC_CACHE_ROOT names it.
+      merge
+        { Some = buildCacheDir, None = ownBuildCacheDir }
+        genericFromAnotherBuild
+
+let dependsOnGenericJob
+    : List Command.TaggedKey.Type -> List Command.TaggedKey.Type
+    =
+      -- Nothing to wait for when the generic packages came from another build.
+          \(deps : List Command.TaggedKey.Type)
+      ->  Prelude.Optional.fold
+            Text
+            genericFromAnotherBuild
+            (List Command.TaggedKey.Type)
+            (\(_ : Text) -> [] : List Command.TaggedKey.Type)
+            deps
+
 let dependsOnApps
     : PackagingSpec.Type -> List Command.TaggedKey.Type
     =
@@ -590,10 +631,11 @@ let docker_step
 
                 then  [] : List Command.TaggedKey.Type
 
-                else  [ { name = genericPackagingName spec
-                        , key = "build-deb-pkg"
-                        }
-                      ]
+                else  dependsOnGenericJob
+                        [ { name = genericPackagingName spec
+                          , key = "build-deb-pkg"
+                          }
+                        ]
 
           let deps
               : List Command.TaggedKey.Type
@@ -623,13 +665,14 @@ let docker_step
                 then  deps
 
                 else    deps
-                      # [ { name = genericPackagingName spec
-                          , key =
-                              "${Docker.lowerName
-                                   Docker.Type.DaemonGeneric}-${Network.lowerName
-                                                                  genericNetwork}-docker-image"
-                          }
-                        ]
+                      # dependsOnGenericJob
+                          [ { name = genericPackagingName spec
+                            , key =
+                                "${Docker.lowerName
+                                     Docker.Type.DaemonGeneric}-${Network.lowerName
+                                                                    genericNetwork}-docker-image"
+                            }
+                          ]
 
           let size = Size.XLarge
 
@@ -637,9 +680,9 @@ let docker_step
                 DockerImage.ReleaseSpec::{
                 , deps = dependsOnGeneric
                 , service = Docker.Type.DaemonProfiled { profile = profile }
+                , base_cache_dir = Some genericBuildCacheDir
                 , network = network
                 , deb_codename = spec.debVersion
-                , docker_publish = spec.docker_publish
                 , deb_profile = profile
                 , build_flags = spec.buildFlags
                 , deb_install_mode = DockerImage.DebianInstallMode.DownloadOnly
@@ -662,7 +705,6 @@ let docker_step
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
-                          , docker_publish = spec.docker_publish
                           , deb_legacy_version = spec.deb_legacy_version
                           , size = size
                           }
@@ -683,7 +725,6 @@ let docker_step
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
-                          , docker_publish = spec.docker_publish
                           , deb_legacy_version = spec.deb_legacy_version
                           , arch = spec.arch
                           , size = size
@@ -698,7 +739,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -718,9 +758,9 @@ let docker_step
                                   }
                                 ]
                           , service = Docker.Type.Daemon { network = network }
+                          , base_cache_dir = Some ownBuildCacheDir
                           , network = network
                           , deb_codename = spec.debVersion
-                          , docker_publish = spec.docker_publish
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , deb_install_mode =
@@ -737,7 +777,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -752,7 +791,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -769,7 +807,6 @@ let docker_step
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
-                          , docker_publish = spec.docker_publish
                           , deb_legacy_version = spec.deb_legacy_version
                           , verify = True
                           , arch = spec.arch
@@ -785,7 +822,6 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -799,6 +835,7 @@ let docker_step
                     ->  [ DockerImage.ReleaseSpec::{
                           , deps = withDocker Docker.Type.RosettaGeneric
                           , service = Docker.Type.Rosetta { network = network }
+                          , base_cache_dir = Some ownBuildCacheDir
                           , network = network
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -807,7 +844,6 @@ let docker_step
                                   (Docker.Type.Rosetta { network = network })
                               )
                           , deb_codename = spec.debVersion
-                          , docker_publish = spec.docker_publish
                           , deb_install_mode =
                               DockerImage.DebianInstallMode.DownloadOnly
                           , arch = spec.arch
@@ -846,6 +882,8 @@ let docker_commands
                                   DebianChannel.effective spec.channel
                               , docker_repo =
                                   DockerRepo.effective spec.docker_repo
+                              , docker_publish = DockerPublish.Type.Disabled
+                              , build_cache_dir = Some ownBuildCacheDir
                               }
                         )
                 )
@@ -910,7 +948,34 @@ let packagePipeline
             , includeIf = spec.includeIf
             , excludeIf = spec.excludeIf
             }
-          , steps = [ build_debian spec ] # docker_commands spec
+          , steps =
+              let reused =
+                        \(root : Text)
+                    ->  [ Command.build
+                            Command.Config::{
+                            , commands =
+                              [ Cmd.run
+                                  "echo Generic packages are not built here: they come from build ${root}"
+                              ]
+                            , label = "Generic: reused from build ${root}"
+                            , key = "generic-reused"
+                            , target = Size.Small
+                            , docker = None DockerCommand.Type
+                            }
+                        ]
+
+              let built = [ build_debian spec ] # docker_commands spec
+
+              in        if spec.generic
+
+                  then  Prelude.Optional.fold
+                          Text
+                          genericFromAnotherBuild
+                          (List Command.Type)
+                          reused
+                          built
+
+                  else  built
           }
 
 in  { onlyDebianPipeline = onlyDebianPipeline

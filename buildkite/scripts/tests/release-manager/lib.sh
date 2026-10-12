@@ -2,7 +2,7 @@
 
 # Release Manager Test Library
 # Shared functions, configuration, and test cases for release manager tests.
-# Sourced by test.sh and test-e2e.sh
+# Sourced by test.sh
 
 # Colors for output
 RED='\033[0;31m'
@@ -37,7 +37,6 @@ TEST_ARCH="amd64"
 
 # Test configuration - signed repository
 SIGNED_TEST_BUCKET="signed-test-packages"
-SIGNED_TEST_BUCKET_EXTERNAL_URL=""
 SIGNED_TEST_CODENAME="bookworm"
 SIGNED_TEST_ARCH="arm64"
 SIGNED_TEST_COMPONENT="test"
@@ -304,14 +303,11 @@ bootstrap_test_environment() {
     # verification containers, which are siblings of the MinIO container on the
     # mock network, so they use the container-internal address.
     TEST_BUCKET_EXTERNAL_URL="${MOCK_REPO_INTERNAL_ENDPOINT}/${TEST_BUCKET}"
-    # Used by test-e2e.sh only.
-    # shellcheck disable=SC2034
-    SIGNED_TEST_BUCKET_EXTERNAL_URL="${MOCK_REPO_INTERNAL_ENDPOINT}/${SIGNED_TEST_BUCKET}"
     DEBIAN_SIGN_KEY="${MOCK_REPO_SIGN_KEY}"
 }
 
 ###############################################################################
-# Dry-run test functions (shared by both quick and e2e suites)
+# Dry-run test functions
 ###############################################################################
 
 # Test: Verify test packages exist in CI component

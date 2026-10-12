@@ -1,0 +1,22 @@
+(library
+ (name synthetic_archive)
+ (public_name mina_automation.synthetic_archive)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  core
+  core_kernel
+  caqti
+  uri
+  ;; local libraries
+  archive_lib
+  mina_automation
+  mina_base
+  mina_caqti
+  pickles_types
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
