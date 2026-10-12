@@ -61,16 +61,6 @@ end
 module Pre_diff_one : sig
   [%%versioned:
   module Stable : sig
-    module V3 : sig
-      type ('a, 'b) t =
-        { completed_works : 'a list
-        ; commands : 'b list
-        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
-        ; internal_command_statuses : Transaction_status.Stable.V2.t list
-        }
-      [@@deriving equal, compare, sexp, yojson]
-    end
-
     module V2 : sig
       type ('a, 'b) t =
         { completed_works : 'a list
@@ -123,7 +113,7 @@ module Pre_diff_with_at_most_one_coinbase : sig
       type t =
         ( Transaction_snark_work.Stable.V3.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_one.Stable.V3.t
+        Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
       val to_latest : t -> t

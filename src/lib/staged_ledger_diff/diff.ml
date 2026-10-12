@@ -121,16 +121,6 @@ module Pre_diff_one = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
-      type ('a, 'b) t =
-        { completed_works : 'a list
-        ; commands : 'b list
-        ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
-        ; internal_command_statuses : Transaction_status.Stable.V2.t list
-        }
-      [@@deriving equal, compare, sexp, yojson]
-    end
-
     module V2 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
@@ -229,7 +219,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
       type t =
         ( Transaction_snark_work.Stable.V3.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_one.Stable.V3.t
+        Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
@@ -242,15 +232,11 @@ module Pre_diff_with_at_most_one_coinbase = struct
         Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
-      let to_latest
-          ({ completed_works; commands; coinbase; internal_command_statuses } :
-            t ) : Latest.t =
-        { completed_works =
-            List.map completed_works
+      let to_latest (t : t) : Latest.t =
+        { t with
+          completed_works =
+            List.map t.completed_works
               ~f:Transaction_snark_work.Stable.V2.to_latest
-        ; commands
-        ; coinbase
-        ; internal_command_statuses
         }
     end
   end]
