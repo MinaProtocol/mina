@@ -146,6 +146,7 @@ let scan_state_base_node_coinbase =
     let coinbase =
       Mina_base.Coinbase.create ~amount:Currency.Amount.zero
         ~receiver:sample_pk_compressed ~fee_transfer:None
+        ~fee_remainder:Currency.Fee.zero
       |> Or_error.ok_exn
     in
     Coinbase

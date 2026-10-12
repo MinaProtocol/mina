@@ -56,7 +56,7 @@ module Stable : sig
 
     val to_latest : t -> t
 
-    val transaction : t -> Mina_transaction.Transaction.Stable.V3.t option
+    val transaction : t -> Mina_transaction.Transaction.Stable.V4.t option
   end
 
   module V2 : sig

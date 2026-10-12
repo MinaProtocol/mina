@@ -78,7 +78,7 @@ let create_ledger_and_transactions ~signature_kind
       let coinbase =
         Coinbase.create ~amount:constraint_constants.coinbase_amount
           ~receiver:(Public_key.compress keys.(0).public_key)
-          ~fee_transfer:None
+          ~fee_transfer:None ~fee_remainder:Currency.Fee.zero
         |> Or_error.ok_exn
       in
       let transactions =

@@ -390,7 +390,13 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
               ic.global_slot_since_genesis ic.sequence_no
               ic.secondary_sequence_no ;
           let%map receiver = Load_data.pk_of_id pool ic.receiver_id in
-          match Coinbase.create ~amount ~receiver ~fee_transfer with
+          match
+            (* The replayer reconstructs coinbases from archived events, where
+               any fee paid to the coinbase receiver is recorded as its own
+               internal command rather than as part of the coinbase. *)
+            Coinbase.create ~amount ~receiver ~fee_transfer
+              ~fee_remainder:Currency.Fee.zero
+          with
           | Ok cb ->
               (Some (Mina_transaction.Transaction.Coinbase cb), ics)
           | Error err ->
