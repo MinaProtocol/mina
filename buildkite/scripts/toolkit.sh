@@ -13,8 +13,8 @@
 set -euo pipefail
 
 declare -A SHA256=(
-  [0.0.7-amd64]=TODO_AFTER_0_0_7_RELEASE
-  [0.0.7-arm64]=TODO_AFTER_0_0_7_RELEASE
+  [0.0.7-amd64]=d9945f67fe087c76826aef304e4a76c91bb7b990464f469bb27ef6b72d12f2d8
+  [0.0.7-arm64]=d1ef0717afb6b6aa6adc0970b03d2b6a9f8cc6228d0824680f853d87202c8c5a
 )
 
 if [[ $# -lt 1 ]]; then
