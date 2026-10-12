@@ -427,9 +427,9 @@ fi
 # / no apt index). The CI step (DownloadOnly install mode) drops the
 # freshly-built .deb files flat into the "dockerfiles/" docker build context via
 # read_all_from_cache.sh; we move them under "${DOCKER_CONTEXT}/_debs/" which the
-# Dockerfiles COPY to /opt/mina-local-debs and then install via
-# install-mina-debs.sh. The _debs directory is always created (possibly empty)
-# so the Dockerfiles' "COPY _debs ..." never fails.
+# Dockerfiles bind-mount at /opt/mina-local-debs for the install step and
+# install via install-mina-debs.sh. The _debs directory is always created
+# (possibly empty) so the Dockerfiles' bind mount never fails.
 LOCAL_DEB_STAGE="${DOCKER_CONTEXT%/}/_debs"
 mkdir -p "${LOCAL_DEB_STAGE}"
 rm -f "${LOCAL_DEB_STAGE}"/*.deb
