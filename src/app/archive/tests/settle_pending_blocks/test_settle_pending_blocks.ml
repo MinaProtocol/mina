@@ -18,9 +18,10 @@ let with_conn (db : B.Db.t) f =
   | Error e ->
       return (Error (to_error e))
   | Ok (module Conn : Mina_caqti.CONNECTION) ->
-      let%bind result = f (module Conn : Mina_caqti.CONNECTION) in
-      let%map () = Conn.disconnect () in
-      Result.map_error result ~f:to_error
+      (* disconnect even when [f] raises, or the database cannot be dropped *)
+      Monitor.protect ~finally:Conn.disconnect (fun () ->
+          f (module Conn : Mina_caqti.CONNECTION)
+          >>| Result.map_error ~f:to_error )
 
 let run ?dry_run db = with_conn db (Settle.run ?dry_run)
 
@@ -255,6 +256,80 @@ let dry_run_and_idempotence server_uri () =
       check_result built { expected with boundary = settled 0 0 } again ;
       check_statuses db built statuses )
 
+(* --- the archive's hook: on_block_added, called as add_block_aux calls it - *)
+
+let added ?link_children db built block =
+  with_conn db (fun (module Conn) ->
+      let open Deferred.Result.Let_syntax in
+      (* add_block_aux links the blocks waiting for this one first *)
+      let%bind () =
+        match link_children with
+        | None ->
+            return ()
+        | Some parent_hash ->
+            Archive_lib.Processor.Block.set_parent_id_if_null
+              (module Conn)
+              ~parent_hash:
+                (Mina_base.State_hash.of_base58_check_exn parent_hash)
+              ~parent_id:(B.block_id built block)
+      in
+      Settle.on_block_added ~logger:(Logger.null ())
+        (module Conn)
+        ~block_id:(B.block_id built block) )
+
+(* The added block is the fork genesis. *)
+let added_fork_genesis server_uri () =
+  let s = B.create () in
+  let _, statuses = fork_mid_canonical () s in
+  let genesis = snd (fst (List.nth_exn statuses 5)) in
+  B.Db.with_fresh ~server_uri ~name:"test_settle_added_genesis" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let%bind () = added db built genesis in
+      check_statuses db built statuses )
+
+(* The fork genesis arrived before its fork block: once the fork block is
+   added and linked, the boundary is settled. *)
+let added_fork_block_after_genesis server_uri () =
+  let s = B.create () in
+  let a = B.block s ~name:"A" ~height:1 Canonical in
+  (* a real state hash: the archive's linking parses it *)
+  let b =
+    B.block ~state_hash:"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+      ~parent:a s ~name:"B" ~height:2 Pending
+  in
+  let b' = B.block ~parent:a s ~name:"B'" ~height:2 Pending in
+  let g =
+    B.block ~parent_hash:(B.state_hash b) ~protocol_version:v5
+      ~global_slot_since_hard_fork:0 s ~name:"genesis" ~height:3 Pending
+  in
+  B.Db.with_fresh ~server_uri ~name:"test_settle_added_fork_block" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let%bind () = added ~link_children:(B.state_hash b) db built b in
+      check_statuses db built
+        [ (("A", a), "canonical")
+        ; (("B", b), "canonical")
+        ; (("B'", b'), "orphaned")
+        ; (("genesis", g), "pending")
+        ] )
+
+(* An ordinary block changes nothing. *)
+let added_ordinary_block server_uri () =
+  let s = B.create () in
+  let a = B.block s ~name:"A" ~height:1 Canonical in
+  let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
+  let b' = B.block ~parent:a s ~name:"B'" ~height:2 Pending in
+  B.Db.with_fresh ~server_uri ~name:"test_settle_added_ordinary" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let%bind () = added db built b in
+      check_statuses db built
+        [ (("A", a), "canonical")
+        ; (("B", b), "pending")
+        ; (("B'", b'), "pending")
+        ] )
+
 let () =
   let uri = B.Db.test_server_uri () in
   let run f () = Thread_safe.block_on_async_exn (f uri) |> Or_error.ok_exn in
@@ -278,5 +353,12 @@ let () =
             (run decided_heights)
         ; Alcotest.test_case "dry run, then idempotent" `Quick
             (run dry_run_and_idempotence)
+        ] )
+    ; ( "on_block_added"
+      , [ Alcotest.test_case "the fork genesis" `Quick (run added_fork_genesis)
+        ; Alcotest.test_case "the fork block, after its genesis" `Quick
+            (run added_fork_block_after_genesis)
+        ; Alcotest.test_case "an ordinary block" `Quick
+            (run added_ordinary_block)
         ] )
     ]

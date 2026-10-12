@@ -18,6 +18,8 @@
   uri
   ;; local libraries
   archive_lib
+  logger
+  mina_base
   mina_automation.synthetic_archive
   mina_caqti)
  (preprocess

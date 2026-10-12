@@ -183,3 +183,42 @@ let run ?(dry_run = false) ?genesis_id (module Conn : Mina_caqti.CONNECTION) =
   | Ok t ->
       let%map () = if dry_run then Conn.rollback () else Conn.commit () in
       t
+
+let completed_fork_geneses_req =
+  (Caqti_type.int ->* Caqti_type.int)
+    {sql| SELECT id FROM blocks
+          WHERE (id = $1 OR parent_id = $1)
+            AND global_slot_since_hard_fork = 0
+            AND global_slot_since_genesis > 0
+    |sql}
+
+(** For the archive, after it adds [block_id] and links the blocks waiting for
+    it as their parent: settle the boundary of every fork genesis this block
+    completes -- the block itself, or a fork genesis whose parent it is. The
+    caller's transaction holds the block and the settle together. *)
+let on_block_added ~logger (module Conn : Mina_caqti.CONNECTION) ~block_id =
+  let open Deferred.Result.Let_syntax in
+  let%bind geneses = Conn.collect_list completed_fork_geneses_req block_id in
+  Mina_caqti.deferred_result_list_fold geneses ~init:() ~f:(fun () genesis_id ->
+      let%map boundary = settle_fork (module Conn) ~genesis_id in
+      let metadata =
+        [ ("genesis_id", `Int genesis_id)
+        ; ("boundary", boundary_to_yojson boundary)
+        ]
+      in
+      match boundary with
+      | Settled _ ->
+          [%log info]
+            "Settled the hard fork boundary at fork genesis $genesis_id: \
+             $boundary"
+            ~metadata
+      | No_fork_block ->
+          [%log info]
+            "Fork genesis $genesis_id: its fork block is not in the archive \
+             yet; the boundary is settled when it arrives"
+            ~metadata
+      | No_canonical_ancestor ->
+          [%log warn]
+            "Fork genesis $genesis_id: the fork block's ancestry reaches no \
+             canonical block, so the boundary is left as it is"
+            ~metadata )

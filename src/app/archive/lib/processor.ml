@@ -4630,6 +4630,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
                   (module Conn)
                   ~logger ~genesis_constants ~block_id )
           in
+          (* a fork genesis, or the parent it was waiting for, settles the
+             hard fork boundary *)
+          let%bind () =
+            Settle_pending_blocks.on_block_added ~logger (module Conn) ~block_id
+          in
           let%bind () =
             match delete_older_than with
             | Some num_blocks ->
@@ -4781,6 +4786,12 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                   ~logger
                   ~constraint_constants:precomputed_values.constraint_constants
                   genesis_block ~accounts_accessed:[] ~accounts_created:[]
+              in
+              (* a fork genesis settles the hard fork boundary *)
+              let%bind.Deferred.Result () =
+                Settle_pending_blocks.on_block_added ~logger
+                  (module Conn)
+                  ~block_id:genesis_block_id
               in
               let%bind.Deferred.Result { ledger_hash; _ } =
                 Block.load (module Conn) ~id:genesis_block_id
