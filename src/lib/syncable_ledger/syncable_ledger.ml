@@ -711,7 +711,11 @@ end = struct
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
-          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
+          (* The target may have changed while the answer was being handled,
+             and a query for a root we no longer want must not be reissued. *)
+          if Root_hash.equal root_hash (desired_root_exn t) then
+            Linear_pipe.write_without_pushback_if_open t.queries
+              (root_hash, query)
         in
         let credit_fulfilled_request () =
           record_envelope_sender t.trust_system logger sender
