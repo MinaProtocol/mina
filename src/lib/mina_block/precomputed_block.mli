@@ -34,6 +34,26 @@ module Stable : sig
           (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
   end
+
+  module V4 : sig
+    type nonrec t =
+      { scheduled_time : Block_time.Stable.V1.t
+      ; protocol_state : Protocol_state.Value.Stable.V3.t
+      ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V3.t
+      ; delta_transition_chain_proof :
+          Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      ; protocol_version : Protocol_version.Stable.V2.t
+      ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+      ; accounts_accessed : (int * Account.Stable.V3.t) list
+      ; accounts_created :
+          (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+      }
+
+    val to_latest : t -> V5.t
+  end
 end]
 
 type t = Stable.Latest.t =
