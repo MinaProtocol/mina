@@ -92,6 +92,18 @@ module Diff_versioned : sig
         | Empty
       [@@deriving equal]
     end
+
+    module V2 : sig
+      type t =
+        | Add_solved_work of
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+        | Empty
+      [@@deriving equal]
+
+      val to_latest : t -> V3.t
+    end
   end]
 
   type t = Resource_pool.Diff.Cached.t =

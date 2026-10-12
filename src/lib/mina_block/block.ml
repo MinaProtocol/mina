@@ -63,6 +63,19 @@ module Stable = struct
             with type t := t
              and type 'a creator := 'a Creatable.creator )
   end
+
+  module V3 = struct
+    type t =
+      { header : Header.Stable.V3.t
+      ; body : Staged_ledger_diff.Body.Stable.V2.t
+      }
+    [@@deriving fields, sexp]
+
+    let to_latest ({ header; body } : t) : Latest.t =
+      Latest.create
+        ~header:(Header.Stable.V3.to_latest header)
+        ~body:(Staged_ledger_diff.Body.Stable.V2.to_latest body)
+  end
 end]
 
 type t = { header : Header.t; body : Staged_ledger_diff.Body.t }

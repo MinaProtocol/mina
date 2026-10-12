@@ -25,6 +25,20 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'sok_digest
         , 'local_state )
         A.Poly.V3.t
+       and type ( 'ledger_hash
+                , 'amount
+                , 'pending_coinbase
+                , 'fee_excess
+                , 'sok_digest
+                , 'local_state )
+                Poly.Stable.V2.t =
+        ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        A.Poly.V2.t
        and type Stable.V3.t = A.V3.t
        and type With_sok.Stable.V3.t = A.With_sok.V3.t
 end
@@ -138,6 +152,40 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
         [@@deriving compare, equal, hash, sexp, yojson, hlist]
       end
+
+      module V2 = struct
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'sok_digest
+             , 'local_state )
+             t =
+              ( 'ledger_hash
+              , 'amount
+              , 'pending_coinbase
+              , 'fee_excess
+              , 'sok_digest
+              , 'local_state )
+              A.Poly.V2.t =
+          { source :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state )
+              Registers.Stable.V1.t
+          ; target :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state )
+              Registers.Stable.V1.t
+          ; connecting_ledger_left : 'ledger_hash
+          ; connecting_ledger_right : 'ledger_hash
+          ; supply_increase : 'amount
+          ; fee_excess : 'fee_excess
+          ; sok_digest : 'sok_digest
+          }
+        [@@deriving compare, equal, hash, sexp, yojson, hlist]
+      end
     end]
 
     let with_empty_local_state ~source_total_currency ~target_total_currency
@@ -214,6 +262,26 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving compare, equal, hash, sexp, yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t =
+        ( Frozen_ledger_hash.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , unit
+        , Local_state.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving compare, equal, hash, sexp, yojson]
+
+      (* A V2 statement records the fee excess and supply increase as deltas,
+         and has no value for the source and target registers that replace
+         them. *)
+      let to_latest (_ : t) : Latest.t =
+        failwith
+          "Snarked_ledger_state.Stable.V2.to_latest: no source or target \
+           registers for the fee excess and total currency"
     end
   end]
 
@@ -361,6 +429,23 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
+      end
+
+      module V2 = struct
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        let to_latest (_ : t) : Latest.t =
+          failwith
+            "Snarked_ledger_state.With_sok.Stable.V2.to_latest: no source or \
+             target registers for the fee excess and total currency"
       end
     end]
 

@@ -93,6 +93,56 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V4 = struct
+    type t =
+      { scheduled_time : Block_time.Stable.V1.t
+      ; protocol_state : Protocol_state.Value.Stable.V3.t
+      ; protocol_state_proof :
+          (Mina_base.Proof.Stable.V2.t
+          [@to_yojson Proof.to_yojson] [@of_yojson Proof.of_yojson] )
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V2.t
+            (* TODO: Delete this or find out why it is here. *)
+      ; delta_transition_chain_proof :
+          Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      ; protocol_version : Protocol_version.Stable.V2.t
+      ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+            [@default None]
+      ; accounts_accessed : (int * Account.Stable.V3.t) list
+      ; accounts_created :
+          (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+      }
+    [@@deriving yojson]
+
+    let to_latest
+        ({ scheduled_time
+         ; protocol_state
+         ; protocol_state_proof
+         ; staged_ledger_diff
+         ; delta_transition_chain_proof
+         ; protocol_version
+         ; proposed_protocol_version
+         ; accounts_accessed
+         ; accounts_created
+         ; tokens_used
+         } :
+          t ) : Latest.t =
+      { scheduled_time
+      ; protocol_state = Protocol_state.Value.Stable.V3.to_latest protocol_state
+      ; protocol_state_proof
+      ; staged_ledger_diff =
+          Legacy_format.Staged_ledger_diff.Stable.V2.to_latest
+            staged_ledger_diff
+      ; delta_transition_chain_proof
+      ; protocol_version
+      ; proposed_protocol_version
+      ; accounts_accessed
+      ; accounts_created
+      ; tokens_used
+      }
+  end
 end]
 
 (* functions for the versioned json, not the unversioned ones provided by `T` *)

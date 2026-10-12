@@ -9,6 +9,14 @@ module Stable : sig
 
     val staged_ledger_diff : t -> Diff.Stable.V4.t
   end
+
+  module V2 : sig
+    type t = { staged_ledger_diff : Diff.Stable.V3.t } [@@deriving equal, sexp]
+
+    val staged_ledger_diff : t -> Diff.Stable.V3.t
+
+    val to_latest : t -> V3.t
+  end
 end]
 
 type t
