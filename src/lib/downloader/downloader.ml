@@ -806,10 +806,12 @@ end = struct
               ; ("keys", f xs)
               ] ;
           List.iter xs ~f:(fun x ->
-              enqueue_exn t
-                { x with
-                  attempts = Map.set x.attempts ~key:peer ~data:Attempt.download
-                } )
+              if not (Ivar.is_full x.res) then
+                enqueue_exn t
+                  { x with
+                    attempts =
+                      Map.set x.attempts ~key:peer ~data:Attempt.download
+                  } )
         in
         List.iter xs ~f:(fun x ->
             Hashtbl.set t.downloading ~key:x.key ~data:(peer, x, Time.now ()) ) ;
@@ -882,11 +884,14 @@ end = struct
                 (* Anything left in jobs, we did not get results for :( *)
                 Hashtbl.iter jobs ~f:(fun x ->
                     Hashtbl.remove t.downloading x.J.key ;
-                    enqueue_exn t
-                      { x with
-                        attempts =
-                          Map.set x.attempts ~key:peer ~data:Attempt.download
-                      } ) ) )
+                    (* A job cancelled while its download was in progress
+                       already has its result, and must not be resurrected. *)
+                    if not (Ivar.is_full x.res) then
+                      enqueue_exn t
+                        { x with
+                          attempts =
+                            Map.set x.attempts ~key:peer ~data:Attempt.download
+                        } ) ) )
 
   let to_yojson t : Yojson.Safe.t =
     check_invariant t ;
