@@ -6,7 +6,7 @@ open Currency
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
            , 'local_state
@@ -26,7 +26,7 @@ module Poly : sig
             , 'pending_coinbase_stack
             , 'fee_excess
             , 'sok_digest )
-            Mina_wire_types.Mina_state.Blockchain_state.Poly.V2.t =
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V3.t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
         ; ledger_proof_statement :
@@ -59,7 +59,7 @@ module Value : sig
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
         , unit )
-        Poly.Stable.V2.t
+        Poly.Stable.V3.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
       val to_latest : t -> t
