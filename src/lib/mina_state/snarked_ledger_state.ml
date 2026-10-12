@@ -202,6 +202,21 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t =
+        ( Frozen_ledger_hash.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V1.t
+        , unit
+        , Local_state.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving compare, equal, hash, sexp, yojson]
+
+      let to_latest (t : t) : Latest.t =
+        { t with fee_excess = Fee_excess.Stable.V1.to_latest t.fee_excess }
+    end
   end]
 
   type var =
@@ -355,6 +370,21 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
+      end
+
+      module V2 = struct
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        let to_latest (t : t) : Latest.t =
+          { t with fee_excess = Fee_excess.Stable.V1.to_latest t.fee_excess }
       end
     end]
 

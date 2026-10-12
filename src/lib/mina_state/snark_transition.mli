@@ -38,6 +38,17 @@ module Value : sig
         Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
     end
+
+    module V2 : sig
+      type t =
+        ( Blockchain_state.Value.Stable.V2.t
+        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
+        , Pending_coinbase.Update.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      val to_latest : t -> V3.t
+    end
   end]
 end
 

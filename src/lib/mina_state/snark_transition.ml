@@ -31,6 +31,21 @@ module Value = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t =
+        ( Blockchain_state.Value.Stable.V2.t
+        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
+        , Pending_coinbase.Update.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest (t : t) : Latest.t =
+        { t with
+          blockchain_state =
+            Blockchain_state.Value.Stable.V2.to_latest t.blockchain_state
+        }
+    end
   end]
 end
 
