@@ -224,7 +224,7 @@
             { with-archive ? false }: {
               command =
                 runInEnv self.devShells.x86_64-linux.integration-tests ''
-                  test_executive local ${test} \
+                  test_executive docker ${test} \
                   --mina-image=${
                     dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
                   } \

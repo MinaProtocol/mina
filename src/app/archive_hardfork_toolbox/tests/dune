@@ -1,5 +1,8 @@
 (test
  (name test_convert_canonical)
+ (deps
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql)
  (libraries
   ;; opam libraries
   alcotest
@@ -32,6 +35,7 @@
   mina_base.import
   mina_block
   mina_caqti
+  mina_automation.synthetic_archive
   mina_numbers
   mina_state
   mina_transaction

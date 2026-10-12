@@ -246,6 +246,12 @@ psql -f ./src/test/archive/sample_db/archive_db.sql "${INDEXER_PG_CONN}"
 mina-rosetta-indexer-test --archive_uri "${INDEXER_PG_CONN}"
 sudo -u postgres dropdb "${INDEXER_DBNAME}"
 
+# /search/transactions on hand-built archives; it creates and drops its own
+# databases on this server
+echo "========================= ROSETTA SEARCH TESTS ==========================="
+MINA_TEST_POSTGRES="postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432" \
+  mina-rosetta-search-test
+
 echo "=========================== NEGATIVE TEST: healthcheck against not-yet-running Rosetta ==========================="
 # Sanity check: before Rosetta is up, `rosetta-healthcheck ready` must
 # fail cleanly.  Catches regressions in error formatting and exit codes

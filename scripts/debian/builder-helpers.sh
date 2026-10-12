@@ -524,6 +524,8 @@ build_rosetta_generic_deb() {
     "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+  cp ./default/src/app/rosetta/search_test/rosetta_search_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-search-test"
 
   build_deb "${package_name}"
 }
