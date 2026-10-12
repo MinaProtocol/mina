@@ -275,10 +275,8 @@ module Versioned = struct
   end
 
   module V4 = struct
-    let state_hashes (_ : Stable.V4.t) =
-      failwith
-        "Precomputed.Versioned.V4.state_hashes: V4 has no hashing of its own \
-         yet"
+    let state_hashes (t : Stable.V4.t) =
+      Protocol_state.Value.Stable.V3.hashes t.protocol_state
   end
 
   let state_hashes = function
