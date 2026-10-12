@@ -66,6 +66,9 @@ dune runtest src/app/archive
 # Synthetic_archive: the shared test archive builder, against the same DB server
 dune runtest src/test/mina_automation/test/synthetic_archive
 
+# archive_hardfork_toolbox load-genesis-accounts, against the same DB server
+dune runtest src/app/archive_hardfork_toolbox/test_load_genesis_accounts
+
 # mina-archive-healthcheck: hermetic CLI smoke tests, plus DB-backed tests on
 # the same server ($MINA_TEST_POSTGRES)
 dune runtest src/app/mina_archive_healthcheck

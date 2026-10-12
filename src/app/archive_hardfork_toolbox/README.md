@@ -147,6 +147,28 @@ To repair an earlier boundary (e.g. on a network with more than one hard fork), 
 `--protocol-version` and `--target-block-hash`/`--fork-height` explicitly instead of
 relying on auto-detection, which always targets the latest boundary.
 
+### load-genesis-accounts
+
+Writes the genesis ledger of a runtime config to `genesis_accounts`, at the
+height of the config's genesis block (the fork genesis for a config with
+`proof.fork`). Rosetta reads this table for accounts that no block touched. The
+archive does the same in the background when it starts with `--config-file`;
+use this command on an archive that did not. An interrupted write continues; a
+written ledger is left as it is.
+
+```bash
+archive_hardfork_toolbox load-genesis-accounts \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
+  --config-file /var/lib/coda/config.json
+```
+
+**Parameters:**
+- `--postgres-uri`: URI for connecting to the archive database
+- `--config-file`: Runtime config with the (fork) genesis ledger
+- `--chunk-size`: Accounts per statement and transaction (default 5000)
+
+Prints JSON: `genesis_height`, `written`, `already_written`.
+
 ## Typical Workflow
 
 1. **Pre-fork validation**: Use the `fork-candidate` commands to ensure the chosen fork point is valid:

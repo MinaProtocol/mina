@@ -1,0 +1,26 @@
+(test
+ (name test_load_genesis_accounts)
+ (deps
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  caqti
+  core
+  core_kernel
+  yojson
+  ;; local libraries
+  archive_hardfork_toolbox_lib
+  archive_lib
+  currency
+  mina_automation.synthetic_archive
+  mina_caqti
+  runtime_config
+  signature_lib)
+ (preprocess
+  (pps ppx_version ppx_jane)))

@@ -485,9 +485,9 @@ let%test_module "Archive node unit tests" =
        + 1] (not 1). When such a block is present in the archive but was ingested
        WITHOUT its ledger accounts (e.g. the archive was never (re)started with
        the fork [--config-file]), [accounts_accessed] is empty for it, so Rosetta
-       reports zero balances at the fork block. [add_genesis_accounts] -- the
-       routine the [populate-genesis-accounts] toolbox command invokes -- must
-       backfill the full fork genesis ledger onto that existing block. *)
+       reports zero balances at the fork block. [add_genesis_accounts] -- run
+       at archive start-up with that config -- must backfill the full fork
+       genesis ledger onto that existing block. *)
     let%test_unit "Accounts_accessed: add_genesis_accounts backfills the fork \
                    genesis ledger onto an existing fork genesis block" =
       let pool = Lazy.force conn_pool_lazy in

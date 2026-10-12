@@ -29,9 +29,9 @@ ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 
 # The per-network config package ships the runtime config JSON and, for hardfork
 # networks, the genesis ledger tarball(s) into /var/lib/coda. Bundling it lets
-# `mina-archive-hardfork-toolbox populate-genesis-accounts` (and `mina-archive
-# run --config-file`) resolve the fork genesis ledger locally -- no S3, no
-# network -- to backfill accounts_accessed for the fork genesis block.
+# `mina-archive run --config-file` (and `mina-archive-hardfork-toolbox
+# load-genesis-accounts`) resolve the fork genesis ledger locally -- no S3, no
+# network.
 #
 # Unlike the daemon (see stages/daemon/2-mina-daemon), the archive image can carry a
 # config safely: its entrypoint never picks up /var/lib/coda/* implicitly, so

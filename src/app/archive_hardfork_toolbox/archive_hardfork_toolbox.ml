@@ -125,24 +125,31 @@ let fetch_last_filled_block_command =
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
      fetch_last_filled_block ~postgres_uri )
 
-let populate_genesis_accounts_command =
-  Async.Command.async
+let load_genesis_accounts_command =
+  Async.Command.async_or_error
     ~summary:
-      "Populate accounts_accessed for the genesis block (including a fork \
-       genesis) from the runtime config's genesis ledger. Repairs a hardfork \
-       archive whose fork genesis block is missing its ledger accounts."
+      "Write the genesis ledger of a runtime config to genesis_accounts, at \
+       the height of its genesis block (the fork genesis for a fork config). \
+       Continues an interrupted write; a written ledger is left as it is."
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
      and runtime_config_file =
        Command.Param.(flag "--config-file" (required string))
          ~doc:"PATH runtime config file containing the (fork) genesis ledger"
-     and chunks_length =
-       Command.Param.(flag "--chunks-length" (optional_with_default 100 int))
-         ~doc:
-           "Int number of accounts to insert per transaction, to avoid \
-            Postgres OOM on large ledgers (default 100)"
+     and chunk_size =
+       Command.Param.(flag "--chunk-size" (optional int))
+         ~doc:"Int accounts per statement and transaction (default 5000)"
      in
-     populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
-    )
+     fun () ->
+       let%map.Deferred.Or_error genesis_height, written, already =
+         load_genesis_accounts ~postgres_uri ~runtime_config_file ?chunk_size ()
+       in
+       print_endline
+         (Yojson.Safe.to_string
+            (`Assoc
+              [ ("genesis_height", `Intlit (Int64.to_string genesis_height))
+              ; ("written", `Int written)
+              ; ("already_written", `Int already)
+              ] ) ) )
 
 (* TODO: consider refactor these commands to reuse queries in the future. *)
 let commands =
@@ -157,7 +164,7 @@ let commands =
   ; ("verify-upgrade", verify_upgrade_command)
   ; ("validate-fork", validate_fork_command)
   ; ("convert-chain-to-canonical", convert_chain_to_canonical_command)
-  ; ("populate-genesis-accounts", populate_genesis_accounts_command)
+  ; ("load-genesis-accounts", load_genesis_accounts_command)
   ]
 
 let () =
