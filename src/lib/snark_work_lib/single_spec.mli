@@ -12,6 +12,22 @@ module Poly : sig
             * 'ledger_proof
       [@@deriving sexp, yojson]
     end
+
+    module V2 : sig
+      type ('witness, 'ledger_proof) t =
+        | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
+        | Merge of
+            Transaction_snark.Statement.Stable.V2.t
+            * 'ledger_proof
+            * 'ledger_proof
+      [@@deriving sexp, yojson]
+
+      val to_latest :
+           ('witness -> 'witness_latest)
+        -> ('ledger_proof -> 'ledger_proof_latest)
+        -> ('witness, 'ledger_proof) t
+        -> ('witness_latest, 'ledger_proof_latest) V3.t
+    end
   end]
 
   val map :
@@ -41,6 +57,16 @@ module Stable : sig
     val to_latest : t -> t
 
     val transaction : t -> Mina_transaction.Transaction.Stable.V4.t option
+  end
+
+  module V2 : sig
+    type t =
+      ( Transaction_witness.Stable.V3.t
+      , Ledger_proof.Stable.V2.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, yojson]
+
+    val to_latest : t -> V3.t
   end
 end]
 

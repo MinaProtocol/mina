@@ -16,6 +16,19 @@ module Stable : sig
 
     val to_latest : t -> t
   end
+
+  module V1 : sig
+    type t =
+      { id : Id.Any.Stable.V1.t
+      ; data :
+          ( Mina_stdlib.Time.Span.Stable.V1.t
+          , Ledger_proof.Stable.V2.t )
+          Proof_carrying_data.Stable.V1.t
+      }
+    [@@deriving to_yojson]
+
+    val to_latest : t -> V2.t
+  end
 end]
 
 type t =

@@ -22,6 +22,31 @@ module Poly = struct
         | Coinbase x ->
             Coinbase x
     end
+
+    module V2 = struct
+      type 'command t = 'command Mina_wire_types.Mina_transaction.Poly.V2.t =
+        | Command of 'command
+        | Fee_transfer of Fee_transfer.Stable.V2.t
+        | Coinbase of Coinbase.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest : 'command t -> 'command Latest.t = function
+        | Command c ->
+            Command c
+        | Fee_transfer f ->
+            Fee_transfer f
+        | Coinbase c ->
+            Coinbase (Coinbase.Stable.V1.to_latest c)
+
+      let map t ~f =
+        match t with
+        | Command x ->
+            Command (f x)
+        | Fee_transfer x ->
+            Fee_transfer x
+        | Coinbase x ->
+            Coinbase x
+    end
   end]
 end
 
@@ -38,6 +63,13 @@ module Stable = struct
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
+  end
+
+  module V3 = struct
+    type t = User_command.Stable.V3.t Poly.Stable.V2.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    let to_latest : t -> Latest.t = Poly.Stable.V2.to_latest
   end
 end]
 

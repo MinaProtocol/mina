@@ -15,6 +15,17 @@ module type Full = sig
       [@@deriving sexp, bin_io, compare, equal, version, hash, yojson]
     end
 
+    module V1 : sig
+      type t = private
+        { receiver : Public_key.Compressed.Stable.V1.t
+        ; amount : Currency.Amount.Stable.V1.t
+        ; fee_transfer : Fee_transfer.Stable.V1.t option
+        }
+      [@@deriving sexp, bin_io, compare, equal, version, hash, yojson]
+
+      val to_latest : t -> V2.t
+    end
+
     module Latest = V2
   end
 

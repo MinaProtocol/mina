@@ -12,6 +12,28 @@ module Poly = struct
             * 'ledger_proof
       [@@deriving sexp, yojson]
     end
+
+    module V2 = struct
+      type ('witness, 'ledger_proof) t =
+        | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
+        | Merge of
+            Transaction_snark.Statement.Stable.V2.t
+            * 'ledger_proof
+            * 'ledger_proof
+      [@@deriving sexp, yojson]
+
+      let to_latest witness_latest ledger_proof_latest : _ t -> _ Latest.t =
+        function
+        | Transition (s, w) ->
+            Transition
+              ( Transaction_snark.Statement.Stable.V2.to_latest s
+              , witness_latest w )
+        | Merge (s, p1, p2) ->
+            Merge
+              ( Transaction_snark.Statement.Stable.V2.to_latest s
+              , ledger_proof_latest p1
+              , ledger_proof_latest p2 )
+    end
   end]
 
   let map ~f_witness ~f_proof = function
@@ -62,6 +84,18 @@ module Stable = struct
     let transaction t =
       Option.map (Poly.witness t) ~f:(fun w ->
           w.Transaction_witness.Stable.Latest.transaction )
+  end
+
+  module V2 = struct
+    type t =
+      ( Transaction_witness.Stable.V3.t
+      , Ledger_proof.Stable.V2.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, yojson]
+
+    let to_latest : t -> Latest.t =
+      Poly.Stable.V2.to_latest Transaction_witness.Stable.V3.to_latest
+        Ledger_proof.Stable.V2.to_latest
   end
 end]
 

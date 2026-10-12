@@ -30,6 +30,32 @@ module Types : sig
           ; sok_digest : 'sok_digest
           }
       end
+
+      module V2 : sig
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'sok_digest
+             , 'local_state )
+             t =
+          { source :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state )
+              Mina_state_registers.V1.t
+          ; target :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state )
+              Mina_state_registers.V1.t
+          ; connecting_ledger_left : 'ledger_hash
+          ; connecting_ledger_right : 'ledger_hash
+          ; supply_increase : 'amount
+          ; fee_excess : 'fee_excess
+          ; sok_digest : 'sok_digest
+          }
+      end
     end
 
     module V3 : sig
@@ -84,6 +110,32 @@ module type Concrete = sig
             Mina_state_registers.V2.t
         ; connecting_ledger_left : 'ledger_hash
         ; connecting_ledger_right : 'ledger_hash
+        ; sok_digest : 'sok_digest
+        }
+    end
+
+    module V2 : sig
+      type ( 'ledger_hash
+           , 'amount
+           , 'pending_coinbase
+           , 'fee_excess
+           , 'sok_digest
+           , 'local_state )
+           t =
+        { source :
+            ( 'ledger_hash
+            , 'pending_coinbase
+            , 'local_state )
+            Mina_state_registers.V1.t
+        ; target :
+            ( 'ledger_hash
+            , 'pending_coinbase
+            , 'local_state )
+            Mina_state_registers.V1.t
+        ; connecting_ledger_left : 'ledger_hash
+        ; connecting_ledger_right : 'ledger_hash
+        ; supply_increase : 'amount
+        ; fee_excess : 'fee_excess
         ; sok_digest : 'sok_digest
         }
     end

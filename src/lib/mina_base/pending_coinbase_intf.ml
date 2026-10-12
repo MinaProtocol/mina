@@ -213,6 +213,17 @@ module type S = sig
           type t = Update_none | Update_one | Update_two_coinbase_in_second
           [@@deriving sexp, to_yojson]
         end
+
+        module V1 : sig
+          type t =
+            | Update_none
+            | Update_one
+            | Update_two_coinbase_in_first
+            | Update_two_coinbase_in_second
+          [@@deriving sexp, to_yojson]
+
+          val to_latest : t -> V2.t
+        end
       end]
 
       type var = Boolean.var * Boolean.var
@@ -238,6 +249,13 @@ module type S = sig
       module V2 : sig
         type t = (Action.Stable.V2.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
+      end
+
+      module V1 : sig
+        type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, to_yojson]
+
+        val to_latest : t -> V2.t
       end
     end]
 

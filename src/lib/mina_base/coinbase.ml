@@ -5,7 +5,10 @@ open Mina_base_import
 module Wire_types = Mina_wire_types.Mina_base.Coinbase
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Coinbase_intf.Full with type Stable.V2.t = A.V2.t
+  module type S =
+    Coinbase_intf.Full
+      with type Stable.V2.t = A.V2.t
+       and type Stable.V1.t = A.V1.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -27,6 +30,18 @@ module Make_str (A : Wire_types.Concrete) = struct
       let description = "Coinbase"
 
       let version_byte = Base58_check.Version_bytes.coinbase
+    end
+
+    module V1 = struct
+      type t = A.V1.t =
+        { receiver : Public_key.Compressed.Stable.V1.t
+        ; amount : Currency.Amount.Stable.V1.t
+        ; fee_transfer : Fee_transfer.Stable.V1.t option
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest ({ receiver; amount; fee_transfer } : t) : Latest.t =
+        { receiver; amount; fee_transfer; fee_remainder = Currency.Fee.zero }
     end
   end]
 

@@ -43,6 +43,27 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V3 = struct
+    type t =
+      { snark_transition : Snark_transition.Value.Stable.V2.t
+      ; ledger_proof : Ledger_proof.Stable.V2.t option
+      ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V3.t
+      }
+
+    let to_latest
+        ({ snark_transition; ledger_proof; prover_state; staged_ledger_diff } :
+          t ) : Latest.t =
+      { snark_transition =
+          Snark_transition.Value.Stable.V2.to_latest snark_transition
+      ; ledger_proof =
+          Option.map ledger_proof ~f:Ledger_proof.Stable.V2.to_latest
+      ; prover_state
+      ; staged_ledger_diff =
+          Staged_ledger_diff.Stable.V3.to_latest staged_ledger_diff
+      }
+  end
 end]
 
 (* bin_io, version omitted *)

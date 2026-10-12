@@ -417,6 +417,27 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let to_latest = Fn.id
         end
+
+        module V1 = struct
+          type t =
+            | Update_none
+            | Update_one
+            | Update_two_coinbase_in_first
+            | Update_two_coinbase_in_second
+          [@@deriving equal, sexp, to_yojson]
+
+          let to_latest : t -> Latest.t = function
+            | Update_none ->
+                Update_none
+            | Update_one ->
+                Update_one
+            | Update_two_coinbase_in_first ->
+                failwith
+                  "Pending_coinbase.Update.Action.Stable.V1.to_latest: a block \
+                   no longer adds a coinbase in its first partition"
+            | Update_two_coinbase_in_second ->
+                Update_two_coinbase_in_second
+        end
       end]
 
       type var = Boolean.var * Boolean.var
@@ -479,6 +500,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
+      end
+
+      module V1 = struct
+        type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest (t : t) : Latest.t =
+          { t with action = Action.Stable.V1.to_latest t.action }
       end
     end]
 

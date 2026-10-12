@@ -12,6 +12,15 @@ module Statement = struct
 
         let to_latest = Fn.id
       end
+
+      module V2 = struct
+        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+        [@@deriving hash, sexp, compare]
+
+        let to_latest : t -> Latest.t =
+          One_or_two.Stable.V1.to_latest
+            Transaction_snark.Statement.Stable.V2.to_latest
+      end
     end]
   end
 
@@ -29,6 +38,18 @@ module Statement = struct
 
       include Comparable.Make_binable (Arg.Stable.V3)
       include Hashable.Make_binable (Arg.Stable.V3)
+    end
+
+    module V2 = struct
+      type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+      [@@deriving equal, compare, hash, sexp, yojson]
+
+      let to_latest : t -> Latest.t = Arg.Stable.V2.to_latest
+
+      let (_ : (t, Arg.Stable.V2.t) Type_equal.t) = Type_equal.T
+
+      include Comparable.Make_binable (Arg.Stable.V2)
+      include Hashable.Make_binable (Arg.Stable.V2)
     end
   end]
 
@@ -62,6 +83,23 @@ module Info = struct
       [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t =
+        { statements : Statement.Stable.V2.t
+        ; work_ids : int One_or_two.Stable.V1.t
+        ; fee : Fee.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving compare, sexp, to_yojson]
+
+      let to_latest ({ statements; work_ids; fee; prover } : t) : Latest.t =
+        { statements = Statement.Stable.V2.to_latest statements
+        ; work_ids
+        ; fee
+        ; prover
+        }
     end
   end]
 
@@ -100,6 +138,23 @@ module T = struct
       let proofs t = t.proofs
 
       let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t =
+        { fee : Fee.Stable.V1.t
+        ; proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving equal, fields, sexp, yojson]
+
+      let to_latest ({ fee; proofs; prover } : t) : Latest.t =
+        { fee
+        ; proofs =
+            One_or_two.Stable.V1.to_latest Ledger_proof.Stable.V2.to_latest
+              proofs
+        ; prover
+        }
     end
   end]
 

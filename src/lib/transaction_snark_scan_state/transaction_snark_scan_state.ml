@@ -42,6 +42,46 @@ module Transaction_with_witness = struct
 
       let to_latest = Fn.id
     end
+
+    module V3 = struct
+      (* TODO: The statement is redundant here - it can be computed from the
+         witness and the transaction
+      *)
+      type t =
+        { transaction_with_status :
+            Mina_transaction.Transaction.Stable.V3.t With_status.Stable.V2.t
+        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+        ; statement : Transaction_snark.Statement.Stable.V2.t
+        ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; first_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
+        ; second_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp, to_yojson]
+
+      let to_latest
+          ({ transaction_with_status
+           ; state_hash
+           ; statement
+           ; init_stack
+           ; first_pass_ledger_witness
+           ; second_pass_ledger_witness
+           ; block_global_slot
+           } :
+            t ) : Latest.t =
+        { transaction_with_status =
+            With_status.map transaction_with_status
+              ~f:Mina_transaction.Transaction.Stable.V3.to_latest
+        ; state_hash
+        ; statement = Transaction_snark.Statement.Stable.V2.to_latest statement
+        ; init_stack
+        ; first_pass_ledger_witness
+        ; second_pass_ledger_witness
+        ; block_global_slot
+        }
+    end
   end]
 
   type t =
@@ -281,6 +321,30 @@ module Stable = struct
         ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V4.t) ->
           Transaction_with_witness.hash x )
         (t.scan_state, t.previous_incomplete_zkapp_updates)
+  end
+
+  module V3 = struct
+    type t =
+      { scan_state :
+          ( Ledger_proof.Stable.V2.t
+          , Transaction_with_witness.Stable.V3.t )
+          Parallel_scan.State.Stable.V1.t
+      ; previous_incomplete_zkapp_updates :
+          Transaction_with_witness.Stable.V3.t list
+          * [ `Border_block_continued_in_the_next_tree of bool ]
+      }
+
+    let to_latest
+        ({ scan_state; previous_incomplete_zkapp_updates = updates, continued } :
+          t ) : Latest.t =
+      { scan_state =
+          Parallel_scan.State.map scan_state
+            ~f1:Ledger_proof.Stable.V2.to_latest
+            ~f2:Transaction_with_witness.Stable.V3.to_latest
+      ; previous_incomplete_zkapp_updates =
+          ( List.map updates ~f:Transaction_with_witness.Stable.V3.to_latest
+          , continued )
+      }
   end
 end]
 

@@ -17,6 +17,16 @@ module Stable : sig
       -> t
       -> Transaction.Stable.V4.t With_status.t list
   end
+
+  module V3 : sig
+    type t [@@deriving sexp]
+
+    val header : t -> Header.Stable.V3.t
+
+    val body : t -> Staged_ledger_diff.Body.Stable.V2.t
+
+    val to_latest : t -> V4.t
+  end
 end]
 
 type t
