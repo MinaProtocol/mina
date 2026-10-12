@@ -186,6 +186,8 @@ module type Full = sig
       [@@deriving compare, equal, hash, sexp, yojson]
 
       val to_latest : t -> V3.t
+
+      val to_input : t -> Tick.Field.t Random_oracle.Input.Chunked.t
     end
   end]
 

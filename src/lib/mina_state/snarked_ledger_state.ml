@@ -216,6 +216,25 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let to_latest (t : t) : Latest.t =
         { t with fee_excess = Fee_excess.Stable.V1.to_latest t.fee_excess }
+
+      let to_input
+          ({ source
+           ; target
+           ; connecting_ledger_left
+           ; connecting_ledger_right
+           ; supply_increase
+           ; fee_excess
+           ; sok_digest = _
+           } :
+            t ) =
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+          [| Registers.to_input source
+           ; Registers.to_input target
+           ; Frozen_ledger_hash.to_input connecting_ledger_left
+           ; Frozen_ledger_hash.to_input connecting_ledger_right
+           ; Amount.Signed.to_input supply_increase
+           ; Fee_excess.Stable.V1.to_input fee_excess
+          |]
     end
   end]
 
