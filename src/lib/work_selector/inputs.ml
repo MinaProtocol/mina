@@ -66,6 +66,15 @@ module Test_inputs = struct
 
         let to_latest = Fn.id
       end
+
+      module V2 = struct
+        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+        [@@deriving hash, compare, sexp]
+
+        let to_latest : t -> Latest.t =
+          One_or_two.Stable.V1.to_latest
+            Transaction_snark.Statement.Stable.V2.to_latest
+      end
     end]
 
     module Work = Hashable.Make_binable (Stable.Latest)
