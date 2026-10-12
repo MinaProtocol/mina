@@ -265,6 +265,10 @@ module Non_hashing_ledger : sig
 
   val unregister_mask_exn : loc:string -> t -> unattached_mask
 
+  (** Apply [f] to a sub-ledger of [t], committing its writes into [t] only if
+      [f] returns [Ok]. *)
+  val within_mask : t -> f:(t -> ('a, 'e) Result.t) -> ('a, 'e) Result.t
+
   module Transaction_partially_applied : sig
     (** Left abstract: it holds a ledger, and a non-hashing ledger must not
         escape as a real one. *)

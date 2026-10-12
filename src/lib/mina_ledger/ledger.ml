@@ -692,6 +692,13 @@ module Non_hashing_ledger = struct
 
   let unregister_mask_exn ~loc (mask : t) : unattached_mask =
     Non_hashing_maskable.unregister_mask_exn ~loc mask
+
+  let within_mask l ~f =
+    let mask = register_mask l (create_mask l) in
+    let r = f mask in
+    if Result.is_ok r then commit mask ;
+    ignore (unregister_mask_exn ~loc:Caml.__LOC__ mask : unattached_mask) ;
+    r
 end
 
 (* use mask to restore ledger after application *)

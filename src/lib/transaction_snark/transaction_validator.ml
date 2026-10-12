@@ -3,19 +3,8 @@ open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Non_hashing_ledger = Ledger.Non_hashing_ledger
 
-let within_mask l ~f =
-  let mask =
-    Non_hashing_ledger.register_mask l (Non_hashing_ledger.create_mask l)
-  in
-  let r = f mask in
-  if Result.is_ok r then Non_hashing_ledger.commit mask ;
-  ignore
-    ( Non_hashing_ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask
-      : Non_hashing_ledger.unattached_mask ) ;
-  r
-
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =
-  within_mask l ~f:(fun l' ->
+  Non_hashing_ledger.within_mask l ~f:(fun l' ->
       Result.map
         ~f:(fun applied_txn ->
           applied_txn
@@ -29,7 +18,7 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
 let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view
     ~signature_kind l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      within_mask l ~f:(fun l' ->
+      Non_hashing_ledger.within_mask l ~f:(fun l' ->
           Non_hashing_ledger.apply_transactions ~signature_kind
             ~constraint_constants ~global_slot ~txn_state_view l' t ) )
 
@@ -42,7 +31,7 @@ let apply_transaction_first_pass ~constraint_constants ~global_slot
     ~txn_state_view ~signature_kind l txn :
     Non_hashing_ledger.Transaction_partially_applied.t Or_error.t =
   O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
-      within_mask l ~f:(fun l' ->
+      Non_hashing_ledger.within_mask l ~f:(fun l' ->
           Non_hashing_ledger.apply_transaction_first_pass ~signature_kind l'
             ~constraint_constants ~global_slot ~txn_state_view txn ) )
 
