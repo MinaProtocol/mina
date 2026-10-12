@@ -61,15 +61,10 @@ module Node = struct
     | Some postgres_uri ->
         let open Malleable_error.Let_syntax in
         let%bind container_id = get_container_id service_name in
-        [%log info] "Dumping archive data from (node: %s, container: %s)"
-          service_name container_id ;
-        let%map data =
-          run_in_container container_id
-            ~cmd:[ "pg_dump"; "--create"; "--no-owner"; postgres_uri ]
-        in
-        [%log info] "Dumping archive data to file %s" data_file ;
-        Out_channel.with_file data_file ~f:(fun out_ch ->
-            Out_channel.output_string out_ch data )
+        Local_engine_common.Ops.dump_archive_data
+          ~run:(fun ~prog ~args ->
+            run_in_container container_id ~cmd:(prog :: args) )
+          ~logger ~service_name ~postgres_uri ~data_file
 
   let get_logs_in_container container_id =
     let%bind.Deferred cwd = Unix.getcwd () in
@@ -125,124 +120,26 @@ module Node = struct
       (t : t) =
     let open Malleable_error.Let_syntax in
     let%bind container_id = get_container_id t.config.service_id in
-    [%log info] "Running replayer on (node: %s, container: %s)"
-      t.config.service_id container_id ;
-    let%bind accounts =
-      run_in_container container_id
-        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/root/runtime_config.json" ]
-    in
-    let target_hash_json =
-      match target_state_hash with
-      | None ->
-          ""
-      | Some hash ->
-          sprintf {|, "target_epoch_ledgers_state_hash": "%s"|}
-            (Mina_base.State_hash.to_base58_check hash)
-    in
-    let replayer_input =
-      sprintf
-        {| { "start_slot_since_genesis": %d,
-             "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }%s} |}
-        start_slot_since_genesis accounts target_hash_json
-    in
-    let dest = "/root/replayer-input.json" in
-    let%bind () =
-      Deferred.bind ~f:Malleable_error.return
-        (cp_string_to_container_file container_id ~str:replayer_input ~dest)
-      >>| ignore
-    in
-    let postgres_url = Option.value_exn t.config.postgres_connection_uri in
-    run_in_container container_id
-      ~cmd:
-        [ "mina-replayer"
-        ; "--archive-uri"
-        ; postgres_url
-        ; "--input-file"
-        ; dest
-        ; "--output-file"
-        ; "/dev/null"
-        ; "--log-json"
-        ; "--continue-on-error"
-        ]
+    let postgres_uri = Option.value_exn t.config.postgres_connection_uri in
+    Local_engine_common.Ops.run_replayer
+      ~run:(fun ~prog ~args -> run_in_container container_id ~cmd:(prog :: args))
+      ~write_file:(fun ~contents ~dest ->
+        Deferred.bind ~f:Malleable_error.return
+          (cp_string_to_container_file container_id ~str:contents ~dest)
+        >>| ignore )
+      ~logger ~service_name:t.config.service_id
+      ~runtime_config_path:"/root/runtime_config.json"
+      ~replayer_input_dest:"/root/replayer-input.json" ~postgres_uri
+      ~start_slot_since_genesis ?target_state_hash ()
 
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
     let container_id = t.config.service_id in
-    [%log info]
-      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.config.service_id container_id ;
+    (* Fetch the container's logs and hand the contents to the shared parser
+       (see also the native engine, which reads the node's log file). *)
     let%bind logs = get_logs_in_container container_id in
-    (* kubectl logs may include non-log output, like "Using password from environment variable" *)
-    let log_lines =
-      String.split logs ~on:'\n'
-      |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
-    in
-    let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
-    let metadata_jsons =
-      List.map jsons ~f:(fun json ->
-          match json with
-          | `Assoc items -> (
-              match List.Assoc.find items ~equal:String.equal "metadata" with
-              | Some md ->
-                  md
-              | None ->
-                  failwithf "Log line is missing metadata: %s"
-                    (Yojson.Safe.to_string json)
-                    () )
-          | other ->
-              failwithf "Expected log line to be a JSON record, got: %s"
-                (Yojson.Safe.to_string other)
-                () )
-    in
-    let state_hash_and_blocks =
-      List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
-          match json with
-          | `Assoc items -> (
-              match
-                List.Assoc.find items ~equal:String.equal "precomputed_block"
-              with
-              | Some block -> (
-                  match
-                    List.Assoc.find items ~equal:String.equal "state_hash"
-                  with
-                  | Some state_hash ->
-                      (state_hash, block) :: acc
-                  | None ->
-                      failwith
-                        "Log metadata contains a precomputed block, but no \
-                         state hash" )
-              | None ->
-                  acc )
-          | other ->
-              failwithf "Expected log line to be a JSON record, got: %s"
-                (Yojson.Safe.to_string other)
-                () )
-    in
-    let%bind.Deferred () =
-      Deferred.List.iter state_hash_and_blocks
-        ~f:(fun (state_hash_json, block_json) ->
-          let double_quoted_state_hash =
-            Yojson.Safe.to_string state_hash_json
-          in
-          let state_hash =
-            String.sub double_quoted_state_hash ~pos:1
-              ~len:(String.length double_quoted_state_hash - 2)
-          in
-          let block = Yojson.Safe.pretty_to_string block_json in
-          let filename = state_hash ^ ".json" in
-          match%map.Deferred Sys.file_exists filename with
-          | `Yes ->
-              [%log info]
-                "File already exists for precomputed block with state hash %s"
-                state_hash
-          | _ ->
-              [%log info]
-                "Dumping precomputed block with state hash %s to file %s"
-                state_hash filename ;
-              Out_channel.with_file filename ~f:(fun out_ch ->
-                  Out_channel.output_string out_ch block ) )
-    in
-    Malleable_error.return ()
+    Local_engine_common.Ops.dump_precomputed_blocks_from_logs ~logger
+      ~service_name:t.config.service_id ~logs
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
