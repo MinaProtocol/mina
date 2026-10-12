@@ -1948,9 +1948,8 @@ module User_command = struct
 
     let add_if_doesn't_exist ?(via = `Ident)
         (module Conn : Mina_caqti.CONNECTION) (t : Signed_command.t)
-        ~v1_transaction_hash =
+        ~transaction_hash ~v1_transaction_hash =
       let open Deferred.Result.Let_syntax in
-      let transaction_hash = Transaction_hash.hash_command (Signed_command t) in
       match%bind find (module Conn) ~transaction_hash ~v1_transaction_hash with
       | Some user_command_id ->
           return user_command_id
@@ -2077,12 +2076,9 @@ module User_command = struct
         id
 
     let add_without_find_opt ~logger (module Conn : Mina_caqti.CONNECTION)
-        (ps : Zkapp_command.t) =
+        (ps : Zkapp_command.t) ~transaction_hash =
       (* Skip find_opt; go straight to child builds + upsert. *)
       let open Deferred.Result.Let_syntax in
-      let transaction_hash =
-        Transaction_hash.hash_zkapp_command_with_hashes ps
-      in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
         Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
@@ -2115,11 +2111,8 @@ module User_command = struct
         { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
 
     let add_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
-        (ps : Zkapp_command.t) =
+        (ps : Zkapp_command.t) ~transaction_hash =
       let open Deferred.Result.Let_syntax in
-      let transaction_hash =
-        Transaction_hash.hash_zkapp_command_with_hashes ps
-      in
       (* Dedup on hash alone: same command in sibling blocks reuses existing row.
          Building child rows unconditionally is wasteful and, with non-deduping
          child tables, can lead to UNIQUE collisions on zkapp_commands_hash_key. *)
@@ -2127,7 +2120,7 @@ module User_command = struct
       | Some id ->
           return id
       | None ->
-          add_without_find_opt ~logger (module Conn) ps
+          add_without_find_opt ~logger (module Conn) ps ~transaction_hash
   end
 
   let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
@@ -2137,14 +2130,14 @@ module User_command = struct
     | Zkapp_command _ ->
         `Zkapp_command
 
-  let add_if_doesn't_exist ~logger conn (t : User_command.t)
+  let add_if_doesn't_exist ~logger conn (t : User_command.t) ~transaction_hash
       ~v1_transaction_hash =
     match t with
     | Signed_command sc ->
-        Signed_command.add_if_doesn't_exist conn ~via:(via t)
+        Signed_command.add_if_doesn't_exist conn ~via:(via t) ~transaction_hash
           ~v1_transaction_hash sc
     | Zkapp_command ps ->
-        Zkapp_command.add_if_doesn't_exist ~logger conn ps
+        Zkapp_command.add_if_doesn't_exist ~logger conn ps ~transaction_hash
 
   let find conn ~(transaction_hash : Transaction_hash.t) ~v1_transaction_hash =
     let open Deferred.Result.Let_syntax in
@@ -2268,9 +2261,8 @@ module Fee_transfer = struct
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       ?(v1_transaction_hash = false) (t : Fee_transfer.Single.t)
-      (kind : [ `Normal | `Via_coinbase ]) =
+      (kind : [ `Normal | `Via_coinbase ]) ~transaction_hash =
     let open Deferred.Result.Let_syntax in
-    let transaction_hash = Transaction_hash.hash_fee_transfer t in
     match%bind
       Internal_command.find_opt
         (module Conn)
@@ -2312,9 +2304,8 @@ module Coinbase = struct
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
-      ?(v1_transaction_hash = false) (t : Coinbase.t) =
+      ?(v1_transaction_hash = false) (t : Coinbase.t) ~transaction_hash =
     let open Deferred.Result.Let_syntax in
-    let transaction_hash = Transaction_hash.hash_coinbase t in
     match%bind
       Internal_command.find_opt
         (module Conn)
@@ -3132,6 +3123,12 @@ module Block = struct
                 let%bind id =
                   User_command.add_if_doesn't_exist ~logger
                     (module Conn)
+                    ~transaction_hash:
+                      ( match command with
+                      | Signed_command sc ->
+                          Transaction_hash.hash_command (Signed_command sc)
+                      | Zkapp_command ps ->
+                          Transaction_hash.hash_zkapp_command_with_hashes ps )
                     ~v1_transaction_hash user_command.data
                 in
                 let%map () =
@@ -3172,6 +3169,8 @@ module Block = struct
                         Fee_transfer.add_if_doesn't_exist
                           (module Conn)
                           fee_transfer `Normal
+                          ~transaction_hash:
+                            (Transaction_hash.hash_fee_transfer fee_transfer)
                       in
                       ( id
                       , secondary_sequence_no
@@ -3286,6 +3285,8 @@ module Block = struct
                         Fee_transfer.add_if_doesn't_exist
                           (module Conn)
                           fee_transfer `Via_coinbase
+                          ~transaction_hash:
+                            (Transaction_hash.hash_fee_transfer fee_transfer)
                       in
                       let status, failure_reason =
                         match status with
@@ -3312,7 +3313,10 @@ module Block = struct
                         ~secondary_sequence_no:0 ~status ~failure_reason
                 in
                 let%bind id =
-                  Coinbase.add_if_doesn't_exist (module Conn) coinbase
+                  Coinbase.add_if_doesn't_exist
+                    (module Conn)
+                    coinbase
+                    ~transaction_hash:(Transaction_hash.hash_coinbase coinbase)
                 in
                 let status, failure_reason =
                   match status with
@@ -4289,10 +4293,15 @@ module Block = struct
                     ~authorization:Control.Poly.None_given )
             in
             let%map cmd_id =
+              let zkapp_command =
+                Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+                  { fee_payer; account_updates; memo }
+              in
               User_command.Zkapp_command.add_if_doesn't_exist ~logger
                 (module Conn)
-                (Zkapp_command.of_simple ~signature_kind ~proof_cache_db
-                   { fee_payer; account_updates; memo } )
+                zkapp_command
+                ~transaction_hash:
+                  (Transaction_hash.hash_zkapp_command_with_hashes zkapp_command)
             in
             (zkapp_cmd, cmd_id) :: acc )
       in
