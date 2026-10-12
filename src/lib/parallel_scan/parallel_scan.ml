@@ -1334,8 +1334,8 @@ let incr_sequence_no : type a b. (a, b) t -> (unit, a, b) State_or_error.t =
   else put { state with curr_job_seq_no = state.curr_job_seq_no + 1 }
 
 let metrics t =
-  List.rev (Mina_stdlib.Nonempty_list.to_list t.trees)
-  |> List.map ~f:(fun tree ->
+  Mina_stdlib.Nonempty_list.to_list t.trees
+  |> List.rev_map ~f:(fun tree ->
          let base_jobs_todo, merge_jobs_todo = Tree.todo_job_count tree in
          { Tree_metrics.available_space = Tree.available_space tree
          ; base_jobs_todo
