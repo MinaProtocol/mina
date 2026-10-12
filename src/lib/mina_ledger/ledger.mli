@@ -252,19 +252,6 @@ module Non_hashing_ledger : sig
 
   val get : t -> Location.t -> Account.t option
 
-  (** Masks of a non-hashing ledger, for applying a transaction that may have
-      to be rolled back. These are the counterparts of {!register_mask},
-      {!commit} and {!unregister_mask_exn} on a real ledger. *)
-  type unattached_mask
-
-  val create_mask : t -> unattached_mask
-
-  val register_mask : t -> unattached_mask -> t
-
-  val commit : t -> unit
-
-  val unregister_mask_exn : loc:string -> t -> unattached_mask
-
   (** Apply [f] to a sub-ledger of [t], committing its writes into [t] only if
       [f] returns [Ok]. *)
   val within_mask : t -> f:(t -> ('a, 'e) Result.t) -> ('a, 'e) Result.t

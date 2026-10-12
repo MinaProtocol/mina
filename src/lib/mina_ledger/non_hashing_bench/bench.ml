@@ -175,16 +175,9 @@ let over_non_hashing_ledger l =
   let nl = Non_hashing_ledger.of_ledger l in
   { apply =
       (fun txn ->
-        let mask =
-          Non_hashing_ledger.register_mask nl
-            (Non_hashing_ledger.create_mask nl)
-        in
-        let r = apply_non_hashing mask txn in
-        if Result.is_ok r then Non_hashing_ledger.commit mask ;
-        ignore
-          ( Non_hashing_ledger.unregister_mask_exn ~loc:__LOC__ mask
-            : Non_hashing_ledger.unattached_mask ) ;
-        outcome_non_hashing r )
+        outcome_non_hashing
+          (Non_hashing_ledger.within_mask nl ~f:(fun mask ->
+               apply_non_hashing mask txn ) ) )
   ; accounts =
       (fun keys ->
         Array.to_list keys
