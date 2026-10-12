@@ -116,6 +116,16 @@ module Stable = struct
           fee_excess
       | None ->
           failwith "Fee_excess.Stable.V1.to_latest: overflow"
+
+    let to_input ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t)
+        =
+      let open Random_oracle.Input.Chunked in
+      List.reduce_exn ~f:append
+        [ Token_id.to_input fee_token_l
+        ; Fee.Signed.to_input fee_excess_l
+        ; Token_id.to_input fee_token_r
+        ; Fee.Signed.to_input fee_excess_r
+        ]
   end
 end]
 
