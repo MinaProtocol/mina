@@ -7,17 +7,57 @@ open Async
 open Mina_automation
 module Progress = Rosetta_load.Progress
 
+(* upgrade.sql and downgrade.sql set lock_timeout = '10s' and stop rather than
+   wait behind the archive's block inserts: their CREATE INDEX and DROP INDEX on
+   user_commands need locks that conflict with those writes. On a live archive
+   that stop is intended and the scripts are idempotent, so a lock timeout is
+   run again instead of failing the test. *)
+let lock_timeout_attempts = 6
+
+let lock_timeout_wait = Time.Span.of_sec 10.
+
+let file_size file =
+  match%map Monitor.try_with (fun () -> Unix.stat file) with
+  | Ok stat ->
+      Int64.to_int_exn stat.size
+  | Error _ ->
+      0
+
+(* the part of [file] written after byte [from] *)
+let read_from file ~from =
+  let%map contents = Reader.file_contents file in
+  String.drop_prefix contents (min from (String.length contents))
+
 let run_script (config : Harness.Config.t) script =
   match Archive.Scripts.filepath script with
   | None ->
       Deferred.Or_error.errorf "cannot find %s" (Archive.Scripts.file script)
   | Some file ->
-      Psql.run_script_logged
-        ~connection:(Harness.Config.connection config)
-        ~on_error_stop:true
-        ~log_file:(Harness.Config.log config "schema-scripts.log")
-        file
-      |> Deferred.Or_error.tag ~tag:(Archive.Scripts.file script)
+      let name = Archive.Scripts.file script in
+      let log_file = Harness.Config.log config "schema-scripts.log" in
+      let rec attempt n =
+        let%bind from = file_size log_file in
+        match%bind
+          Psql.run_script_logged
+            ~connection:(Harness.Config.connection config)
+            ~on_error_stop:true ~log_file file
+        with
+        | Ok () ->
+            Deferred.Or_error.return ()
+        | Error _ as error ->
+            let%bind output = read_from log_file ~from in
+            if
+              n < lock_timeout_attempts
+              && String.is_substring output
+                   ~substring:"canceling statement due to lock timeout"
+            then (
+              Progress.printf "compat: %s hit a lock timeout (attempt %d/%d)"
+                name n lock_timeout_attempts ;
+              let%bind () = after lock_timeout_wait in
+              attempt (n + 1) )
+            else return error
+      in
+      attempt 1 |> Deferred.Or_error.tag ~tag:name
 
 let wait_for_new_blocks ~db ~since ~timeout ~label =
   let deadline = Time.add (Time.now ()) timeout in
