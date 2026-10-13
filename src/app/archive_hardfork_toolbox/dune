@@ -33,6 +33,11 @@
   mina_base.import
   mina_block
   mina_caqti
+  mina_ledger
+  pickles
+  pickles.backend
+  pickles_types
+  precomputed_values
   mina_numbers
   mina_state
   mina_transaction
@@ -43,7 +48,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules logic sql utils change_plan)
+ (modules logic sql utils change_plan populate_genesis_accounts)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

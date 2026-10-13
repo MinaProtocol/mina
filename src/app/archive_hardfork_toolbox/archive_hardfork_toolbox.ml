@@ -136,10 +136,8 @@ let populate_genesis_accounts_command =
        Command.Param.(flag "--config-file" (required string))
          ~doc:"PATH runtime config file containing the (fork) genesis ledger"
      and chunks_length =
-       Command.Param.(flag "--chunks-length" (optional_with_default 100 int))
-         ~doc:
-           "Int number of accounts to insert per transaction, to avoid \
-            Postgres OOM on large ledgers (default 100)"
+       Command.Param.(flag "--chunks-length" (optional_with_default 2000 int))
+         ~doc:"Int number of accounts to write per transaction (default 2000)"
      in
      populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     )

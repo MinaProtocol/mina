@@ -51,12 +51,10 @@ let connect postgres_uri =
       pool
 
 (* Populate accounts_accessed for the genesis block described by the runtime
-   config. When the config has [proof.fork] set, the genesis block is the fork
-   genesis, so this attaches the full fork genesis ledger to the fork block. This
-   is the same routine the archive runs at startup with --config-file; exposing it
-   here lets operators repair an existing hardfork archive whose fork genesis was
-   never populated (e.g. because the archive was not (re)started with the fork
-   config). *)
+   config (the fork genesis when the config has [proof.fork]): add the block
+   if the archive lacks it, check its ledger hash, then write the ledger with
+   [Populate_genesis_accounts]. Repairs a hardfork archive whose fork genesis
+   was never populated. *)
 let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     () =
   let runtime_config =
@@ -64,14 +62,86 @@ let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     |> Runtime_config.of_yojson |> Result.ok_or_failwith
   in
   let (module G) = Genesis_constants.profiled () in
-  let genesis_constants = G.genesis_constants in
-  let constraint_constants = G.constraint_constants in
-  let pool = connect postgres_uri in
   [%log info] "Populating genesis accounts from runtime config %s"
     runtime_config_file ;
-  Archive_lib.Processor.add_genesis_accounts ~logger
-    ~runtime_config_opt:(Some runtime_config) ~genesis_constants ~chunks_length
-    ~constraint_constants pool
+  let%bind precomputed_values =
+    Genesis_ledger_helper.init_from_config_file ~logger
+      ~proof_level:G.proof_level ~genesis_constants:G.genesis_constants
+      ~constraint_constants:G.constraint_constants ~cli_proof_level:None
+      runtime_config
+    >>| Or_error.ok_exn
+  in
+  let ledger =
+    Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+  in
+  let genesis_block =
+    let With_hash.{ data = block; hash = the_hash }, _ =
+      Mina_block.genesis ~precomputed_values
+    in
+    With_hash.{ data = block; hash = the_hash }
+  in
+  let%bind accounts =
+    let%map account_ids = Mina_ledger.Ledger.accounts ledger in
+    Mina_base.Account_id.Set.to_list account_ids
+    |> List.map ~f:(fun account_id ->
+           let index =
+             Mina_ledger.Ledger.index_of_account_exn ledger account_id
+           in
+           let location =
+             Mina_ledger.Ledger.location_of_account ledger account_id
+             |> Option.value_exn
+           in
+           (index, Mina_ledger.Ledger.get ledger location |> Option.value_exn) )
+  in
+  let or_fail = function
+    | Ok x ->
+        x
+    | Error e ->
+        failwith (Caqti_error.show e)
+  in
+  let%bind (module Conn : Mina_caqti.CONNECTION) =
+    Mina_caqti.connect postgres_uri >>| or_fail
+  in
+  Monitor.protect ~finally:Conn.disconnect
+  @@ fun () ->
+  let%bind block_id =
+    Archive_lib.Processor.Block.add_if_doesn't_exist
+      (module Conn)
+      ~logger ~constraint_constants:G.constraint_constants genesis_block
+      ~accounts_accessed:[] ~accounts_created:[]
+    >>| or_fail
+  in
+  let%bind { ledger_hash; height; _ } =
+    Archive_lib.Processor.Block.load (module Conn) ~id:block_id >>| or_fail
+  in
+  let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
+  if
+    not
+      (Mina_base.Ledger_hash.equal
+         (Mina_base.Ledger_hash.of_base58_check_exn ledger_hash)
+         actual_ledger_hash )
+  then
+    failwithf "Genesis block %d has ledger hash %s, the config's ledger has %s"
+      block_id ledger_hash
+      (Mina_base.Ledger_hash.to_base58_check actual_ledger_hash)
+      () ;
+  let start = Time.now () in
+  let%map written =
+    Populate_genesis_accounts.run ~chunk_size:chunks_length ~logger
+      (module Conn)
+      ~block_id accounts
+    >>| or_fail
+  in
+  [%log info]
+    "Genesis block $block_id at height $height: wrote $written of $total \
+     accounts in $seconds s"
+    ~metadata:
+      [ ("block_id", `Int block_id)
+      ; ("height", `String (Int64.to_string height))
+      ; ("written", `Int written)
+      ; ("total", `Int (List.length accounts))
+      ; ("seconds", `Float (Time.Span.to_sec (Time.diff (Time.now ()) start)))
+      ]
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let pool = connect postgres_uri in
