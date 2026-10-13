@@ -1618,9 +1618,21 @@ struct
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     (* == Step 6: Prepare PlonK minimal form and combined evaluations == *)
     let plonk_minimal =
-      plonk |> Plonk.to_minimal
-      |> Plonk.Minimal.to_wrap
-           ~feature_flags:Features.(map ~f:Boolean.var_of_value none_bool)
+      let { Composition_types.Step.Proof_state.Deferred_values.Plonk.Minimal
+            .alpha
+          ; beta
+          ; gamma
+          ; zeta
+          } =
+        Plonk.to_minimal plonk
+      in
+      { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha
+      ; beta
+      ; gamma
+      ; zeta
+      ; joint_combiner = None
+      ; feature_flags = Features.(map ~f:Boolean.var_of_value none_bool)
+      }
     in
     (* Combine chunked polynomial evaluations into single values *)
     let combined_evals =
