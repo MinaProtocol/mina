@@ -689,4 +689,64 @@ let%test_module "Epoch ledger sync tests" =
             (module Context)
             ~staking_epoch_ledger ~next_epoch_ledger
           >>= cannot_sync_staking_ledger )
+
+    (* A sync whose target changes while it still has more queries outstanding
+       for the old target than [glue_sync_ledger] keeps in flight, none of
+       which any peer can answer, must still get the new target's queries
+       answered. *)
+    let retarget_past_unanswerable_queries (module Context : CONTEXT)
+        (test : test_state) =
+      let open Context in
+      let query_reader, query_writer = Linear_pipe.create () in
+      let answer_reader, answer_writer = Linear_pipe.create () in
+      Mina_networking.glue_sync_ledger test.network_info2.networking
+        ~preferred:[ test.network_info1.network_peer ]
+        query_reader answer_writer ;
+      let stale_root = Quickcheck.random_value Ledger_hash.gen in
+      List.init 500 ~f:(fun i ->
+          ( stale_root
+          , Syncable_ledger.Query.What_contents
+              (Mina_ledger.Ledger.Addr.of_int_exn
+                 ~ledger_depth:constraint_constants.ledger_depth i ) ) )
+      |> List.iter ~f:(Linear_pipe.write_without_pushback query_writer) ;
+      let target_root =
+        Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+          test.next_epoch_ledger
+      in
+      Linear_pipe.write_without_pushback query_writer
+        (target_root, Syncable_ledger.Query.Num_accounts) ;
+      let%map answer =
+        Clock.with_timeout (Time.Span.of_min 1.)
+          (Linear_pipe.read answer_reader)
+      in
+      Linear_pipe.close query_writer ;
+      test.cleanup () ;
+      match answer with
+      | `Result (`Ok (root, Syncable_ledger.Query.Num_accounts, _)) ->
+          assert (Ledger_hash.equal root target_root)
+      | `Result (`Ok _) ->
+          failwith "answer to a query other than the new target's Num_accounts"
+      | `Result `Eof ->
+          failwith "answer pipe closed"
+      | `Timeout ->
+          failwith "new target's query was not answered after retargeting"
+
+    let%test_unit "Sync retargets past unanswerable queries for the old target"
+        =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind (module Context) = make_context () in
+          let staking_epoch_ledger =
+            make_db_ledger ~backing_type:Stable_db
+              (module Context)
+              (List.take test_accounts 10)
+          in
+          let next_epoch_ledger =
+            make_db_ledger ~backing_type:Stable_db
+              (module Context)
+              (List.take test_accounts 20)
+          in
+          setup_test ~name:"retarget past unanswerable queries" ~test_number:4
+            (module Context)
+            ~staking_epoch_ledger ~next_epoch_ledger
+          >>= retarget_past_unanswerable_queries (module Context) )
   end )
