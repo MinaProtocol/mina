@@ -1,7 +1,7 @@
 (* populate-genesis-accounts writes a genesis ledger to accounts_accessed with
    set-based statements. The rows must read back, through the archive's own
    Load_data, as the ledger's accounts, and match what the archive's
-   per-account writer stores. Needs MINA_TEST_POSTGRES. *)
+   per-account writer stores. *)
 
 open Core
 open Async
@@ -182,14 +182,12 @@ let continues_after_the_archive_writer server_uri () =
       let%map got = read_back db ~block_id in
       check_accounts ledger got )
 
-let () =
-  let uri = B.Db.test_server_uri () in
-  let run f () = Thread_safe.block_on_async_exn (f uri) |> Or_error.ok_exn in
-  Alcotest.run "archive_hardfork_toolbox"
-    [ ( "populate-genesis-accounts"
-      , [ Alcotest.test_case "reads back as the ledger" `Quick
-            (run reads_back_as_the_ledger)
-        ; Alcotest.test_case "continues after the archive's writer" `Quick
-            (run continues_after_the_archive_writer)
-        ] )
-    ]
+let tests ~server_uri =
+  let run f () =
+    Thread_safe.block_on_async_exn (f server_uri) |> Or_error.ok_exn
+  in
+  [ ("reads back as the ledger", `Quick, run reads_back_as_the_ledger)
+  ; ( "continues after the archive's writer"
+    , `Quick
+    , run continues_after_the_archive_writer )
+  ]

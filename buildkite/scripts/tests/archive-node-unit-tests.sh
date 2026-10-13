@@ -70,7 +70,4 @@ dune runtest src/test/mina_automation/test/synthetic_archive
 # the same server ($MINA_TEST_POSTGRES)
 dune runtest src/app/mina_archive_healthcheck
 
-# archive_hardfork_toolbox populate-genesis-accounts, against the same DB server
-dune runtest src/app/archive_hardfork_toolbox/test_populate_genesis_accounts
-
 ./buildkite/scripts/upload-partial-coverage-data.sh ${command_key} "dev"

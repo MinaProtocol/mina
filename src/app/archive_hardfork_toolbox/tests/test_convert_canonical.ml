@@ -822,4 +822,7 @@ let () =
               Thread_safe.block_on_async_exn test_summary_counts
               |> Or_error.ok_exn )
         ] )
+    ; ( "populate_genesis_accounts"
+      , Populate_genesis_accounts_tests.tests
+          ~server_uri:(Uri.of_string (get_postgres_uri ())) )
     ]

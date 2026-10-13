@@ -37,6 +37,8 @@
   mina_caqti
   mina_automation.synthetic_archive
   mina_numbers
+  pickles.backend
+  pickles
   mina_state
   mina_transaction
   mina_wire_types
@@ -46,7 +48,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules test_convert_canonical)
+ (modules test_convert_canonical populate_genesis_accounts_tests)
  (preprocess
   (pps
    ppx_version
