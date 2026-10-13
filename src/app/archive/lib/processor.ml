@@ -4805,7 +4805,6 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               ; ("actual_ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
               ] ;
           exit 1 ) ;
-        let open Deferred.Let_syntax in
         let genesis_accounts_count = List.length account_ids in
         [%log info] "Archiving genesis accounts"
           ~metadata:[ ("count", `Int genesis_accounts_count) ] ;
@@ -4828,35 +4827,19 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               | Some acct ->
                   (index, acct) )
         in
-        let%bind list_of_results =
+        let accounts =
           List.map account_ids ~f:(fun acct_id ->
               acccount_with_index_of_id ~ledger acct_id )
-          |> List.chunks_of ~length:chunks_length
-          |> Deferred.List.mapi ~f:(fun i batch ->
-                 match%bind
-                   Pool.use
-                     (fun (module Conn : CONNECTION) ->
-                       Accounts_accessed.add_accounts_if_don't_exist
-                         (module Conn)
-                         genesis_block_id batch )
-                     pool
-                 with
-                 | Ok _ ->
-                     [%log trace] "Archived batch of account %d of %d"
-                       (i * chunks_length) genesis_accounts_count ;
-                     return (Result.Ok ())
-                 | Error err ->
-                     [%log error] "Could not add batch of genesis account"
-                       ~metadata:
-                         [ ("batch number", `Int i)
-                         ; ("error", `String (Caqti_error.show err))
-                         ] ;
-                     return (Result.Error err) )
         in
-
-        return
-          ( List.find list_of_results ~f:(fun result -> Result.is_error result)
-          |> Option.value ~default:(Result.Ok ()) )
+        Pool.use
+          (fun conn ->
+            let%map.Deferred.Result written =
+              Genesis_accounts_accessed.run ~chunk_size:chunks_length ~logger
+                conn ~block_id:genesis_block_id accounts
+            in
+            [%log info] "Archived $written genesis accounts"
+              ~metadata:[ ("written", `Int written) ] )
+          pool
       in
       match%map
         retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
