@@ -262,6 +262,10 @@ module Sql = struct
       in
       Int64.( > ) num_canonical_at_height Int64.zero
 
+    let query_max_height =
+      Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
+        {sql| SELECT MAX(height) FROM blocks |sql}
+
     let run (module Conn : Mina_caqti.CONNECTION) = function
       | Some (`This (`Height h)) ->
           let open Deferred.Result.Let_syntax in
@@ -270,12 +274,7 @@ module Sql = struct
           in
           if has_canonical_height then Conn.find_opt query_height_canonical h
           else
-            let%bind max_height =
-              Conn.find
-                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
-                   {sql| SELECT MAX(height) FROM blocks |sql} )
-                ()
-            in
+            let%bind max_height = Conn.find query_max_height () in
             let max_queryable_height =
               Int64.( - ) max_height Network.Sql.max_height_delta
             in
@@ -532,10 +531,10 @@ module Sql = struct
             ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
     |sql}]
 
+    let request = Mina_caqti.collect_req Caqti_type.(t2 int string) typ query
+
     let run (module Conn : Mina_caqti.CONNECTION) id =
-      Conn.collect_list
-        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
-        (id, Mina_base.Token_id.(to_string default))
+      Conn.collect_list request (id, Mina_base.Token_id.(to_string default))
 
     let to_info t =
       Cte.to_info ~coinbase_receiver:(coinbase_receiver t) t.command

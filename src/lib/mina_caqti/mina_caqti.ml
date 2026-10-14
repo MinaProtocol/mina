@@ -9,6 +9,12 @@ open Mina_base
    request built per call leaks one prepared statement per call on every pooled
    connection. Pass [~oneshot:true] only for SQL text that changes per call;
    such a request is never prepared. *)
+(* Build every request once, at module scope. Caqti 2.0.1 keys the server-side
+   PREPARE by the identity of the [Caqti_request.t] value, so a request built
+   inside a per-call function is prepared again on every pooled connection and
+   stays there for the life of the connection (#18857). Use [~oneshot:true]
+   only for SQL text that embeds its values and takes [Caqti_type.unit]
+   parameters: Caqti 2.0.1 sends a oneshot query without its parameter types. *)
 let find_req ?oneshot t u s = Caqti_request.Infix.(t ->! u) ?oneshot s
 
 let find_opt_req ?oneshot t u s = Caqti_request.Infix.(t ->? u) ?oneshot s
