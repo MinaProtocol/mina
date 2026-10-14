@@ -1,5 +1,5 @@
 (test
- (name test_convert_canonical)
+ (name main)
  (deps
   %{project_root}/app/archive/create_schema.sql
   %{project_root}/app/archive/upgrade.sql)
@@ -46,7 +46,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules test_convert_canonical populate_genesis_accounts_tests)
+ (modules main test_env convert_canonical_tests populate_genesis_accounts_tests)
  (preprocess
   (pps
    ppx_version

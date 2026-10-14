@@ -108,6 +108,8 @@ let tests ~server_uri =
   let run f () =
     Thread_safe.block_on_async_exn (f server_uri) |> Or_error.ok_exn
   in
-  [ ("writes the ledger once", `Quick, run writes_the_ledger_once)
-  ; ("fails without the table", `Quick, run fails_without_the_table)
+  [ ( "populate_genesis_accounts"
+    , [ ("writes the ledger once", `Quick, run writes_the_ledger_once)
+      ; ("fails without the table", `Quick, run fails_without_the_table)
+      ] )
   ]
