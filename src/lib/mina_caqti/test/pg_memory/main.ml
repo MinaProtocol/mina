@@ -40,10 +40,6 @@
 open Core
 open Async
 
-(* The exit status of a failed --assert-no-growth. It differs from the status of
-   every other failure, so a leak can be told apart from a broken run. *)
-let memory_gate_exit_status = 42
-
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
 let exec_oneshot sql =
@@ -387,12 +383,11 @@ let insert_into_returning_scenario ~shape_idx =
         >>| ignore )
   }
 
-(* [insert_multi_into_col_no_dedup] renders its values into the SQL text and
-   has neither ON CONFLICT nor a SELECT-back, so the column carries no UNIQUE
-   constraint. Every call emits a different VALUES list, so every call is a
-   distinct query string -- the last remaining sprintf-of-values path. *)
+(* [insert_int_arrays_no_dedup] has neither ON CONFLICT nor a SELECT-back, so
+   the [int[]] column carries no UNIQUE constraint. Each call inserts a varying
+   number of ragged arrays. *)
 let insert_multi_no_dedup_scenario ~shape_idx =
-  let name = sprintf "insert_multi_into_col_no_dedup_s%d" shape_idx in
+  let name = sprintf "insert_int_arrays_no_dedup_s%d" shape_idx in
   let distractors =
     generate ~scenario:"shape:insert_multi_into_col_no_dedup"
       ~iteration:shape_idx
@@ -406,21 +401,22 @@ let insert_multi_no_dedup_scenario ~shape_idx =
   in
   { name
   ; describe =
-      ( if List.is_empty distractors then "v text (no distractor columns)"
-      else sprintf "v text; distractors: %s" (describe_cols distractors) )
+      ( if List.is_empty distractors then "v int[] (no distractor columns)"
+      else sprintf "v int[]; distractors: %s" (describe_cols distractors) )
   ; setup =
       (fun ~table ->
-        sprintf "CREATE TABLE %s (id serial PRIMARY KEY, v text NOT NULL%s)"
+        sprintf "CREATE TABLE %s (id serial PRIMARY KEY, v int[] NOT NULL%s)"
           table distractor_defs )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
   ; step =
       (fun ~table conn i ->
         let values =
           generate ~scenario:name ~iteration:i gen_tokens
-          |> List.mapi ~f:(fun j v -> sprintf "v-%d-%d-%s" i j v)
+          |> List.mapi ~f:(fun j v ->
+                 Array.init (1 + (String.length v % 4)) ~f:(fun k -> i + j + k) )
         in
-        Mina_caqti.insert_multi_into_col_no_dedup ~table_name:table ~col:"v"
-          conn values
+        Mina_caqti.insert_int_arrays_no_dedup ~table_name:table ~col:"v" conn
+          values
         >>| Mina_caqti.ok_exn ~ctx:name
         >>| ignore )
   }
@@ -515,9 +511,10 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   in
   printf
     "   RESULT scenario=%s iterations=%d prepared_final=%d \
-     prepared_per_call=%.3f plan_cache_KiB_final=%s plan_cache_KiB_growth=%s \
+     prepared_per_call=%.3f prepared_growth=%d calls_per_s=%.1f \
+     plan_cache_KiB_final=%s plan_cache_KiB_growth=%s \
      plan_cache_bytes_per_call=%s\n"
-    s.name iterations final_prepared per_call
+    s.name iterations final_prepared per_call prepared_growth calls_per_s
     (Option.value_map plan_cache_kib_final ~default:"n/a" ~f:Int.to_string)
     (Option.value_map plan_cache_growth_kib ~default:"n/a" ~f:Int.to_string)
     (Option.value_map plan_cache_bytes_per_call ~default:"n/a"
@@ -536,28 +533,39 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
 
 (* --- InfluxDB line protocol (matches scripts/tests/rosetta-load.sh) --------- *)
 
-(* the plan-cache fields are omitted rather than sent as 0 where the server has
-   no [pg_backend_memory_contexts]: a constant-zero series charts as a real
-   measurement, whereas a missing one is visibly missing. *)
-let influx_points ~measurement ~tags (results : result list) =
+(* line-protocol tag/measurement values must not contain unescaped spaces or
+   commas; keep it simple and sanitise to underscores *)
+let sanitize s =
+  String.map s ~f:(fun c -> match c with ' ' | ',' | '=' -> '_' | c -> c)
+
+let influx_lines ~measurement ~tags (results : result list) =
+  let ts_ns = Time_ns.now () |> Time_ns.to_int_ns_since_epoch in
+  let tag_str =
+    List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
+    |> String.concat ~sep:","
+  in
+  (* the plan-cache fields are omitted rather than sent as 0 where the server
+     has no [pg_backend_memory_contexts]: a constant-zero series charts as a
+     real measurement, whereas a missing one is visibly missing. *)
   List.map results ~f:(fun r ->
-      Influxdb_line_protocol.(
-        create
-          ~tags:(tags @ [ ("scenario", r.name) ])
-          ~measurement
-          ( [ ("prepared_final", Field.Int r.prepared_final)
-            ; ("prepared_per_call", Float r.per_call)
-            ; ("prepared_growth", Int r.prepared_growth)
-            ; ("calls_per_s", Float r.calls_per_s)
-            ; ("iterations", Int r.iterations)
-            ]
-          @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
-                [ ("plan_cache_kib_final", Field.Int kib) ] )
-          @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
-                [ ("plan_cache_growth_kib", Field.Int kib) ] )
-          @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
-              ~f:(fun bytes ->
-                [ ("plan_cache_bytes_per_call", Field.Float bytes) ] ) )) )
+      let fields =
+        [ sprintf "prepared_final=%di" r.prepared_final
+        ; sprintf "prepared_per_call=%.6f" r.per_call
+        ; sprintf "prepared_growth=%di" r.prepared_growth
+        ; sprintf "calls_per_s=%.3f" r.calls_per_s
+        ; sprintf "iterations=%di" r.iterations
+        ]
+        @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
+              [ sprintf "plan_cache_kib_final=%di" kib ] )
+        @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
+              [ sprintf "plan_cache_growth_kib=%di" kib ] )
+        @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
+            ~f:(fun bytes -> [ sprintf "plan_cache_bytes_per_call=%.6f" bytes ])
+      in
+      sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
+        (sanitize r.name)
+        (String.concat ~sep:"," fields)
+        ts_ns )
 
 let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
     ~assert_no_growth ~influxdb_file ~measurement ~tags () =
@@ -576,15 +584,14 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
         r.name r.prepared_final r.per_call r.prepared_growth r.calls_per_s
         (Option.value_map r.plan_cache_bytes_per_call ~default:"n/a"
            ~f:(sprintf "%.1f") ) ) ;
-  let points = influx_points ~measurement ~tags results in
+  let lines = influx_lines ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
       ()
   | Some path ->
-      Influxdb_line_protocol.write_file path points ;
+      Out_channel.write_lines path lines ;
       printf "\n== influxdb line protocol -> %s ==\n" path ;
-      List.iter points ~f:(fun p ->
-          printf "   %s\n" (Influxdb_line_protocol.to_line p) ) ) ;
+      List.iter lines ~f:(fun l -> printf "   %s\n" l) ) ;
   ( match assert_max_prepared with
   | None ->
       ()
@@ -612,7 +619,7 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
         (List.length offenders) ;
       List.iter offenders ~f:(fun r ->
           eprintf "   %s: +%d prepared\n" r.name r.prepared_growth ) ;
-      Shutdown.shutdown memory_gate_exit_status )
+      Shutdown.shutdown 1 )
     else printf "\nOK: no scenario grew its prepared-statement count\n" ) ;
   return ()
 
