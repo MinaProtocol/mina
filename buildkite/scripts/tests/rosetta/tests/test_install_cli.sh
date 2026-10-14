@@ -118,10 +118,10 @@ t_unmounted_cache_builds_and_does_not_store () {
 }
 
 t_cache_write_failure_does_not_fail_the_install () {
+  # A file where the cache directory should be defeats mkdir even for root.
   mkdir -p "${WORK}/storagebox/tool-cache"
-  chmod 0555 "${WORK}/storagebox/tool-cache"
+  : > "${WORK}/storagebox/tool-cache/rosetta-cli"
   run
-  chmod 0755 "${WORK}/storagebox/tool-cache"
   expect "exit $RC: $OUT" test $RC -eq 0
   expect "binary installed" installed_is "built-from-source"
   expect "warns" grep -q "WARNING: could not store" <<< "$OUT"
