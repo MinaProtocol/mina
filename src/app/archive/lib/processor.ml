@@ -5010,7 +5010,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
          Since we're bootstrapping, I guess? *)
       (* TODO: figure out whether we need to add genesis accounts to accounts_created *)
       let add_accounts () =
-        let%bind.Deferred.Result ledger_hash, genesis_block_id, genesis_height =
+        let%bind.Deferred.Result ledger_hash, genesis_block_id =
           Mina_caqti.Pool.use
             (fun (module Conn : Mina_caqti.CONNECTION) ->
               let%bind.Deferred.Result genesis_block_id =
@@ -5020,10 +5020,10 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                   ~constraint_constants:precomputed_values.constraint_constants
                   genesis_block ~accounts_accessed:[] ~accounts_created:[]
               in
-              let%bind.Deferred.Result { ledger_hash; height; _ } =
+              let%bind.Deferred.Result { ledger_hash; _ } =
                 Block.load (module Conn) ~id:genesis_block_id
               in
-              return (Ok (ledger_hash, genesis_block_id, height)) )
+              return (Ok (ledger_hash, genesis_block_id)) )
             pool
         in
         let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
@@ -5066,12 +5066,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               | Some acct ->
                   (index, acct) )
         in
-        let accounts =
+        let%bind list_of_results =
           List.map account_ids ~f:(fun acct_id ->
               acccount_with_index_of_id ~ledger acct_id )
-        in
-        let%bind list_of_results =
-          accounts
           |> List.chunks_of ~length:chunks_length
           |> Deferred.List.mapi ~f:(fun i batch ->
                  match%bind
@@ -5095,43 +5092,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                      return (Result.Error err) )
         in
 
-        match
-          List.find list_of_results ~f:(fun result -> Result.is_error result)
-        with
-        | Some error ->
-            return error
-        | None -> (
-            match%map
-              Pool.use
-                (fun conn ->
-                  Genesis_accounts.add conn ~genesis_height
-                    (List.map accounts ~f:snd) )
-                pool
-            with
-            | Error _ as error ->
-                error
-            | Ok `No_table ->
-                [%log warn]
-                  "The archive database has no genesis_accounts table; run \
-                   upgrade.sql so that balance queries can read the genesis \
-                   ledger"
-                  ~metadata:
-                    [ ( "genesis_height"
-                      , `String (Int64.to_string genesis_height) )
-                    ] ;
-                Ok ()
-            | Ok `Already_loaded ->
-                Ok ()
-            | Ok (`Added (count, resumed_after)) ->
-                [%log info]
-                  "Wrote $count genesis ledger accounts at height $height, \
-                   after $resumed_after written before"
-                  ~metadata:
-                    [ ("count", `Int count)
-                    ; ("resumed_after", `Int resumed_after)
-                    ; ("height", `String (Int64.to_string genesis_height))
-                    ] ;
-                Ok () )
+        return
+          ( List.find list_of_results ~f:(fun result -> Result.is_error result)
+          |> Option.value ~default:(Result.Ok ()) )
       in
       match%map
         retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
