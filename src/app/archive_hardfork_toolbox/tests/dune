@@ -46,7 +46,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules test_convert_canonical)
+ (modules test_convert_canonical populate_genesis_accounts_tests)
  (preprocess
   (pps
    ppx_version
