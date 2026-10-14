@@ -4,14 +4,19 @@ open Async
 open Core_kernel
 open Mina_base
 
-(* custom Caqti types for generating type annotations on queries *)
-let find_req t u s = Caqti_request.Infix.(t ->! u) s
+(* Request builders. Build every request once, in module scope. Caqti 2.0.1
+   keys the server-side PREPARE by the identity of the request value, so a
+   request built per call leaks one prepared statement per call on every pooled
+   connection. Pass [~oneshot:true] only for SQL text that changes per call;
+   such a request is never prepared. *)
+let find_req ?oneshot t u s = Caqti_request.Infix.(t ->! u) ?oneshot s
 
-let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
+let find_opt_req ?oneshot t u s = Caqti_request.Infix.(t ->? u) ?oneshot s
 
-let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+let collect_req ?oneshot t u s = Caqti_request.Infix.(t ->* u) ?oneshot s
 
-let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s
+let exec_req ?oneshot t s =
+  Caqti_request.Infix.(t ->. Caqti_type.unit) ?oneshot s
 
 module type CONNECTION = sig
   include Caqti_async.CONNECTION
