@@ -161,18 +161,6 @@ ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	&& echo "✅ libp2p_helper build complete"
 endif
 
-.PHONY: genesis_ledger
-genesis_ledger: ocaml_checks ## Build runtime genesis ledger
-	$(if $(MINA_PROFILE),,$(error MINA_PROFILE must be set, e.g. make genesis_ledger MINA_PROFILE=devnet))
-	$(info 🏗️  Building runtime_genesis_ledger with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
-	env MINA_PROFILE=$(MINA_PROFILE) MINA_COMMIT_SHA1=$(GITLONGHASH) \
-	dune exec \
-		--profile=$(DUNE_PROFILE) \
-		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- \
-		--genesis-dir $(GENESIS_DIR)
-	$(info Genesis ledger and genesis proof generated)
-
 .PHONY: check
 check: ocaml_checks libp2p_helper ## Check that all OCaml packages build without issues
 	dune build @src/check
