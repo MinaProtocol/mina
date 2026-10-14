@@ -20,7 +20,7 @@
  (modes native)
  (flags
   (:standard -warn-error +a))
- (libraries mina_cli_entrypoint mina_signature_kind.testnet disk_cache.lmdb)
+ (libraries mina_cli_entrypoint disk_cache.lmdb)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -34,7 +34,7 @@
  (modes native)
  (flags
   (:standard -warn-error +a))
- (libraries mina_cli_entrypoint mina_signature_kind.mainnet disk_cache.lmdb)
+ (libraries mina_cli_entrypoint disk_cache.lmdb)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
