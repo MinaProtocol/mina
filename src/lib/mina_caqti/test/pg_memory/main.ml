@@ -120,17 +120,18 @@ type scenario =
   ; setup : table:string -> string
         (* ONE statement, so the table either exists complete or not at all *)
   ; teardown : table:string -> string
-  ; step :
+  ; make_step :
       table:string -> (module Mina_caqti.CONNECTION) -> int -> unit Deferred.t
-        (* one unit of work exercising a single helper, using a fresh request *)
+        (* called once per run: builds the helper's [Mina_caqti.prepared] for
+           [table], and returns one unit of work that runs it *)
   }
 
 (* --- generated table shapes and payloads -----------------------------------
 
    A shape is a list of columns, each with a generated name and a generated
-   type (text or int). The heterogeneous row value is packed into a nested
-   [Caqti_type.t2] product built at runtime and hidden behind an existential,
-   so the same code drives helpers over tables of any generated width.
+   type (text or int). The row type is a nested [Caqti_type.t2] product built
+   once per shape and hidden behind an existential ([codec]), so the same code
+   drives helpers over tables of any generated width.
 
    The iteration index is prefixed to every value that must be unique: a
    collision would silently turn an INSERT into a SELECT hit and change what is
@@ -141,8 +142,6 @@ type col_ty = Text | Int
 type col = { col_name : string; col_ty : col_ty }
 
 type cell = Cell_text of string | Cell_int of int
-
-type packed_row = Pack : 'a Caqti_type.t * 'a -> packed_row
 
 let gen_token =
   let open Quickcheck.Generator.Let_syntax in
@@ -183,22 +182,37 @@ let generate ~scenario ~iteration gen =
     ~seed:(`Deterministic (sprintf "%s:%d" scenario iteration))
     gen
 
-(* helpers under test take typed params, so ints go through as ints *)
-let pack_cell = function
-  | Cell_text s ->
-      Pack (Caqti_type.string, s)
-  | Cell_int i ->
-      Pack (Caqti_type.int, i)
+(* The row type of a shape, built once, with the function that turns a
+   generated row of that shape into a value of the type. Helpers under test
+   take typed params, so ints go through as ints. *)
+type codec = Codec : 'a Caqti_type.t * (cell list -> 'a) -> codec
 
-let rec pack_row = function
+let codec_of_col = function
+  | { col_ty = Text; _ } ->
+      Codec
+        ( Caqti_type.string
+        , function [ Cell_text s ] -> s | _ -> failwith "codec: expected text"
+        )
+  | { col_ty = Int; _ } ->
+      Codec
+        ( Caqti_type.int
+        , function [ Cell_int i ] -> i | _ -> failwith "codec: expected int" )
+
+let rec codec_of_cols = function
   | [] ->
-      failwith "pack_row: empty row"
-  | [ cell ] ->
-      pack_cell cell
-  | cell :: rest ->
-      let (Pack (t, v)) = pack_cell cell in
-      let (Pack (t', v')) = pack_row rest in
-      Pack (Caqti_type.t2 t t', (v, v'))
+      failwith "codec_of_cols: empty shape"
+  | [ col ] ->
+      codec_of_col col
+  | col :: rest ->
+      let (Codec (t, f)) = codec_of_col col in
+      let (Codec (t', f')) = codec_of_cols rest in
+      Codec
+        ( Caqti_type.t2 t t'
+        , function
+          | cell :: cells ->
+              (f [ cell ], f' cells)
+          | [] ->
+              failwith "codec: short row" )
 
 (* calls that must never collide with an earlier call's row get the iteration
    index stamped into their first cell; shapes generate the first column as
@@ -254,21 +268,23 @@ let select_insert_scenario ~shape_idx =
           (col_defs cols)
           (String.concat ~sep:", " (col_names cols)) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        (* distinct key each call -> SELECT miss then INSERT: exercises BOTH
-           of the requests this helper builds per call *)
-        let (Pack (typ, value)) =
+  ; make_step =
+      (fun ~table ->
+        let (Codec (typ, of_cells)) = codec_of_cols cols in
+        let select_insert =
+          Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+            ~table_name:table
+            ~cols:(col_names cols, typ)
+            ()
+        in
+        fun conn i ->
+          (* distinct key each call -> SELECT miss then INSERT: exercises BOTH
+             of the helper's requests *)
           generate ~scenario:name ~iteration:i (gen_row cols)
           |> stamp_first ~tag:(sprintf "k-%d" i)
-          |> pack_row
-        in
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+          |> of_cells |> select_insert.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let insert_multi_scenario ~shape_idx =
@@ -296,16 +312,19 @@ let insert_multi_scenario ~shape_idx =
           "CREATE TABLE %s (id serial PRIMARY KEY, v text UNIQUE NOT NULL%s)"
           table distractor_defs )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        (* a varying number of values per call, which is the realistic shape *)
-        let values =
+  ; make_step =
+      (fun ~table ->
+        let insert_multi =
+          Mina_caqti.insert_multi_into_col ~table_name:table ~col:"v" ()
+        in
+        fun conn i ->
+          (* a varying number of values per call, which is the realistic
+             shape *)
           generate ~scenario:name ~iteration:i gen_tokens
           |> List.mapi ~f:(fun j v -> sprintf "v-%d-%d-%s" i j v)
-        in
-        Mina_caqti.insert_multi_into_col ~table_name:table ~col:"v" conn values
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+          |> insert_multi.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let upsert_scenario ~shape_idx =
@@ -332,26 +351,33 @@ let upsert_scenario ~shape_idx =
           (col_defs cols)
           (String.concat ~sep:", " (col_names keys)) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        (* every second call reuses the previous key, so the ON CONFLICT DO
-           UPDATE branch is exercised as well as the plain insert *)
-        let key_index = if i % 2 = 0 then i - 1 else i in
-        let key_cells =
-          generate ~scenario:(name ^ ":key") ~iteration:key_index (gen_row keys)
-          |> stamp_first ~tag:(sprintf "k-%d" key_index)
+  ; make_step =
+      (fun ~table ->
+        let (Codec (typ, of_cells)) = codec_of_cols cols in
+        let upsert =
+          Mina_caqti.upsert_into_cols_returning
+            ~on_conflict:(String.concat ~sep:"," (col_names keys))
+            ~returning:("id", Caqti_type.int) ~table_name:table
+            ~cols:(col_names cols, typ)
+            ()
         in
-        let payload_cells =
-          generate ~scenario:(name ^ ":payload") ~iteration:i (gen_row payload)
-        in
-        let (Pack (typ, value)) = pack_row (key_cells @ payload_cells) in
-        Mina_caqti.upsert_into_cols_returning
-          ~on_conflict:(String.concat ~sep:"," (col_names keys))
-          ~returning:("id", Caqti_type.int) ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+        fun conn i ->
+          (* every second call reuses the previous key, so the ON CONFLICT DO
+             UPDATE branch is exercised as well as the plain insert *)
+          let key_index = if i % 2 = 0 then i - 1 else i in
+          let key_cells =
+            generate ~scenario:(name ^ ":key") ~iteration:key_index
+              (gen_row keys)
+            |> stamp_first ~tag:(sprintf "k-%d" key_index)
+          in
+          let payload_cells =
+            generate ~scenario:(name ^ ":payload") ~iteration:i
+              (gen_row payload)
+          in
+          of_cells (key_cells @ payload_cells)
+          |> upsert.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let insert_into_returning_scenario ~shape_idx =
@@ -368,19 +394,21 @@ let insert_into_returning_scenario ~shape_idx =
         sprintf "CREATE TABLE %s (id serial PRIMARY KEY, %s)" table
           (col_defs cols) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        let (Pack (typ, value)) =
+  ; make_step =
+      (fun ~table ->
+        let (Codec (typ, of_cells)) = codec_of_cols cols in
+        let insert_returning =
+          Mina_caqti.insert_into_cols_returning
+            ~returning:("id", Caqti_type.int) ~table_name:table
+            ~cols:(col_names cols, typ)
+            ()
+        in
+        fun conn i ->
           generate ~scenario:name ~iteration:i (gen_row cols)
           |> stamp_first ~tag:(sprintf "k-%d" i)
-          |> pack_row
-        in
-        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
-          ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+          |> of_cells |> insert_returning.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 (* [insert_int_arrays_no_dedup] has neither ON CONFLICT nor a SELECT-back, so
@@ -408,17 +436,18 @@ let insert_multi_no_dedup_scenario ~shape_idx =
         sprintf "CREATE TABLE %s (id serial PRIMARY KEY, v int[] NOT NULL%s)"
           table distractor_defs )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        let values =
+  ; make_step =
+      (fun ~table ->
+        let insert_int_arrays =
+          Mina_caqti.insert_int_arrays_no_dedup ~table_name:table ~col:"v" ()
+        in
+        fun conn i ->
           generate ~scenario:name ~iteration:i gen_tokens
           |> List.mapi ~f:(fun j v ->
                  Array.init (1 + (String.length v % 4)) ~f:(fun k -> i + j + k) )
-        in
-        Mina_caqti.insert_int_arrays_no_dedup ~table_name:table ~col:"v" conn
-          values
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+          |> insert_int_arrays.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let scenarios ~shapes : scenario list =
@@ -453,6 +482,7 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
     >>| Mina_caqti.ok_exn ~ctx:(sprintf "setup[%s]" s.name)
   in
   let sampler = Sampler.create conn in
+  let step = s.make_step ~table in
   printf "\n== scenario: %s (table %s) ==\n" s.name table ;
   printf "   shape: %s\n" s.describe ;
   printf "   %-10s %-12s %-16s\n" "calls" "prepared" "plancache_KiB" ;
@@ -473,7 +503,7 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
       ~init:(prepared0, bytes0)
       ~f:(fun acc i ->
         let started = Time_ns.now () in
-        let%bind () = s.step ~table conn i in
+        let%bind () = step conn i in
         (elapsed :=
            Time_ns.Span.(!elapsed + Time_ns.diff (Time_ns.now ()) started) ) ;
         if i % sample_every = 0 || i = iterations || i = midpoint then (
