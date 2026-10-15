@@ -4,8 +4,61 @@ open Core_kernel
 open Async
 open Archive_lib
 
+(* [pg_prepared_statements] lists only the prepared statements of the session
+   that runs the query. With a one-connection pool (CAQTI_POOL_MAX_SIZE=1,
+   CAQTI_POOL_MAX_USE_COUNT=none) that session is the one that writes the
+   blocks, so these counts show whether its requests are built once. *)
+let prepared_statements_count_req =
+  Mina_caqti.find_req Caqti_type.unit
+    Caqti_type.(t2 int int)
+    "SELECT count(*)::int, count(DISTINCT statement)::int FROM \
+     pg_prepared_statements"
+
+let duplicate_prepared_statements_req =
+  Mina_caqti.collect_req Caqti_type.unit
+    Caqti_type.(t2 int string)
+    "SELECT count(*)::int, regexp_replace(statement, '\\s+', ' ', 'g') FROM \
+     pg_prepared_statements GROUP BY statement HAVING count(*) > 1 ORDER BY 1 \
+     DESC, 2 LIMIT 10"
+
+(* Appends one line per block, [block <n> <statements> <distinct texts>], and
+   after the last block one [duplicate <count> <statement>] line for each SQL
+   text prepared more than once. *)
+let record_prepared_statements ~pool ~logger path =
+  let out = Out_channel.create ~append:true path in
+  let use f =
+    match%map Mina_caqti.Pool.use f pool with
+    | Ok x ->
+        Some x
+    | Error err ->
+        [%log error] "Could not read pg_prepared_statements"
+          ~metadata:[ ("error", `String (Caqti_error.show err)) ] ;
+        None
+  in
+  let after_block n =
+    use (fun (module Conn : Mina_caqti.CONNECTION) ->
+        Conn.find prepared_statements_count_req () )
+    >>| Option.iter ~f:(fun (total, distinct) ->
+            Out_channel.output_lines out
+              [ sprintf "block %d %d %d" n total distinct ] ;
+            Out_channel.flush out )
+  in
+  let finish () =
+    let%map duplicates =
+      use (fun (module Conn : Mina_caqti.CONNECTION) ->
+          Conn.collect_list duplicate_prepared_statements_req () )
+    in
+    Option.iter duplicates ~f:(fun rows ->
+        Out_channel.output_lines out
+          (List.map rows ~f:(fun (count, statement) ->
+               sprintf "duplicate %d %s" count statement ) ) ) ;
+    Out_channel.close out
+  in
+  (after_block, finish)
+
 let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-    ~extensional ~success_file ~failure_file ~log_successes ~files () =
+    ~extensional ~success_file ~failure_file ~log_successes
+    ~prepared_statements_file ~files () =
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let output_file_line path =
     match path with
@@ -79,26 +132,40 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
              ~genesis_constants ~logger ~pool ~delete_older_than:None
              ~signature_kind:Mina_signature_kind.t_DEPRECATED )
       in
-      Deferred.List.iter files ~f:(fun file ->
-          In_channel.with_file file ~f:(fun in_channel ->
-              try
-                let json = Yojson.Safe.from_channel in_channel in
-                if precomputed then add_precomputed_block ~json ~file
-                else if extensional then add_extensional_block ~json ~file
-                else failwith "Internal error, bad flags"
-              with
-              | Yojson.Json_error err ->
-                  [%log error] "Could not parse JSON from file"
-                    ~metadata:[ ("file", `String file); ("error", `String err) ] ;
-                  return (add_to_failure_file file)
-              | exn ->
-                  (* should be unreachable *)
-                  [%log error] "Internal error when processing file"
-                    ~metadata:
-                      [ ("file", `String file)
-                      ; ("error", `String (Exn.to_string exn))
-                      ] ;
-                  return (add_to_failure_file file) ) )
+      let after_block, finish =
+        match prepared_statements_file with
+        | Some path ->
+            record_prepared_statements ~pool ~logger path
+        | None ->
+            ((fun _ -> Deferred.unit), fun () -> Deferred.unit)
+      in
+      let%bind () =
+        Deferred.List.iteri files ~f:(fun n file ->
+            let%bind () =
+              In_channel.with_file file ~f:(fun in_channel ->
+                  try
+                    let json = Yojson.Safe.from_channel in_channel in
+                    if precomputed then add_precomputed_block ~json ~file
+                    else if extensional then add_extensional_block ~json ~file
+                    else failwith "Internal error, bad flags"
+                  with
+                  | Yojson.Json_error err ->
+                      [%log error] "Could not parse JSON from file"
+                        ~metadata:
+                          [ ("file", `String file); ("error", `String err) ] ;
+                      return (add_to_failure_file file)
+                  | exn ->
+                      (* should be unreachable *)
+                      [%log error] "Internal error when processing file"
+                        ~metadata:
+                          [ ("file", `String file)
+                          ; ("error", `String (Exn.to_string exn))
+                          ] ;
+                      return (add_to_failure_file file) )
+            in
+            after_block (n + 1) )
+      in
+      finish ()
 
 let () =
   Command.(
@@ -135,6 +202,14 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
+         and prepared_statements_file =
+           Param.flag "--prepared-statements-file"
+             ~doc:
+               "PATH Append the prepared-statement count of the database \
+                session after each block (meaningful only with a \
+                one-connection pool, CAQTI_POOL_MAX_SIZE=1)"
+             (Flag.optional Param.string)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+           ~extensional ~success_file ~failure_file ~log_successes
+           ~prepared_statements_file ~files )))
