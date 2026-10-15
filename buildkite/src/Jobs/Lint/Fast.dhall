@@ -6,6 +6,8 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Cmd = ../../Lib/Cmds.dhall
 
 let Command = ../../Command/Base.dhall
@@ -17,6 +19,7 @@ let Size = ../../Command/Size.dhall
 let commands =
       [ Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
+      , RunInToolchain.submoduleInit "src/lib/snarky"
       , Cmd.run "make check-snarky-submodule"
       ]
 
