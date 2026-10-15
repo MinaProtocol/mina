@@ -1,6 +1,6 @@
-(* Archive_lib.Processor.Genesis_accounts: the genesis ledger rows the archive
-   writes at start-up, and the reader balance queries fall back to. Needs a
-   PostgreSQL server: MINA_TEST_POSTGRES (any database path is ignored). *)
+(* Archive_lib.Processor.Genesis_accounts: the writer of the genesis ledger
+   rows, and the reader balance queries fall back to. Needs a PostgreSQL
+   server: MINA_TEST_POSTGRES (any database path is ignored). *)
 
 open Core
 open Async
