@@ -15,7 +15,8 @@ that needs a custom image without a CI round-trip.
 `scripts/docker/build.sh` installs the mina packages directly from the
 local filesystem — no apt repository is involved. It stages any `.deb`
 files it finds in the `dockerfiles/` build context into
-`dockerfiles/_debs/`, which the Dockerfiles `COPY` and install.
+`dockerfiles/_debs/`, which the Dockerfiles bind-mount for the install
+step. The `.deb` files are not copied into the image.
 
 1. Copy your locally-built `.deb`(s) into the docker build context:
 

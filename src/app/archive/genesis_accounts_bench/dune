@@ -17,6 +17,7 @@
   archive_lib
   genesis_constants
   genesis_ledger_helper
+  influxdb_line_protocol
   logger
   mina_automation
   mina_automation.synthetic_archive

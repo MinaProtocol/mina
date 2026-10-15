@@ -77,9 +77,6 @@ let median xs =
   let xs = List.sort xs ~compare:Float.compare in
   List.nth_exn xs (List.length xs / 2)
 
-(* line-protocol tag values must not contain unescaped spaces/commas/= *)
-let sanitize = String.map ~f:(function ' ' | ',' | '=' -> '_' | c -> c)
-
 let main ?chunk_size ~server_uri ~config_file ~runs ~influxdb_file ~measurement
     ~tags () =
   let logger = Logger.null () in
@@ -106,19 +103,18 @@ let main ?chunk_size ~server_uri ~config_file ~runs ~influxdb_file ~measurement
      %.0f rows/s\n"
     rows median_ms min_ms max_ms rows_per_s ;
   Option.iter influxdb_file ~f:(fun path ->
-      let ts = Time_ns.now () |> Time_ns.to_int_ns_since_epoch in
-      let tags =
-        List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-        |> String.concat ~sep:","
-      in
-      Out_channel.write_lines path
-        [ sprintf
-            "%s,%s \
-             rows=%di,median_ms=%.3f,min_ms=%.3f,max_ms=%.3f,rows_per_s=%.1f,ledger_load_ms=%.3f,runs=%di \
-             %d"
-            measurement tags rows median_ms min_ms max_ms rows_per_s ledger_ms
-            runs ts
-        ] ;
+      Influxdb_line_protocol.(
+        write_file path
+          [ create ~tags ~measurement
+              [ ("rows", Int rows)
+              ; ("median_ms", Float median_ms)
+              ; ("min_ms", Float min_ms)
+              ; ("max_ms", Float max_ms)
+              ; ("rows_per_s", Float rows_per_s)
+              ; ("ledger_load_ms", Float ledger_ms)
+              ; ("runs", Int runs)
+              ]
+          ]) ;
       printf "wrote 1 point to %s\n" path ) ;
   return ()
 
