@@ -38,8 +38,7 @@ MANIFEST="${TMP_DIR}/build-manifest.txt"
 find _build/default -type f -name "*.exe" ! -name "*ppx.exe" > "$MANIFEST"
 
 for extra in \
-  "src/app/libp2p_helper/result/bin/libp2p_helper" \
-  "src/app/minimina/target/release/minimina"; do
+  "src/app/libp2p_helper/result/bin/libp2p_helper"; do
   [[ -f "$extra" ]] && echo "$extra" >> "$MANIFEST"
 done
 
