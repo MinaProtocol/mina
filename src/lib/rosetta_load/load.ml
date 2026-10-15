@@ -15,9 +15,10 @@ module Config = struct
     ; sample_size : int
     }
 
-  (* One call every 10, 10, 2, 1, 2 and 1 s. Well under what one rosetta serves: a search takes ~1 s of postgres time,
-     and at ~20 requests/s the queue grows without bound, so latency would
-     measure the queue instead of rosetta. *)
+  (* One call every 10, 10, 2, 1, 2 and 1 s. Well under what one rosetta
+     serves: a search takes ~1 s of postgres time, and at ~20 requests/s the
+     queue grows without bound, so latency would measure the queue instead of
+     rosetta. *)
   let default_rates : (Endpoint.t * float) list =
     [ (Network_status, 0.1)
     ; (Network_options, 0.1)
@@ -55,7 +56,8 @@ end
 
 module Stats = struct
   type t =
-    { mutable latencies_ms : float list
+    { mutable fired : int  (** requests sent *)
+    ; mutable latencies_ms : float list
     ; mutable ok : int
     ; mutable errors : int
     ; mutable first_errors : string list  (** at most [max_kept_errors] *)
@@ -63,7 +65,8 @@ module Stats = struct
 
   let max_kept_errors = 5
 
-  let create () = { latencies_ms = []; ok = 0; errors = 0; first_errors = [] }
+  let create () =
+    { fired = 0; latencies_ms = []; ok = 0; errors = 0; first_errors = [] }
 
   let record t (outcome : Endpoint.outcome) =
     Option.iter outcome.latency ~f:(fun span ->
@@ -77,17 +80,12 @@ module Stats = struct
           t.first_errors <- msg :: t.first_errors
 end
 
-(* Nearest-rank percentile, [p] in [0, 1]. *)
-let percentile sorted p =
-  let n = Array.length sorted in
-  if n = 0 then Float.nan
-  else
-    let rank = Float.iround_up_exn (p *. Float.of_int n) in
-    sorted.(Int.clamp_exn (rank - 1) ~min:0 ~max:(n - 1))
-
+(* Latencies are [nan] when no request came back with one. *)
 type summary =
-  { requests : int
+  { fired : int
+  ; requests : int  (** answered or failed; [fired - requests] never ended *)
   ; errors : int
+  ; samples : int  (** latency samples *)
   ; rps : float
   ; p50 : float
   ; p95 : float
@@ -96,16 +94,19 @@ type summary =
   }
 
 let summarize (stats : Stats.t) ~elapsed_s =
-  let sorted = Array.of_list stats.latencies_ms in
-  Array.sort sorted ~compare:Float.compare ;
+  let module S = Bench_report.Stats in
+  let sorted = S.sorted stats.latencies_ms in
+  let or_nan = Option.value ~default:Float.nan in
   let requests = stats.ok + stats.errors in
-  { requests
+  { fired = stats.fired
+  ; requests
   ; errors = stats.errors
+  ; samples = Array.length sorted
   ; rps = Float.of_int requests /. elapsed_s
-  ; p50 = percentile sorted 0.50
-  ; p95 = percentile sorted 0.95
-  ; p99 = percentile sorted 0.99
-  ; max = (if Array.is_empty sorted then Float.nan else Array.last sorted)
+  ; p50 = or_nan (S.percentile sorted 0.50)
+  ; p95 = or_nan (S.percentile sorted 0.95)
+  ; p99 = or_nan (S.percentile sorted 0.99)
+  ; max = or_nan (S.max sorted)
   }
 
 (* Request arguments per endpoint, sampled from the archive. An endpoint with
@@ -152,10 +153,12 @@ module Open_loop = struct
     let fire endpoint args =
       let arg = args.(Random.int (Array.length args)) in
       let queued_at = Time_ns.now () in
+      let endpoint_stats = stats_of endpoint in
+      endpoint_stats.fired <- endpoint_stats.fired + 1 ;
       let request =
         let%map outcome =
           Throttle.enqueue throttle (fun () ->
-              Endpoint.call client endpoint ~arg )
+              Endpoint.call ~require_synced:false client endpoint ~arg )
         in
         (* latency from when the request was due, not from when a slot freed
            up *)
@@ -163,7 +166,7 @@ module Open_loop = struct
           Option.map outcome.latency ~f:(fun _ ->
               Time_ns.diff (Time_ns.now ()) queued_at )
         in
-        Stats.record (stats_of endpoint) { outcome with latency }
+        Stats.record endpoint_stats { outcome with latency }
       in
       outstanding := request :: !outstanding
     in
@@ -193,8 +196,7 @@ module Open_loop = struct
         on_tick () ) ;
     let%bind () = Deferred.List.iter ~how:`Parallel config.rates ~f:driver in
     (* Let the requests still out come back before the run is scored; one that
-       never does counts as neither ok nor error, and shows up as a request
-       count below rate * duration. *)
+       never does is a failure in [Verdict]. *)
     let%map () =
       Clock.with_timeout (Time.Span.of_sec 60.) (Deferred.all_unit !outstanding)
       >>| ignore
@@ -202,11 +204,37 @@ module Open_loop = struct
     stats
 end
 
-(* What fails a run: any wrong answer, and a p95 above the endpoint's limit. *)
+(* What fails a run: any wrong answer, a request that never ended, a p95
+   above the endpoint's limit, and a driver that sent fewer requests than its
+   rate asks for. [missed_fraction] allows for the first and last interval of
+   the run and for scheduling jitter; a driver further behind than that means
+   the test process, not rosetta, set the pace. *)
 module Verdict = struct
+  let missed_fraction = 0.05
+
   let failures ~(config : Config.t) ~stats ~summaries =
     List.concat_map summaries ~f:(fun (endpoint, summary) ->
         let s = List.Assoc.find_exn stats ~equal:Endpoint.equal endpoint in
+        let unfinished =
+          let n = summary.fired - summary.requests in
+          if n > 0 then
+            [ sprintf "%s: %d of %d requests never ended"
+                (Endpoint.name endpoint) n summary.fired
+            ]
+          else []
+        in
+        let missed =
+          let rate =
+            List.Assoc.find_exn config.rates ~equal:Endpoint.equal endpoint
+          in
+          let expected = rate *. Time.Span.to_sec config.duration in
+          if Float.(of_int summary.fired < expected *. (1. -. missed_fraction))
+          then
+            [ sprintf "%s: sent %d requests, %.0f expected at %.2f/s"
+                (Endpoint.name endpoint) summary.fired expected rate
+            ]
+          else []
+        in
         let errors =
           if summary.errors > 0 then
             [ sprintf "%s: %d of %d requests failed, e.g. %s"
@@ -226,7 +254,7 @@ module Verdict = struct
           | _ ->
               []
         in
-        errors @ latency )
+        unfinished @ missed @ errors @ latency )
 end
 
 type result =
@@ -267,32 +295,38 @@ let print_report result =
 
 (* One InfluxDB line, sent to the bench database by
    buildkite/scripts/bench/send.sh. The memory field names are the ones the
-   bench dashboards query. *)
+   bench dashboards query. A latency or memory value with no sample is left
+   out of the line; [<endpoint>_samples] says how many there were. [None] when
+   the run measured nothing at all. *)
 let influx_line result ~network ~branch ~commit =
-  let escape = String.substr_replace_all ~pattern:" " ~with_:"\\ " in
+  let open Bench_report.Influx in
   let latency_fields =
     List.concat_map result.summaries ~f:(fun (endpoint, s) ->
         let n = Endpoint.name endpoint in
-        [ sprintf "%s_p50_ms=%.2f" n s.p50
-        ; sprintf "%s_p95_ms=%.2f" n s.p95
-        ; sprintf "%s_p99_ms=%.2f" n s.p99
-        ; sprintf "%s_rps=%.2f" n s.rps
-        ; sprintf "%s_errors=%di" n s.errors
+        [ (n ^ "_p50_ms", Float s.p50)
+        ; (n ^ "_p95_ms", Float s.p95)
+        ; (n ^ "_p99_ms", Float s.p99)
+        ; (n ^ "_rps", Float s.rps)
+        ; (n ^ "_errors", Int s.errors)
+        ; (n ^ "_samples", Int s.samples)
         ] )
   in
   let memory_fields =
     List.concat_map result.memory ~f:(fun (name, (m : Memory.stats)) ->
-        [ sprintf "%s_max=%.2f" name m.max
-        ; sprintf "%s_p95=%.2f" name m.p95
-        ; sprintf "%s_p99=%.2f" name m.p99
-        ; sprintf "%s_median=%.2f" name m.median
+        [ (name ^ "_max", Float m.max)
+        ; (name ^ "_p95", Float m.p95)
+        ; (name ^ "_p99", Float m.p99)
+        ; (name ^ "_median", Float m.median)
         ] )
   in
-  sprintf "rosetta_load_test,network=%s,branch=%s,commit=%s %s %Ld"
-    (Network.to_string network)
-    (escape branch) (escape commit)
-    (String.concat ~sep:"," (memory_fields @ latency_fields))
-    (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()) |> Int63.to_int64)
+  line ~measurement:"rosetta_load_test"
+    ~tags:
+      [ ("network", Network.to_string network)
+      ; ("branch", branch)
+      ; ("commit", commit)
+      ]
+    ~fields:(memory_fields @ latency_fields)
+    ~timestamp_ns:(Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
 
 (* The load flags of every tool that runs a load; [None] when
    [--load-duration 0] turns the load run off. *)
@@ -352,11 +386,15 @@ let run_and_report ~config ~client ~network ~db ~memory
   print_report result ;
   let%bind () =
     Deferred.ok
-      (Writer.save perf_output.file
-         ~contents:
-           ( influx_line result ~network ~branch:perf_output.branch
-               ~commit:perf_output.commit
-           ^ "\n" ) )
+      ( match
+          influx_line result ~network ~branch:perf_output.branch
+            ~commit:perf_output.commit
+        with
+      | Some line ->
+          Writer.save perf_output.file ~contents:(line ^ "\n")
+      | None ->
+          Progress.printf "load: nothing measured, no bench line" ;
+          Deferred.unit )
   in
   match result.failures with
   | [] ->

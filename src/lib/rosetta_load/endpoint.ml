@@ -37,8 +37,6 @@ let of_name s =
         (String.concat ~sep:", " (List.map all ~f:name))
         ()
 
-let rosetta_version = "1.4.9"
-
 let client ?(timeout = 30.) ~rosetta network =
   Rosetta_client.Http.create ~base_uri:rosetta
     ~network:(Network.to_string network)
@@ -86,14 +84,26 @@ let expect_string json keys ~expected =
   | _ ->
       Error (sprintf "%s missing" (String.concat ~sep:"." keys))
 
-let check t ~arg (json : Yojson.Safe.t) =
+(* Any sync stage is a valid answer; [require_synced] also asks for
+   "Synced". *)
+let check_sync_status json ~require_synced =
+  if require_synced then
+    expect_string json [ "sync_status"; "stage" ] ~expected:"Synced"
+  else
+    match path json [ "sync_status"; "stage" ] with
+    | Some (`String _) ->
+        Ok ()
+    | _ ->
+        Error "sync_status.stage missing"
+
+let check t ~arg ~require_synced (json : Yojson.Safe.t) =
   match t with
   | Network_status ->
-      expect_string json [ "sync_status"; "stage" ] ~expected:"Synced"
+      check_sync_status json ~require_synced
   | Network_options ->
       expect_string json
         [ "version"; "rosetta_version" ]
-        ~expected:rosetta_version
+        ~expected:Rosetta_models.Spec_version.rosetta
   | Block ->
       expect_string json [ "block"; "block_identifier"; "hash" ] ~expected:arg
   | Account_balance ->
@@ -114,14 +124,17 @@ type outcome =
    only a transport failure or a timeout has none. [Rosetta_client.Http]
    folds both into the error channel; an answer is the one rendered by
    [Rosetta_client.Errors.format_http_body], "HTTP <status> from ...". *)
-let call client t ~arg =
+(* [require_synced] (default [true]) makes a [Network_status] answer that is
+   not "Synced" wrong. A load run passes [false]: a node that is briefly in
+   catchup still answers correctly. *)
+let call ?(require_synced = true) client t ~arg =
   let start = Time_ns.now () in
   let%map response = request client t ~arg in
   let latency = Time_ns.diff (Time_ns.now ()) start in
   let result, latency =
     match response with
     | Ok json ->
-        (check t ~arg json, Some latency)
+        (check t ~arg ~require_synced json, Some latency)
     | Error e ->
         let msg = Error.to_string_hum e in
         let answered = String.is_prefix msg ~prefix:"HTTP " in

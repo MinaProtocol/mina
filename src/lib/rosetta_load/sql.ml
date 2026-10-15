@@ -24,46 +24,75 @@ module Block_count = struct
 end
 
 (* Random rather than the first rows, so a run spreads over the whole archive
-   instead of its genesis corner. Accounts and transactions come from canonical
-   blocks: rosetta's search only returns canonical transactions (and pending
-   ones above the canonical tip), and a public key in the archive need not be a
-   MINA account in the ledger. Each query takes the sample size. *)
+   instead of its genesis corner. Each sample is one probe: a random id between
+   1 and the table's largest, and the nearest row from that id whose block is
+   canonical, searched upwards first and then downwards, so a probe finds a row
+   whenever the table has one. A probe walks the primary key and the block
+   links by index, so its cost does not grow with the archive, as a random sort
+   of every row would. Probes that land on the same row give one sample, so a
+   query returns at most [limit] values.
+
+   Everything comes from canonical blocks: rosetta's search only returns
+   canonical transactions (and pending ones above the canonical tip), and a
+   public key in the archive need not be a MINA account in the ledger. *)
 module Sample = struct
+  (* [g * 0] ties the start id to its row of [generate_series], so [random ()]
+     runs once per probe. [LIMIT 1] over the two branches stops at the first
+     row found. *)
+  let probes ~table ~select ~from ~canonical =
+    sprintf
+      {sql| SELECT DISTINCT probe.value
+            FROM generate_series(1, $1) g
+            CROSS JOIN LATERAL
+              (SELECT g * 0 + floor(random() * (SELECT max(id) FROM %s)) AS id)
+              start
+            CROSS JOIN LATERAL
+              ((SELECT %s AS value FROM %s
+                WHERE x.id >= start.id AND %s
+                ORDER BY x.id LIMIT 1)
+               UNION ALL
+               (SELECT %s AS value FROM %s
+                WHERE x.id < start.id AND %s
+                ORDER BY x.id DESC LIMIT 1)
+               LIMIT 1) probe |sql}
+      table select from canonical select from canonical
+
   let block =
     Mina_caqti.collect_req Caqti_type.int Caqti_type.string
-      {sql| SELECT state_hash FROM blocks ORDER BY random() LIMIT ? |sql}
+      (probes ~table:"blocks" ~select:"x.state_hash" ~from:"blocks x"
+         ~canonical:"x.chain_status = 'canonical'" )
 
   let mina_account =
-    Mina_caqti.collect_req Caqti_type.int Caqti_type.string
-      {sql| SELECT DISTINCT pk.value
-            FROM (SELECT aa.account_identifier_id
-                  FROM accounts_accessed aa
-                  JOIN blocks b ON b.id = aa.block_id
-                  WHERE b.chain_status = 'canonical'
-                  ORDER BY random() LIMIT 10000) aa
-            JOIN account_identifiers ai ON ai.id = aa.account_identifier_id
-            JOIN public_keys pk ON pk.id = ai.public_key_id
-            JOIN tokens t ON t.id = ai.token_id
-            WHERE t.value = 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf'
-            LIMIT ? |sql}
+    Mina_caqti.collect_req
+      Caqti_type.(t2 int string)
+      Caqti_type.string
+      (probes ~table:"account_identifiers" ~select:"pk.value"
+         ~from:
+           "account_identifiers x JOIN public_keys pk ON pk.id = \
+            x.public_key_id"
+         ~canonical:
+           "x.token_id = (SELECT id FROM tokens WHERE value = $2) AND EXISTS \
+            (SELECT 1 FROM accounts_accessed aa JOIN blocks b ON b.id = \
+            aa.block_id WHERE aa.account_identifier_id = x.id AND \
+            b.chain_status = 'canonical')" )
 
   let payment_transaction =
     Mina_caqti.collect_req Caqti_type.int Caqti_type.string
-      {sql| SELECT uc.hash
-            FROM user_commands uc
-            JOIN blocks_user_commands buc ON buc.user_command_id = uc.id
-            JOIN blocks b ON b.id = buc.block_id
-            WHERE b.chain_status = 'canonical'
-            ORDER BY random() LIMIT ? |sql}
+      (probes ~table:"user_commands" ~select:"x.hash" ~from:"user_commands x"
+         ~canonical:
+           "EXISTS (SELECT 1 FROM blocks_user_commands buc JOIN blocks b ON \
+            b.id = buc.block_id WHERE buc.user_command_id = x.id AND \
+            b.chain_status = 'canonical')" )
 
   let zkapp_transaction =
     Mina_caqti.collect_req Caqti_type.int Caqti_type.string
-      {sql| SELECT zc.hash
-            FROM zkapp_commands zc
-            JOIN blocks_zkapp_commands bzc ON bzc.zkapp_command_id = zc.id
-            JOIN blocks b ON b.id = bzc.block_id
-            WHERE b.chain_status = 'canonical'
-            ORDER BY random() LIMIT ? |sql}
+      (probes ~table:"zkapp_commands" ~select:"x.hash" ~from:"zkapp_commands x"
+         ~canonical:
+           "EXISTS (SELECT 1 FROM blocks_zkapp_commands bzc JOIN blocks b ON \
+            b.id = bzc.block_id WHERE bzc.zkapp_command_id = x.id AND \
+            b.chain_status = 'canonical')" )
+
+  let mina_token = Mina_base.Token_id.(to_string default)
 
   (* The two network calls take no argument; one empty one stands for it. *)
   let run (module Conn : Mina_caqti.CONNECTION) (endpoint : Endpoint.t) ~limit =
@@ -74,7 +103,7 @@ module Sample = struct
     | Block ->
         collect block
     | Account_balance ->
-        collect mina_account
+        Conn.collect_list mina_account (limit, mina_token)
     | Payment_transaction ->
         collect payment_transaction
     | Zkapp_transaction ->

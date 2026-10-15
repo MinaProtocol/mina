@@ -23,23 +23,17 @@ let sample t =
       | _ ->
           () )
 
+(* [nan] for a group with no sample. *)
 type stats = { max : float; p95 : float; p99 : float; median : float }
 
 let stats t =
+  let module S = Bench_report.Stats in
   List.map t.groups ~f:(fun (name, _) ->
-      let sorted = Hashtbl.find_multi t.samples name |> Array.of_list in
-      Array.sort sorted ~compare:Float.compare ;
-      let at p =
-        if Array.is_empty sorted then 0.
-        else
-          sorted.(Int.min
-                    (Array.length sorted - 1)
-                    (Float.iround_down_exn
-                       (p *. Float.of_int (Array.length sorted)) ))
-      in
+      let sorted = S.sorted (Hashtbl.find_multi t.samples name) in
+      let or_nan = Option.value ~default:Float.nan in
       ( name
-      , { max = (if Array.is_empty sorted then 0. else Array.last sorted)
-        ; p95 = at 0.95
-        ; p99 = at 0.99
-        ; median = at 0.5
+      , { max = or_nan (S.max sorted)
+        ; p95 = or_nan (S.percentile sorted 0.95)
+        ; p99 = or_nan (S.percentile sorted 0.99)
+        ; median = or_nan (S.percentile sorted 0.5)
         } ) )

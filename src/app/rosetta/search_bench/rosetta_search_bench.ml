@@ -117,11 +117,6 @@ let time f =
   let%map count = f () in
   (count, Time_ns.Span.to_ms (Time_ns.diff (Time_ns.now ()) started))
 
-let median xs =
-  let xs = List.sort xs ~compare:Float.compare |> Array.of_list in
-  let n = Array.length xs in
-  if n % 2 = 1 then xs.(n / 2) else (xs.((n / 2) - 1) +. xs.(n / 2)) /. 2.
-
 (* one warm-up, then [runs] timed calls; [f] returns the total count *)
 let measure ~runs ~shape ~scope f =
   let%bind _ = f () in
@@ -133,7 +128,9 @@ let measure ~runs ~shape ~scope f =
   { shape
   ; scope
   ; total_count
-  ; median_ms = median times
+  ; median_ms =
+      Option.value_exn
+        (Bench_report.Stats.median (Bench_report.Stats.sorted times))
   ; min_ms = List.reduce_exn times ~f:Float.min
   ; max_ms = List.reduce_exn times ~f:Float.max
   ; runs
@@ -155,21 +152,20 @@ let user_commands conn ~logger (query : Query.t) () =
   >>| ok_exn ~ctx:"user commands"
   >>| fst
 
-(* line-protocol tag values must not contain unescaped spaces/commas/= *)
-let sanitize = String.map ~f:(function ' ' | ',' | '=' -> '_' | c -> c)
-
 let influx_lines ~measurement ~tags results =
-  let ts = Time_ns.now () |> Time_ns.to_int_ns_since_epoch in
-  let tags =
-    List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-    |> String.concat ~sep:","
-  in
-  List.map results ~f:(fun r ->
-      sprintf
-        "%s,%s,shape=%s,scope=%s \
-         median_ms=%.3f,min_ms=%.3f,max_ms=%.3f,total_count=%Ldi,runs=%di %d"
-        measurement tags r.shape r.scope r.median_ms r.min_ms r.max_ms
-        r.total_count r.runs ts )
+  let timestamp_ns = Time_ns.to_int63_ns_since_epoch (Time_ns.now ()) in
+  List.filter_map results ~f:(fun r ->
+      Bench_report.Influx.line ~measurement
+        ~tags:(tags @ [ ("shape", r.shape); ("scope", r.scope) ])
+        ~fields:
+          Bench_report.Influx.
+            [ ("median_ms", Float r.median_ms)
+            ; ("min_ms", Float r.min_ms)
+            ; ("max_ms", Float r.max_ms)
+            ; ("total_count", Int64 r.total_count)
+            ; ("runs", Int r.runs)
+            ]
+        ~timestamp_ns )
 
 let main ~uri ~runs ~influxdb_file ~measurement ~tags () =
   let logger = Logger.null () in

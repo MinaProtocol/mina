@@ -15,8 +15,11 @@
   uri
   yojson
   ;; local libraries
+  bench_report
+  mina_base
   mina_caqti
-  rosetta_client)
+  rosetta_client
+  rosetta_models)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
