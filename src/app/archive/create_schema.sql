@@ -621,8 +621,5 @@ CREATE TABLE genesis_accounts
 , cliff_amount             text
 , vesting_period           bigint
 , vesting_increment        text
-, PRIMARY KEY (genesis_height, public_key, token)
+, PRIMARY KEY (public_key, token, genesis_height)
 );
-
-CREATE INDEX idx_genesis_accounts_lookup
-  ON genesis_accounts(public_key, token, genesis_height DESC);

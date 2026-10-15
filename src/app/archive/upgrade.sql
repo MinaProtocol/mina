@@ -244,11 +244,8 @@ CREATE TABLE IF NOT EXISTS genesis_accounts (
     cliff_amount             text,
     vesting_period           bigint,
     vesting_increment        text,
-    PRIMARY KEY (genesis_height, public_key, token)
+    PRIMARY KEY (public_key, token, genesis_height)
 );
-
-CREATE INDEX IF NOT EXISTS idx_genesis_accounts_lookup
-  ON genesis_accounts(public_key, token, genesis_height DESC);
 
 -- 4. Update schema_history
 
