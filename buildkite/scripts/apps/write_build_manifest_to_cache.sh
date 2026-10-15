@@ -34,14 +34,13 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 MANIFEST="${TMP_DIR}/build-manifest.txt"
 
 # The dune binaries (same set apps/write_to_cache.sh flattens into the apps
-# cache), plus the non-dune binaries it also caches.
+# cache), plus the non-dune libp2p_helper it also caches.
 find _build/default -type f -name "*.exe" ! -name "*ppx.exe" > "$MANIFEST"
 
-for extra in \
-  "src/app/libp2p_helper/result/bin/libp2p_helper" \
-  "src/app/minimina/target/release/minimina"; do
-  [[ -f "$extra" ]] && echo "$extra" >> "$MANIFEST"
-done
+HELPER="src/app/libp2p_helper/result/bin/libp2p_helper"
+if [[ -f "$HELPER" ]]; then
+  echo "$HELPER" >> "$MANIFEST"
+fi
 
 echo "--- Publishing build manifest ($(wc -l < "$MANIFEST") entries) for ${CODENAME}/${BUILD_VARIANT}"
 ./buildkite/scripts/cache/manager.sh write-to-dir "$MANIFEST" "build-manifest/${CODENAME}/${BUILD_VARIANT}"
