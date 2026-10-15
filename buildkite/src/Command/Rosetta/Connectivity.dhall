@@ -85,13 +85,14 @@ let debs =
 
           in      "mina-generic,mina-archive-${network},mina-rosetta-${network}"
               ++  ",mina-archive-generic,mina-rosetta-generic"
-              ++  ",mina-${network}-profile,mina-tx-tools"
+              ++  ",mina-${network}-profile,mina-tx-tools,mina-test-suite"
 
 let envExports =
           \(spec : Spec.Type)
       ->  [ "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
           , "MINA_PROFILE=${Profiles.lowerName spec.profile}"
           , "APPS_BARE_BINARIES=${bareBinaries}"
+          , "MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper"
           ]
 
 let connectivityScript =
@@ -129,6 +130,7 @@ let command
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
             , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
+            , timeout_in_minutes = Some +150
             , soft_fail = Some spec.softFail
             , if_ = Some spec.if_
             , depends_on =

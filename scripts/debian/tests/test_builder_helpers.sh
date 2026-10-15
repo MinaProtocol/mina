@@ -174,7 +174,6 @@ assert_rosetta_binaries() {
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-indexer-test"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-search-test"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-load"
-    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-connectivity-test"
 }
 
 assert_rosetta_configs() {
@@ -605,6 +604,7 @@ test_build_functional_test_suite_deb() {
 
     # Test binaries
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-command-line-tests"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta-connectivity-test"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-benchmarks"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-ledger-export-benchmark"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-disk-caching-stats"

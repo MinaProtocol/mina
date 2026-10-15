@@ -476,6 +476,8 @@ build_functional_test_suite_deb() {
     "${BUILDDIR}/usr/local/bin/mina-archive-node-test"
   cp ./default/src/test/node_status_mock_server/node_status_mock_server.exe \
     "${BUILDDIR}/usr/local/bin/mina-node-status-mock-server"
+  cp ./default/src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-connectivity-test"
 
   mkdir -p ${BUILDDIR}/etc/mina/test/archive/sample_db
   rsync -Huav ../src/test/archive/sample_db* "${BUILDDIR}/etc/mina/test/archive"
@@ -531,8 +533,6 @@ build_rosetta_generic_deb() {
     "${BUILDDIR}/usr/local/bin/mina-rosetta-search-test"
   cp ./default/src/app/rosetta/load/rosetta_load_cli.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta-load"
-  cp ./default/src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta-connectivity-test"
 
   build_deb "${package_name}"
 }
