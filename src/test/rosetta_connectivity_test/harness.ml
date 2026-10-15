@@ -48,6 +48,7 @@ type t =
   ; dirs : Daemon.Config.ConfigDirs.t
   ; mutable services : service list
   ; mutable daemon : Daemon.t option
+  ; mutable torn_down : bool
   }
 
 let services_named t ~prefix =
@@ -110,6 +111,16 @@ let start_archive t =
   in
   add_service t ~name:"archive" archive.process
 
+let daemon_config t =
+  Daemon.Config.of_dirs ~dirs:t.dirs ~client_port:t.config.client_port
+    ~rest_port:t.config.graphql_port ()
+
+(* The daemon's libp2p keypair, made before any service starts, so a failure
+   leaves nothing running and its output is in an artifact. *)
+let generate_keys t =
+  Daemon.Config.generate_keys_logged (daemon_config t)
+    ~log_file:(Config.log t.config "libp2p-keypair.log")
+
 (* The seed list is fetched here rather than with --peer-list-url: the daemon's
    own HTTPS client has no retry, and one connect timeout to the bucket ends
    it. *)
@@ -120,16 +131,9 @@ let start_daemon t =
   let%bind _ =
     Deferred.Or_error.try_with (fun () ->
         Utils.wget ~url:(Config.seed_list config) ~target:peers )
+    |> Deferred.Or_error.tag ~tag:"seed list"
   in
-  let daemon_config =
-    Daemon.Config.of_dirs ~dirs:t.dirs ~client_port:config.client_port
-      ~rest_port:config.graphql_port ()
-  in
-  let%bind () =
-    Deferred.Or_error.try_with (fun () ->
-        Daemon.Config.generate_keys daemon_config )
-  in
-  let daemon = Daemon.of_config daemon_config in
+  let daemon = Daemon.of_config (daemon_config t) in
   let%map process =
     Deferred.ok
       (Daemon.start daemon ~seed:false ~demo_mode:false ~external_ip:None
@@ -161,10 +165,13 @@ let create (config : Config.t) =
   ; dirs = Daemon.Config.ConfigDirs.create ~root_path:config.workdir ()
   ; services = []
   ; daemon = None
+  ; torn_down = false
   }
 
 let setup t =
-  let%bind.Deferred.Or_error () = prepare_database t.config in
+  let open Deferred.Or_error.Let_syntax in
+  let%bind () = generate_keys t in
+  let%bind () = prepare_database t.config in
   start_services t
 
 let rosetta_client t =
@@ -279,19 +286,28 @@ let collect_logs t =
             |> Deferred.ignore_m
           else return () )
 
+(* Stops every service; a second call does nothing. A daemon that does not
+   answer its stop request within 30 s is terminated. *)
 let teardown t =
-  let%bind () =
-    match
-      (t.daemon, List.find t.services ~f:(fun s -> String.equal s.name "daemon"))
-    with
-    | Some daemon, Some service when Utils.is_running service.process ->
-        let%bind () = Daemon.Client.stop_daemon (Daemon.client daemon) in
-        Utils.terminate ~grace:(Time.Span.of_sec 30.) service.process
-    | _ ->
-        return ()
-  in
-  Deferred.List.iter t.services ~f:(fun s ->
-      if Utils.is_running s.process then
-        Progress.printf "stopping %s (pid %d)" s.name
-          (Pid.to_int (Process.pid s.process)) ;
-      Utils.terminate s.process )
+  if t.torn_down then return ()
+  else (
+    t.torn_down <- true ;
+    let%bind () =
+      match
+        ( t.daemon
+        , List.find t.services ~f:(fun s -> String.equal s.name "daemon") )
+      with
+      | Some daemon, Some service when Utils.is_running service.process ->
+          let%bind (_ : [ `Result of unit | `Timeout ]) =
+            Clock.with_timeout (Time.Span.of_sec 30.)
+              (Daemon.Client.stop_daemon (Daemon.client daemon))
+          in
+          Utils.terminate ~grace:(Time.Span.of_sec 30.) service.process
+      | _ ->
+          return ()
+    in
+    Deferred.List.iter t.services ~f:(fun s ->
+        if Utils.is_running s.process then
+          Progress.printf "stopping %s (pid %d)" s.name
+            (Pid.to_int (Process.pid s.process)) ;
+        Utils.terminate s.process ) )

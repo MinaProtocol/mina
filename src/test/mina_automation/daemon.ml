@@ -190,6 +190,31 @@ module Config = struct
 
   let generate_keys t =
     Init.Client.generate_libp2p_keypair_do (libp2p_keypair_folder t) ()
+
+  (** [generate_keys_logged t ~log_file] makes the libp2p keypair with
+      [mina libp2p generate-keypair] in a subprocess, with its output in
+      [log_file]. A failure, such as a libp2p_helper that cannot be found, is
+      an error that names [log_file], and the calling process keeps
+      running. *)
+  let generate_keys_logged t ~log_file =
+    let%bind _, process =
+      Executor.run_in_background Executor.default
+        ~args:
+          [ "libp2p"
+          ; "generate-keypair"
+          ; "--privkey-path"
+          ; libp2p_keypair_folder t
+          ]
+        ()
+    in
+    let%bind () = Utils.drain_output_to_file process ~log_file in
+    match%map Process.wait process with
+    | Ok () ->
+        Ok ()
+    | Error _ as e ->
+        Or_error.errorf "mina libp2p generate-keypair failed (%s), see %s"
+          (Unix.Exit_or_signal.to_string_hum e)
+          log_file
 end
 
 (** 

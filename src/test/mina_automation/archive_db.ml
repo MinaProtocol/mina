@@ -27,10 +27,26 @@ let fetch_latest_public_dump ~prefix ~max_age_days ~workdir =
           let%map () = Unix.unlink archive in
           workdir ^/ Archive_dumps.sql_name ~prefix ~date )
 
+(* psql carries on past a failing statement in a dump restore, so a dump that
+   is cut short still restores "successfully". A restored dump has blocks; an
+   empty [blocks] table is a failed restore. *)
+let check_restored ~connection ~log_file =
+  match%map Psql.run_command ~connection "SELECT count(*) FROM blocks" with
+  | Ok count -> (
+      match Option.try_with (fun () -> Int.of_string count) with
+      | Some n when n > 0 ->
+          Ok ()
+      | _ ->
+          Or_error.errorf "the restored dump has %s blocks, see %s" count
+            log_file )
+  | Error e ->
+      Error (Error.tag e ~tag:(sprintf "the restored dump, see %s" log_file))
+
 (** [prepare ~postgres_uri ~source ~workdir ~log_file] loads [source] into the
     database [postgres_uri] names, with psql output in [log_file], then waits
-    until the archive schema answers. A public dump is several GB once
-    extracted, so it is deleted after the restore.
+    until the archive schema answers. A restored dump must have blocks. A
+    public dump is several GB once extracted, so it is deleted after the
+    restore.
 
     A public dump creates and connects to a database named [archive]; restore
     one only into a database of that name. *)
@@ -44,13 +60,15 @@ let prepare ~postgres_uri ~(source : source) ~workdir ~log_file =
         let%bind schema = Deferred.ok (Psql.create_db_script ()) in
         restore schema
     | `Dump file ->
-        restore file
+        let%bind () = restore file in
+        check_restored ~connection ~log_file
     | `Latest_public_dump (prefix, max_age_days) ->
         let%bind file =
           fetch_latest_public_dump ~prefix ~max_age_days ~workdir
         in
         let%bind () = restore file in
-        Deferred.ok (Unix.unlink file)
+        let%bind () = Deferred.ok (Unix.unlink file) in
+        check_restored ~connection ~log_file
   in
   Archive_healthcheck.wait_db_ready
     ~postgres_uri:(Uri.to_string postgres_uri)

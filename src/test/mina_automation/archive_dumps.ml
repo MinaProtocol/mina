@@ -18,7 +18,10 @@ let public_url ~prefix ~date =
     (dump_name ~prefix ~date)
 
 (** [find_latest_date ~prefix ~max_age_days] is the date (YYYY-MM-DD, UTC) of
-    the newest midnight dump no older than [max_age_days], if any. *)
+    the newest midnight dump no older than [max_age_days], if any. A lookup
+    that does not answer within [head_timeout] counts as no dump. *)
+let head_timeout = Core.Time.Span.of_sec 30.
+
 let find_latest_date ~prefix ~max_age_days =
   let open Core in
   let today = Date.today ~zone:Time.Zone.utc in
@@ -27,10 +30,12 @@ let find_latest_date ~prefix ~max_age_days =
     ~f:(fun days_back ->
       let date = Date.add_days today (-days_back) |> Date.to_string in
       match%map
-        Monitor.try_with ~rest:`Log (fun () ->
-            Cohttp_async.Client.head (Uri.of_string (public_url ~prefix ~date)) )
+        Clock.with_timeout head_timeout
+          (Monitor.try_with ~rest:`Log (fun () ->
+               Cohttp_async.Client.head
+                 (Uri.of_string (public_url ~prefix ~date)) ) )
       with
-      | Ok response
+      | `Result (Ok response)
         when Cohttp.Code.is_success
                (Cohttp.Code.code_of_status (Cohttp.Response.status response)) ->
           Some date

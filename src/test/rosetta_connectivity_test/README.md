@@ -39,11 +39,17 @@ Run it from the repository root. Each service binary is taken from
 `_build/default` when it is there, else from `PATH` by its installed name
 (`mina`, `mina-archive`, `mina-rosetta`).
 
+The daemon and the keypair step need `libp2p_helper`. `make libp2p_helper`
+builds it at `src/app/libp2p_helper/result/bin/libp2p_helper`, where a run from
+the repository root finds it. To use another copy, set
+`MINA_LIBP2P_HELPER_PATH` to its path.
+
 ```sh
 docker run -d --name rosetta-pg -p 127.0.0.1:5433:5432 \
   -e POSTGRES_USER=pguser -e POSTGRES_PASSWORD=pguser \
   -e POSTGRES_DB=archive postgres:17
 
+make libp2p_helper
 dune build src/test/rosetta_connectivity_test src/app/cli/src/mina.exe \
   src/app/archive/archive.exe src/app/rosetta/rosetta.exe
 MINA_PROFILE=devnet \

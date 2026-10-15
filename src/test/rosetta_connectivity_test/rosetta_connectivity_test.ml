@@ -118,6 +118,14 @@ let () =
          }
        in
        let%bind harness = Harness.create config in
+       (* A cancelled or timed-out CI job sends SIGTERM: keep the logs and
+          stop the services before exiting. *)
+       Signal.handle [ Signal.term; Signal.int ] ~f:(fun signal ->
+           Progress.printf "received %s, stopping" (Signal.to_string signal) ;
+           don't_wait_for
+             (let%bind () = Harness.collect_logs harness in
+              let%map () = Harness.teardown harness in
+              shutdown 1 ) ) ;
        (* An exception is a failed run too: it must still stop the services
           and keep their logs. *)
        let%bind result =

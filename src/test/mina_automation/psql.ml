@@ -135,16 +135,8 @@ let run_script_logged ~connection ?db ?(on_error_stop = false) ~log_file script
     @ [ "-q"; "-f"; script ]
   in
   let%bind process = Process.create_exn ~prog:psql ~args () in
-  let%bind writer = Writer.open_file ~append:true log_file in
-  let drain reader =
-    Pipe.iter_without_pushback (Reader.pipe reader) ~f:(Writer.write writer)
-  in
-  let%bind () =
-    Deferred.all_unit
-      [ drain (Process.stdout process); drain (Process.stderr process) ]
-  in
-  let%bind exit_status = Process.wait process in
-  let%map () = Writer.close writer in
+  let%bind () = Utils.drain_output_to_file process ~log_file in
+  let%map exit_status = Process.wait process in
   match exit_status with
   | Ok () ->
       Ok ()
