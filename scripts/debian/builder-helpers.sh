@@ -105,6 +105,9 @@ fi
 # Allow override via environment (set by build.sh for isolated parallel workers).
 BUILDDIR="${BUILDDIR:-deb_build}"
 
+# Ledger tarballs of the genesis configs, as <s3_data_hash>/<file name in S3>.
+LEDGER_TARBALLS_DIR="${LEDGER_TARBALLS_DIR:-/var/storagebox/ledger-tarballs}"
+
 # Function to ease creation of Debian package control files
 create_control_file() {
 
@@ -648,6 +651,41 @@ build_profile_generic_tent_deb() {
 ## END PROFILE-GENERIC TENT PACKAGE ##
 
 ## CONFIG PACKAGE ##
+# Puts the ledger tarballs of the network's genesis config into
+# /var/lib/coda, where the daemon finds them before it downloads them from
+# S3. Each one is copied from LEDGER_TARBALLS_DIR and checked against the
+# config's s3_data_hash.
+copy_ledger_tarballs() {
+  local network="$1"
+  local config="../genesis_ledgers/${network}.json"
+  local hashes s3_data_hash files dest actual_hash
+
+  hashes=$(jq -r '[.ledger, .epoch_data.staking, .epoch_data.next]
+    | map(.s3_data_hash? // empty) | unique[]' "${config}")
+  if [[ -z "${hashes}" ]]; then
+    echo "No s3_data_hash in ${config}" >&2
+    exit 1
+  fi
+
+  for s3_data_hash in ${hashes}; do
+    files=("${LEDGER_TARBALLS_DIR}/${s3_data_hash}"/*.tar.gz)
+    if [[ ${#files[@]} -ne 1 || ! -f "${files[0]}" ]]; then
+      echo "Expected one ledger tarball in ${LEDGER_TARBALLS_DIR}/${s3_data_hash}" >&2
+      exit 1
+    fi
+
+    dest="${BUILDDIR}/var/lib/coda/${files[0]##*/}"
+    echo "Ledger tarball ${files[0]}"
+    cp "${files[0]}" "${dest}"
+
+    actual_hash=$(openssl dgst -sha3-256 -r "${dest}" | cut -d' ' -f1)
+    if [[ "${actual_hash}" != "${s3_data_hash}" ]]; then
+      echo "${files[0]}: SHA3-256 is ${actual_hash}, not ${s3_data_hash}" >&2
+      exit 1
+    fi
+  done
+}
+
 build_daemon_config_deb() {
 
   local network="$1"
@@ -669,6 +707,7 @@ build_daemon_config_deb() {
      "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_configs "${network}"
+  copy_ledger_tarballs "${network}"
 
   # The config package owns mina.service so that exactly one co-installed
   # package ships it, with the correct per-network seed peer URL.
