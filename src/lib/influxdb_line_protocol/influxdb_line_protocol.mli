@@ -1,5 +1,4 @@
-(** InfluxDB line protocol: points for [influx write], as the benchmarks send
-    them to InfluxDB (buildkite/scripts/bench/send.sh).
+(** InfluxDB line protocol: points as [influx write] reads them.
 
     {v measurement,tag=value,... field=value,... timestamp v}
 
