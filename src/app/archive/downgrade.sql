@@ -132,8 +132,8 @@ BEGIN
     END IF;
 END$$;
 
--- 2. Drop genesis_accounts. The archive writes it again from the genesis
--- ledger at start-up once the database is upgraded.
+-- 2. Drop genesis_accounts. After the next upgrade it is empty until the
+-- genesis ledgers are written to it again.
 
 DROP TABLE IF EXISTS genesis_accounts;
 
