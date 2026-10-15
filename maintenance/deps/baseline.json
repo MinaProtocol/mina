@@ -123,7 +123,7 @@
       "opam": 11
     },
     "exe:app/rosetta/load:rosetta_load_cli": {
-      "libs": 108,
+      "libs": 109,
       "opam": 39
     },
     "exe:app/rosetta/ocaml-signer:signer": {
@@ -139,7 +139,7 @@
       "opam": 54
     },
     "exe:app/rosetta/search_bench:rosetta_search_bench": {
-      "libs": 204,
+      "libs": 205,
       "opam": 55
     },
     "exe:app/rosetta/search_test:rosetta_search_test": {
@@ -267,7 +267,7 @@
       "opam": 6
     },
     "exe:test/rosetta_connectivity_test:rosetta_connectivity_test": {
-      "libs": 250,
+      "libs": 251,
       "opam": 65
     }
   },
