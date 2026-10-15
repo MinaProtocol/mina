@@ -8,8 +8,8 @@
    does not change its cost; the primary key and the lookup index are kept up
    to date as in production.
 
-   Results go to stdout and, with [--influxdb-file], to InfluxDB line protocol
-   for buildkite/scripts/bench/send.sh. *)
+   The run is a Bench_result; it goes to stdout and, with [--influxdb-file],
+   to a file as InfluxDB line protocol. *)
 
 open Core
 open Async
@@ -73,48 +73,26 @@ let write_once ?chunk_size ~server_uri accounts =
   | Error e ->
       failwith (Caqti_error.show e)
 
-let median xs =
-  let xs = List.sort xs ~compare:Float.compare in
-  List.nth_exn xs (List.length xs / 2)
-
 let main ?chunk_size ~server_uri ~config_file ~runs ~influxdb_file ~measurement
     ~tags () =
   let logger = Logger.null () in
   let%bind accounts, ledger_ms =
     time (fun () -> load_accounts ~logger ~config_file)
   in
-  printf "genesis ledger: %d accounts, loaded in %.0f ms\n%!"
-    (List.length accounts) ledger_ms ;
   let%bind results =
-    Deferred.List.init ~how:`Sequential runs ~f:(fun i ->
-        let%map rows, ms = write_once ?chunk_size ~server_uri accounts in
-        printf "run %d: %d rows in %.0f ms (%.0f rows/s)\n%!" (i + 1) rows ms
-          (Float.of_int rows /. (ms /. 1000.)) ;
-        (rows, ms) )
+    Deferred.List.init ~how:`Sequential runs ~f:(fun _ ->
+        write_once ?chunk_size ~server_uri accounts )
   in
-  let rows = fst (List.hd_exn results) in
-  let times = List.map results ~f:snd in
-  let median_ms = median times in
-  let min_ms = List.reduce_exn times ~f:Float.min in
-  let max_ms = List.reduce_exn times ~f:Float.max in
-  let rows_per_s = Float.of_int rows /. (median_ms /. 1000.) in
-  printf
-    "genesis_accounts write: %d rows, median %.0f ms (min %.0f, max %.0f), \
-     %.0f rows/s\n"
-    rows median_ms min_ms max_ms rows_per_s ;
+  let result =
+    { Bench_result.rows = fst (List.hd_exn results)
+    ; ledger_load_ms = ledger_ms
+    ; write_ms = List.map results ~f:snd
+    }
+  in
+  print_endline (Bench_result.summary result) ;
   Option.iter influxdb_file ~f:(fun path ->
-      Influxdb_line_protocol.(
-        write_file path
-          [ create ~tags ~measurement
-              [ ("rows", Int rows)
-              ; ("median_ms", Float median_ms)
-              ; ("min_ms", Float min_ms)
-              ; ("max_ms", Float max_ms)
-              ; ("rows_per_s", Float rows_per_s)
-              ; ("ledger_load_ms", Float ledger_ms)
-              ; ("runs", Int runs)
-              ]
-          ]) ;
+      Out_channel.write_lines path
+        [ Bench_result.to_line ~measurement ~tags result ] ;
       printf "wrote 1 point to %s\n" path ) ;
   return ()
 
