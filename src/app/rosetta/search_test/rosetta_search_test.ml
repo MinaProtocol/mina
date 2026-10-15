@@ -1,7 +1,9 @@
 (* Rosetta /search/transactions (Lib.Search.Sql.run) on hand-built archives:
    which transactions an account matches, which blocks are visible, and how
    pages split a result. Rows read "<transaction> @ <block>" (see Fixture).
-   Needs the PostgreSQL server MINA_TEST_POSTGRES names. *)
+   The "memory" suite checks that the database connection does not keep
+   preparing statements. Needs the PostgreSQL server MINA_TEST_POSTGRES
+   names. *)
 
 open Core
 open Fixture
@@ -208,6 +210,80 @@ let pages_add_up_to_the_whole ~with_coinbases_and_zkapps () =
             (label ^ ": past the end, still the total_count")
             whole_size past_the_end.total_count ) )
 
+(* Rosetta builds every database request once, so the connection that serves
+   it holds one prepared statement for each query shape, however many requests
+   arrive and whatever values they carry. A request built per call, or a value
+   rendered into the SQL text, adds a statement on every call. *)
+let prepared_statements_stay_bounded () =
+  let chain = Chain.create () in
+  let alice = Chain.account chain "alice" in
+  let bob = Chain.account chain "bob" in
+  let carol = Chain.account chain "carol" in
+  let blocks = Chain.canonical_chain chain ~length:4 in
+  List.iteri blocks ~f:(fun i block ->
+      Chain.payment chain
+        (sprintf "pay in h%d" (i + 1))
+        ~from:alice ~to_:bob ~in_:[ block ] ;
+      Chain.coinbase chain ~to_:carol block ) ;
+  Chain.delegation chain "delegate_ab" ~from:alice ~to_:bob
+    ~in_:[ List.hd_exn blocks ] ;
+  Chain.zkapp chain "zkapp in h2" ~fee_payer:alice ~updating:[ bob ]
+    ~in_:[ List.nth_exn blocks 1 ] ;
+  let transactions =
+    [ "pay in h1"; "pay in h2"; "pay in h3"; "pay in h4"; "delegate_ab" ]
+  in
+  with_search chain (fun s ->
+      let q = Search.query s in
+      (* Every query shape, with values that change from round to round. Each
+         choice of a filter is between two values (a choice can change the SQL,
+         as success:true and success:false do), so rounds 0 and 1 together
+         use every shape. *)
+      let round i =
+        let pick l = List.nth_exn l (i % List.length l) in
+        let offset = i % 3 and limit = 1 + (i % 4) in
+        let search request = ignore (Search.run s request : Search.result) in
+        List.iter
+          [ `And; `Or ]
+          ~f:(fun operator ->
+            search (q ~operator ~address:(pick [ "alice"; "bob" ]) ()) ;
+            search
+              (q ~operator ~address:(pick [ "alice"; "bob" ]) ~offset ~limit ()) ;
+            search (q ~operator ~account:(pick [ "bob"; "carol" ]) ~limit ()) ;
+            search (q ~operator ~transaction:(pick transactions) ()) ;
+            search
+              (q ~operator ~address:"alice" ~transaction:(pick transactions) ()) ;
+            search
+              (q ~operator ~address:"alice"
+                 ~op_type:(pick [ "payment_receiver_inc"; "delegate_change" ])
+                 () ) ;
+            search
+              (q ~operator ~address:"alice"
+                 ~op_status:(pick [ "applied"; "failed" ])
+                 () ) ;
+            search (q ~operator ~address:"bob" ~success:(i % 2 = 0) ()) ;
+            search (q ~operator ~address:"alice" ~max_block:(1 + (i % 4)) ()) ) ;
+        let height = Int64.of_int (1 + (i % 4)) in
+        Search.block s None ;
+        Search.block s (Some (`This (`Height height))) ;
+        Search.block s
+          (Some (`That (`Hash (Chain.key_of s.chain (sprintf "h%Ld" height))))) ;
+        Search.block s
+          (Some
+             (`Those
+               ( `Height height
+               , `Hash (Chain.key_of s.chain (sprintf "h%Ld" height)) ) ) )
+      in
+      round 0 ;
+      round 1 ;
+      let after_warm_up = Search.prepared_statements s in
+      Alcotest.(check bool)
+        "the connection's prepared statements are visible" true
+        (after_warm_up > 0) ;
+      List.iter (List.range 2 20) ~f:round ;
+      Alcotest.(check int)
+        "no prepared statement added after every shape was used" after_warm_up
+        (Search.prepared_statements s) )
+
 let () =
   Alcotest.run "rosetta search"
     [ ( "search_transactions"
@@ -221,5 +297,12 @@ let () =
             "pages across user, internal and zkApp commands add up to the whole"
             `Quick
             (pages_add_up_to_the_whole ~with_coinbases_and_zkapps:true)
+        ] )
+      (* the memory gate: CI runs this suite on its own, after every other
+         Rosetta test (buildkite/scripts/tests/rosetta/integration-tests.sh) *)
+    ; ( "memory"
+      , [ Alcotest.test_case
+            "prepared statements stay bounded across searches and blocks" `Quick
+            prepared_statements_stay_bounded
         ] )
     ]
