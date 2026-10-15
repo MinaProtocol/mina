@@ -1,7 +1,7 @@
 open Core
 
 module Field = struct
-  type t = Int of int | Float of float | String of string | Bool of bool
+  type t = Int of int | Float of float
 end
 
 type t =
@@ -11,50 +11,63 @@ type t =
   ; timestamp : Time_ns.t
   }
 
+let invalid fmt =
+  ksprintf (fun msg -> invalid_arg ("InfluxDB point: " ^ msg)) fmt
+
+let check_name what name =
+  let allowed c =
+    Char.is_alphanum c || List.mem [ '_'; '.'; '-' ] c ~equal:Char.equal
+  in
+  if
+    String.is_empty name
+    || String.is_prefix name ~prefix:"_"
+    || not (String.for_all name ~f:allowed)
+  then invalid "invalid %s %S" what name
+
+let check_unique what keys =
+  Option.iter (List.find_a_dup keys ~compare:String.compare) ~f:(fun key ->
+      invalid "%s %S given twice" what key )
+
 let create ?(timestamp = Time_ns.now ()) ?(tags = []) ~measurement fields =
+  check_name "measurement" measurement ;
+  List.iter tags ~f:(fun (key, value) ->
+      check_name "tag key" key ;
+      if String.is_empty value || String.mem value '\n' then
+        invalid "tag %s has an empty or multi-line value" key ) ;
+  check_unique "tag" (List.map tags ~f:fst) ;
+  if List.is_empty fields then invalid "%s has no field" measurement ;
+  List.iter fields ~f:(fun (key, value) ->
+      check_name "field key" key ;
+      match (value : Field.t) with
+      | Float f when not (Float.is_finite f) ->
+          invalid "field %s is not finite" key
+      | Int _ | Float _ ->
+          () ) ;
+  check_unique "field" (List.map fields ~f:fst) ;
   { measurement; tags; fields; timestamp }
 
-let escape ~chars s =
-  let buf = Buffer.create (String.length s) in
-  String.iter s ~f:(fun c ->
-      if List.mem chars c ~equal:Char.equal then Buffer.add_char buf '\\' ;
-      Buffer.add_char buf c ) ;
-  Buffer.contents buf
+(* tag values: commas, equals signs and spaces are escaped *)
+let escape_tag_value value =
+  String.concat_map value ~f:(function
+    | (',' | '=' | ' ') as c ->
+        sprintf "\\%c" c
+    | c ->
+        String.of_char c )
 
-(* measurement: commas and spaces; tag keys, tag values and field keys: also
-   equals signs; string field values: double quotes and backslashes *)
-let escape_measurement = escape ~chars:[ ','; ' ' ]
-
-let escape_key = escape ~chars:[ ','; '='; ' ' ]
-
-let field_value : Field.t -> string option = function
+let field_value : Field.t -> string = function
   | Int i ->
-      Some (sprintf "%di" i)
-  | Float f when Float.is_finite f ->
-      Some (sprintf "%.15g" f)
-  | Float _ ->
-      None
-  | String s ->
-      Some (sprintf "\"%s\"" (escape ~chars:[ '"'; '\\' ] s))
-  | Bool b ->
-      Some (Bool.to_string b)
+      sprintf "%di" i
+  | Float f ->
+      sprintf "%.15g" f
 
 let to_line { measurement; tags; fields; timestamp } =
-  let tags =
-    List.filter_map tags ~f:(fun (key, value) ->
-        if String.is_empty value then None
-        else Some (sprintf ",%s=%s" (escape_key key) (escape_key value)) )
-  in
-  let fields =
-    List.filter_map fields ~f:(fun (key, value) ->
-        Option.map (field_value value) ~f:(sprintf "%s=%s" (escape_key key)) )
-  in
-  if List.is_empty fields then
-    failwithf "InfluxDB point %s has no field to write" measurement () ;
-  sprintf "%s%s %s %d"
-    (escape_measurement measurement)
-    (String.concat tags)
-    (String.concat ~sep:"," fields)
+  sprintf "%s%s %s %d" measurement
+    (String.concat
+       (List.map tags ~f:(fun (key, value) ->
+            sprintf ",%s=%s" key (escape_tag_value value) ) ) )
+    (String.concat ~sep:","
+       (List.map fields ~f:(fun (key, value) ->
+            sprintf "%s=%s" key (field_value value) ) ) )
     (Time_ns.to_int_ns_since_epoch timestamp)
 
 let write_file path points =
