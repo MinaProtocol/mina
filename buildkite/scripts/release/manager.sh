@@ -13,7 +13,7 @@
 # - FIX: Repair Debian repository manifests when needed
 # - PERSIST: Archive artifacts to long-term storage backends
 #
-# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
+# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa
 #
 # Artifacts that carry a docker image as well as a debian package:
 #   mina-daemon (mina-daemon), mina-generic (mina-daemon), mina-archive (mina-archive),
@@ -161,7 +161,7 @@ function main_help(){
     echo " architectures: $DEFAULT_ARCHITECTURES"
     echo ""
     echo "Available values: "
-    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina-daemon,mina-config,mina-automode,mina-prefork,mina-postfork,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa,minimina"
+    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina-daemon,mina-config,mina-automode,mina-prefork,mina-postfork,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa"
     echo " networks: devnet,mainnet"
     echo " codenames: bullseye,focal"
     echo " channels: unstable,alpha,beta,stable"
@@ -980,7 +980,7 @@ function publish(){
         for artifact in "${__artifacts_arr[@]}"; do
             for __codename in "${__codenames_arr[@]}"; do
                     case $artifact in
-                            mina-logproc|minimina)
+                            mina-logproc)
 
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
@@ -1472,7 +1472,7 @@ function promote(){
     for artifact in "${__artifacts_arr[@]}"; do
         for __codename in "${__codenames_arr[@]}"; do
                     case $artifact in
-                        mina-logproc|minimina)
+                        mina-logproc)
 
                             if [[ $__only_dockers == 0 ]]; then
                                 promote_debian $artifact \
@@ -1888,7 +1888,7 @@ function verify(){
         for artifact in "${__artifacts_arr[@]}"; do
             for __codename in "${__codenames_arr[@]}"; do
                         case $artifact in
-                            mina-logproc|minimina)
+                            mina-logproc)
 
                                 if [[ $__only_dockers == 0 ]]; then
                                         echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
@@ -3423,7 +3423,7 @@ function progress(){
                     for artifact in "${__artifacts_arr[@]}"; do
                         # Handle artifacts that need network suffix
                         case $artifact in
-                            mina-logproc|minimina)
+                            mina-logproc)
                                 local package_name="$artifact"
                                 ((total_debian_checks=total_debian_checks+1))
 
@@ -3524,7 +3524,7 @@ function progress(){
 
         for artifact in "${__artifacts_arr[@]}"; do
             # Skip artifacts that have no docker image
-            if [[ "$artifact" == "mina-logproc" || "$artifact" == "minimina" || "$artifact" == "mina-config" || "$artifact" == "mina-prefork" || "$artifact" == "mina-postfork" || "$artifact" == "mina-postfork-mesa" || "$artifact" == "mina-prefork-mesa" ]]; then
+            if [[ "$artifact" == "mina-logproc" || "$artifact" == "mina-config" || "$artifact" == "mina-prefork" || "$artifact" == "mina-postfork" || "$artifact" == "mina-postfork-mesa" || "$artifact" == "mina-prefork-mesa" ]]; then
                 continue
             fi
 
