@@ -26,10 +26,14 @@ let%test_module "Archive node unit tests" =
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let archive_uri =
-      Uri.of_string
-        (Option.value
-           (Sys.getenv "MINA_TEST_POSTGRES")
-           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
+      match Sys.getenv "MINA_TEST_POSTGRES" with
+      | Some uri ->
+          Uri.of_string uri
+      | None ->
+          failwith
+            "MINA_TEST_POSTGRES is not set: the archive tests need a \
+             PostgreSQL database with the archive schema (CI sets it up with \
+             buildkite/scripts/setup-database-for-archive-node.sh)"
 
     let conn_lazy =
       lazy

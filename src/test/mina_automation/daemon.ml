@@ -17,7 +17,7 @@ module Executor = Executor.Make (Paths)
 let logger = Logger.create ()
 
 let path () =
-  Deferred.map Executor.PathFinder.standalone_path ~f:(fun opt ->
+  Deferred.map (Executor.PathFinder.standalone_path ()) ~f:(fun opt ->
       Option.value_exn opt
         ~message:
           "Could not find released mina daemon environment. App is not \

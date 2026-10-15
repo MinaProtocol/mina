@@ -1,0 +1,53 @@
+{
+    "genesis": {
+        "slots_per_epoch": 48,
+        "k": 10,
+        "grace_period_slots": 3,
+        "genesis_state_timestamp": "2026-10-06 11:58:28+00:00"
+    },
+    "proof": {
+        "work_delay": 1,
+        "level": "none",
+        "transaction_capacity": {
+            "2_to_the": 2
+        },
+        "block_window_duration_ms": 30000
+    },
+    "ledger": {
+        "name": "release",
+        "num_accounts": 6,
+        "accounts": [
+            {
+                "pk": "B62qmMxyRfyU8mzWhc8yN5Xk8Dsayvrxe91y7L5uij6nB79HsRFeJSc",
+                "sk": null,
+                "balance": "5.000000000",
+                "delegate": null
+            },
+            {
+                "pk": "B62qnZEjBsdZ5aM7qYP8ceH7DwtqUh3RmuwB727jY8v6mqXmS9FsE5s",
+                "sk": null,
+                "balance": "11550000.000000000",
+                "delegate": "B62qmTU2SgB2EBMRj8pV1s5u82C5a4hWnTrNcmhMBztGyQGZWqz9CLT"
+            },
+            {
+                "pk": "B62qmTU2SgB2EBMRj8pV1s5u82C5a4hWnTrNcmhMBztGyQGZWqz9CLT",
+                "sk": null,
+                "balance": "499.000000000",
+                "delegate": null
+            },
+            {
+                "pk": "B62qqvMJaw7asmEhbUx1RmJf6Pxi1Xn2QDcoDpFmfQ1xAR8w8RZsC7y",
+                "sk": null,
+                "balance": "11550000.000000000",
+                "delegate": "B62qnGF4eW2XXx8h6sFHiAYrWhCtZaaV8UznjKoFf3UVmfm8ipBdPZM"
+            },
+            {
+                "pk": "B62qnGF4eW2XXx8h6sFHiAYrWhCtZaaV8UznjKoFf3UVmfm8ipBdPZM",
+                "sk": null,
+                "balance": "499.000000000",
+                "delegate": null
+            }
+        ],
+        "add_genesis_winner": true
+    }
+}
