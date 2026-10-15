@@ -193,28 +193,38 @@ module Config = struct
 
   (** [generate_keys_logged t ~log_file] makes the libp2p keypair with
       [mina libp2p generate-keypair] in a subprocess, with its output in
-      [log_file]. A failure, such as a libp2p_helper that cannot be found, is
-      an error that names [log_file], and the calling process keeps
-      running. *)
+      [log_file]. A failure is an error that names [log_file], and the calling
+      process keeps running. The command prints nothing when it cannot start
+      libp2p_helper and exits with code 20, so the error says so. *)
   let generate_keys_logged t ~log_file =
-    let%bind _, process =
-      Executor.run_in_background Executor.default
-        ~args:
-          [ "libp2p"
-          ; "generate-keypair"
-          ; "--privkey-path"
-          ; libp2p_keypair_folder t
-          ]
-        ()
+    let args =
+      [ "libp2p"
+      ; "generate-keypair"
+      ; "--privkey-path"
+      ; libp2p_keypair_folder t
+      ]
     in
-    let%bind () = Utils.drain_output_to_file process ~log_file in
-    match%map Process.wait process with
-    | Ok () ->
-        Ok ()
-    | Error _ as e ->
-        Or_error.errorf "mina libp2p generate-keypair failed (%s), see %s"
-          (Unix.Exit_or_signal.to_string_hum e)
-          log_file
+    match%bind
+      Monitor.try_with (fun () ->
+          Executor.run_in_background Executor.default ~args () )
+    with
+    | Error exn ->
+        Deferred.Or_error.errorf "cannot start mina libp2p generate-keypair: %s"
+          (Exn.to_string exn)
+    | Ok (_, process) -> (
+        let%bind () = Utils.drain_output_to_file process ~log_file in
+        match%map Process.wait process with
+        | Ok () ->
+            Ok ()
+        | Error (`Exit_non_zero 20) ->
+            Or_error.errorf
+              "mina libp2p generate-keypair exited with code 20: libp2p_helper \
+               could not be started; set MINA_LIBP2P_HELPER_PATH (see %s)"
+              log_file
+        | Error _ as e ->
+            Or_error.errorf "mina libp2p generate-keypair failed (%s), see %s"
+              (Unix.Exit_or_signal.to_string_hum e)
+              log_file )
 end
 
 (** 
