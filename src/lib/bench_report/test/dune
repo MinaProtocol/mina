@@ -1,0 +1,10 @@
+(test
+ (name test_bench_report)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core_kernel
+  ;; local libraries
+  bench_report)
+ (preprocess
+  (pps ppx_version)))

@@ -8,6 +8,7 @@
 (package (name archive_health_queries))
 (package (name archive_lib))
 (package (name base58_check))
+(package (name bench_report))
 (package (name best_tip_merger))
 (package (name best_tip_prover))
 (package (name bignum_bigint))
