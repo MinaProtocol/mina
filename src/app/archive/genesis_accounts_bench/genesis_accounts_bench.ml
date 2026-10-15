@@ -5,7 +5,7 @@
    for each of [--runs] runs, writes it with [Processor.Genesis_accounts.add]
    into a fresh database created from create_schema.sql, and times only that
    call. genesis_accounts has no foreign keys, so an otherwise empty database
-   does not change its cost; the primary key and the lookup index are kept up
+   does not change its cost; the primary key is kept up
    to date as in production.
 
    The run is a Bench_result; it goes to stdout and, with [--influxdb-file],
