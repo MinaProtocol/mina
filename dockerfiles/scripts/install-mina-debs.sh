@@ -3,8 +3,8 @@
 # the local build context (no apt repo / no apt index involved).
 #
 # scripts/docker/build.sh stages the freshly-built .deb files into the docker
-# build context under _debs/, which the Dockerfiles COPY to ${LOCAL_DEB_DIR}
-# (default /opt/mina-local-debs). This script resolves each requested mina
+# build context under _debs/, which the Dockerfiles bind-mount at ${LOCAL_DEB_DIR}
+# (default /opt/mina-local-debs) for the install step only. This script resolves each requested mina
 # package to its concrete .deb file in that directory and hands the explicit
 # file paths to a single `apt-get install`. apt still resolves any non-mina
 # dependencies (system libraries) from the image's normal OS apt sources.
@@ -31,7 +31,7 @@
 #                    or ${LOCAL_DEB_DIR}/pkg_*_all.deb
 #
 # Environment:
-#   LOCAL_DEB_DIR    - directory the local debs were COPY'd to.
+#   LOCAL_DEB_DIR    - directory the local debs are mounted at.
 #                      Default: /opt/mina-local-debs
 #   APT_NO_DOWNGRADE - if set to "1", omit --allow-downgrades
 

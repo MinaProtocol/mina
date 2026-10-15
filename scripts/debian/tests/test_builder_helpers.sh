@@ -269,6 +269,32 @@ run_test_expect_fail() {
 # Setup
 ################################################################################
 
+# Puts a ledger tarball with content "tarball:<name>" into
+# LEDGER_TARBALLS_DIR/<its SHA3-256>/<name> and prints the hash.
+add_ledger_tarball() {
+    local name="$1"
+    local content="tarball:${name}"
+    local hash
+    hash=$(printf '%s' "$content" | openssl dgst -sha3-256 -r | cut -d' ' -f1)
+    mkdir -p "${LEDGER_TARBALLS_DIR}/${hash}"
+    printf '%s' "$content" > "${LEDGER_TARBALLS_DIR}/${hash}/${name}"
+    echo "$hash"
+}
+
+# Writes genesis_ledgers/<network>.json with a genesis ledger and one epoch
+# ledger (staking == next), both in LEDGER_TARBALLS_DIR.
+write_genesis_config() {
+    local network="$1"
+    local genesis_hash epoch_hash
+    genesis_hash=$(add_ledger_tarball "genesis_ledger_${network}.tar.gz")
+    epoch_hash=$(add_ledger_tarball "epoch_ledger_${network}.tar.gz")
+    jq -n --arg network "$network" --arg genesis "$genesis_hash" --arg epoch "$epoch_hash" '{
+        genesis: $network,
+        ledger: {s3_data_hash: $genesis},
+        epoch_data: {staking: {s3_data_hash: $epoch}, next: {s3_data_hash: $epoch}}
+    }' > "${PROJECT_ROOT}/genesis_ledgers/${network}.json"
+}
+
 setup_test_environment() {
     TEST_TMPDIR=$(mktemp -d)
     export PROJECT_ROOT="${TEST_TMPDIR}/project"
@@ -411,8 +437,9 @@ SVCEOF
 
     # genesis ledgers
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
-    echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
-    echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
+    export LEDGER_TARBALLS_DIR="${TEST_TMPDIR}/ledger-tarballs"
+    write_genesis_config mainnet
+    write_genesis_config devnet
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -636,6 +663,12 @@ test_build_daemon_mainnet_config_deb() {
     # Should NOT have binaries
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
+    # Ledger tarballs of the genesis config, under their S3 names
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/genesis_ledger_mainnet.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/epoch_ledger_mainnet.tar.gz"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/genesis_ledger_mainnet.tar.gz" "tarball:genesis_ledger_mainnet.tar.gz"
+
     # Verify genesis content
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" "mainnet"
 
@@ -671,6 +704,25 @@ test_build_daemon_devnet_config_deb() {
 ################################################################################
 # Tests: Prefork packages
 ################################################################################
+
+# A tarball whose SHA3-256 is not the config's s3_data_hash fails the build.
+test_config_deb_rejects_bad_ledger_tarball() {
+    local dir="${TEST_TMPDIR}/bad-ledger-tarballs"
+    rm -rf "$dir"
+    cp -r "$LEDGER_TARBALLS_DIR" "$dir"
+    local f
+    for f in "$dir"/*/genesis_ledger_devnet.tar.gz; do printf 'corrupt' > "$f"; done
+    LEDGER_TARBALLS_DIR="$dir" safe_build build_daemon_config_deb devnet
+}
+
+# A tarball missing from LEDGER_TARBALLS_DIR fails the build.
+test_config_deb_rejects_missing_ledger_tarball() {
+    local dir="${TEST_TMPDIR}/missing-ledger-tarballs"
+    rm -rf "$dir"
+    cp -r "$LEDGER_TARBALLS_DIR" "$dir"
+    rm -f "$dir"/*/epoch_ledger_devnet.tar.gz
+    LEDGER_TARBALLS_DIR="$dir" safe_build build_daemon_config_deb devnet
+}
 
 test_build_daemon_mainnet_prefork_deb() {
     safe_build build_daemon_prefork_deb mainnet || { log_fail "build exited non-zero"; return; }
@@ -1043,6 +1095,8 @@ test_build_daemon_devnet_hardfork_config_deb() {
     # Ledger tarballs copied
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger1.tar.gz"
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger2.tar.gz"
+    # ... and not the ones of the pre-fork config
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/genesis_ledger_devnet.tar.gz"
 
     # Old genesis ledger backup
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.old.json"
@@ -1340,6 +1394,10 @@ main() {
     # Archive packages
     run_test test_build_archive_devnet_deb
     run_test test_build_archive_mainnet_deb
+
+    # Ledger tarballs in the config packages
+    run_test_expect_fail test_config_deb_rejects_bad_ledger_tarball
+    run_test_expect_fail test_config_deb_rejects_missing_ledger_tarball
 
     # Hardfork config packages
     run_test test_build_daemon_devnet_hardfork_config_deb

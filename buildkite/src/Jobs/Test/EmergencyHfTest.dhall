@@ -12,6 +12,8 @@ let Size = ../../Command/Size.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let FixPermissions = ../../Command/FixPermissions.dhall
@@ -39,7 +41,8 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                  [ FixPermissions.command Arch.Type.Amd64 ]
+                  RunInToolchain.submodulesInit True
+                # [ FixPermissions.command Arch.Type.Amd64 ]
                 # [ RunWithPostgres.runInDockerWithPostgresConn
                       ([] : List Text)
                       (None RunWithPostgres.ScriptOrArchive)
