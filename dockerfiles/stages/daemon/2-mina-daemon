@@ -33,8 +33,9 @@ ENV MINA_STORAGE_DEB=mina-daemon-storage-toolbox
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
 # Packages are installed DIRECTLY from the local build context: scripts/docker/build.sh
-# stages the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
-# and install-mina-debs.sh resolves each requested package to its concrete .deb file and
+# stages the freshly-built .deb files under _debs, bind-mounted at /opt/mina-local-debs for
+# the install step only (a COPY would bake every staged .deb into an image layer), and
+# install-mina-debs.sh resolves each requested package to its concrete .deb file and
 # installs them with a single apt-get call (no apt repo / no apt index). Since there is no
 # repo to resolve the mina dependency closure, every mina dependency (e.g. mina-logproc,
 # a dependency of the daemon and the storage toolboxes) is requested explicitly here.
@@ -60,8 +61,8 @@ RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
   && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
-COPY _debs /opt/mina-local-debs
-RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+RUN --mount=type=bind,source=_debs,target=/opt/mina-local-debs \
+  echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && chmod +x /usr/local/bin/install-mina-debs.sh \
   && mina_debs=( \
        "${MINA_DEB}=$deb_version" \

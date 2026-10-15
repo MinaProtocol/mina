@@ -38,7 +38,6 @@ resolve_deb_output() {
   case "$token" in
     # Simple single-name packages
     logproc)               echo "mina-logproc" ;;
-    minimina)              echo "minimina" ;;
     tx_tools)              echo "mina-tx-tools" ;;
     test_executive)        echo "mina-test-executive" ;;
     functional_test_suite) echo "mina-test-suite" ;;
