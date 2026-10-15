@@ -66,6 +66,9 @@ dune runtest src/app/archive
 # Synthetic_archive: the shared test archive builder, against the same DB server
 dune runtest src/test/mina_automation/test/synthetic_archive
 
+# Rosetta's liquid and total balance of a vesting account, read from the archive
+dune runtest src/test/rosetta_vesting_balance
+
 # mina-archive-healthcheck: hermetic CLI smoke tests, plus DB-backed tests on
 # the same server ($MINA_TEST_POSTGRES)
 dune runtest src/app/mina_archive_healthcheck
