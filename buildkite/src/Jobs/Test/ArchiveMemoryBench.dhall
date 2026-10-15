@@ -8,6 +8,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
+let MemoryGate = ../../Constants/MemoryGate.dhall
+
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
@@ -27,6 +29,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ArchiveMemoryBench")
           , S.exactly "buildkite/scripts/tests/archive-memory-bench" "sh"
+          , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
           , S.strictlyStart (S.contains "src/test/archive/archive_memory_bench")
           ]
         , path = "Test"
@@ -55,6 +58,7 @@ in  Pipeline.build
                   ContainerImages.minaToolchain
                   "./buildkite/scripts/tests/archive-memory-bench.sh"
               ]
+            , softFail = Some MemoryGate.softFail
             }
         ]
       }

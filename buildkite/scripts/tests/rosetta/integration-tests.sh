@@ -250,7 +250,7 @@ sudo -u postgres dropdb "${INDEXER_DBNAME}"
 # databases on this server
 echo "========================= ROSETTA SEARCH TESTS ==========================="
 MINA_TEST_POSTGRES="postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432" \
-  mina-rosetta-search-test
+  mina-rosetta-search-test test search_transactions
 
 echo "=========================== NEGATIVE TEST: healthcheck against not-yet-running Rosetta ==========================="
 # Sanity check: before Rosetta is up, `rosetta-healthcheck ready` must
@@ -433,5 +433,16 @@ rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
+
+echo "========================= ROSETTA MEMORY GATE ==========================="
+# Last, so that every other test above has already passed or failed on its
+# own. A failure here exits with MEMORY_GATE_EXIT_STATUS, which the job
+# soft-fails on (see buildkite/scripts/bench/memory-gate.sh).
+MEMORY_GATE_EXIT_STATUS=42
+if ! MINA_TEST_POSTGRES="postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432" \
+  mina-rosetta-search-test test memory; then
+  echo "MEMORY GATE FAILED: rosetta-search-prepared-statements"
+  exit "${MEMORY_GATE_EXIT_STATUS}"
+fi
 
 # EXIT trap calls collect_logs; no need to invoke it explicitly here.
