@@ -483,7 +483,11 @@ let glue_sync_ledger :
        Throttle.create ~continue_on_error:true ~max_concurrent_jobs:400
      in
      let download q =
-       if not (is_current q) then Deferred.unit
+       (* A downloader torn down with the sync never resolves new jobs. *)
+       if
+         Deferred.is_determined (Linear_pipe.closed query_reader)
+         || not (is_current q)
+       then Deferred.unit
        else (
          Hash_set.add in_flight q ;
          let%bind result =
