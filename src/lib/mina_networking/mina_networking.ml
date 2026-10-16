@@ -474,7 +474,9 @@ let glue_sync_ledger :
         ledger ignores their answers anyway. So on a change of target, cancel
         them and point the downloader's knowledge at the new target; otherwise
         they would hold every in-flight slot and the new target's queries would
-        never be sent. *)
+        never be sent. The downloader also forgets what it learnt about peers
+        from the old target, lest it pass over the peers that failed its
+        queries because they have moved on to the new one. *)
      let is_current (h, _) =
        Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r)
      in
@@ -506,9 +508,12 @@ let glue_sync_ledger :
          let%map () =
            if is_current q then Deferred.unit
            else
-             let%map () = Broadcast_pipe.Writer.write root_hash_w (fst q) in
+             let new_root = fst q in
              Hash_set.to_list in_flight
-             |> List.filter ~f:(Fn.non is_current)
-             |> List.iter ~f:(Sl_downloader.cancel downloader)
+             |> List.filter ~f:(fun (h, _) ->
+                    not (Ledger_hash.equal h new_root) )
+             |> List.iter ~f:(Sl_downloader.cancel downloader) ;
+             Sl_downloader.forget_peer_state downloader ;
+             Broadcast_pipe.Writer.write root_hash_w new_root
          in
          don't_wait_for (Throttle.enqueue throttle (fun () -> download q)) ) )
