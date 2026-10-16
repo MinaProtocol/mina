@@ -121,3 +121,26 @@ let create_random_mina_db ~connection ~prefix =
   let%bind create_script = create_db_script () in
   let%bind _ = run_script ~connection ~db create_script in
   Deferred.return db
+
+(** [run_script_logged ~connection ~log_file script] runs [script] with its
+    output appended to [log_file] instead of kept in memory, for scripts as
+    large as an archive dump. With [on_error_stop] the first failing statement
+    fails the run; without it psql reports the error and carries on, as a
+    pg_dump restore needs for ownership and extension statements. *)
+let run_script_logged ~connection ?db ?(on_error_stop = false) ~log_file script
+    =
+  let args =
+    create_credential_arg ~connection ?db ()
+    @ (if on_error_stop then [ "-v"; "ON_ERROR_STOP=1" ] else [])
+    @ [ "-q"; "-f"; script ]
+  in
+  let%bind process = Process.create_exn ~prog:psql ~args () in
+  let%bind () = Utils.drain_output_to_file process ~log_file in
+  let%map exit_status = Process.wait process in
+  match exit_status with
+  | Ok () ->
+      Ok ()
+  | Error _ as e ->
+      Or_error.errorf "psql -f %s failed (%s), see %s" script
+        (Unix.Exit_or_signal.to_string_hum e)
+        log_file

@@ -465,7 +465,8 @@ module Options = struct
     (* Currently, mainnet, testnet, devnet etc don't affect Rosetta options *)
     let handle (_network : Network_request.t) =
       M.return
-      @@ { Network_options_response.version = Version.create "1.4.9" "1.0.0"
+      @@ { Network_options_response.version =
+             Version.create Spec_version.rosetta "1.0.0"
          ; allow =
              { Allow.operation_statuses = Lazy.force Operation_statuses.all
              ; operation_types = Lazy.force Operation_types.all
@@ -497,7 +498,7 @@ module Options = struct
           ~expected:
             ( Result.return
             @@ { Network_options_response.version =
-                   Version.create "1.4.9" "1.0.0"
+                   Version.create Spec_version.rosetta "1.0.0"
                ; allow =
                    { Allow.operation_statuses =
                        Lazy.force Operation_statuses.all

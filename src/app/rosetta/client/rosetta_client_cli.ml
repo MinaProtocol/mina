@@ -50,9 +50,9 @@ let global_flags_param =
   { client; compact }
 
 (* Single JSON record on stdout, with a trailing newline.  Stdout is
-   this CLI's data channel -- scripts/tests/rosetta-helper.sh pipes it
-   straight into jq -- so the payload goes out raw, unprefixed and
-   unlabelled.  Diagnostics go the other way, through [Logger] below. *)
+   this CLI's data channel -- callers pipe it straight into jq -- so the
+   payload goes out raw, unprefixed and unlabelled.  Diagnostics go the
+   other way, through [Logger] below. *)
 let emit_json g json =
   let s =
     if g.compact then Yojson.Safe.to_string json

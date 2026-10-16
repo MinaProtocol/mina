@@ -65,4 +65,8 @@ let select
                 , innerScript = innerScript
                 }
 
-in  { SelectionMode = SelectionMode, Spec = Spec, select = select }
+in  { SelectionMode = SelectionMode
+    , Spec = Spec
+    , select = select
+    , imageFor = imageFor
+    }

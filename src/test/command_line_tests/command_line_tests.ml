@@ -564,7 +564,11 @@ module MisconfiguredWalletCrashLog = struct
        earlier test leaves [wallets/store] behind as a directory, which would
        make the [write_all] below fail with [Is a directory]. *)
     let dirs = Daemon.Config.ConfigDirs.create ~root_path:test.temp_dir () in
-    let config = Daemon.Config.create ~dirs ~config:test.config.config () in
+    let config =
+      Daemon.Config.create ~dirs
+        ~config:(Option.value_exn test.config.config)
+        ()
+    in
     let daemon = Daemon.of_config config in
     let%bind () = Daemon.Config.generate_keys config in
     let ledger_file = dirs.conf ^/ "daemon.json" in

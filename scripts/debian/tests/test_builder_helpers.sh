@@ -173,6 +173,7 @@ assert_rosetta_binaries() {
     assert_file_captured "$captured_files" "usr/local/bin/mina-ocaml-signer"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-indexer-test"
     assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-search-test"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-load"
 }
 
 assert_rosetta_configs() {
@@ -381,6 +382,8 @@ MOCKEXE
     create_mock_exe "default/src/app/rosetta/search_test/rosetta_search_test.exe"
     create_mock_exe "default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe"
     create_mock_exe "default/src/app/rosetta/client/rosetta_client_cli.exe"
+    create_mock_exe "default/src/app/rosetta/load/rosetta_load_cli.exe"
+    create_mock_exe "default/src/test/rosetta_connectivity_test/rosetta_connectivity_test.exe"
     create_mock_exe "default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
     create_mock_exe "default/src/app/generate_keypair/generate_keypair.exe"
     create_mock_exe "default/src/app/validate_keypair/validate_keypair.exe"
@@ -601,6 +604,7 @@ test_build_functional_test_suite_deb() {
 
     # Test binaries
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-command-line-tests"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta-connectivity-test"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-benchmarks"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-ledger-export-benchmark"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-disk-caching-stats"

@@ -42,9 +42,7 @@ let dedup_and_sort_archive_files files : string list =
   |> List.dedup_and_sort ~compare:(fun left right ->
          precomputed_blocks_comparator left right )
 
-let force_kill process =
-  Process.send_signal process Core.Signal.kill ;
-  match%map Process.wait process with
+let exit_of_wait = function
   | Ok () ->
       Ok (`Exited 0)
   | Error (`Exit_non_zero exit_code) ->
@@ -53,6 +51,11 @@ let force_kill process =
       Ok `Sig_killed
   | Error (`Signal signal) ->
       Or_error.errorf "Process exited with signal %s" (Signal.to_string signal)
+
+(** [force_kill process] sends SIGKILL and waits for [process] to exit. *)
+let force_kill process =
+  Process.send_signal process Core.Signal.kill ;
+  Process.wait process >>| exit_of_wait
 
 (** [get_memory_usage_mib pid] retrieves the memory usage in mebibytes for the process
   with the given [pid].
@@ -118,3 +121,39 @@ let get_memory_usage_mib_of_user_process process =
     |> fun kb -> kb /. 1024.0
   in
   Deferred.return total_memory_mb
+
+(** [drain_output_to_file process ~log_file] appends the stdout and stderr of
+    [process] to [log_file], and is determined when the process has closed
+    both. Nothing else may read them: an undrained pipe blocks the process
+    once it fills. *)
+let drain_output_to_file process ~log_file =
+  let%bind writer = Writer.open_file ~append:true log_file in
+  let drain reader =
+    Pipe.iter_without_pushback (Reader.pipe reader) ~f:(Writer.write writer)
+  in
+  let%bind () =
+    Deferred.all_unit
+      [ drain (Process.stdout process); drain (Process.stderr process) ]
+  in
+  Writer.close writer
+
+(** [log_output_to_file process ~log_file] is [drain_output_to_file] for a
+    long-running [process], in the background. *)
+let log_output_to_file process ~log_file =
+  don't_wait_for (drain_output_to_file process ~log_file)
+
+(** [is_running process] is false once [process] has exited. Async reaps its
+    children, so an exited one is never found as a zombie. *)
+let is_running process = Option.is_none (Deferred.peek (Process.wait process))
+
+(** [terminate ?grace process] sends SIGTERM, and SIGKILL if [process] is
+    still running after [grace] (default 10 s). *)
+let terminate ?(grace = Time.Span.of_sec 10.) process =
+  if not (is_running process) then return ()
+  else (
+    Process.send_signal process Signal.term ;
+    match%bind Clock.with_timeout grace (Process.wait process) with
+    | `Result _ ->
+        return ()
+    | `Timeout ->
+        force_kill process >>| ignore )

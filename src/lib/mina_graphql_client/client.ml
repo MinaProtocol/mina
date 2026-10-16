@@ -220,11 +220,12 @@ let get_global_slot_since_hard_fork ~logger node_uri =
     (Mina_numbers.Global_slot_since_hard_fork.to_string res) ;
   res
 
-let get_best_chain ?max_length ~logger node_uri =
+let get_best_chain ?max_length ?num_tries ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   let query = Queries.Best_chain.(make @@ makeVariables ?max_length ()) in
   let%bind result =
-    exec_graphql_request ~logger ~node_uri ~query_name:"best_chain" query
+    exec_graphql_request ?num_tries ~logger ~node_uri ~query_name:"best_chain"
+      query
   in
   match result.bestChain with
   | None | Some [||] ->
@@ -247,6 +248,7 @@ let get_best_chain ?max_length ~logger node_uri =
                    block.protocolState.consensusState.slotSinceGenesis
                ; global_slot_since_hard_fork =
                    block.protocolState.consensusState.slot
+               ; timestamp = block.protocolState.blockchainState.utcDate
                } )
            (Array.to_list chain)
 

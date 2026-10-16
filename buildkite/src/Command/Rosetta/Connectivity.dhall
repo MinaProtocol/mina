@@ -28,6 +28,10 @@ let Expr = ../../Pipeline/Expr.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+
+let Arch = ../../Constants/Arch.dhall
+
 let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
@@ -65,35 +69,43 @@ let Spec =
       }
 
 let bareBinaries =
-    -- rosetta-client is required by scripts/tests/rosetta-helper.sh, which
-    -- both the sanity and the load test source.  Restoring every binary
-    -- here makes restore-or-install.sh skip the deb install, so anything
-    -- the tests call must be listed.
-          "mina.exe:mina"
+    -- The test app plus everything it starts. Restoring every binary here
+    -- makes restore-or-install.sh skip the deb install, so anything the test
+    -- calls must be listed. The healthcheck waits for the database.
+          "rosetta_connectivity_test.exe:mina-rosetta-connectivity-test"
+      ++  ",mina.exe:mina"
       ++  ",archive.exe:mina-archive"
+      ++  ",mina_archive_healthcheck.exe:mina-archive-healthcheck"
       ++  ",rosetta.exe:mina-rosetta"
-      ++  ",rosetta_client_cli.exe:rosetta-client"
       ++  ",libp2p_helper:libp2p_helper"
+
+let debs =
+          \(spec : Spec.Type)
+      ->  let network = Network.lowerName spec.network
+
+          in      "mina-generic,mina-archive-${network},mina-rosetta-${network}"
+              ++  ",mina-archive-generic,mina-rosetta-generic"
+              ++  ",mina-${network}-profile,mina-tx-tools,mina-test-suite"
 
 let envExports =
           \(spec : Spec.Type)
-      ->  [ "MINA_NETWORK_DEB=${Network.lowerName spec.network}"
-          , "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
+      ->  [ "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
           , "MINA_PROFILE=${Profiles.lowerName spec.profile}"
           , "APPS_BARE_BINARIES=${bareBinaries}"
+          , "MINA_LIBP2P_HELPER_PATH=/usr/local/bin/libp2p_helper"
           ]
 
 let connectivityScript =
           \(spec : Spec.Type)
-      ->      "./buildkite/scripts/tests/rosetta/connectivity.sh"
+      ->      "mina-rosetta-connectivity-test"
           ++  " --network ${Network.lowerName spec.network}"
+          ++  " --postgres-uri postgres://postgres:postgres@localhost:5432/archive"
+          ++  " --workdir \\\${HOME}/rosetta-connectivity"
           ++  " --sync-timeout ${Natural/show spec.syncTimeout}"
           ++  " --new-block-timeout ${Natural/show spec.newBlockTimeout}"
-          ++  " --run-compatibility-test develop"
-          ++  " --run-load-test"
+          ++  " --compatibility"
           ++  " --branch \\\${BUILDKITE_BRANCH}"
           ++  " --commit \\\${BUILDKITE_COMMIT}"
-          ++  " --metrics-mode"
           ++  " --perf-output-file /workdir/rosetta.perf"
 
 let command
@@ -102,10 +114,13 @@ let command
       ->  Command.build
             Command.Config::{
             , commands =
-                  Toolchain.select
-                    Toolchain.Spec::{ debVersion = spec.dockerType }
-                    (envExports spec)
-                    (connectivityScript spec)
+                  [ RunWithPostgres.runInToolchainWithPostgresAndDebs
+                      (envExports spec)
+                      (None RunWithPostgres.ScriptOrArchive)
+                      (Toolchain.imageFor spec.dockerType Arch.Type.Amd64)
+                      (debs spec)
+                      (connectivityScript spec)
+                  ]
                 # RunInToolchain.runInDefaultToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
                     "./buildkite/scripts/bench/send.sh"
@@ -115,6 +130,7 @@ let command
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
             , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
+            , timeout_in_minutes = Some +150
             , soft_fail = Some spec.softFail
             , if_ = Some spec.if_
             , depends_on =
@@ -141,7 +157,6 @@ let pipeline
                       "dhall"
                   , S.strictlyStart
                       (S.contains "buildkite/scripts/tests/rosetta")
-                  , S.strictlyStart (S.contains "scripts/tests/rosetta")
                   , S.exactly "buildkite/scripts/debian/restore-or-install" "sh"
                   , S.strictlyStart (S.contains "buildkite/scripts/apps")
                   , S.strictlyStart (S.contains "genesis_ledgers")

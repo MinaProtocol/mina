@@ -175,6 +175,9 @@ module Best_chain =
         publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
       }
       protocolState {
+        blockchainState {
+          utcDate
+        }
         consensusState {
           blockHeight
           slotSinceGenesis @ppxCustom(module: "Scalars.GlobalSlotSinceGenesis")
