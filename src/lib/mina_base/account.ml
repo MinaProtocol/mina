@@ -660,9 +660,7 @@ let empty =
   ; delegate = None
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
-  ; permissions =
-      Permissions.user_default
-      (* TODO: This should maybe be Permissions.empty *)
+  ; permissions = Permissions.user_default
   ; zkapp = None
   }
 
@@ -1216,9 +1214,7 @@ module Unstable = struct
     ; delegate = None
     ; voting_for = State_hash.dummy
     ; timing = Timing.Untimed
-    ; permissions =
-        Permissions.user_default
-        (* TODO: This should maybe be Permissions.empty *)
+    ; permissions = Permissions.user_default
     ; zkapp = None
     ; unstable_field = Nonce.zero
     }

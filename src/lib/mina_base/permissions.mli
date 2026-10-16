@@ -115,7 +115,7 @@ val typ : (Checked.t, t) Typ.t
 
 val user_default : t
 
-val empty : t
+val dummy_value_for_set_or_keep_placeholder_only : t
 
 val deriver :
      (< contramap : (t -> t) ref
@@ -150,6 +150,4 @@ module Hardfork : sig
   type t = Stable.Latest.t [@@deriving equal, sexp, compare]
 
   val user_default : t
-
-  val empty : t
 end

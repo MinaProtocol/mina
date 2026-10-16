@@ -589,7 +589,7 @@ let user_default : t =
   ; access = None
   }
 
-let empty : t =
+let dummy_value_for_set_or_keep_placeholder_only : t =
   { edit_state = None
   ; send = None
   ; receive = None
@@ -697,21 +697,5 @@ module Hardfork = struct
     ; set_voting_for = Signature
     ; set_timing = Signature
     ; access = None
-    }
-
-  let empty : t =
-    { edit_state = None
-    ; send = None
-    ; receive = None
-    ; access = None
-    ; set_delegate = None
-    ; set_permissions = None
-    ; set_verification_key = (None, hardfork_txn_version)
-    ; set_zkapp_uri = None
-    ; edit_action_state = None
-    ; set_token_symbol = None
-    ; increment_nonce = None
-    ; set_voting_for = None
-    ; set_timing = None
     }
 end

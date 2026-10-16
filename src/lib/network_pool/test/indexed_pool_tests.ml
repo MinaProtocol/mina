@@ -444,7 +444,7 @@ let init_permissionless_ledger ledger account_info =
         Or_error.ok_exn (get_or_create ledger account_id)
       in
       set ledger location
-        { account with balance; permissions = Permissions.empty } )
+        { account with balance; permissions = Permissions.user_default } )
 
 let apply_to_ledger ledger cmd =
   let signature_kind = Mina_signature_kind.Testnet in
