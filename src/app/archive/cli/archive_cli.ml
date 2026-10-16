@@ -45,11 +45,21 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
+     and hardfork_handover =
+       flag "--hardfork-handover" ~aliases:[ "-hardfork-handover" ] no_arg
+         ~doc:
+           " Write the genesis ledger of --config-file to genesis_accounts, \
+            instead of accounts_accessed. Also enabled when the \
+            MINA_ARCHIVE_HARDFORK_HANDOVER environment variable is set."
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
            Yojson.Safe.from_file file |> Runtime_config.of_yojson
            |> Result.ok_or_failwith )
+     in
+     let hardfork_handover =
+       hardfork_handover
+       || Option.is_some (Sys.getenv "MINA_ARCHIVE_HARDFORK_HANDOVER")
      in
      fun () ->
        let logger = Logger.create () in
@@ -67,7 +77,7 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED ~hardfork_handover )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

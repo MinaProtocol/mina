@@ -4737,6 +4737,74 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 (** See genesis_accounts.ml. *)
 module Genesis_accounts = Genesis_accounts
 
+(* [precomputed_values_of_config] builds the precomputed values of the
+   runtime config. Both genesis writers use it. *)
+let precomputed_values_of_config ~logger ~(runtime_config : Runtime_config.t)
+    ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+  let (module G) = Genesis_constants.profiled () in
+  match%map
+    Genesis_ledger_helper.init_from_config_file ~logger
+      ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+      runtime_config ~cli_proof_level:None
+  with
+  | Ok precomputed_values ->
+      precomputed_values
+  | Error err ->
+      failwithf "Could not get precomputed values, error: %s"
+        (Error.to_string_hum err) ()
+
+(* [genesis_height_of] is the blockchain length of the genesis block, the
+   height that genesis_accounts rows are keyed by. *)
+let genesis_height_of ~precomputed_values =
+  let With_hash.{ data = block; _ }, _ =
+    Mina_block.genesis ~precomputed_values
+  in
+  Mina_block.blockchain_length block
+  |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int64
+
+(* [add_genesis_ledger] is called when starting the archive process with
+   --hardfork-handover. It writes the genesis ledger to genesis_accounts, at the
+   height of the genesis block, instead of to accounts_accessed. *)
+let add_genesis_ledger ~logger ~(runtime_config : Runtime_config.t)
+    ~(genesis_constants : Genesis_constants.t) ~chunks_length
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
+  let%bind precomputed_values =
+    precomputed_values_of_config ~logger ~runtime_config ~genesis_constants
+      ~constraint_constants
+  in
+  let genesis_height = genesis_height_of ~precomputed_values in
+  let%bind accounts =
+    Precomputed_values.genesis_ledger precomputed_values
+    |> Lazy.force |> Mina_ledger.Ledger.to_list
+  in
+  let metadata = [ ("height", `String (Int64.to_string genesis_height)) ] in
+  match%bind
+    Pool.use
+      (fun (module Conn : CONNECTION) ->
+        Genesis_accounts.add ~chunk_size:chunks_length
+          (module Conn)
+          ~genesis_height accounts )
+      pool
+  with
+  | Error e ->
+      failwithf "Could not write genesis accounts: %s" (Caqti_error.show e) ()
+  | Ok `No_table ->
+      failwith
+        "The archive database has no genesis_accounts table; run upgrade.sql"
+  | Ok `Already_loaded ->
+      [%log info] "The genesis ledger at height $height is already written"
+        ~metadata ;
+      Deferred.unit
+  | Ok (`Added (count, resumed_after)) ->
+      [%log info]
+        "Wrote $count genesis ledger accounts at height $height, after \
+         $resumed_after written before"
+        ~metadata:
+          ( metadata
+          @ [ ("count", `Int count); ("resumed_after", `Int resumed_after) ] ) ;
+      Deferred.unit
+
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
@@ -4745,18 +4813,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
-        match%map
-          Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
-            runtime_config ~cli_proof_level:None
-        with
-        | Ok precomputed_values ->
-            precomputed_values
-        | Error err ->
-            failwithf "Could not get precomputed values, error: %s"
-              (Error.to_string_hum err) ()
+        precomputed_values_of_config ~logger ~runtime_config ~genesis_constants
+          ~constraint_constants
       in
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
@@ -4913,7 +4972,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~hardfork_handover =
   let%bind metric_server = create_metrics_server ~logger ~metrics_server_port in
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
@@ -4957,8 +5016,17 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Deferred.unit
   | Ok pool ->
       let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt ~chunks_length
+        match (runtime_config_opt, hardfork_handover) with
+        | None, true ->
+            [%log warn]
+              "--hardfork-handover has no effect without --config-file" ;
+            Deferred.unit
+        | Some runtime_config, true ->
+            add_genesis_ledger ~logger ~runtime_config ~genesis_constants
+              ~constraint_constants ~chunks_length pool
+        | _, false ->
+            add_genesis_accounts pool ~logger ~genesis_constants
+              ~constraint_constants ~runtime_config_opt ~chunks_length
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than
