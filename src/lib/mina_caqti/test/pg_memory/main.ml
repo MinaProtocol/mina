@@ -40,8 +40,8 @@
 open Core
 open Async
 
-(* The exit status of a failed --assert-no-growth, kept apart from every other
-   failure so that CI can treat the memory gate on its own. *)
+(* The exit status of a failed --assert-no-growth. It differs from the status of
+   every other failure, so a leak can be told apart from a broken run. *)
 let memory_gate_exit_status = 42
 
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running

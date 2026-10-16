@@ -1,12 +1,21 @@
 (* prepared_statements_probe.ml
 
-   Used only by archive_blocks --instrumented. [pg_prepared_statements] lists
-   only the statements of the session that runs the query. With a one-connection
-   pool (CAQTI_POOL_MAX_SIZE=1) the session that runs these probes is the one
-   that writes the blocks, so the counts show whether its requests are built
-   once. The output is one line per block, [block <n> <statements> <distinct
-   texts>], and after the last block one [duplicate <count> <statement>] line
-   for each SQL text prepared more than once. *)
+   Measures whether archive_blocks builds its database requests once. Caqti
+   prepares a statement for each request object on each connection, and keeps
+   it for the life of that connection. A request built again on every call
+   therefore adds a statement on every call, and the connection's memory grows
+   without bound (#18857). The probe reads the count after each block, so the
+   growth shows in the output, and it lists each SQL text prepared more than
+   once, which names the request that leaks.
+
+   Only archive_blocks --instrumented uses it. It must run on the connection
+   that writes the blocks, so the pool must hold one connection
+   (CAQTI_POOL_MAX_SIZE=1). pg_prepared_statements shows only the statements of
+   the session that runs the query.
+
+   Output: one line [block <n> <statements> <distinct texts>] per block, then
+   one [duplicate <count> <statement>] line per SQL text prepared more than
+   once. *)
 
 open Core_kernel
 open Async

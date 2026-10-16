@@ -56,8 +56,8 @@ let ok_exn ~ctx = function
 
 let int_opt s = Option.try_with (fun () -> Int.of_string s)
 
-(* The exit status of a failed --assert-bounded-statements, kept apart from
-   every other failure so that CI can treat the memory gate on its own. *)
+(* The exit status of a failed --assert-bounded-statements. It differs from the
+   status of every other failure, so a leak can be told apart from a broken run. *)
 let memory_gate_exit_status = 42
 
 (* VmRSS of a process in KiB, or 0 if it is gone *)

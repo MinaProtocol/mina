@@ -28,7 +28,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
         "Failed to create a Caqti connection to Postgresql" ;
       exit 1
-  | Ok pool -> (
+  | Ok pool ->
       [%log info] "Successfully created Caqti connection to Postgresql" ;
       let make_add_block of_yojson add_block_aux ~json ~file =
         match of_yojson json with
@@ -80,6 +80,15 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
              ~genesis_constants ~logger ~pool ~delete_older_than:None
              ~signature_kind:Mina_signature_kind.t_DEPRECATED )
       in
+      (* the probe runs only when --instrumented is given *)
+      let probe_after_block n =
+        Option.value_map instrumented ~default:Deferred.unit ~f:(fun path ->
+            Prepared_statements_probe.after_block ~pool ~logger ~path n )
+      in
+      let probe_finish () =
+        Option.value_map instrumented ~default:Deferred.unit ~f:(fun path ->
+            Prepared_statements_probe.finish ~pool ~logger ~path )
+      in
       let%bind () =
         Deferred.List.iteri files ~f:(fun n file ->
             let%bind () =
@@ -104,17 +113,9 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
                           ] ;
                       return (add_to_failure_file file) )
             in
-            match instrumented with
-            | None ->
-                Deferred.unit
-            | Some path ->
-                Prepared_statements_probe.after_block ~pool ~logger ~path (n + 1) )
+            probe_after_block (n + 1) )
       in
-      match instrumented with
-      | None ->
-          Deferred.unit
-      | Some path ->
-          Prepared_statements_probe.finish ~pool ~logger ~path )
+      probe_finish ()
 
 let () =
   Command.(

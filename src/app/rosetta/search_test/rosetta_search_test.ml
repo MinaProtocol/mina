@@ -238,40 +238,43 @@ let prepared_statements_stay_bounded () =
          choice of a filter is between two values (a choice can change the SQL,
          as success:true and success:false do), so rounds 0 and 1 together
          use every shape. *)
-      let round i =
-        let pick l = List.nth_exn l (i % List.length l) in
-        let offset = i % 3 and limit = 1 + (i % 4) in
-        let search request = ignore (Search.run s request : Search.result) in
-        List.iter
-          [ `And; `Or ]
-          ~f:(fun operator ->
-            search (q ~operator ~address:(pick [ "alice"; "bob" ]) ()) ;
-            search
-              (q ~operator ~address:(pick [ "alice"; "bob" ]) ~offset ~limit ()) ;
-            search (q ~operator ~account:(pick [ "bob"; "carol" ]) ~limit ()) ;
-            search (q ~operator ~transaction:(pick transactions) ()) ;
-            search
-              (q ~operator ~address:"alice" ~transaction:(pick transactions) ()) ;
-            search
-              (q ~operator ~address:"alice"
-                 ~op_type:(pick [ "payment_receiver_inc"; "delegate_change" ])
-                 () ) ;
-            search
-              (q ~operator ~address:"alice"
-                 ~op_status:(pick [ "applied"; "failed" ])
-                 () ) ;
-            search (q ~operator ~address:"bob" ~success:(i % 2 = 0) ()) ;
-            search (q ~operator ~address:"alice" ~max_block:(1 + (i % 4)) ()) ) ;
+      let search request = ignore (Search.run s request : Search.result) in
+      (* the values of round [i] cycle through their choices *)
+      let choose i l = List.nth_exn l (i % List.length l) in
+      (* the block queries of round [i]: the latest block, then one block by
+         height, by hash and by both *)
+      let block_queries i =
         let height = Int64.of_int (1 + (i % 4)) in
+        let hash = Chain.key_of s.chain (sprintf "h%Ld" height) in
         Search.block s None ;
         Search.block s (Some (`This (`Height height))) ;
-        Search.block s
-          (Some (`That (`Hash (Chain.key_of s.chain (sprintf "h%Ld" height))))) ;
-        Search.block s
-          (Some
-             (`Those
-               ( `Height height
-               , `Hash (Chain.key_of s.chain (sprintf "h%Ld" height)) ) ) )
+        Search.block s (Some (`That (`Hash hash))) ;
+        Search.block s (Some (`Those (`Height height, `Hash hash)))
+      in
+      (* the filter queries of round [i] under one [operator] *)
+      let filter_queries i operator =
+        let address = choose i [ "alice"; "bob" ] in
+        let transaction = choose i transactions in
+        let offset = i % 3 and limit = 1 + (i % 4) in
+        search (q ~operator ~address ()) ;
+        search (q ~operator ~address ~offset ~limit ()) ;
+        search (q ~operator ~account:(choose i [ "bob"; "carol" ]) ~limit ()) ;
+        search (q ~operator ~transaction ()) ;
+        search (q ~operator ~address:"alice" ~transaction ()) ;
+        search
+          (q ~operator ~address:"alice"
+             ~op_type:(choose i [ "payment_receiver_inc"; "delegate_change" ])
+             () ) ;
+        search
+          (q ~operator ~address:"alice"
+             ~op_status:(choose i [ "applied"; "failed" ])
+             () ) ;
+        search (q ~operator ~address:"bob" ~success:(i % 2 = 0) ()) ;
+        search (q ~operator ~address:"alice" ~max_block:(1 + (i % 4)) ())
+      in
+      let round i =
+        List.iter [ `And; `Or ] ~f:(filter_queries i) ;
+        block_queries i
       in
       round 0 ;
       round 1 ;
@@ -298,8 +301,7 @@ let () =
             `Quick
             (pages_add_up_to_the_whole ~with_coinbases_and_zkapps:true)
         ] )
-      (* the memory gate: CI runs this suite on its own, after every other
-         Rosetta test (buildkite/scripts/tests/rosetta/integration-tests.sh) *)
+      (* the memory gate, kept apart from the other suites *)
     ; ( "memory"
       , [ Alcotest.test_case
             "prepared statements stay bounded across searches and blocks" `Quick
