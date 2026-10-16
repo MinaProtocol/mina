@@ -571,18 +571,21 @@ end = struct
               (let cancel =
                  Option.iter ~f:(fun e -> Clock.Event.abort_if_possible e ())
                in
-               if List.is_empty succs then
-                 Hashtbl.update t.temporary_ignores peer0 ~f:(fun x ->
-                     cancel x ;
-                     Clock.Event.run_after t.ignore_period
-                       (fun () ->
-                         Hashtbl.remove t.temporary_ignores peer0 ;
-                         if not (Strict_pipe.Writer.is_closed t.w) then
-                           Strict_pipe.Writer.write t.w () )
-                       () )
-               else (
-                 Hashtbl.find_and_remove t.temporary_ignores peer0 |> cancel ;
-                 Preferred_heap.add t.all_preferred (peer0, Time.now ()) ) ) ;
+               match (succs, unsuccs) with
+               | [], [] ->
+                   ()
+               | [], _ :: _ ->
+                   Hashtbl.update t.temporary_ignores peer0 ~f:(fun x ->
+                       cancel x ;
+                       Clock.Event.run_after t.ignore_period
+                         (fun () ->
+                           Hashtbl.remove t.temporary_ignores peer0 ;
+                           if not (Strict_pipe.Writer.is_closed t.w) then
+                             Strict_pipe.Writer.write t.w () )
+                         () )
+               | _ :: _, _ ->
+                   Hashtbl.find_and_remove t.temporary_ignores peer0 |> cancel ;
+                   Preferred_heap.add t.all_preferred (peer0, Time.now ()) ) ;
               Hash_set.remove t.downloading_peers peer0 ;
               jobs_no_longer_needed t succs ;
               match Hashtbl.find t.knowledge peer0 with
@@ -832,6 +835,17 @@ end = struct
                   in
                   List.iter succ ~f:(Hash_set.remove all) ;
                   (succ, Hash_set.to_list all)
+            in
+            (* A job cancelled while it was being downloaded is no evidence
+               against the peer, which may well have stopped serving it for
+               the same reason that we stopped wanting it. *)
+            let unsuccs =
+              let cancelled =
+                List.filter_map xs ~f:(fun x ->
+                    Option.some_if (Ivar.is_full x.J.res) x.key )
+                |> Key.Hash_set.of_list
+              in
+              List.filter unsuccs ~f:(Fn.non (Hash_set.mem cancelled))
             in
             Useful_peers.update t.useful_peers
               (Download_finished (peer, `Successful succs, `Unsuccessful unsuccs)
