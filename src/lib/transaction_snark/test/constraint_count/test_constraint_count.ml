@@ -50,34 +50,34 @@ type profile_expected_values =
 
 let dev_expected_values =
   { transaction_merge =
-      { constraints = 634
-      ; public_input_size = 300
-      ; auxiliary_input_size = 1899
-      ; digest = "d71089b3a1669535999e8f181cd59afc"
+      { constraints = 555
+      ; public_input_size = 296
+      ; auxiliary_input_size = 1669
+      ; digest = "e34682a932ff0046752e353c32c23752"
       }
   ; transaction_base =
-      { constraints = 12875
-      ; public_input_size = 300
-      ; auxiliary_input_size = 37503
-      ; digest = "740db2397b0b01806a48f061a2e2b063"
+      { constraints = 12848
+      ; public_input_size = 296
+      ; auxiliary_input_size = 37237
+      ; digest = "5794514ac7614c4ff9603a03ddb902c8"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 16332
-      ; public_input_size = 300
-      ; auxiliary_input_size = 73525
-      ; digest = "aa73b81ac2eca4d57fc889bfe562e01b"
+      { constraints = 16308
+      ; public_input_size = 296
+      ; auxiliary_input_size = 73262
+      ; digest = "0015598765beaad73654535cb78c4812"
       }
   ; zkapp_opt_signed =
-      { constraints = 8924
-      ; public_input_size = 300
-      ; auxiliary_input_size = 40635
-      ; digest = "080790458ad5287478889328c21ce774"
+      { constraints = 8900
+      ; public_input_size = 296
+      ; auxiliary_input_size = 40372
+      ; digest = "f9a6991e50df2e6ca34c801ad21300e5"
       }
   ; zkapp_proved =
-      { constraints = 5146
-      ; public_input_size = 300
-      ; auxiliary_input_size = 39201
-      ; digest = "7a16111a5abe7fb0d7c92e44b160218b"
+      { constraints = 5123
+      ; public_input_size = 296
+      ; auxiliary_input_size = 38938
+      ; digest = "b455fa5a10d68d6d7c35ec35f4e66337"
       }
   }
 

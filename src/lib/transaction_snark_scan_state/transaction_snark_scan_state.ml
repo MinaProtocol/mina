@@ -23,6 +23,27 @@ module Transaction_with_witness = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V4 = struct
+      (* TODO: The statement is redundant here - it can be computed from the
+         witness and the transaction
+      *)
+      type t =
+        { transaction_with_status :
+            Mina_transaction.Transaction.Stable.V3.t With_status.Stable.V2.t
+        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+        ; statement : Transaction_snark.Statement.Stable.V3.t
+        ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; first_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
+        ; second_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V3 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
@@ -41,7 +62,24 @@ module Transaction_with_witness = struct
         }
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ transaction_with_status
+           ; state_hash
+           ; statement
+           ; init_stack
+           ; first_pass_ledger_witness
+           ; second_pass_ledger_witness
+           ; block_global_slot
+           } :
+            t ) : Latest.t =
+        { transaction_with_status
+        ; state_hash
+        ; statement = Transaction_snark.Statement.Stable.V2.to_latest statement
+        ; init_stack
+        ; first_pass_ledger_witness
+        ; second_pass_ledger_witness
+        ; block_global_slot
+        }
     end
   end]
 
@@ -182,17 +220,7 @@ module Job_view = struct
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", R.to_yojson s.source)
         ; ("Target", R.to_yojson s.target)
-        ; ( "Fee Excess"
-          , `List
-              [ `Assoc
-                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_l)
-                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_l)
-                  ]
-              ; `Assoc
-                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_r)
-                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
-                  ]
-              ] )
+        ; ("Fee Excess", Fee.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
         ]
     in
@@ -272,6 +300,28 @@ let hash_generic :
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  module V4 = struct
+    type t =
+      { scan_state :
+          ( Ledger_proof.Stable.V3.t
+          , Transaction_with_witness.Stable.V4.t )
+          Parallel_scan.State.Stable.V1.t
+      ; previous_incomplete_zkapp_updates :
+          Transaction_with_witness.Stable.V4.t list
+          * [ `Border_block_continued_in_the_next_tree of bool ]
+      }
+
+    let to_latest = Fn.id
+
+    let hash (t : t) =
+      hash_generic
+        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V3.t) ->
+          Ledger_proof_with_hash.hash x )
+        ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V4.t) ->
+          Transaction_with_witness.hash x )
+        (t.scan_state, t.previous_incomplete_zkapp_updates)
+  end
+
   module V3 = struct
     type t =
       { scan_state :
@@ -283,15 +333,17 @@ module Stable = struct
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
 
-    let to_latest = Fn.id
-
-    let hash (t : t) =
-      hash_generic
-        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V2.t) ->
-          Ledger_proof_with_hash.hash x )
-        ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
-          Transaction_with_witness.hash x )
-        (t.scan_state, t.previous_incomplete_zkapp_updates)
+    let to_latest
+        ({ scan_state; previous_incomplete_zkapp_updates = updates, continued } :
+          t ) : Latest.t =
+      { scan_state =
+          Parallel_scan.State.map scan_state
+            ~f1:Ledger_proof.Stable.V2.to_latest
+            ~f2:Transaction_with_witness.Stable.V3.to_latest
+      ; previous_incomplete_zkapp_updates =
+          ( List.map updates ~f:Transaction_with_witness.Stable.V3.to_latest
+          , continued )
+      }
   end
 end]
 
@@ -682,7 +734,7 @@ struct
         Option.value_map ~default:(Ok ()) last_proof_statement
           ~f:(fun statement -> check_registers statement.target registers_end)
     | Ok
-        ( { fee_excess = { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+        ( { fee_excess
           ; source = _
           ; target
           ; connecting_ledger_left = _
@@ -697,21 +749,7 @@ struct
               Transaction_snark.Statement.merge statement t |> Or_error.ignore_m )
         and () = check_registers registers_end target
         and () =
-          clarify_error
-            (Fee.Signed.equal Fee.Signed.zero fee_excess_l)
-            "nonzero fee excess"
-        and () =
-          clarify_error
-            (Fee.Signed.equal Fee.Signed.zero fee_excess_r)
-            "nonzero fee excess"
-        and () =
-          clarify_error
-            (Token_id.equal Token_id.default fee_token_l)
-            "nondefault fee token"
-        and () =
-          clarify_error
-            (Token_id.equal Token_id.default fee_token_r)
-            "nondefault fee token"
+          clarify_error (Fee_excess.is_zero fee_excess) "nonzero fee excess"
         in
         ()
 

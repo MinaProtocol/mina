@@ -37,11 +37,11 @@
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 12,875      | 300          | 37,502          |
-    | zkapp-opt_signed-opt_signed | 14,537      | 300          | 56,588          |
-    | zkapp-opt_signed            | 8,026       | 300          | 32,166          |
-    | zkapp-proved                | 4,249       | 300          | 30,732          |
+    | transaction-merge           | 555         | 296          | 1,669           |
+    | transaction-base            | 12,848      | 296          | 37,237          |
+    | zkapp-opt_signed-opt_signed | 16,308      | 296          | 73,262          |
+    | zkapp-opt_signed            | 8,900       | 296          | 40,372          |
+    | zkapp-proved                | 5,123       | 296          | 38,938          |
     v}
 
     {b Devnet profile:}
@@ -98,8 +98,14 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type t [@@deriving compare, equal, sexp, yojson, hash]
+    end
+
     module V2 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
+
+      val to_latest : t -> V3.t
     end
   end]
 

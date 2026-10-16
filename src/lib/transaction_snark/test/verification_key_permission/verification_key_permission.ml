@@ -24,12 +24,6 @@ end
 let%test_module "Update account verification key permission from mainnet to \
                  berkeley" =
   ( module struct
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
     open Currency
     open Signature_lib
     module U = Transaction_snark_tests.Util
@@ -98,11 +92,4 @@ let%test_module "Update account verification key permission from mainnet to \
     let%test_unit "change verification key perm to Either and bump txn version"
         =
       mk_update_perm_check ~perm_after:Either ()
-
-    let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
   end )

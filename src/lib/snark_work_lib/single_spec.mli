@@ -3,6 +3,16 @@ open Core_kernel
 module Poly : sig
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type ('witness, 'ledger_proof) t =
+        | Transition of Transaction_snark.Statement.Stable.V3.t * 'witness
+        | Merge of
+            Transaction_snark.Statement.Stable.V3.t
+            * 'ledger_proof
+            * 'ledger_proof
+      [@@deriving sexp, yojson]
+    end
+
     module V2 : sig
       type ('witness, 'ledger_proof) t =
         | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -11,6 +21,12 @@ module Poly : sig
             * 'ledger_proof
             * 'ledger_proof
       [@@deriving sexp, yojson]
+
+      val to_latest :
+           ('witness -> 'witness_latest)
+        -> ('ledger_proof -> 'ledger_proof_latest)
+        -> ('witness, 'ledger_proof) t
+        -> ('witness_latest, 'ledger_proof_latest) V3.t
     end
   end]
 
@@ -31,6 +47,18 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
+  module V3 : sig
+    type t =
+      ( Transaction_witness.Stable.V4.t
+      , Ledger_proof.Stable.V3.t )
+      Poly.Stable.V3.t
+    [@@deriving sexp, yojson]
+
+    val to_latest : t -> t
+
+    val transaction : t -> Mina_transaction.Transaction.Stable.V3.t option
+  end
+
   module V2 : sig
     type t =
       ( Transaction_witness.Stable.V3.t
@@ -38,9 +66,7 @@ module Stable : sig
       Poly.Stable.V2.t
     [@@deriving sexp, yojson]
 
-    val to_latest : t -> t
-
-    val transaction : t -> Mina_transaction.Transaction.Stable.V3.t option
+    val to_latest : t -> V3.t
   end
 end]
 

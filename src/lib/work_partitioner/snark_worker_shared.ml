@@ -8,6 +8,17 @@ module Zkapp_command_inputs = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t =
+        ( Zkapp_command_segment.Witness.Stable.V3.t
+        * Zkapp_command_segment.Basic.Stable.V1.t
+        * Statement.With_sok.Stable.V3.t )
+        Nonempty_list.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Zkapp_command_segment.Witness.Stable.V2.t
@@ -16,7 +27,11 @@ module Zkapp_command_inputs = struct
         Nonempty_list.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest : t -> Latest.t =
+        Nonempty_list.map ~f:(fun (witness, spec, statement) ->
+            ( Zkapp_command_segment.Witness.Stable.V2.to_latest witness
+            , spec
+            , Statement.With_sok.Stable.V2.to_latest statement ) )
     end
   end]
 

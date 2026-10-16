@@ -1,11 +1,18 @@
 module Block_data = struct
   [%%versioned
   module Stable = struct
+    module V4 = struct
+      type t = Mina_state.Protocol_state.Body.Value.Stable.V4.t
+      [@@deriving sexp]
+
+      let to_latest = Core_kernel.Fn.id
+    end
+
     module V3 = struct
       type t = Mina_state.Protocol_state.Body.Value.Stable.V3.t
       [@@deriving sexp]
 
-      let to_latest = Core_kernel.Fn.id
+      let to_latest = Mina_state.Protocol_state.Body.Value.Stable.V3.to_latest
     end
   end]
 
@@ -17,6 +24,15 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
+    module V4 = struct
+      type 'a t =
+        { transaction : 'a
+        ; block_data : Block_data.Stable.V4.t
+        ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp]
+    end
+
     module V3 = struct
       type 'a t =
         { transaction : 'a
@@ -24,14 +40,27 @@ module Poly = struct
         ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp]
+
+      let to_latest a_latest ({ transaction; block_data; global_slot } : _ t) :
+          _ Latest.t =
+        { transaction = a_latest transaction
+        ; block_data = Block_data.Stable.V3.to_latest block_data
+        ; global_slot
+        }
     end
   end]
 end
 
 [%%versioned
 module Stable = struct
+  module V4 = struct
+    type 'a t = 'a Poly.Stable.V4.t [@@deriving sexp]
+  end
+
   module V3 = struct
     type 'a t = 'a Poly.Stable.V3.t [@@deriving sexp]
+
+    let to_latest = Poly.Stable.V3.to_latest
   end
 end]
 
