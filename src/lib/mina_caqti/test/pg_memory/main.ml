@@ -516,37 +516,26 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
 
 (* --- InfluxDB line protocol (matches scripts/tests/rosetta-load.sh) --------- *)
 
-(* line-protocol tag/measurement values must not contain unescaped spaces or
-   commas; keep it simple and sanitise to underscores *)
-let sanitize s =
-  String.map s ~f:(fun c -> match c with ' ' | ',' | '=' -> '_' | c -> c)
-
-let influx_lines ~measurement ~tags (results : result list) =
-  let ts_ns = Time_ns.now () |> Time_ns.to_int_ns_since_epoch in
-  let tag_str =
-    List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-    |> String.concat ~sep:","
-  in
-  (* the plan-cache fields are omitted rather than sent as 0 where the server
-     has no [pg_backend_memory_contexts]: a constant-zero series charts as a
-     real measurement, whereas a missing one is visibly missing. *)
+(* the plan-cache fields are omitted rather than sent as 0 where the server has
+   no [pg_backend_memory_contexts]: a constant-zero series charts as a real
+   measurement, whereas a missing one is visibly missing. *)
+let influx_points ~measurement ~tags (results : result list) =
   List.map results ~f:(fun r ->
-      let fields =
-        [ sprintf "prepared_final=%di" r.prepared_final
-        ; sprintf "prepared_per_call=%.6f" r.per_call
-        ; sprintf "iterations=%di" r.iterations
-        ]
-        @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
-              [ sprintf "plan_cache_kib_final=%di" kib ] )
-        @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
-              [ sprintf "plan_cache_growth_kib=%di" kib ] )
-        @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
-            ~f:(fun bytes -> [ sprintf "plan_cache_bytes_per_call=%.6f" bytes ])
-      in
-      sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
-        (sanitize r.name)
-        (String.concat ~sep:"," fields)
-        ts_ns )
+      Influxdb_line_protocol.(
+        create
+          ~tags:(tags @ [ ("scenario", r.name) ])
+          ~measurement
+          ( [ ("prepared_final", Field.Int r.prepared_final)
+            ; ("prepared_per_call", Float r.per_call)
+            ; ("iterations", Int r.iterations)
+            ]
+          @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
+                [ ("plan_cache_kib_final", Field.Int kib) ] )
+          @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
+                [ ("plan_cache_growth_kib", Field.Int kib) ] )
+          @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
+              ~f:(fun bytes ->
+                [ ("plan_cache_bytes_per_call", Field.Float bytes) ] ) )) )
 
 let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
     ~influxdb_file ~measurement ~tags () =
@@ -563,14 +552,15 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
         r.name r.prepared_final r.per_call
         (Option.value_map r.plan_cache_bytes_per_call ~default:"n/a"
            ~f:(sprintf "%.1f") ) ) ;
-  let lines = influx_lines ~measurement ~tags results in
+  let points = influx_points ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
       ()
   | Some path ->
-      Out_channel.write_lines path lines ;
+      Influxdb_line_protocol.write_file path points ;
       printf "\n== influxdb line protocol -> %s ==\n" path ;
-      List.iter lines ~f:(fun l -> printf "   %s\n" l) ) ;
+      List.iter points ~f:(fun p ->
+          printf "   %s\n" (Influxdb_line_protocol.to_line p) ) ) ;
   ( match assert_max_prepared with
   | None ->
       ()

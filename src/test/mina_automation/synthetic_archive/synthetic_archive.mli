@@ -186,6 +186,17 @@ type timing =
 val account_state :
   ?nonce:int -> ?timing:timing -> t -> block -> account -> balance:int -> unit
 
+(** [account] in the genesis ledger that takes effect at [genesis_height],
+    written by the archive's genesis ledger writer. *)
+val genesis_account :
+     ?nonce:int
+  -> ?timing:timing
+  -> t
+  -> genesis_height:int
+  -> account
+  -> balance:int
+  -> unit
+
 (** What [materialize] wrote, for tests that need database ids. *)
 type built
 

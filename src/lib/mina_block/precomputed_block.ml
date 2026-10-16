@@ -183,3 +183,40 @@ let of_block ~logger
   ; accounts_created
   ; tokens_used
   }
+
+module Versioned = struct
+  type t = V4 of Stable.V4.t
+
+  let version = function V4 _ -> 4
+
+  let of_latest (t : Stable.Latest.t) = V4 t
+
+  let to_yojson = function V4 t -> Stable.V4.to_yojson t
+
+  let of_yojson json =
+    let open Result.Let_syntax in
+    let%bind version =
+      match json with
+      | `Assoc fields -> (
+          match List.Assoc.find fields ~equal:String.equal "version" with
+          | Some (`Int version) ->
+              Ok version
+          | _ ->
+              Error "Precomputed.Versioned.of_yojson: missing version tag" )
+      | _ ->
+          Error "Precomputed.Versioned.of_yojson: expected an object"
+    in
+    match version with
+    | 4 ->
+        Stable.V4.of_yojson json >>| fun t -> V4 t
+    | _ ->
+        Error
+          (sprintf "Precomputed.Versioned.of_yojson: unsupported version %d"
+             version )
+
+  module V4 = struct
+    let state_hashes (t : Stable.V4.t) = Protocol_state.hashes t.protocol_state
+  end
+
+  let state_hashes = function V4 t -> V4.state_hashes t
+end
