@@ -22,9 +22,9 @@
      against time, "heavy blocks started" is indistinguishable from a leak.
 
    The RSS numbers are measurements only. The gate is the prepared-statement
-   count of the ingest's own database session. The archive_blocks test build
-   (archive_blocks_instrumented) records it after each block. A request built
-   once is prepared once, so after the first blocks have used every query
+   count of the ingest's own database session. archive_blocks --instrumented
+   records it after each block. A request built once is prepared once, so
+   after the first blocks have used every query
    shape the count stops growing. With --assert-bounded-statements the run fails if the
    count grows during the second half of the replay. The count does not depend
    on timing or on the machine, unlike RSS.
@@ -285,7 +285,7 @@ let compute_metrics curve =
           |> Option.value ~default:0
       }
 
-(* What the archive_blocks test build wrote to its statements file: the
+(* What archive_blocks --instrumented wrote to its statements file: the
    session's prepared-statement count after each block, and each SQL text
    prepared more than once. *)
 module Prepared_statements = struct
@@ -369,14 +369,11 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed
           ; failed
           ; "--log-successful"
           ; "false"
+          ; "--instrumented"
+          ; statements_file
           ]
         @ blocks )
-      ~env:
-        (`Extend
-          ( pool_env
-          @ [ ("ARCHIVE_BLOCKS_PREPARED_STATEMENTS_FILE", statements_file) ] )
-          )
-      ()
+      ~env:(`Extend pool_env) ()
   in
   let started = Time_ns.now () in
   let%bind curve, status =
@@ -496,9 +493,8 @@ let () =
      and archive_blocks =
        flag "--archive-blocks"
          (optional_with_default
-            "_build/default/src/test/archive/archive_blocks_instrumented/archive_blocks_instrumented.exe"
-            string )
-         ~doc:"PATH archive_blocks test build (archive_blocks_instrumented.exe)"
+            "_build/default/src/app/archive_blocks/archive_blocks.exe" string )
+         ~doc:"PATH archive_blocks executable"
      and corpus =
        flag "--corpus"
          (optional_with_default

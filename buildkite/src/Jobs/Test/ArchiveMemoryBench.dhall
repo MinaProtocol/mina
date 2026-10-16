@@ -31,8 +31,6 @@ in  Pipeline.build
           , S.exactly "buildkite/scripts/tests/archive-memory-bench" "sh"
           , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
           , S.strictlyStart (S.contains "src/test/archive/archive_memory_bench")
-          , S.strictlyStart
-              (S.contains "src/test/archive/archive_blocks_instrumented")
           ]
         , path = "Test"
         , name = "ArchiveMemoryBench"
