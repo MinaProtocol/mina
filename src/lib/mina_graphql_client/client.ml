@@ -250,6 +250,24 @@ let get_best_chain ?max_length ~logger node_uri =
                } )
            (Array.to_list chain)
 
+let get_scan_state ?state_hash ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  let query = Queries.Scan_state.(make @@ makeVariables ?state_hash ()) in
+  let%map result =
+    exec_graphql_request ~logger ~node_uri ~query_name:"scan_state" query
+  in
+  Types.
+    { state_hash = result.scanState.stateHash
+    ; trees =
+        List.map
+          ~f:(fun tree ->
+            { Types.available_space = tree.availableSpace
+            ; base_jobs_todo = tree.baseJobsTodo
+            ; merge_jobs_todo = tree.mergeJobsTodo
+            } )
+          (Array.to_list result.scanState.trees)
+    }
+
 let get_account ~logger node_uri ~account_id =
   let pk = Mina_base.Account_id.public_key account_id in
   let token = Mina_base.Account_id.token_id account_id in
