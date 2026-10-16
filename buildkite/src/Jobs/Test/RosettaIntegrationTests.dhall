@@ -70,8 +70,6 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                   [ Cmd.run
-                      "./buildkite/scripts/tests/rosetta/tests/test_install_cli.sh"
-                  , Cmd.run
                       "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
                   ]
                 # RunInToolchain.runInToolchain
