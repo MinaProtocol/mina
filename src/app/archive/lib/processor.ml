@@ -4734,6 +4734,9 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
     | Transition_frontier _ ->
         Deferred.unit )
 
+(** See genesis_accounts.ml. *)
+module Genesis_accounts = Genesis_accounts
+
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
