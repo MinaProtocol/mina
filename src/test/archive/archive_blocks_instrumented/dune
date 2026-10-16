@@ -1,0 +1,16 @@
+(executable
+ (name archive_blocks_instrumented)
+ (libraries
+  ;; opam libraries
+  async
+  caqti
+  core
+  stdio
+  ;; local libraries
+  archive_blocks_lib
+  logger
+  mina_caqti)
+ (preprocess
+  (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv))
+ (instrumentation
+  (backend bisect_ppx)))

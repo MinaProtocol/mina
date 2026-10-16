@@ -1,0 +1,27 @@
+(library
+ (name archive_blocks_lib)
+ (libraries
+  ;; opam libraries
+  async
+  async.async_command
+  async_kernel
+  async_unix
+  base
+  base.caml
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  core
+  core_kernel
+  result
+  stdio
+  uri
+  ;; local libraries
+  archive_lib
+  mina_stdlib
+  genesis_constants
+  logger
+  mina_block
+  mina_caqti)
+ (preprocess
+  (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

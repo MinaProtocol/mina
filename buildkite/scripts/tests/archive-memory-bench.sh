@@ -3,7 +3,8 @@
 # Archive-node end-to-end memory benchmark (CI runner)
 #
 # RunWithPostgres has already loaded src/app/archive/create_schema.sql into
-# $PG_CONN. This builds archive_blocks and the bench, and runs the bench,
+# $PG_CONN. This builds the archive_blocks test build (which the bench runs
+# instead of the production archive_blocks) and the bench, and runs the bench,
 # which replays the zkApp-heavy corpus and writes an InfluxDB line-protocol
 # perf file to /workdir for buildkite/scripts/bench/send.sh. Its memory gate
 # (--assert-bounded-statements) fails if the ingest session keeps preparing new
@@ -25,12 +26,13 @@ eval "$(opam config env)"
 # the corpus was produced by a devnet-profile local network
 export MINA_PROFILE=devnet
 
-echo "Building archive_blocks and the benchmark..."
-dune build src/app/archive_blocks/archive_blocks.exe \
+echo "Building the archive_blocks test build and the benchmark..."
+dune build src/test/archive/archive_blocks_instrumented/archive_blocks_instrumented.exe \
     src/test/archive/archive_memory_bench/archive_memory_bench.exe
 
 ./buildkite/scripts/bench/memory-gate.sh run archive-memory-bench \
   ./_build/default/src/test/archive/archive_memory_bench/archive_memory_bench.exe \
+    --archive-blocks ./_build/default/src/test/archive/archive_blocks_instrumented/archive_blocks_instrumented.exe \
     --uri "${PG_CONN}" \
     --assert-bounded-statements \
     --variant "${MINA_BENCH_VARIANT:-ci}" \

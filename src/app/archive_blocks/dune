@@ -3,28 +3,8 @@
  (name archive_blocks)
  (public_name archive_blocks)
  (libraries
-  ;; opam libraries
-  async
-  async.async_command
-  async_kernel
-  async_unix
-  base
-  base.caml
-  caqti
-  caqti-async
-  caqti-driver-postgresql
-  core
-  core_kernel
-  result
-  stdio
-  uri
   ;; local libraries
-  archive_lib
-  mina_stdlib
-  genesis_constants
-  logger
-  mina_block
-  mina_caqti)
+  archive_blocks_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
