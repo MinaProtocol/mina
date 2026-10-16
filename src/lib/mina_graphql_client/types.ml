@@ -20,8 +20,10 @@ type scan_state_tree =
   ; base_jobs_todo : int
   ; merge_jobs_todo : int
   }
+[@@deriving yojson]
 
 type scan_state = { state_hash : string; trees : scan_state_tree list }
+[@@deriving yojson]
 
 type account_data =
   { nonce : Mina_numbers.Account_nonce.t

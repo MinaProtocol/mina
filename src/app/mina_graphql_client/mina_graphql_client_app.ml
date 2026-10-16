@@ -133,18 +133,7 @@ let scan_state_command =
        match result with
        | Ok scan_state ->
            Yojson.Safe.pretty_to_channel Out_channel.stdout
-             (`Assoc
-               [ ("state_hash", `String scan_state.state_hash)
-               ; ( "trees"
-                 , `List
-                     (List.map scan_state.trees ~f:(fun tree ->
-                          `Assoc
-                            [ ("available_space", `Int tree.available_space)
-                            ; ("base_jobs_todo", `Int tree.base_jobs_todo)
-                            ; ( "merge_jobs_todo"
-                              , `Int tree.merge_jobs_todo )
-                            ] ) )
-               ] )
+             (Mina_graphql_client.Types.scan_state_to_yojson scan_state)
        | Error error ->
            prerr_endline
              (Yojson.Safe.to_string (Error_json.error_to_yojson error)) ;
