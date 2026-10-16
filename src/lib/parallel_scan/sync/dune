@@ -1,0 +1,18 @@
+(library
+ (name parallel_scan_sync)
+ (public_name parallel_scan.sync)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  core_kernel
+  digestif
+  ;; local libraries
+  mina_stdlib
+  parallel_scan
+  ppx_version.runtime)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Fragment-wise synchronisation of a parallel scan state"))
