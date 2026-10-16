@@ -15,6 +15,14 @@ type best_chain_block =
   ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
   }
 
+type scan_state_tree =
+  { available_space : int
+  ; base_jobs_todo : int
+  ; merge_jobs_todo : int
+  }
+
+type scan_state = { state_hash : string; trees : scan_state_tree list }
+
 type account_data =
   { nonce : Mina_numbers.Account_nonce.t
   ; inferred_nonce : Mina_numbers.Account_nonce.t option
