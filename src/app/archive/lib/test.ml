@@ -590,6 +590,91 @@ let%test_module "Archive node unit tests" =
          fork genesis block. *)
       [%test_result: int] ~expect:num_accounts after
 
+    (* --hardfork-handover: [add_genesis_ledger] writes the fork genesis ledger
+       to genesis_accounts at the genesis height and leaves accounts_accessed
+       alone. The shared database is not reset between tests, so the fork
+       height is random: rows from an earlier run cannot be counted. *)
+    let%test_unit "Genesis_accounts: add_genesis_ledger writes the fork \
+                   genesis ledger at its height and not to accounts_accessed" =
+      let pool = Lazy.force conn_pool_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let blockchain_length =
+        1_000
+        + Int.rem
+            (Time_ns.to_int_ns_since_epoch (Time_ns.now ()) / 1000)
+            1_000_000
+      in
+      let genesis_height = Int64.of_int (blockchain_length + 1) in
+      let num_accounts = 3 in
+      let accounts =
+        List.init num_accounts ~f:(fun i ->
+            let pk = Public_key.compress (Keypair.create ()).public_key in
+            { Runtime_config.Accounts.Single.default with
+              pk = Public_key.Compressed.to_base58_check pk
+            ; balance = Currency.Balance.of_mina_int_exn (2000 + i)
+            } )
+      in
+      let fork_state_hash =
+        State_hash.to_base58_check
+          (Quickcheck.random_value
+             ~seed:(`Deterministic "genesis-ledger-handover-test")
+             State_hash.gen )
+      in
+      let runtime_config =
+        { Runtime_config.default with
+          proof =
+            Some
+              (Runtime_config.Proof_keys.make
+                 ~fork:
+                   { Runtime_config.Fork_config.state_hash = fork_state_hash
+                   ; blockchain_length
+                   ; global_slot_since_genesis = blockchain_length
+                   }
+                 () )
+        ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
+        }
+      in
+      let count query param =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) -> Conn.find query param)
+            pool
+        with
+        | Ok count ->
+            count
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let count_accounts_accessed () =
+        count
+          (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
+             "SELECT COUNT(*) FROM accounts_accessed" )
+          ()
+      in
+      let count_genesis_rows () =
+        count
+          (Mina_caqti.find_req Caqti_type.int64 Caqti_type.int
+             "SELECT COUNT(*) FROM genesis_accounts WHERE genesis_height = ?" )
+          genesis_height
+      in
+      let%bind accessed_before = count_accounts_accessed () in
+      let%bind () =
+        Processor.add_genesis_ledger ~logger ~runtime_config ~genesis_constants
+          ~chunks_length:2 ~constraint_constants pool
+      in
+      let%bind written = count_genesis_rows () in
+      [%test_result: int] ~expect:num_accounts written ;
+      let%bind accessed_after = count_accounts_accessed () in
+      [%test_result: int] ~expect:accessed_before accessed_after ;
+      (* A second start writes nothing more. *)
+      let%bind () =
+        Processor.add_genesis_ledger ~logger ~runtime_config ~genesis_constants
+          ~chunks_length:2 ~constraint_constants pool
+      in
+      let%map again = count_genesis_rows () in
+      [%test_result: int] ~expect:num_accounts again
+
     (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in
