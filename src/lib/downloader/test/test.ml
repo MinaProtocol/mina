@@ -244,3 +244,47 @@ let%test_unit "a cancelled job's failed download does not penalise the peer" =
       | `Result (Error `Finished) ->
           failwith "job was cancelled/stopped unexpectedly" ) ;
       [%test_eq: int] total_jobs 0 )
+
+(* [forget_peer_state] lifts a temporary ignore, so that a peer which failed
+   the jobs of a superseded knowledge context is used straight away for the
+   jobs of the new one rather than after the (two-minute, by default) ignore
+   period. *)
+
+let%test_unit "forget_peer_state lifts a temporary ignore" =
+  Thread_safe.block_on_async_exn (fun () ->
+      let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
+      let stop = Ivar.create () in
+      let peer = test_peer () in
+      let knowledge_context, _knowledge_w = Broadcast_pipe.create () in
+      let%bind downloader =
+        D.create ~peer_refresh_interval:(Time.Span.of_ms 100.) ~max_batch_size:1
+          ~stop:(Ivar.read stop) ~logger ~trust_system
+          ~get:(fun _peer keys ->
+            match keys with
+            | [ 1 ] ->
+                Deferred.return
+                  (Or_error.error_string "simulated download failure")
+            | _ ->
+                Deferred.Or_error.return keys )
+          ~knowledge_context
+          ~knowledge:(fun () _peer -> Deferred.return `All)
+          ~peers:(fun () -> Deferred.return [ peer ])
+          ~preferred:[] ()
+      in
+      let (_ : D.Job.t) =
+        D.download downloader ~key:1 ~attempts:Peer.Map.empty
+      in
+      let%bind () = after (Time.Span.of_ms 500.) in
+      D.cancel downloader 1 ;
+      D.forget_peer_state downloader ;
+      let job = D.download downloader ~key:2 ~attempts:Peer.Map.empty in
+      let%map result = with_timeout (Time.Span.of_sec 15.) (D.Job.result job) in
+      Ivar.fill_if_empty stop () ;
+      match result with
+      | `Timeout ->
+          failwith "the peer was still ignored after forget_peer_state"
+      | `Result (Ok _) ->
+          ()
+      | `Result (Error `Finished) ->
+          failwith "job was cancelled/stopped unexpectedly" )

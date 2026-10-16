@@ -101,6 +101,13 @@ end) : sig
 
   val mark_preferred : t -> Peer.t -> now:Time.t -> unit
 
+  (** Forget what each peer has claimed to know, which jobs it has failed, and
+      any temporary ignore placed on it for failing them. For use when the
+      knowledge context moves to one in which this information no longer
+      holds, so that peers which failed the old context's jobs because they
+      have moved on are not passed over for the new one. *)
+  val forget_peer_state : t -> unit
+
   val add_knowledge : t -> Peer.t -> Key.t list -> unit
 
   val update_knowledge : t -> Peer.t -> Key.t Claimed_knowledge.t -> unit
@@ -495,6 +502,7 @@ end = struct
           * [ `Unsuccessful of Key.t list ]
       | Download_starting of Peer.t
       | Job_cancelled of Key.t
+      | Forget_peer_state
       | Add_knowledge of
           { peer : Peer.t; claimed : Key.t list; out_of_band : bool }
       | Knowledge_request_starting of Peer.t
@@ -564,6 +572,13 @@ end = struct
               jobs_no_longer_needed t [ h ] ;
               Hashtbl.iter t.knowledge ~f:(fun s ->
                   Hash_set.remove s.tried_and_failed h )
+          | Forget_peer_state ->
+              Hashtbl.iter t.temporary_ignores ~f:(fun e ->
+                  Clock.Event.abort_if_possible e () ) ;
+              Hashtbl.clear t.temporary_ignores ;
+              Hashtbl.map_inplace t.knowledge ~f:(fun k ->
+                  Hash_set.clear k.tried_and_failed ;
+                  { k with claimed = None } )
           | Download_starting peer ->
               Hash_set.add t.downloading_peers peer
           | Download_finished (peer0, `Successful succs, `Unsuccessful unsuccs)
@@ -1019,6 +1034,8 @@ end = struct
     Useful_peers.update t.useful_peers
       (Knowledge
          { peer; claimed; active_jobs = active_jobs t; out_of_band = true } )
+
+  let forget_peer_state t = Useful_peers.update t.useful_peers Forget_peer_state
 
   let mark_preferred t peer ~now =
     Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)
