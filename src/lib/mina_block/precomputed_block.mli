@@ -59,3 +59,28 @@ val of_block :
   -> accounts_created:Account_id.t list
   -> (Block.t, Mina_base.State_hash.State_hashes.t) With_hash.t
   -> t
+
+(** A precomputed block in the version it was written in.
+
+    Converting an older block to the latest version changes what hashing it
+    gives, so anything that derives an identity from a block it did not
+    produce itself, such as its state hash or its transactions' hashes,
+    should work from this type and derive that identity by the rules of the
+    block's own version. *)
+module Versioned : sig
+  type t = V4 of Stable.V4.t
+
+  val version : t -> int
+
+  val of_latest : Stable.Latest.t -> t
+
+  (** Writes the version's own versioned JSON. *)
+  val to_yojson : t -> Yojson.Safe.t
+
+  (** Reads versioned JSON of any version listed in [t], dispatching on its
+      version tag. *)
+  val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+  (** The hashes of the block's protocol state, by its version's rules. *)
+  val state_hashes : t -> Mina_base.State_hash.State_hashes.t
+end
