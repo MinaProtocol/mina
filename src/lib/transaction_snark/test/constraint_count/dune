@@ -1,12 +1,96 @@
-(tests
- (names test_constraint_count)
+(executable
+ (name print_circuit_stats)
  (libraries
-  alcotest
+  core
   core_kernel
   genesis_constants
   mina_signature_kind
   node_config
   snark_params
-  transaction_snark)
+  transaction_snark
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_version ppx_jane)))
+
+; Generate the circuit statistics JSON for every profile, selecting each with
+; MINA_PROFILE: node_config reads the profile at runtime, so one build of the
+; printer covers them all. The output file names include the profile because
+; constraint counts depend on configuration parameters such as the ledger depth.
+
+(rule
+ (target dev_circuit_stats.json.computed)
+ (deps print_circuit_stats.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   dev
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (deps
+  (:orig dev_circuit_stats.json)
+  (:computed dev_circuit_stats.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
+
+(rule
+ (target devnet_circuit_stats.json.computed)
+ (deps print_circuit_stats.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   devnet
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (deps
+  (:orig devnet_circuit_stats.json)
+  (:computed devnet_circuit_stats.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
+
+(rule
+ (target lightnet_circuit_stats.json.computed)
+ (deps print_circuit_stats.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   lightnet
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (deps
+  (:orig lightnet_circuit_stats.json)
+  (:computed lightnet_circuit_stats.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
+
+(rule
+ (target mainnet_circuit_stats.json.computed)
+ (deps print_circuit_stats.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   mainnet
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (deps
+  (:orig mainnet_circuit_stats.json)
+  (:computed mainnet_circuit_stats.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
