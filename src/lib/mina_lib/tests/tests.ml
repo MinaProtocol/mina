@@ -693,7 +693,8 @@ let%test_module "Epoch ledger sync tests" =
     (* A sync whose target changes while it still has more queries outstanding
        for the old target than [glue_sync_ledger] keeps in flight, none of
        which any peer can answer, must still get the new target's queries
-       answered. *)
+       answered, and promptly: that peers failed the old target's queries
+       must not keep them from being asked the new target's. *)
     let retarget_past_unanswerable_queries (module Context : CONTEXT)
         (test : test_state) =
       let open Context in
@@ -713,10 +714,13 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
           test.next_epoch_ledger
       in
+      (* Give the downloader time to try the peer on the old target's queries,
+         and to have them fail, before retargeting. *)
+      let%bind () = after (Time.Span.of_sec 5.) in
       Linear_pipe.write_without_pushback query_writer
         (target_root, Syncable_ledger.Query.Num_accounts) ;
       let%map answer =
-        Clock.with_timeout (Time.Span.of_min 1.)
+        Clock.with_timeout (Time.Span.of_sec 30.)
           (Linear_pipe.read answer_reader)
       in
       Linear_pipe.close query_writer ;
