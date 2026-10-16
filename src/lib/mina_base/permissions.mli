@@ -145,9 +145,3 @@ val deriver :
       as
       'a )
   -> 'a
-
-module Hardfork : sig
-  type t = Stable.Latest.t [@@deriving equal, sexp, compare]
-
-  val user_default : t
-end

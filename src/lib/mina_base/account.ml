@@ -1128,23 +1128,33 @@ module Hardfork = struct
 
   let balance { balance; _ } = balance
 
-  (** An empty Mesa account. Note that this is not [of_stable] on the empty
-      Berkeley account, because [of_stable] deliberately avoids changing the
-      permissions of accounts. For that reason we use the anticipated Mesa
-      [Permissions.Hardfork.user_default] permissions explicitly.
-  *)
-  let empty : t =
-    { public_key = Public_key.Compressed.empty
-    ; token_id = Token_id.default
-    ; token_symbol = Token_symbol.default
-    ; balance = Balance.zero
-    ; nonce = Nonce.zero
-    ; receipt_chain_hash = Receipt.Chain_hash.empty
-    ; delegate = None
-    ; voting_for = State_hash.dummy
-    ; timing = Timing.Untimed
-    ; permissions = Permissions.Hardfork.user_default
-    ; zkapp = None
+  let empty =
+    let ({ public_key
+         ; token_id
+         ; token_symbol
+         ; balance
+         ; nonce
+         ; receipt_chain_hash
+         ; delegate
+         ; voting_for
+         ; timing
+         ; permissions
+         ; zkapp
+         }
+          : Stable.Latest.t ) =
+      empty
+    in
+    { public_key
+    ; token_id
+    ; token_symbol
+    ; balance
+    ; nonce
+    ; receipt_chain_hash
+    ; delegate
+    ; voting_for
+    ; timing
+    ; permissions
+    ; zkapp
     }
 
   let identifier ({ public_key; token_id; _ } : t) =
