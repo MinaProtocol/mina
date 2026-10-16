@@ -50,7 +50,6 @@ let dirtyWhen =
           "dhall"
       , S.exactly "buildkite/scripts/tests/debian-automode-transition-test" "sh"
       , S.strictlyStart (S.contains "scripts/debian")
-      , S.exactly "buildkite/scripts/cache/manager" "sh"
       ]
 
 in  Pipeline.build

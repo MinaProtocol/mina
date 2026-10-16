@@ -33,7 +33,7 @@ in  { step =
                 , Cmd.run
                     "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 , Cmd.run
-                    "./buildkite/scripts/cache/manager.sh write-to-dir archive.perf archive-node-test"
+                    "buildkite-cache-manager write archive.perf archive-node-test"
                 ]
               , label = "Archive: Node Test"
               , key = key
