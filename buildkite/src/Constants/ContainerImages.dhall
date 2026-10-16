@@ -2,12 +2,11 @@
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBookworm
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
--- NOTE: minaReleaseToolkit bundles the deb-toolkit binary and is published by
+-- NOTE: minaReleaseToolkit bundles the mina-release-toolkit CLIs and is published by
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
---       (not a moving tag like :latest) for reproducible CI; bump it
---       deliberately when a newer toolkit is wanted. minaReleaseToolkitVersion
---       must match it: buildkite/scripts/toolkit.sh reads it to fetch the same
---       version's release .deb (pin its sha256 there when bumping).
+--       (not a moving tag like :latest) for reproducible CI. The toolchain image
+--       installs the CLIs from the same version (dockerfiles/toolchain/3-toolchain),
+--       so bump both together.
 -- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
 --       built from THIS branch: develop's pins carry v0.14 and will not build
 --       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
@@ -62,6 +61,5 @@
 , postgres = "docker.io/library/postgres:17-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "docker.io/minaprotocol/nixos:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.7"
-, minaReleaseToolkitVersion = "0.0.7"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.8"
 }

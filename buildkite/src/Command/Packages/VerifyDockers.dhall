@@ -16,7 +16,7 @@ let Spec =
 let verify
     : Spec.Type -> Text
     =     \(spec : Spec.Type)
-      ->      "./buildkite/scripts/toolkit.sh release-manager docker verify "
+      ->      "release-manager docker verify "
           ++  "--image \\\$(cat ${spec.imageRefFile}) "
           ++  "--package ${Docker.dockerName spec.service} "
           ++  "--check-scripts-dir scripts/verify "
