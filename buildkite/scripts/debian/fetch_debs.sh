@@ -55,12 +55,12 @@ fetch_deb() {
     if [[ -n "${LOCAL_DEB_SOURCE_DIR:-}" ]]; then
         _fetch_deb_local "$dest" "$pattern"
     else
-        ./buildkite/scripts/toolkit.sh buildkite-cache-manager read --root "${ROOT:-${BUILDKITE_BUILD_ID}}" "$pattern" "$dest"
+        buildkite-cache-manager read --root "${ROOT:-${BUILDKITE_BUILD_ID}}" "$pattern" "$dest"
     fi
 }
 
 fetch_legacy_deb() {
     local dest="$1" pattern="$2"
 
-    ./buildkite/scripts/toolkit.sh buildkite-cache-manager read --root "legacy" "$pattern" "$dest"
+    buildkite-cache-manager read --root "legacy" "$pattern" "$dest"
 }

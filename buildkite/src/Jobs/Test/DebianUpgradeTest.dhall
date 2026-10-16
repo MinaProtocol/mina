@@ -92,7 +92,6 @@ in  Pipeline.build
                 , S.exactly "buildkite/src/Jobs/Test/DebianUpgradeTest" "dhall"
                 , S.exactly "buildkite/scripts/tests/debian-upgrade-test" "sh"
                 , S.strictlyStart (S.contains "scripts/debian")
-                , S.exactly "buildkite/scripts/toolkit" "sh"
                 ]
 
           in  JobSpec::{
