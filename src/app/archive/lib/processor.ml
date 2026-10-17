@@ -4696,9 +4696,26 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~tokens_used:block.Extensional.Block.tokens_used block
 
+(* A block starts a hard fork when its global slot since the hard fork is 0,
+   after the first genesis, whose global slot since genesis is above 0. *)
+let starts_hard_fork (block : Mina_block.t) =
+  let consensus_state = Mina_block.consensus_state block in
+  let since_hard_fork =
+    Consensus.Data.Consensus_state.curr_global_slot consensus_state
+    |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+    |> Unsigned.UInt32.to_int64
+  in
+  let since_genesis =
+    Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+    |> Mina_numbers.Global_slot_since_genesis.to_uint32
+    |> Unsigned.UInt32.to_int64
+  in
+  Int64.equal since_hard_fork 0L && Int64.( > ) since_genesis 0L
+
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
-    ~logger ~delete_older_than : unit Deferred.t =
+let run ?(settle_hard_fork = false) pool reader ~proof_cache_db
+    ~genesis_constants ~constraint_constants ~logger ~delete_older_than :
+    unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
@@ -4730,7 +4747,16 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
               "Failed to archive block with state hash $state_hash, see $error" ;
             Deferred.unit
         | Ok () ->
-            Deferred.unit )
+            if settle_hard_fork && starts_hard_fork (With_hash.data block) then
+              match%map
+                Settle_pending_blocks.settle_stored_fork_genesis ~logger pool
+              with
+              | Error e ->
+                  [%log warn] "Could not settle the hard fork boundary: $error"
+                    ~metadata:[ ("error", `String (Caqti_error.show e)) ]
+              | Ok () ->
+                  ()
+            else Deferred.unit )
     | Transition_frontier _ ->
         Deferred.unit )
 
@@ -4804,6 +4830,25 @@ let add_genesis_ledger ~logger ~(runtime_config : Runtime_config.t)
           ( metadata
           @ [ ("count", `Int count); ("resumed_after", `Int resumed_after) ] ) ;
       Deferred.unit
+
+(* [settle_hard_fork_at_startup] is called with --hardfork-handover, once the
+   genesis ledger is written. It settles the boundary of the newest fork
+   genesis in the archive, if there is one. *)
+let settle_hard_fork_at_startup ~logger pool =
+  match%map
+    Pool.use
+      (fun (module Conn : CONNECTION) -> Settle_pending_blocks.run (module Conn))
+      pool
+  with
+  | Error e ->
+      failwithf "Could not settle the hard fork boundary: %s"
+        (Caqti_error.show e) ()
+  | Ok ({ genesis_id = None; _ } as result) ->
+      [%log info] "No fork genesis in the archive, nothing to settle"
+        ~metadata:[ ("result", Settle_pending_blocks.to_yojson result) ]
+  | Ok result ->
+      [%log info] "Settled the hard fork boundary"
+        ~metadata:[ ("result", Settle_pending_blocks.to_yojson result) ]
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
@@ -5022,13 +5067,21 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
               "--hardfork-handover has no effect without --config-file" ;
             Deferred.unit
         | Some runtime_config, true ->
-            add_genesis_ledger ~logger ~runtime_config ~genesis_constants
-              ~constraint_constants ~chunks_length pool
+            let%bind () =
+              add_genesis_ledger ~logger ~runtime_config ~genesis_constants
+                ~constraint_constants ~chunks_length pool
+            in
+            settle_hard_fork_at_startup ~logger pool
         | _, false ->
             add_genesis_accounts pool ~logger ~genesis_constants
               ~constraint_constants ~runtime_config_opt ~chunks_length
       in
-      run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
+      (* without a config file there is no startup settle: settle as each
+         fork genesis is stored *)
+      run
+        ~settle_hard_fork:
+          (hardfork_handover && Option.is_none runtime_config_opt)
+        ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
