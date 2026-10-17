@@ -4,5 +4,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps mina_ppx))
  (libraries core_kernel mina_stdlib))

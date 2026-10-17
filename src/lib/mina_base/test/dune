@@ -38,6 +38,6 @@
   snark_params
   with_hash)
  (preprocess
-  (pps ppx_assert ppx_base ppx_let))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

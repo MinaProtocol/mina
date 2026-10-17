@@ -30,7 +30,7 @@
   ppx_version.runtime
   visualization)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving.show))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Implementation of different account databases"))
