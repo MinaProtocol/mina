@@ -79,11 +79,11 @@ let transaction_of_latest : Transaction.t -> transaction = function
                    |> Transaction_hash.hash_fee_transfer )
         }
 
-(** The parts of a block of the latest version. *)
-let of_latest ~constraint_constants ~state_hash
-    ~(protocol_state : Protocol_state.Value.t)
-    ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
-    ~proposed_protocol_version =
+(** The parts of a block, from its protocol state, of whatever version, and
+    [get_transactions], which gives its transactions from its coinbase
+    receiver and whether its coinbase is supercharged. *)
+let of_protocol_state ~state_hash ~protocol_state ~get_transactions
+    ~protocol_version ~proposed_protocol_version =
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let transactions =
@@ -94,10 +94,7 @@ let of_latest ~constraint_constants ~state_hash
        let supercharge_coinbase =
          Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
        in
-       match
-         Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-           ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
-       with
+       match get_transactions ~coinbase_receiver ~supercharge_coinbase with
        | Ok transactions ->
            List.map transactions ~f:(With_status.map ~f:transaction_of_latest)
        | Error e ->
@@ -134,6 +131,17 @@ let of_latest ~constraint_constants ~state_hash
   ; proposed_protocol_version
   ; transactions
   }
+
+(** The parts of a block of the latest version. *)
+let of_latest ~constraint_constants ~state_hash
+    ~(protocol_state : Protocol_state.Value.t)
+    ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
+    ~proposed_protocol_version =
+  of_protocol_state ~state_hash ~protocol_state
+    ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
+      Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
+        ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff )
+    ~protocol_version ~proposed_protocol_version
 
 let of_precomputed_v5 ~constraint_constants ~proof_cache_db
     (t : Mina_block.Precomputed.Stable.V5.t) =
