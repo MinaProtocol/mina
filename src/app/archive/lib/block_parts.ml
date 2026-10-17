@@ -48,17 +48,10 @@ type t =
             derive. *)
   }
 
-let transaction_of_latest : Transaction.t -> transaction = function
-  | Command (Signed_command signed_command as command) ->
-      Command
-        { command
-        ; hash = Transaction_hash.hash_command (Signed_command signed_command)
-        }
-  | Command (Zkapp_command zkapp_command as command) ->
-      Command
-        { command
-        ; hash = Transaction_hash.hash_zkapp_command_with_hashes zkapp_command
-        }
+let transaction_of_latest ~command_hash : Transaction.t -> transaction =
+  function
+  | Command command ->
+      Command { command; hash = command_hash command }
   | Fee_transfer fee_transfer ->
       Fee_transfer
         { fee_transfer
@@ -79,8 +72,9 @@ let transaction_of_latest : Transaction.t -> transaction = function
                    |> Transaction_hash.hash_fee_transfer )
         }
 
-(** The parts of a block of the latest version. *)
-let of_latest ~constraint_constants ~state_hash
+(** The parts of a block whose staged ledger diff is of the latest version,
+    with the hashes of its commands given by [command_hash]. *)
+let of_diff ~command_hash ~constraint_constants ~state_hash
     ~(protocol_state : Protocol_state.Value.t)
     ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
     ~proposed_protocol_version =
@@ -99,7 +93,8 @@ let of_latest ~constraint_constants ~state_hash
            ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
        with
        | Ok transactions ->
-           List.map transactions ~f:(With_status.map ~f:transaction_of_latest)
+           List.map transactions
+             ~f:(With_status.map ~f:(transaction_of_latest ~command_hash))
        | Error e ->
            Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e) )
   in
@@ -134,6 +129,9 @@ let of_latest ~constraint_constants ~state_hash
   ; proposed_protocol_version
   ; transactions
   }
+
+(** The parts of a block of the latest version. *)
+let of_latest = of_diff ~command_hash:Transaction_hash.hash_command_with_hashes
 
 (* A V4 block is read through the latest version's code, which only
    type-checks while V4 is the latest version. Once it is not, this needs
