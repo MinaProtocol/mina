@@ -8,6 +8,8 @@
 
 let S = ../../Lib/SelectFiles.dhall
 
+let InfraTestPaths = ../../Constants/InfraTestPaths.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -27,6 +29,7 @@ let Network = ../../Constants/Network.dhall
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
+        , dirtyWhenExcept = InfraTestPaths.testOnly
         , dirtyWhen =
           [ S.strictlyStart
               ( S.contains

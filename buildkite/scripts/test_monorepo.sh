@@ -258,6 +258,32 @@ EOF
   assert_equals "0" "$result" "Should not select job when dirty pattern doesn't match"
 }
 
+# Test: select_job with dirtyWhenExcept
+test_select_job_triaged_except() {
+  echo -e "\n${YELLOW}Testing: select_job (triaged mode, dirtyWhenExcept)${NC}"
+
+  cat > "$TEST_DIR/ExceptJob.yml" << 'EOF'
+spec:
+  name: ExceptJob
+EOF
+
+  echo "^scripts/debian" > "$TEST_DIR/ExceptJob.dirtywhen"
+  echo "^scripts/debian/tests" > "$TEST_DIR/ExceptJob.dirtywhenexcept"
+
+  local result
+  echo "scripts/debian/tests/test_builder_helpers.sh" > "$TEST_DIR/diff_except_only.txt"
+  result=$(select_job false true "$TEST_DIR/ExceptJob.yml" "ExceptJob" "$TEST_DIR/diff_except_only.txt")
+  assert_equals "0" "$result" "Should not select job when only excepted paths changed"
+
+  printf '%s\n' "scripts/debian/tests/test_builder_helpers.sh" "scripts/debian/builder-helpers.sh" > "$TEST_DIR/diff_except_mixed.txt"
+  result=$(select_job false true "$TEST_DIR/ExceptJob.yml" "ExceptJob" "$TEST_DIR/diff_except_mixed.txt")
+  assert_equals "1" "$result" "Should select job when a non-excepted path also matches"
+
+  echo '""' > "$TEST_DIR/ExceptJob.dirtywhenexcept"
+  result=$(select_job false true "$TEST_DIR/ExceptJob.yml" "ExceptJob" "$TEST_DIR/diff_except_only.txt")
+  assert_equals "1" "$result" "Empty dirtyWhenExcept should not filter anything"
+}
+
 # Test: check_exclude_if with no excludeIf
 test_check_exclude_if_no_conditions() {
   echo -e "\n${YELLOW}Testing: check_exclude_if (no conditions)${NC}"
@@ -939,6 +965,7 @@ main() {
   test_scope_matches
   test_select_job_full
   test_select_job_triaged
+  test_select_job_triaged_except
   test_check_exclude_if_no_conditions
   test_check_exclude_if_matching
   test_check_exclude_if_not_matching

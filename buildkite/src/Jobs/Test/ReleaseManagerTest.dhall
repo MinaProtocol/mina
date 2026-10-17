@@ -1,5 +1,7 @@
 let S = ../../Lib/SelectFiles.dhall
 
+let InfraTestPaths = ../../Constants/InfraTestPaths.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -21,6 +23,7 @@ let command_key = "release-manager-tests"
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
+        , dirtyWhenExcept = InfraTestPaths.testOnly
         , dirtyWhen =
           [ S.strictlyStart (S.contains "buildkite/scripts/release")
           , S.strictlyStart (S.contains "scripts/debian")

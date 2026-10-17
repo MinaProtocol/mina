@@ -12,6 +12,7 @@ in  { Type =
         , scope : List Scope.Type
         , tags : List PipelineTag.Type
         , dirtyWhen : List SelectFiles.Type
+        , dirtyWhenExcept : List SelectFiles.Type
         , excludeIf : List Expr.Type
         , includeIf : List Expr.Type
         }
@@ -19,6 +20,7 @@ in  { Type =
         { path = "."
         , scope = Scope.Full
         , tags = [ PipelineTag.Type.Fast ]
+        , dirtyWhenExcept = [] : List SelectFiles.Type
         , excludeIf = [] : List Expr.Type
         , includeIf = [] : List Expr.Type
         }
