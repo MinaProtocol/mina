@@ -116,6 +116,45 @@ let field_element_decimal_deserialization () =
   let json = Yojson.Safe.from_file filename in
   json_serialization_is_stable_impl @@ Yojson.Safe.to_string json
 
+(* Mainnet blocks of version 3, from the public block bucket. The first has
+   a zkApp command authorized by a proof, and an account with a zkApp. *)
+let v3_block_files =
+  [ "mainnet-545000-3NKc1wHM45SweeqiCZyNwmNJQnT4vjzJmeCYkG83YqXNgDPY57ZD.json"
+  ; "mainnet-520000-3NKuyY4iqW7mXThknMwwNiKst67uo6txzhWFJj3S9fk1jot8M7Qn.json"
+  ]
+
+let v3_data filename =
+  match Yojson.Safe.from_file filename with
+  | `Assoc fields ->
+      ( List.Assoc.find_exn fields ~equal:String.equal "version"
+      , List.Assoc.find_exn fields ~equal:String.equal "data" )
+  | _ ->
+      failwith "block JSON is not an object"
+
+let v3_roundtrips () =
+  List.iter v3_block_files ~f:(fun filename ->
+      let version, data = v3_data filename in
+      assert (Yojson.Safe.equal version (`Int 3)) ;
+      let block =
+        Mina_block.Precomputed.V3.of_yojson data |> Result.ok_or_failwith
+      in
+      assert (Yojson.Safe.equal data (Mina_block.Precomputed.V3.to_yojson block)) )
+
+(* A file in the bucket is named after the state hash of its block. *)
+let v3_state_hash_matches_file_name () =
+  List.iter v3_block_files ~f:(fun filename ->
+      let block =
+        Mina_block.Precomputed.V3.of_yojson (snd (v3_data filename))
+        |> Result.ok_or_failwith
+      in
+      let state_hash =
+        (Mina_state.Protocol_state.hashes block.protocol_state).state_hash
+      in
+      [%test_eq: string]
+        ( String.chop_suffix_exn filename ~suffix:".json"
+        |> String.split ~on:'-' |> List.last_exn )
+        (Mina_base.State_hash.to_base58_check state_hash) )
+
 let () =
   run "Precomputed block serialization tests"
     [ ( "sexp"
@@ -143,6 +182,11 @@ let () =
             versioned_state_hash_matches_latest
         ; test_case "rejects unknown versions" `Quick
             versioned_rejects_unknown_version
+        ] )
+    ; ( "version 3"
+      , [ test_case "mainnet blocks roundtrip" `Quick v3_roundtrips
+        ; test_case "state hashes match the file names" `Quick
+            v3_state_hash_matches_file_name
         ] )
     ; ( "field element represented by decimal"
       , [ test_case "block is deserializable" `Quick
