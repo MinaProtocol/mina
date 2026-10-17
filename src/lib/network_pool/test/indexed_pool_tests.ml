@@ -443,8 +443,15 @@ let init_permissionless_ledger ledger account_info =
       let _tag, account, location =
         Or_error.ok_exn (get_or_create ledger account_id)
       in
-      set ledger location
-        { account with balance; permissions = Permissions.user_default } )
+      (* The zkApp commands built by [make_zkapp_command_payment] debit the
+         sender and increment nonces without any authorization. *)
+      let permissions =
+        { Permissions.user_default with
+          send = Permissions.Auth_required.None
+        ; increment_nonce = None
+        }
+      in
+      set ledger location { account with balance; permissions } )
 
 let apply_to_ledger ledger cmd =
   let signature_kind = Mina_signature_kind.Testnet in
