@@ -38,7 +38,6 @@
    h_list.ppx
    ppx_annot
    ppx_assert
-   ppx_bin_prot
    ppx_compare
    ppx_custom_printf
    ppx_deriving.std

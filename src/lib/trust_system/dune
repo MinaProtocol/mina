@@ -32,7 +32,6 @@
   (pps
    ppx_assert
    ppx_base
-   ppx_bin_prot
    ppx_mina
    ppx_custom_printf
    ppx_deriving.std

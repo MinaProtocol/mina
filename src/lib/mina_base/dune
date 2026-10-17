@@ -82,7 +82,6 @@
    ppx_assert
    ppx_base
    ppx_bench
-   ppx_bin_prot
    ppx_custom_printf
    ppx_deriving.enum
    ppx_deriving.make

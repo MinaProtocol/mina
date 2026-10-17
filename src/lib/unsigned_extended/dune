@@ -25,7 +25,6 @@
   (pps
    ppx_mina
    ppx_version
-   ppx_bin_prot
    ppx_sexp_conv
    ppx_compare
    ppx_hash

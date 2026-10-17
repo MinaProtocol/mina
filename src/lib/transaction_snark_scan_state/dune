@@ -51,7 +51,6 @@
    ppx_mina
    ppx_version
    ppx_let
-   ppx_bin_prot
    ppx_custom_printf
    ppx_deriving_yojson))
  (instrumentation

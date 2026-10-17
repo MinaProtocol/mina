@@ -48,7 +48,6 @@
   transaction_witness)
  (preprocess
   (pps
-   ppx_bin_prot
    ppx_mina
    ppx_here
    ppx_custom_printf

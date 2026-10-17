@@ -37,7 +37,6 @@
    ppx_let
    ppx_deriving.std
    ppx_deriving_yojson
-   ppx_bin_prot
    ppx_custom_printf
    ppx_snarky))
  (instrumentation
