@@ -321,7 +321,7 @@ let sync_status_command =
            print_endline (Sync_status.to_string status)
        | Error e, true ->
            prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
-           Core.exit 1
+           Shutdown.shutdown 1
        | Ok status, false ->
            Yojson.Safe.pretty_to_channel Out_channel.stdout
              (`Assoc [ ("sync_status", Sync_status.to_yojson status) ])
@@ -349,7 +349,7 @@ let network_id_command =
            print_endline network_id
        | Error e, true ->
            prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
-           Core.exit 1
+           Shutdown.shutdown 1
        | Ok network_id, false ->
            Yojson.Safe.pretty_to_channel Out_channel.stdout
              (`Assoc [ ("network_id", `String network_id) ])
@@ -372,7 +372,7 @@ let fork_config_command =
            print_endline (Yojson.Safe.to_string json)
        | Error e ->
            prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
-           Core.exit 1 )
+           Shutdown.shutdown 1 )
 
 let send_raw_command =
   Command.async
@@ -405,7 +405,7 @@ let send_raw_command =
            print_endline (Yojson.Safe.to_string json)
        | Error e ->
            prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
-           Core.exit 1 )
+           Shutdown.shutdown 1 )
 
 let () =
   (* Route logs to stderr so stdout carries only the JSON result. Without this

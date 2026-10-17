@@ -1,0 +1,27 @@
+(test
+ (name test_rosetta_genesis_balances)
+ (deps
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  %{project_root}/app/archive/downgrade.sql
+  (env_var MINA_TEST_POSTGRES))
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  uri
+  ;; local libraries
+  lib
+  rosetta_lib
+  mina_automation
+  mina_automation.synthetic_archive
+  mina_caqti)
+ (preprocess
+  (pps ppx_version ppx_jane)))

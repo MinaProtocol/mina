@@ -79,8 +79,8 @@ if [[ -z "$DOCKER_REGISTRY_ARG" ]]; then
 fi
 
 # scripts/docker/build.sh picks up every *.deb sitting in the docker build
-# context and stages it under _debs/, which the Dockerfiles COPY into the image
-# for install-mina-debs.sh -- no apt repo involved.
+# context and stages it under _debs/, which the Dockerfiles bind-mount for
+# install-mina-debs.sh -- no apt repo involved, nothing copied into a layer.
 DEB_STAGE="dockerfiles"
 
 echo "--- Staging locally built debian packages into ${DEB_STAGE}"

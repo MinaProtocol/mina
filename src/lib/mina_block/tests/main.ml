@@ -54,6 +54,51 @@ let json_serialization_roundtrips () =
   json_serialization_roundtrips_impl
   @@ Sample_precomputed_block.sample_block_json
 
+let versioned_reads_sample () =
+  let json =
+    Yojson.Safe.from_string Sample_precomputed_block.sample_block_json
+  in
+  match Mina_block.Precomputed.Versioned.of_yojson json with
+  | Ok block ->
+      assert (
+        Yojson.Safe.equal json
+          (Mina_block.Precomputed.Versioned.to_yojson block) )
+  | Error err ->
+      failwith err
+
+let versioned_state_hash_matches_latest () =
+  let json =
+    Yojson.Safe.from_string Sample_precomputed_block.sample_block_json
+  in
+  let latest = Mina_block.Precomputed.of_yojson json |> Result.ok_or_failwith in
+  let versioned =
+    Mina_block.Precomputed.Versioned.of_yojson json |> Result.ok_or_failwith
+  in
+  assert (
+    Mina_base.State_hash.equal
+      (Mina_state.Protocol_state.hashes latest.protocol_state).state_hash
+      (Mina_block.Precomputed.Versioned.state_hashes versioned).state_hash )
+
+let versioned_rejects_unknown_version () =
+  let json =
+    match
+      Yojson.Safe.from_string Sample_precomputed_block.sample_block_json
+    with
+    | `Assoc fields ->
+        `Assoc
+          (List.map fields ~f:(function
+            | "version", _ ->
+                ("version", `Int 1000)
+            | field ->
+                field ) )
+    | _ ->
+        failwith "sample block JSON is not an object"
+  in
+  assert (Result.is_error (Mina_block.Precomputed.Versioned.of_yojson json)) ;
+  assert (
+    Result.is_error
+      (Mina_block.Precomputed.Versioned.of_yojson (`Assoc [ ("data", `Null) ])) )
+
 let large_precomputed_json_file = "hetzner-itn-1-1795.json"
 
 let _json_serialization_is_stable_from_file () =
@@ -90,6 +135,14 @@ let () =
              ; test_case "serialization roundtrips from file" `Quick
                  json_serialization_roundtrips_from_file
           *)
+        ] )
+    ; ( "versioned"
+      , [ test_case "reads the sample at its version" `Quick
+            versioned_reads_sample
+        ; test_case "state hash matches the latest version's" `Quick
+            versioned_state_hash_matches_latest
+        ; test_case "rejects unknown versions" `Quick
+            versioned_rejects_unknown_version
         ] )
     ; ( "field element represented by decimal"
       , [ test_case "block is deserializable" `Quick

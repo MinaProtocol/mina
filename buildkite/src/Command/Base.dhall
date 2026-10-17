@@ -125,12 +125,16 @@ let Config =
       }
 
 let targetToAgent =
+    -- Integration agents also advertise generic=true, so generic=true jobs
+    -- can land on them. Generic pins to the dedicated generic pool for jobs
+    -- that cannot tolerate a burstable agent.
           \(target : Size)
       ->  merge
             { XLarge = toMap { generic = "true" }
             , Large = toMap { generic = "true" }
             , Medium = toMap { generic = "true" }
             , Small = toMap { generic = "true" }
+            , Generic = toMap { size = "generic" }
             , Integration = toMap { integration = "true" }
             , QA = toMap { qa = "true" }
             , Perf = toMap { performance = "true" }

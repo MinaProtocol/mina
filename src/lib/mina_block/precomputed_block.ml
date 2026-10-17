@@ -233,3 +233,57 @@ let of_block ~logger
   ; accounts_created
   ; tokens_used
   }
+
+module Versioned = struct
+  type t = V5 of Stable.V5.t | V4 of Stable.V4.t
+
+  let version = function V5 _ -> 5 | V4 _ -> 4
+
+  let of_latest (t : Stable.Latest.t) = V5 t
+
+  let to_yojson = function
+    | V5 t ->
+        Stable.V5.to_yojson t
+    | V4 t ->
+        Stable.V4.to_yojson t
+
+  let of_yojson json =
+    let open Result.Let_syntax in
+    let%bind version =
+      match json with
+      | `Assoc fields -> (
+          match List.Assoc.find fields ~equal:String.equal "version" with
+          | Some (`Int version) ->
+              Ok version
+          | _ ->
+              Error "Precomputed.Versioned.of_yojson: missing version tag" )
+      | _ ->
+          Error "Precomputed.Versioned.of_yojson: expected an object"
+    in
+    match version with
+    | 5 ->
+        Stable.V5.of_yojson json >>| fun t -> V5 t
+    | 4 ->
+        Stable.V4.of_yojson json >>| fun t -> V4 t
+    | _ ->
+        Error
+          (sprintf "Precomputed.Versioned.of_yojson: unsupported version %d"
+             version )
+
+  module V5 = struct
+    let state_hashes (t : Stable.V5.t) = Protocol_state.hashes t.protocol_state
+  end
+
+  module V4 = struct
+    let state_hashes (_ : Stable.V4.t) =
+      failwith
+        "Precomputed.Versioned.V4.state_hashes: V4 has no hashing of its own \
+         yet"
+  end
+
+  let state_hashes = function
+    | V5 t ->
+        V5.state_hashes t
+    | V4 t ->
+        V4.state_hashes t
+end

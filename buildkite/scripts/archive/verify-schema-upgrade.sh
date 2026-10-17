@@ -7,8 +7,11 @@
 # (Mesa/develop) branch's create_schema.sql, and that downgrade.sql
 # reverses the upgrade correctly.
 #
-# The upgrade/downgrade scripts are always taken from the current working tree,
-# while source and target schemas are fetched from their respective remote branches.
+# The upgrade/downgrade scripts are always taken from the current working tree.
+# The source schema is fetched from the remote source branch. The target schema
+# is taken from the working tree when the working tree is on the target branch
+# line (e.g. a PR into develop that changes create_schema.sql together with
+# upgrade.sql); otherwise it is fetched from the remote target branch.
 #
 # USAGE:
 #   verify-schema-upgrade.sh [OPTIONS]
@@ -187,6 +190,15 @@ normalize_known_schema_deltas() {
     mv "$tmp_file" "$schema_file"
 }
 
+# --- Target schema source ---
+# The working tree is on the target line when its merge-base with the target
+# branch holds commits that the source branch lacks.
+working_tree_on_target() {
+    local merge_base
+    merge_base="$(git merge-base HEAD "origin/${TARGET_BRANCH}")"
+    [[ "$(git rev-list --count "origin/${SOURCE_BRANCH}..${merge_base}")" -gt 0 ]]
+}
+
 # --- Main ---
 main() {
     parse_args "$@"
@@ -195,18 +207,27 @@ main() {
     echo "Source branch (pre-upgrade):  $SOURCE_BRANCH"
     echo "Target branch (post-upgrade): $TARGET_BRANCH"
     echo "Upgrade/downgrade scripts:    current working tree"
-    echo ""
 
     # Fetch both branches
     git fetch origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
 
+    local target_schema_ref="origin/${TARGET_BRANCH}"
+    if working_tree_on_target; then
+        target_schema_ref="working tree"
+    fi
+    echo "Target create_schema.sql:     ${target_schema_ref}"
+    echo ""
+
     start_postgres
 
-    # Extract schemas from remote branches
     local source_schema_file="/tmp/source_schema_$$.sql"
     local target_schema_file="/tmp/target_schema_$$.sql"
     git show "origin/${SOURCE_BRANCH}:src/app/archive/create_schema.sql" > "$source_schema_file"
-    git show "origin/${TARGET_BRANCH}:src/app/archive/create_schema.sql" > "$target_schema_file"
+    if [[ "$target_schema_ref" == "working tree" ]]; then
+        cp "${REPO_ROOT}/src/app/archive/create_schema.sql" "$target_schema_file"
+    else
+        git show "${target_schema_ref}:src/app/archive/create_schema.sql" > "$target_schema_file"
+    fi
 
     local upgrade_script="${REPO_ROOT}/src/app/archive/upgrade.sql"
     local downgrade_script="${REPO_ROOT}/src/app/archive/downgrade.sql"

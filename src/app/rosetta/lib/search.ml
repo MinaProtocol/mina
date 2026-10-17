@@ -309,6 +309,29 @@ module Sql = struct
     let () = Format.pp_print_flush ppf () in
     Buffer.contents buffer
 
+  (* [ctes] ends with [id_count], the size of the whole result, and [page]
+     selects one page of it with that count on every row. An empty page has no
+     row to carry the count, so the count is then read on its own. *)
+  let collect_page (module Conn : Mina_caqti.CONNECTION) ~logger ~params ~typ
+      ~ctes ~page =
+    let open Deferred.Result.Let_syntax in
+    let query =
+      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) (ctes ^ page)
+    in
+    [%log debug] "Running SQL query $query"
+      ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+    match%bind Conn.collect_list query params with
+    | (total_count, _) :: _ as rows ->
+        return (total_count, List.map rows ~f:snd)
+    | [] ->
+        let%map total_count =
+          Conn.find
+            (Mina_caqti.find_req Params.typ Caqti_type.int64
+               (ctes ^ " SELECT total_count FROM id_count") )
+            params
+        in
+        (total_count, [])
+
   module Block_extras = struct
     type t = { block_hash : string; block_height : int64 }
     [@@deriving hlist, fields]
@@ -366,7 +389,16 @@ module Sql = struct
             ; int64
             ]
 
-      let query_string operator op_type =
+      (* [by_account]: a single account bounds the result (see [by_account]
+         below), so candidate commands are looked up from that account's public
+         key through the user_commands account indexes. Without a bounding
+         account the command-driven join is kept: enumerating candidates for
+         every public key would be much slower.
+
+         In both cases, visible blocks (canonical, or pending above the
+         canonical tip) are filtered per joined row, instead of materializing a
+         copy of every canonical block on each request. *)
+      let query_string ~by_account operator op_type =
         let op_type_filters =
           Option.map op_type ~f:(function
             | `Fee_payment ->
@@ -394,9 +426,34 @@ module Sql = struct
             ~op_status_field:"buc.status" ~address_fields:[ "pk.value" ]
             ~op_type_filters operator
         in
-        [%string
-          {sql|
-            SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}
+        let source, account_match =
+          if by_account then
+            ( {sql|
+            FROM public_keys pk
+            /* Candidate commands for the account: one equality lookup per
+               account column, each served by its user_commands index. With the
+               single OR join condition instead, the planner can badly
+               overestimate the matches and hash-join all of
+               blocks_user_commands. */
+            CROSS JOIN LATERAL (
+              SELECT id FROM user_commands WHERE fee_payer_id = pk.id
+              UNION
+              SELECT id FROM user_commands WHERE source_id = pk.id
+              UNION
+              SELECT id FROM user_commands WHERE receiver_id = pk.id
+            ) candidates
+            INNER JOIN user_commands u
+              ON u.id = candidates.id
+            INNER JOIN blocks_user_commands buc
+              ON buc.user_command_id = u.id
+            INNER JOIN blocks b
+              ON buc.block_id = b.id|sql}
+            , {sql|(pk.id = u.fee_payer_id
+                OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id)))
+              AND |sql}
+            )
+          else
+            ( {sql|
             FROM user_commands u
             INNER JOIN blocks_user_commands buc
               ON buc.user_command_id = u.id
@@ -404,8 +461,16 @@ module Sql = struct
               ON pk.id = u.fee_payer_id
                 OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id))
             INNER JOIN blocks b
-              ON buc.block_id = b.id
-            WHERE %{filters}
+              ON buc.block_id = b.id|sql}
+            , "" )
+        in
+        [%string
+          {sql|
+            SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}%{source}
+            WHERE %{account_match}(b.chain_status = 'canonical'
+                OR (b.chain_status = 'pending'
+                  AND b.height > (SELECT max_height FROM max_canonical_height)))
+              AND %{filters}
           |sql}]
     end
 
@@ -443,23 +508,25 @@ module Sql = struct
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
         Caqti_type.[ Cte.typ; string; string; string; option int64 ]
 
-    let query_string ~offset ~limit op_type operator =
+    let ctes ~by_account op_type operator =
+      [%string
+        {sql|
+          WITH
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM blocks WHERE chain_status = 'canonical'),
+            user_command_info AS (
+              %{Cte.query_string ~by_account operator op_type}
+            ),
+            id_count AS (
+              SELECT COUNT(*) AS total_count FROM user_command_info
+            )
+        |sql}]
+
+    let page ~offset ~limit =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
       let offset = offset_sql offset in
       let limit = limit_sql limit in
       [%string
         {sql|
-          WITH
-            canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
-            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
-            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
-            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
-            user_command_info AS (
-              %{Cte.query_string operator op_type}
-            ),
-            id_count AS (
-              SELECT COUNT(*) AS total_count FROM user_command_info
-            )
             SELECT %{fields}
             FROM id_count,
                 (SELECT * FROM user_command_info ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) AS u
@@ -496,24 +563,30 @@ module Sql = struct
             ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
-    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
-      let open Deferred.Result.Let_syntax in
-      let params = Params.of_query input in
-      let query_string =
-        query_string ~offset ~limit
-          Transaction_query.(input.filter.Filter.op_type)
-          input.operator
+    (* A conservative test for "one account bounds the result, and nothing
+       bounds it better". An account or address filter combined with AND does.
+       An AND-combined transaction hash is unique, so the command-driven join
+       reaches the row through user_commands_hash_key instead. Some OR requests
+       also reduce to a single account, but they keep the command-driven join
+       rather than making this condition track sql_filters. *)
+    let by_account { Transaction_query.operator; filter; _ } =
+      let has_account =
+        Option.is_some filter.Transaction_query.Filter.account_identifier
+        || Option.is_some filter.address
       in
-      let query =
-        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
+      let has_txn_hash = Option.is_some filter.transaction_hash in
+      let conjunctive =
+        match operator with None | Some `And -> true | Some `Or -> false
       in
-      [%log debug] "Running SQL query $query"
-        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
-      match%map Conn.collect_list query params with
-      | [] ->
-          (0L, [])
-      | (total_count, _) :: _ as user_commands ->
-          (total_count, List.map user_commands ~f:snd)
+      has_account && conjunctive && not has_txn_hash
+
+    let run conn ~logger ~offset ~limit input =
+      collect_page conn ~logger ~params:(Params.of_query input) ~typ
+        ~ctes:
+          (ctes ~by_account:(by_account input)
+             Transaction_query.(input.filter.Filter.op_type)
+             input.operator )
+        ~page:(page ~offset ~limit)
 
     let to_info ({ command = { signed_command = uc; _ } as command; _ } as t) =
       let open Result.Let_syntax in
@@ -686,11 +759,7 @@ module Sql = struct
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
         Caqti_type.[ Filtered_commands_cte.typ; option int64 ]
 
-    let query_string ~offset ~limit op_type operator =
-      let fields =
-        String.concat ~sep:","
-          [ "id_count.total_count"; "i.*"; "ac.creation_fee" ]
-      in
+    let ctes op_type operator =
       let op_type_filters =
         Option.map op_type ~f:(function
           | `Coinbase_inc ->
@@ -723,8 +792,6 @@ module Sql = struct
           ~op_status_field:"bic.status" ~address_fields ~op_type_filters
           operator
       in
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
       [%string
         {sql|
             WITH canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
@@ -750,6 +817,17 @@ module Sql = struct
             id_count AS (
               SELECT COUNT(*) AS total_count FROM internal_commands_info
             )
+          |sql}]
+
+    let page ~offset ~limit =
+      let fields =
+        String.concat ~sep:","
+          [ "id_count.total_count"; "i.*"; "ac.creation_fee" ]
+      in
+      let offset = offset_sql offset in
+      let limit = limit_sql limit in
+      [%string
+        {sql|
             SELECT %{fields}
             FROM id_count, (SELECT * FROM internal_commands_info ORDER BY block_id, id, sequence_no, secondary_sequence_no LIMIT %{limit} OFFSET %{offset}) i
             LEFT JOIN account_identifiers ai
@@ -776,20 +854,10 @@ module Sql = struct
             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
-      let open Deferred.Result.Let_syntax in
-      let params = Params.of_query input in
-      let query =
-        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
-        @@ query_string ~offset ~limit input.filter.op_type input.operator
-      in
-      [%log debug] "Running SQL query $query"
-        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
-      match%map Conn.collect_list query params with
-      | [] ->
-          (0L, [])
-      | (total_count, _) :: _ as internal_commands ->
-          (total_count, List.map internal_commands ~f:snd)
+    let run conn ~logger ~offset ~limit input =
+      collect_page conn ~logger ~params:(Params.of_query input) ~typ
+        ~ctes:(ctes input.filter.op_type input.operator)
+        ~page:(page ~offset ~limit)
 
     let to_info ({ internal_command; _ } as t : t) =
       let open Result.Let_syntax in
@@ -893,8 +961,7 @@ module Sql = struct
             WHERE %{filters}
         |sql}]
 
-    let query_string ~offset ~limit ~filters =
-      let fields = String.concat ~sep:"," [ "id_count.total_count"; "zc.*" ] in
+    let ctes ~filters =
       let ctes_string =
         String.concat ~sep:","
           [ "canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = \
@@ -912,18 +979,23 @@ module Sql = struct
              zkapp_commands_ids)"
           ]
       in
+      [%string {sql|
+          WITH %{ctes_string}
+        |sql}]
+
+    let page ~offset ~limit =
+      let fields = String.concat ~sep:"," [ "id_count.total_count"; "zc.*" ] in
+      let offset = offset_sql offset in
+      let limit = limit_sql limit in
       [%string
         {sql|
-          WITH %{ctes_string}
           SELECT %{fields}
           FROM id_count, (SELECT * FROM zkapp_commands_ids ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) as ids
           INNER JOIN zkapp_commands_info zc ON ids.id = zc.id AND ids.block_id = zc.block_id AND ids.sequence_no = zc.sequence_no
           ORDER BY block_id, id, sequence_no
         |sql}]
 
-    let query ~offset ~limit op_type operator =
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
+    let filters op_type operator =
       let op_type_filters =
         Option.map op_type ~f:(function
           | `Zkapp_fee_payer_dec ->
@@ -943,33 +1015,22 @@ module Sql = struct
           | `Delegate_change ->
               "FALSE" )
       in
-      let filters =
-        let default_token =
-          [%string "'%{Mina_base.Token_id.(to_string default)}'"]
-        in
-        sql_filters ~block_height_field:"b.height" ~txn_hash_field:"zc.hash"
-          ~account_identifier_fields:
-            [ ("pk_fee_payer.value", default_token)
-            ; ("pk_update_body.value", "token_update_body.value")
-            ]
-          ~op_status_field:"bzc.status"
-          ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
-          ~op_type_filters operator
+      let default_token =
+        [%string "'%{Mina_base.Token_id.(to_string default)}'"]
       in
-      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
-      @@ query_string ~offset ~limit ~filters
+      sql_filters ~block_height_field:"b.height" ~txn_hash_field:"zc.hash"
+        ~account_identifier_fields:
+          [ ("pk_fee_payer.value", default_token)
+          ; ("pk_update_body.value", "token_update_body.value")
+          ]
+        ~op_status_field:"bzc.status"
+        ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
+        ~op_type_filters operator
 
-    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
-      let open Deferred.Result.Let_syntax in
-      let params = Params.of_query input in
-      let query = query ~offset ~limit input.filter.op_type input.operator in
-      [%log debug] "Running SQL query $query"
-        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
-      match%map Conn.collect_list query params with
-      | [] ->
-          (0L, [])
-      | (total_count, _) :: _ as res ->
-          (total_count, List.map res ~f:snd)
+    let run conn ~logger ~offset ~limit input =
+      collect_page conn ~logger ~params:(Params.of_query input) ~typ
+        ~ctes:(ctes ~filters:(filters input.filter.op_type input.operator))
+        ~page:(page ~offset ~limit)
 
     include Rosetta_lib_block.Sql.Zkapp_commands.Make_common (struct
       type command = t
@@ -1167,7 +1228,8 @@ module Specific = struct
       { Search_transactions_response.next_offset
       ; total_count = transactions_info.total_count
       ; transactions =
-          internal_transactions @ user_transactions @ zkapp_transactions
+          (* the order Sql.run pages them in, so pages add up to the whole *)
+          user_transactions @ internal_transactions @ zkapp_transactions
       }
   end
 
