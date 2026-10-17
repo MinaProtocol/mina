@@ -4,6 +4,8 @@
  (libraries
   ;; opam libraries
   core_kernel
+  ppx_deriving_yojson.runtime
+  yojson
   ;; local libraries
   currency
   mina_base
