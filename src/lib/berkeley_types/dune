@@ -15,7 +15,9 @@
   pickles
   pickles_types
   sgn
-  signature_lib)
+  signature_lib
+  staged_ledger_diff
+  transaction_snark_work)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
