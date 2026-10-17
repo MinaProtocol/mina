@@ -8,6 +8,7 @@
   currency
   mina_base
   mina_numbers
+  mina_transaction
   mina_stdlib
   pickles
   pickles_types
