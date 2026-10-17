@@ -4,7 +4,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_compare ppx_jane ppx_version))
+  (pps ppx_jane ppx_version))
  (libraries
   blake2
   core_kernel

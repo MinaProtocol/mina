@@ -25,7 +25,6 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_compare
    ppx_deriving.std
    ppx_deriving_yojson
    ppx_inline_test

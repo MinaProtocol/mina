@@ -44,12 +44,6 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps
-   ppx_snarky
-   ppx_version
-   ppx_jane
-   ppx_sexp_conv
-   ppx_inline_test
-   ppx_assert))
+  (pps ppx_snarky ppx_version ppx_jane ppx_inline_test))
  (instrumentation
   (backend bisect_ppx)))
