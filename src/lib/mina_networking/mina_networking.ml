@@ -412,6 +412,7 @@ end
 let glue_sync_ledger :
        t
     -> preferred:Peer.t list
+    -> target:Mina_base.Ledger_hash.t option Broadcast_pipe.Reader.t
     -> (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
     -> ( Mina_base.Ledger_hash.t
@@ -419,7 +420,12 @@ let glue_sync_ledger :
        * Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
- fun t ~preferred query_reader response_writer ->
+ fun t ~preferred ~target query_reader response_writer ->
+  (* [target] is closed along with the sync ledger. *)
+  let current_target () =
+    try Broadcast_pipe.Reader.peek target
+    with Broadcast_pipe.Already_closed _ -> None
+  in
   let downloader =
     let heartbeat_timeout = Time_ns.Span.of_sec 20. in
     let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
@@ -433,11 +439,17 @@ let glue_sync_ledger :
       | Failed_to_connect _ | Connected { data = Error _; _ } ->
           `Some []
     in
-    let%bind _ = Linear_pipe.values_available query_reader in
-    let root_hash_r, root_hash_w =
-      Broadcast_pipe.create
-        (Option.value_exn (Linear_pipe.peek query_reader) |> fst)
+    let%bind first_target =
+      Deferred.create (fun first_target ->
+          don't_wait_for
+            (Broadcast_pipe.Reader.iter_until target ~f:(function
+              | None ->
+                  return false
+              | Some h ->
+                  Ivar.fill_if_empty first_target h ;
+                  return true ) ) )
     in
+    let root_hash_r, root_hash_w = Broadcast_pipe.create first_target in
     Sl_downloader.create ~preferred ~max_batch_size:100
       ~peers:(fun () -> peers t)
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
@@ -469,6 +481,11 @@ let glue_sync_ledger :
   in
   don't_wait_for
     (let%bind downloader, root_hash_r, root_hash_w = downloader in
+     let is_current (h, _) =
+       Option.value_map (current_target ()) ~default:false
+         ~f:(Ledger_hash.equal h)
+     in
+     let in_flight = Sl_downloader.Key.Hash_set.create () in
      (* Once the sync ledger moves to a new target, queries for the old one
         are never answered by peers that have moved on with it, and the sync
         ledger ignores their answers anyway. So on a change of target, cancel
@@ -477,10 +494,22 @@ let glue_sync_ledger :
         never be sent. The downloader also forgets what it learnt about peers
         from the old target, lest it pass over the peers that failed its
         queries because they have moved on to the new one. *)
-     let is_current (h, _) =
-       Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r)
-     in
-     let in_flight = Sl_downloader.Key.Hash_set.create () in
+     don't_wait_for
+       (Broadcast_pipe.Reader.iter target ~f:(function
+         | None ->
+             Deferred.unit
+         | Some new_root ->
+             if
+               Ledger_hash.equal new_root
+                 (Broadcast_pipe.Reader.peek root_hash_r)
+             then Deferred.unit
+             else (
+               Hash_set.to_list in_flight
+               |> List.filter ~f:(fun (h, _) ->
+                      not (Ledger_hash.equal h new_root) )
+               |> List.iter ~f:(Sl_downloader.cancel downloader) ;
+               Sl_downloader.forget_peer_state downloader ;
+               Broadcast_pipe.Writer.write root_hash_w new_root ) ) ) ;
      let throttle =
        Throttle.create ~continue_on_error:true ~max_concurrent_jobs:400
      in
@@ -505,15 +534,5 @@ let glue_sync_ledger :
                (fst q, snd q, { a with data = snd a.data }) )
      in
      Linear_pipe.iter query_reader ~f:(fun q ->
-         let%map () =
-           if is_current q then Deferred.unit
-           else
-             let new_root = fst q in
-             Hash_set.to_list in_flight
-             |> List.filter ~f:(fun (h, _) ->
-                    not (Ledger_hash.equal h new_root) )
-             |> List.iter ~f:(Sl_downloader.cancel downloader) ;
-             Sl_downloader.forget_peer_state downloader ;
-             Broadcast_pipe.Writer.write root_hash_w new_root
-         in
-         don't_wait_for (Throttle.enqueue throttle (fun () -> download q)) ) )
+         don't_wait_for (Throttle.enqueue throttle (fun () -> download q)) ;
+         Deferred.unit ) )
