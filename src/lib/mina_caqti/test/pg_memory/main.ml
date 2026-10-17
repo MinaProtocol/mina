@@ -40,6 +40,10 @@
 open Core
 open Async
 
+(* The exit status of a failed --assert-no-growth. It differs from the status of
+   every other failure, so a leak can be told apart from a broken run. *)
+let memory_gate_exit_status = 42
+
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
 let exec_oneshot sql =
@@ -649,7 +653,7 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
         (List.length offenders) ;
       List.iter offenders ~f:(fun r ->
           eprintf "   %s: +%d prepared\n" r.name r.prepared_growth ) ;
-      Shutdown.shutdown 1 )
+      Shutdown.shutdown memory_gate_exit_status )
     else printf "\nOK: no scenario grew its prepared-statement count\n" ) ;
   return ()
 
