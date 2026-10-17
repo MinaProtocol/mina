@@ -57,6 +57,13 @@ module Space_partition : sig
   type t = { first : int * int; second : (int * int) option } [@@deriving sexp]
 end
 
+(** Per-tree counts of free space and outstanding work. *)
+module Tree_metrics : sig
+  type t =
+    { available_space : int; base_jobs_todo : int; merge_jobs_todo : int }
+  [@@deriving equal, sexp]
+end
+
 module Job_view : sig
   type t [@@deriving sexp, to_yojson]
 end
@@ -214,6 +221,9 @@ val work_statements_for_new_diff :
 
 (** True if the latest tree is full and transactions would be added on to a new tree *)
 val next_on_new_tree : t -> bool
+
+(** Per-tree counts of free space and outstanding work, oldest tree first *)
+val tree_metrics : t -> Tree_metrics.t list
 
 (**update scan state metrics*)
 val update_metrics : t -> unit Or_error.t
