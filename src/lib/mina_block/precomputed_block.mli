@@ -94,7 +94,7 @@ end
     should work from this type and derive that identity by the rules of the
     block's own version. *)
 module Versioned : sig
-  type t = V4 of Stable.V4.t
+  type t = V3 of V3.t | V4 of Stable.V4.t
 
   val version : t -> int
 

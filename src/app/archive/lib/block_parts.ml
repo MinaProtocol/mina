@@ -184,12 +184,15 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
         (Lazy.force berkeley_hashes)
         (Transaction_hash.hash_command_with_hashes command) )
     ~constraint_constants
-    ~state_hash:(Protocol_state.hashes t.protocol_state).state_hash
+    ~state_hash:
+      (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
     ~protocol_state:t.protocol_state ~staged_ledger_diff
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
 let of_precomputed ~constraint_constants ~proof_cache_db :
     Mina_block.Precomputed.Versioned.t -> t = function
+  | V3 t ->
+      of_precomputed_v3 ~constraint_constants ~proof_cache_db t
   | V4 t ->
       of_precomputed_v4 ~constraint_constants ~proof_cache_db t

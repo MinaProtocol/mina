@@ -63,6 +63,8 @@ let versioned_reads_sample () =
       assert (
         Yojson.Safe.equal json
           (Mina_block.Precomputed.Versioned.to_yojson block) )
+  | Ok (V3 _) ->
+      failwith "read the version 4 sample as version 3"
   | Error err ->
       failwith err
 
