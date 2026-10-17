@@ -4,11 +4,6 @@ open Async
 open Core_kernel
 open Mina_base
 
-(* Request builders. Build every request once, in module scope. Caqti 2.0.1
-   keys the server-side PREPARE by the identity of the request value, so a
-   request built per call leaks one prepared statement per call on every pooled
-   connection. Pass [~oneshot:true] only for SQL text that changes per call;
-   such a request is never prepared. *)
 (* Build every request once, at module scope. Caqti 2.0.1 keys the server-side
    PREPARE by the identity of the [Caqti_request.t] value, so a request built
    inside a per-call function is prepared again on every pooled connection and
@@ -411,16 +406,11 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
   | None ->
       sprintf "%s RETURNING %s" insert returning
 
-(* Prepared statements.
-
-   Caqti prepares a request once per connection and keys that by the identity
-   of the [Caqti_request.t] value, so a request built on every call becomes a
-   new server-side prepared statement on every call, kept for the life of the
-   connection (#18857). The helpers below take their SQL-shaping arguments,
+(* Prepared statements. The helpers below take their SQL-shaping arguments,
    build their requests then, and return a [prepared] whose [run] reuses them.
-   Build each [prepared] once, in module scope, and call [run] per row: a
-   [prepared] built inside a per-call function rebuilds its requests on every
-   call, and that is visible where it happens. *)
+   Build each [prepared] once, in module scope (see the rule at the top of this
+   file); a [prepared] built inside a per-call function rebuilds its requests on
+   every call. *)
 
 type ('a, 'b) prepared =
   { run :

@@ -318,7 +318,7 @@ module Sql = struct
     let counts = String.Table.create () in
     fun ~ctes ~page ->
       let collect =
-        Hashtbl.find_or_add pages ctes ~default:(fun () ->
+        Hashtbl.find_or_add pages (ctes ^ page) ~default:(fun () ->
             Mina_caqti.collect_req
               Caqti_type.(t2 Params.typ (t2 (option int64) int64))
               Caqti_type.(t2 int64 typ)
