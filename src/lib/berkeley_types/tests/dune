@@ -1,0 +1,14 @@
+(test
+ (name main)
+ (libraries
+  alcotest
+  base64
+  berkeley_types
+  bin_prot
+  core_kernel
+  mina_transaction)
+ (deps zkapp_v1_transaction_id.txt)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))
