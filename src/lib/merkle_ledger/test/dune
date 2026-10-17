@@ -7,7 +7,6 @@
   (pps
    ppx_version
    ppx_jane
-   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson))
  (libraries
@@ -50,7 +49,6 @@
   (pps
    ppx_version
    ppx_jane
-   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson))
  (libraries

@@ -49,7 +49,6 @@
    ppx_version
    ppx_custom_printf
    ppx_sexp_conv
-   ppx_bin_prot
    ppx_hash
    ppx_compare
    ppx_compare
