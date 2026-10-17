@@ -29,17 +29,7 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps
-   ppx_assert
-   ppx_base
-   ppx_mina
-   ppx_custom_printf
-   ppx_deriving.std
-   ppx_fields_conv
-   ppx_inline_test
-   ppx_let
-   ppx_snarky
-   ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Track how much we trust peers"))

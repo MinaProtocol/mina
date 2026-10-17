@@ -14,12 +14,10 @@
   work_selector)
  (preprocess
   (pps
-   ppx_compare
-   ppx_custom_printf
-   ppx_let
-   ppx_mina
-   ppx_sexp_conv
-   ppx_version))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis

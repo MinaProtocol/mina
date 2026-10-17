@@ -32,9 +32,9 @@
   ../../../../graphql_schema.json)
  (preprocess
   (pps
-   ppx_let
-   ppx_custom_printf
-   ppx_version
-   graphql_ppx
+   mina_ppx.graphql
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal
    --
    %{read-lines:../../../graphql-ppx-config.inc})))

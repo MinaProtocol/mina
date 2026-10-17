@@ -14,6 +14,6 @@
   base.caml
   ppx_version.runtime)
  (preprocess
-  (pps ppx_base ppx_version ppx_deriving.std ppx_deriving_yojson ppx_let))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

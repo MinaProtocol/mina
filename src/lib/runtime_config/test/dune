@@ -18,7 +18,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps mina_ppx -allow-unannotated-ignores -allow-toplevel-expression -dont-check-underscored-literal)))
 
 ; The test asserts against the configs that actually ship, rather than copies
 ; that could drift from them.
