@@ -14,6 +14,8 @@ module V = struct
     end
   end]
 
+  type 'a t = 'a Stable.V1.t [@@deriving equal, sexp, yojson]
+
   (** Extends [t] to the current length, filling the new elements with
       [pad]. *)
   let to_mesa (t : 'a Stable.V1.t) ~(pad : 'a) : 'a Mina_base.Zkapp_state.V.t =

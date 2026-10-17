@@ -5,9 +5,14 @@
   ;; opam libraries
   core_kernel
   ;; local libraries
+  currency
   mina_base
+  mina_numbers
+  mina_stdlib
   pickles
-  pickles_types)
+  pickles_types
+  sgn
+  signature_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
