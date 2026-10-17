@@ -184,6 +184,25 @@ let of_block ~logger
   ; tokens_used
   }
 
+module V3 = struct
+  type t =
+    { scheduled_time : Block_time.Stable.V1.t
+    ; protocol_state : Protocol_state.Value.Stable.V3.t
+    ; protocol_state_proof : Proof.t
+    ; staged_ledger_diff : Berkeley_types.Diff.t
+    ; delta_transition_chain_proof :
+        Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+    ; protocol_version : Protocol_version.Stable.V2.t
+    ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+          [@default None]
+    ; accounts_accessed : (int * Berkeley_types.Account.Stable.V2.t) list
+    ; accounts_created :
+        (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+    ; tokens_used : (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+    }
+  [@@deriving yojson]
+end
+
 module Versioned = struct
   type t = V4 of Stable.V4.t
 
