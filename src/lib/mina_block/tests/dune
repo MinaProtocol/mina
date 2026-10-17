@@ -34,11 +34,14 @@
  (libraries
   alcotest
   async
+  berkeley_types
   core_kernel
   disk_cache.lmdb
   mina_base
   mina_block
   mina_state
+  mina_transaction
+  staged_ledger_diff
   yojson)
  (deps
   hetzner-itn-1-1795.json

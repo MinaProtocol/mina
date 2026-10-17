@@ -118,44 +118,67 @@ let field_element_decimal_deserialization () =
   let json = Yojson.Safe.from_file filename in
   json_serialization_is_stable_impl @@ Yojson.Safe.to_string json
 
-(* Mainnet blocks of version 3, from the public block bucket. The first has
-   a zkApp command authorized by a proof, and an account with a zkApp. *)
-let v3_block_files =
-  [ "mainnet-545000-3NKc1wHM45SweeqiCZyNwmNJQnT4vjzJmeCYkG83YqXNgDPY57ZD.json"
-  ; "mainnet-520000-3NKuyY4iqW7mXThknMwwNiKst67uo6txzhWFJj3S9fk1jot8M7Qn.json"
+(* Mainnet blocks of version 3, from the public block bucket, with the hashes
+   of their commands in the mainnet archive dump
+   `mainnet-archive-dump-2026-10-01_0000`, in sequence order. The first block
+   has a zkApp command authorized by a proof, and an account with a zkApp. *)
+let v3_blocks =
+  [ ( "mainnet-545000-3NKc1wHM45SweeqiCZyNwmNJQnT4vjzJmeCYkG83YqXNgDPY57ZD.json"
+    , [ "5Jv6nCoABLcAsszC4kyFvEy3g6PXS5htvfM9JrGv2vPGERE11N8H"
+      ; "5JvGVjyaCDWmyrgw6G9GWYhNaHftMAqUNe6PX2k8wfYYVpGDydDC"
+      ; "5JusDQDoH4GfZpD19eRNJmW4vbFwToR7ja12FEMtAbL9Q9dpDk6D"
+      ; "5JuNyBCfHpx8XkCMA7ox4i5mVdRudPGHSy7CmYW9SFqp5QJz9rUb"
+      ; "5JuEnYjGNm9f4w2MQ3rjhGc7QubsonB7taTUxCsPzv5QVTiCGRCM"
+      ] )
+  ; ( "mainnet-520000-3NKuyY4iqW7mXThknMwwNiKst67uo6txzhWFJj3S9fk1jot8M7Qn.json"
+    , [ "5Ju7ubyPvv3tDvZtHRRUovWckgDQVmQtas8FF4GwUNeYJsJnHTmj" ] )
   ]
 
-let v3_data filename =
-  match Yojson.Safe.from_file filename with
-  | `Assoc fields ->
-      ( List.Assoc.find_exn fields ~equal:String.equal "version"
-      , List.Assoc.find_exn fields ~equal:String.equal "data" )
-  | _ ->
-      failwith "block JSON is not an object"
+let read_v3 filename =
+  match
+    Mina_block.Precomputed.Versioned.of_yojson (Yojson.Safe.from_file filename)
+  with
+  | Ok (V3 block) ->
+      block
+  | Ok (V4 _) ->
+      failwith "read a version 3 block as version 4"
+  | Error err ->
+      failwith err
 
 let v3_roundtrips () =
-  List.iter v3_block_files ~f:(fun filename ->
-      let version, data = v3_data filename in
-      assert (Yojson.Safe.equal version (`Int 3)) ;
-      let block =
-        Mina_block.Precomputed.V3.of_yojson data |> Result.ok_or_failwith
-      in
-      assert (Yojson.Safe.equal data (Mina_block.Precomputed.V3.to_yojson block)) )
+  List.iter v3_blocks ~f:(fun (filename, _) ->
+      let json = Yojson.Safe.from_file filename in
+      assert (
+        Yojson.Safe.equal json
+          (Mina_block.Precomputed.Versioned.to_yojson (V3 (read_v3 filename))) ) )
 
 (* A file in the bucket is named after the state hash of its block. *)
 let v3_state_hash_matches_file_name () =
-  List.iter v3_block_files ~f:(fun filename ->
-      let block =
-        Mina_block.Precomputed.V3.of_yojson (snd (v3_data filename))
-        |> Result.ok_or_failwith
-      in
+  List.iter v3_blocks ~f:(fun (filename, _) ->
       let state_hash =
-        (Mina_state.Protocol_state.hashes block.protocol_state).state_hash
+        (Mina_block.Precomputed.Versioned.state_hashes (V3 (read_v3 filename)))
+          .state_hash
       in
       [%test_eq: string]
         ( String.chop_suffix_exn filename ~suffix:".json"
         |> String.split ~on:'-' |> List.last_exn )
         (Mina_base.State_hash.to_base58_check state_hash) )
+
+let v3_command_hashes_match_archive () =
+  List.iter v3_blocks ~f:(fun (filename, archived_hashes) ->
+      let block = read_v3 filename in
+      let two, one =
+        Berkeley_types.Diff.commands_with_hashes block.staged_ledger_diff
+      in
+      let { Staged_ledger_diff.Pre_diff_two.commands; _ } = two in
+      let one_commands =
+        Option.value_map one ~default:[]
+          ~f:(fun { Staged_ledger_diff.Pre_diff_one.commands; _ } -> commands)
+      in
+      [%test_eq: string list] archived_hashes
+        (List.map (commands @ one_commands)
+           ~f:(fun { Mina_base.With_status.data = _, hash; _ } ->
+             Mina_transaction.Transaction_hash.to_base58_check hash ) ) )
 
 let () =
   run "Precomputed block serialization tests"
@@ -189,6 +212,8 @@ let () =
       , [ test_case "mainnet blocks roundtrip" `Quick v3_roundtrips
         ; test_case "state hashes match the file names" `Quick
             v3_state_hash_matches_file_name
+        ; test_case "command hashes match the archive's" `Quick
+            v3_command_hashes_match_archive
         ] )
     ; ( "field element represented by decimal"
       , [ test_case "block is deserializable" `Quick
