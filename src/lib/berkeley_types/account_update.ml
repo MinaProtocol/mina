@@ -143,6 +143,35 @@ module Body = struct
     end]
   end
 
+  (* A precomputed block writes the magnitude of a balance change in
+     nanomina, as it does every amount. At least one Berkeley block in the
+     public block bucket, mainnet-520000-3NKRSbMxB1MToKojY4rDFe7pkeLzHFztNubG7LGHZUuq1tMSzLT3,
+     writes it in MINA, as a decimal, instead; reading that as nanomina would
+     silently give its whole part. A magnitude containing a decimal point is
+     read as MINA. *)
+  let balance_change_of_yojson json =
+    let open Result.Let_syntax in
+    let%bind json =
+      match json with
+      | `Assoc fields ->
+          List.map fields ~f:(function
+            | "magnitude", `String magnitude when String.mem magnitude '.' ->
+                Result.try_with (fun () ->
+                    ( "magnitude"
+                    , Currency.Amount.Stable.V1.to_yojson
+                        (Currency.Amount.of_mina_string_exn magnitude) ) )
+                |> Result.map_error ~f:(fun _ ->
+                       "Body.balance_change_of_yojson: invalid magnitude" )
+            | field ->
+                Ok field )
+          |> Result.all
+          >>| fun fields -> `Assoc fields
+      | json ->
+          Ok json
+    in
+    Currency.Signed_poly.Stable.V1.of_yojson Currency.Amount.Stable.V1.of_yojson
+      Sgn.Stable.V1.of_yojson json
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -151,9 +180,10 @@ module Body = struct
         ; token_id : Mina_base.Token_id.Stable.V2.t
         ; update : Update.Stable.V1.t
         ; balance_change :
-            ( Currency.Amount.Stable.V1.t
-            , Sgn.Stable.V1.t )
-            Currency.Signed_poly.Stable.V1.t
+            (( Currency.Amount.Stable.V1.t
+             , Sgn.Stable.V1.t )
+             Currency.Signed_poly.Stable.V1.t
+            [@of_yojson balance_change_of_yojson] )
         ; increment_nonce : bool
         ; events : Events.Stable.V1.t
         ; actions : Events.Stable.V1.t

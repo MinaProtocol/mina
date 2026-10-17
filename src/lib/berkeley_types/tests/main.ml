@@ -30,10 +30,38 @@ let zkapp_command_hash_matches_berkeley () =
     ( Berkeley_types.Zkapp_command.hash command
     |> Mina_transaction.Transaction_hash.to_base58_check )
 
+let balance_change_reads_nanomina_and_mina () =
+  let read magnitude =
+    Berkeley_types.Account_update.Body.balance_change_of_yojson
+      (`Assoc
+        [ ("magnitude", `String magnitude); ("sgn", `List [ `String "Neg" ]) ]
+        )
+    |> Result.ok_or_failwith
+  in
+  let expected : _ Currency.Signed_poly.t =
+    { magnitude = Currency.Amount.of_nanomina_int_exn 682962428; sgn = Sgn.Neg }
+  in
+  assert (
+    [%equal: (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t] expected
+      (read "682962428") ) ;
+  assert (
+    [%equal: (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t] expected
+      (read "0.682962428") ) ;
+  assert (
+    Result.is_error
+      (Berkeley_types.Account_update.Body.balance_change_of_yojson
+         (`Assoc
+           [ ("magnitude", `String "0.6.8"); ("sgn", `List [ `String "Neg" ]) ]
+           ) ) )
+
 let () =
   Alcotest.run "Berkeley types"
     [ ( "zkapp_command"
       , [ Alcotest.test_case "hash matches 3.4.0" `Quick
             zkapp_command_hash_matches_berkeley
+        ] )
+    ; ( "account_update"
+      , [ Alcotest.test_case "balance changes read in nanomina or MINA" `Quick
+            balance_change_reads_nanomina_and_mina
         ] )
     ]
