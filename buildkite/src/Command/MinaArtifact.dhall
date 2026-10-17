@@ -30,6 +30,8 @@ let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
+let InfraTestPaths = ../Constants/InfraTestPaths.dhall
+
 let DebianRepo = ../Constants/DebianRepo.dhall
 
 let DockerPublish = ../Constants/Docker/Publish.dhall
@@ -898,6 +900,7 @@ let pipelineBuilder
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , dirtyWhenExcept = InfraTestPaths.testOnly
             , path = "Release"
             , name = selfName spec
             , tags = spec.tags
@@ -923,6 +926,7 @@ let appsPipeline
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , dirtyWhenExcept = InfraTestPaths.testOnly
             , path = "Release"
             , name =
                 "${spec.prefix}${spec.nameSegment}${DebianVersions.capitalName
@@ -943,6 +947,7 @@ let packagePipeline
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.packageDirtyWhen
+            , dirtyWhenExcept = InfraTestPaths.testOnly
             , path = "Release"
             , name = selfName spec
             , tags = spec.tags

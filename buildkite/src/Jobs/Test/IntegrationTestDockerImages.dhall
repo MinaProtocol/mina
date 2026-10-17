@@ -41,6 +41,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let S = ../../Lib/SelectFiles.dhall
 
+let InfraTestPaths = ../../Constants/InfraTestPaths.dhall
+
 let Command = ../../Command/Base.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
@@ -174,6 +176,7 @@ let archiveStep =
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
+        , dirtyWhenExcept = InfraTestPaths.testOnly
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.strictlyStart (S.contains "dockerfiles")

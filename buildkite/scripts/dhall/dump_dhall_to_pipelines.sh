@@ -28,6 +28,8 @@ do
 
     dhall-to-yaml <<< "let SelectFiles = $ROOT/Lib/SelectFiles.dhall in SelectFiles.compile (./$file).spec.dirtyWhen " > "$OUTPUT"/"$filename".dirtywhen
 
+    dhall-to-yaml <<< "let SelectFiles = $ROOT/Lib/SelectFiles.dhall in SelectFiles.compile (./$file).spec.dirtyWhenExcept " > "$OUTPUT"/"$filename".dirtywhenexcept
+
 
     COUNTER=$((COUNTER+1))
 done

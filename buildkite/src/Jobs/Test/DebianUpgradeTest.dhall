@@ -2,6 +2,8 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let S = ../../Lib/SelectFiles.dhall
 
+let InfraTestPaths = ../../Constants/InfraTestPaths.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
@@ -96,6 +98,7 @@ in  Pipeline.build
                 ]
 
           in  JobSpec::{
+              , dirtyWhenExcept = InfraTestPaths.testOnly
               , dirtyWhen = dirtyWhen
               , path = "Test"
               , name = "DebianUpgradeTest"

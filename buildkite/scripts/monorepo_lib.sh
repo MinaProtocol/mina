@@ -175,6 +175,21 @@ check_include_if() {
   echo 0
 }
 
+# Read a compiled SelectFiles regex dumped by dump_dhall_to_pipelines.sh.
+# Prints nothing when the file is missing or the pattern list was empty.
+read_dirtywhen() {
+  local path="$1"
+  [[ -f "$path" ]] || return 0
+  local pattern
+  pattern=$(cat "$path")
+  # Remove quotes from beginning and end of string
+  pattern="${pattern%\"}"
+  pattern="${pattern#\"}"
+  # Unescape YAML-escaped backslashes (dhall-to-yaml outputs \\\\ for regex \\)
+  pattern="${pattern//\\\\/\\}"
+  echo "$pattern"
+}
+
 # select_job - Determine if a job should be selected based on selection mode
 # Args:
 #   $1: selection_full (true/false)
@@ -193,13 +208,16 @@ select_job() {
   if [[ "$selection_full" == true ]]; then
     echo 1
   elif [[ "$selection_triaged" == true ]]; then
-    dirtyWhen=$(cat "${file%.yml}.dirtywhen")
-    # Remove quotes from beginning and end of string
-    dirtyWhen="${dirtyWhen%\"}"
-    dirtyWhen="${dirtyWhen#\"}"
-    # Unescape YAML-escaped backslashes (dhall-to-yaml outputs \\\\ for regex \\)
-    dirtyWhen="${dirtyWhen//\\\\/\\}"
-    if cat "$git_diff_file" | grep -E "$dirtyWhen" > /dev/null; then
+    dirtyWhen=$(read_dirtywhen "${file%.yml}.dirtywhen")
+    # Changed paths matching dirtyWhenExcept do not count for this job.
+    local dirtyWhenExcept changed
+    dirtyWhenExcept=$(read_dirtywhen "${file%.yml}.dirtywhenexcept")
+    if [[ -n "$dirtyWhenExcept" ]]; then
+      changed=$(grep -vE "$dirtyWhenExcept" "$git_diff_file" || true)
+    else
+      changed=$(cat "$git_diff_file")
+    fi
+    if [[ -n "$changed" ]] && grep -E "$dirtyWhen" <<< "$changed" > /dev/null; then
       echo 1
     else
       echo 0

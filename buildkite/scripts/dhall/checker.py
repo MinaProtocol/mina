@@ -61,7 +61,8 @@ class PipelineInfoBuilder:
 
     def get_dirty(self):
         dirty = []
-        for dirtyWhen in self.pipeline["spec"]["dirtyWhen"]:
+        spec = self.pipeline["spec"]
+        for dirtyWhen in spec["dirtyWhen"] + spec.get("dirtyWhenExcept", []):
             path = dirtyWhen["dir"][0] if "dir" in dirtyWhen else ""
             exts = dirtyWhen["exts"][0] if "exts" in dirtyWhen else ""
             strictEnd = bool(dirtyWhen["strictEnd"]) if (
