@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let CacheManagerTest = ../../Command/CacheManagerTest.dhall
 
 in  Pipeline.build
@@ -18,6 +20,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "CacheManagerTest"
+        , scope = PipelineScope.InfraOnly
         , tags =
           [ PipelineTag.Type.Fast
           , PipelineTag.Type.Test
