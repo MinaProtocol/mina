@@ -3,6 +3,8 @@
    PostgreSQL server: MINA_TEST_POSTGRES (any database path is ignored). *)
 
 open Core
+open Mina_base
+open Signature_lib
 open Async
 module B = Synthetic_archive
 module Settle = Archive_lib.Settle_pending_blocks
@@ -228,6 +230,97 @@ let dry_run_and_idempotence server_uri () =
       check_result built { expected with boundary = settled 0 0 } again ;
       check_statuses db built statuses )
 
+(* End to end, with --hardfork-handover and a config file: the config's genesis
+   ledger is written at the fork genesis height, then the boundary is settled
+   at startup. The fork block is the one of [fork_mid_canonical] (height 3), so
+   the fork genesis is at height 4, where the config's genesis ledger goes. *)
+let handover_startup server_uri () =
+  let s = B.create () in
+  let _, statuses = fork_mid_canonical () s in
+  let accounts =
+    List.init 3 ~f:(fun i ->
+        let pk = Public_key.compress (Keypair.create ()).public_key in
+        { Runtime_config.Accounts.Single.default with
+          pk = Public_key.Compressed.to_base58_check pk
+        ; balance = Currency.Balance.of_mina_int_exn (2000 + i)
+        } )
+  in
+  let fork_state_hash =
+    State_hash.to_base58_check
+      (Quickcheck.random_value ~seed:(`Deterministic "handover-startup")
+         State_hash.gen )
+  in
+  let runtime_config =
+    { Runtime_config.default with
+      proof =
+        Some
+          (Runtime_config.Proof_keys.make
+             ~fork:
+               { Runtime_config.Fork_config.state_hash = fork_state_hash
+               ; blockchain_length = 3
+               ; global_slot_since_genesis = 3
+               }
+             () )
+    ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
+    }
+  in
+  let precomputed = Lazy.force Precomputed_values.for_unit_tests in
+  let logger = Logger.null () in
+  let ok d = Deferred.map d ~f:(fun () -> Ok ()) in
+  let count query param pool =
+    Mina_caqti.Pool.use
+      (fun (module Conn : Mina_caqti.CONNECTION) -> Conn.find query param)
+      pool
+    |> Deferred.Result.map_error ~f:to_error
+  in
+  B.Db.with_fresh ~server_uri ~name:"test_handover_startup" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let pool =
+        match Mina_caqti.connect_pool db.uri with
+        | Ok pool ->
+            pool
+        | Error e ->
+            failwith (Caqti_error.show e)
+      in
+      (* drain the pool, or the database cannot be dropped *)
+      Monitor.protect
+        ~finally:(fun () -> Caqti_async.Pool.drain pool.Mina_caqti.Pool.pool)
+        (fun () ->
+          let%bind accessed_before =
+            count
+              (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
+                 "SELECT COUNT(*) FROM accounts_accessed" )
+              () pool
+          in
+          let%bind () =
+            ok
+              (Archive_lib.Processor.add_genesis_ledger ~logger ~runtime_config
+                 ~genesis_constants:precomputed.genesis_constants
+                 ~chunks_length:2
+                 ~constraint_constants:precomputed.constraint_constants pool )
+          in
+          let%bind () =
+            ok (Archive_lib.Processor.settle_hard_fork_at_startup ~logger pool)
+          in
+          let%bind written =
+            count
+              (Mina_caqti.find_req Caqti_type.int64 Caqti_type.int
+                 "SELECT COUNT(*) FROM genesis_accounts WHERE genesis_height = \
+                  ?" )
+              4L pool
+          in
+          Alcotest.(check int) "genesis ledger accounts at height 4" 3 written ;
+          let%bind accessed_after =
+            count
+              (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
+                 "SELECT COUNT(*) FROM accounts_accessed" )
+              () pool
+          in
+          Alcotest.(check int)
+            "accounts_accessed unchanged" accessed_before accessed_after ;
+          check_statuses db built statuses ) )
+
 let () =
   let uri = B.Db.test_server_uri () in
   let run f () = Thread_safe.block_on_async_exn (f uri) |> Or_error.ok_exn in
@@ -249,5 +342,9 @@ let () =
             (run fork_unanchored)
         ; Alcotest.test_case "dry run, then idempotent" `Quick
             (run dry_run_and_idempotence)
+        ] )
+    ; ( "handover_startup"
+      , [ Alcotest.test_case "genesis ledger and settle at startup" `Quick
+            (run handover_startup)
         ] )
     ]
