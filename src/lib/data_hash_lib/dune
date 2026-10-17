@@ -32,15 +32,10 @@
   test_util)
  (preprocess
   (pps
-   ppx_bench
-   ppx_compare
-   ppx_hash
-   ppx_inline_test
-   ppx_let
-   ppx_mina
-   ppx_sexp_conv
-   ppx_snarky
-   ppx_version))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Data hash"))

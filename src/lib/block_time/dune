@@ -33,12 +33,8 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_hash
-   ppx_let
-   ppx_mina
-   ppx_version
-   ppx_compare
-   ppx_sexp_conv
-   ppx_compare
-   ppx_inline_test))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (synopsis "Block time"))

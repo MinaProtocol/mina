@@ -28,12 +28,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_annot
-   ppx_assert
-   ppx_base
-   ppx_custom_printf
-   ppx_deriving_yojson
-   ppx_fields_conv
-   ppx_let
-   ppx_version)))
+  (pps mina_ppx)))

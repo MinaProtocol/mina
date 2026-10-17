@@ -16,4 +16,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_base ppx_here ppx_let)))
+  (pps mina_ppx)))
