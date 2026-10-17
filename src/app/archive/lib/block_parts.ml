@@ -150,6 +150,45 @@ let of_precomputed_v4 ~constraint_constants ~proof_cache_db
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
+(* A V3 block's transactions are derived as a V4 block's are, from its diff
+   converted to the latest version, which only extends zkApp states. Each
+   command takes the Berkeley hash of the command it was converted from,
+   found by the latest hash of the converted command. *)
+let of_precomputed_v3 ~constraint_constants ~proof_cache_db
+    (t : Mina_block.Precomputed.V3.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let berkeley_hashes =
+    lazy
+      (let two, one =
+         Berkeley_types.Diff.commands_with_hashes t.staged_ledger_diff
+       in
+       let { Staged_ledger_diff.Pre_diff_two.commands; _ } = two in
+       let one_commands =
+         Option.value_map one ~default:[]
+           ~f:(fun { Staged_ledger_diff.Pre_diff_one.commands; _ } -> commands)
+       in
+       List.map (commands @ one_commands)
+         ~f:(fun { With_status.data = command, hash; _ } ->
+           ( Transaction_hash.hash_command
+               (Berkeley_types.User_command.to_mesa command)
+           , hash ) )
+       |> Transaction_hash.Map.of_alist_exn )
+  in
+  let staged_ledger_diff =
+    Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+      (Berkeley_types.Diff.to_mesa t.staged_ledger_diff)
+  in
+  of_diff
+    ~command_hash:(fun command ->
+      Map.find_exn
+        (Lazy.force berkeley_hashes)
+        (Transaction_hash.hash_command_with_hashes command) )
+    ~constraint_constants
+    ~state_hash:(Protocol_state.hashes t.protocol_state).state_hash
+    ~protocol_state:t.protocol_state ~staged_ledger_diff
+    ~protocol_version:t.protocol_version
+    ~proposed_protocol_version:t.proposed_protocol_version
+
 let of_precomputed ~constraint_constants ~proof_cache_db :
     Mina_block.Precomputed.Versioned.t -> t = function
   | V4 t ->
