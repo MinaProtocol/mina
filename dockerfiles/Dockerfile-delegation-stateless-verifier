@@ -28,14 +28,14 @@ fi
 
 # install mina delegation verifier
 # Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
-# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
-# and install-mina-debs.sh installs the resolved .deb files with apt-get (no apt
-# repo / no apt index). mina-delegation-verify depends on mina-logproc, which
+# the freshly-built .deb files under _debs, bind-mounted at /opt/mina-local-debs for
+# the install step only, and install-mina-debs.sh installs the resolved .deb files
+# with apt-get (no apt repo / no apt index). mina-delegation-verify depends on mina-logproc, which
 # has no repo to resolve it, so it is requested explicitly as a local file.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
-COPY _debs /opt/mina-local-debs
-RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+RUN --mount=type=bind,source=_debs,target=/opt/mina-local-debs \
+  chmod +x /usr/local/bin/install-mina-debs.sh \
   && /usr/local/bin/install-mina-debs.sh \
        "mina-delegation-verify=$deb_version" \
        "mina-logproc=$deb_version"

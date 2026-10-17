@@ -147,7 +147,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
               Processor.User_command.add_if_doesn't_exist conn ~logger
-                ~v1_transaction_hash:false user_command
+                ~transaction_hash ~v1_transaction_hash:false user_command
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
@@ -208,7 +208,7 @@ let%test_module "Archive node unit tests" =
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
                   Processor.User_command.add_if_doesn't_exist conn ~logger
-                    ~v1_transaction_hash:false user_command
+                    ~transaction_hash ~v1_transaction_hash:false user_command
                 in
                 let%map result =
                   Processor.User_command.find conn ~transaction_hash
@@ -272,10 +272,14 @@ let%test_module "Archive node unit tests" =
                 let%bind id1 =
                   Processor.For_test.add_zkapp_command_without_find_opt ~logger
                     conn p
+                    ~transaction_hash:
+                      (Transaction_hash.hash_zkapp_command_with_hashes p)
                 in
                 let%map id2 =
                   Processor.For_test.add_zkapp_command_without_find_opt ~logger
                     conn p
+                    ~transaction_hash:
+                      (Transaction_hash.hash_zkapp_command_with_hashes p)
                 in
                 [%test_result: int] ~expect:id1 id2
               with
@@ -305,6 +309,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
+                ~transaction_hash
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
@@ -330,6 +335,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind coinbase_id =
               Processor.Coinbase.add_if_doesn't_exist conn coinbase
+                ~transaction_hash
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash

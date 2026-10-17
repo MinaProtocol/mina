@@ -50,13 +50,10 @@ let connect postgres_uri =
   | Ok pool ->
       pool
 
-(* Populate accounts_accessed for the genesis block described by the runtime
-   config. When the config has [proof.fork] set, the genesis block is the fork
-   genesis, so this attaches the full fork genesis ledger to the fork block. This
-   is the same routine the archive runs at startup with --config-file; exposing it
-   here lets operators repair an existing hardfork archive whose fork genesis was
-   never populated (e.g. because the archive was not (re)started with the fork
-   config). *)
+(* Write the genesis ledger of the runtime config to genesis_accounts, at the
+   height of the config's genesis block (the fork genesis when the config has
+   [proof.fork]). Balance queries read an account no block touched from there.
+   Continues an interrupted write; a written ledger is left as it is. *)
 let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     () =
   let runtime_config =
@@ -64,14 +61,57 @@ let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     |> Runtime_config.of_yojson |> Result.ok_or_failwith
   in
   let (module G) = Genesis_constants.profiled () in
-  let genesis_constants = G.genesis_constants in
-  let constraint_constants = G.constraint_constants in
-  let pool = connect postgres_uri in
   [%log info] "Populating genesis accounts from runtime config %s"
     runtime_config_file ;
-  Archive_lib.Processor.add_genesis_accounts ~logger
-    ~runtime_config_opt:(Some runtime_config) ~genesis_constants ~chunks_length
-    ~constraint_constants pool
+  let%bind precomputed_values =
+    Genesis_ledger_helper.init_from_config_file ~logger
+      ~proof_level:G.proof_level ~genesis_constants:G.genesis_constants
+      ~constraint_constants:G.constraint_constants ~cli_proof_level:None
+      runtime_config
+    >>| Or_error.ok_exn
+  in
+  let genesis_height =
+    let With_hash.{ data = block; _ }, _ =
+      Mina_block.genesis ~precomputed_values
+    in
+    Mina_block.blockchain_length block
+    |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int64
+  in
+  let%bind accounts =
+    Precomputed_values.genesis_ledger precomputed_values
+    |> Lazy.force |> Mina_ledger.Ledger.to_list
+  in
+  let%bind (module Conn : Mina_caqti.CONNECTION) =
+    match%map Mina_caqti.connect postgres_uri with
+    | Ok conn ->
+        conn
+    | Error e ->
+        failwith (Caqti_error.show e)
+  in
+  Monitor.protect ~finally:Conn.disconnect
+  @@ fun () ->
+  let metadata = [ ("height", `String (Int64.to_string genesis_height)) ] in
+  match%map
+    Archive_lib.Processor.Genesis_accounts.add ~chunk_size:chunks_length
+      (module Conn)
+      ~genesis_height accounts
+  with
+  | Error e ->
+      failwith (Caqti_error.show e)
+  | Ok `No_table ->
+      failwith
+        "The archive database has no genesis_accounts table; run upgrade.sql"
+  | Ok `Already_loaded ->
+      [%log info] "The genesis ledger at height $height is already written"
+        ~metadata
+  | Ok (`Added (count, resumed_after)) ->
+      [%log info]
+        "Wrote $count genesis ledger accounts at height $height, after \
+         $resumed_after written before"
+        ~metadata:
+          ( ("count", `Int count)
+          :: ("resumed_after", `Int resumed_after)
+          :: metadata )
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let pool = connect postgres_uri in

@@ -375,6 +375,47 @@ module Itn = struct
             ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
               let bp_keys = Mina_lib.block_production_pubkeys mina in
               not (Public_key.Compressed.Set.is_empty bp_keys) )
+        ; field "commitId"
+            ~args:Arg.[]
+            ~doc:
+              "Git commit of the daemon build, so that a client can check that \
+               it was built for this daemon"
+            ~typ:(non_null string)
+            ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
+              Mina_lib.commit_id mina )
+        ] )
+
+  let created_account : (bool * Mina_lib.t, Keypair.t option) typ =
+    obj "ItnCreatedAccount" ~fields:(fun _ ->
+        [ field "publicKey"
+            ~args:Arg.[]
+            ~doc:"Public key of the new account"
+            ~typ:(non_null (Scalars.PublicKey.typ ()))
+            ~resolve:(fun _ (kp : Keypair.t) ->
+              Public_key.compress kp.public_key )
+        ; field "privateKey"
+            ~args:Arg.[]
+            ~doc:"Private key of the new account, in base58"
+            ~typ:(non_null string)
+            ~resolve:(fun _ (kp : Keypair.t) ->
+              Private_key.to_base58_check kp.private_key )
+        ] )
+
+  let created_accounts :
+      (bool * Mina_lib.t, (string * Keypair.t list) option) typ =
+    obj "ItnCreatedAccounts" ~fields:(fun _ ->
+        [ field "handle"
+            ~args:Arg.[]
+            ~doc:
+              "Handle of the background job that funds the accounts; it is \
+               listed by scheduledTransactions until the job ends"
+            ~typ:(non_null string)
+            ~resolve:(fun _ (handle, _) -> handle)
+        ; field "accounts"
+            ~args:Arg.[]
+            ~doc:"The new accounts, funded by the background job"
+            ~typ:(non_null (list (non_null created_account)))
+            ~resolve:(fun _ (_, accounts) -> accounts)
         ] )
 
   let metadatum =
@@ -3443,6 +3484,38 @@ module Input = struct
                      will have (2*maxAccountUpdates+2) account updates \
                      (including balancing and fee payer)"
                   ~typ:int
+              ]
+    end
+
+    module CreateAccountsDetails = struct
+      type input =
+        { fee_payer : Signature_lib.Private_key.t
+        ; num_accounts : int
+        ; fee : Currency.Fee.t
+        ; amount : Currency.Amount.t
+        }
+
+      let arg_typ : ((input, string) result option, input option) arg_typ =
+        obj "CreateAccountsDetails"
+          ~doc:"Fee payer and amounts for creating and funding new accounts"
+          ~coerce:(fun fee_payer num_accounts fee amount ->
+            Result.return { fee_payer; num_accounts; fee; amount } )
+          ~split:(fun f (t : input) ->
+            f t.fee_payer t.num_accounts t.fee t.amount )
+          ~fields:
+            Arg.
+              [ arg "feePayer"
+                  ~typ:(non_null PrivateKey.arg_typ)
+                  ~doc:"Private key of the account that funds the new accounts"
+              ; arg "numAccounts" ~typ:(non_null int)
+                  ~doc:"Number of new accounts"
+              ; arg "fee" ~typ:(non_null Fee.arg_typ)
+                  ~doc:"Fee of each zkApp command that creates accounts"
+              ; arg "amount"
+                  ~typ:(non_null CurrencyAmount.arg_typ)
+                  ~doc:
+                    "Amount divided among the new accounts (each account also \
+                     pays the account creation fee out of its share)"
               ]
     end
 
