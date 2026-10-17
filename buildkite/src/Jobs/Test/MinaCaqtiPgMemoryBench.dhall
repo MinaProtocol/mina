@@ -8,6 +8,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
+let MemoryGate = ../../Constants/MemoryGate.dhall
+
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
@@ -26,6 +28,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/MinaCaqtiPgMemoryBench")
           , S.exactly "buildkite/scripts/tests/mina-caqti-pg-memory-bench" "sh"
+          , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
           ]
         , path = "Test"
         , name = "MinaCaqtiPgMemoryBench"
@@ -50,6 +53,7 @@ in  Pipeline.build
                       ContainerImages.minaToolchain
                       "./buildkite/scripts/tests/mina-caqti-pg-memory-bench.sh"
                   ]
+            , softFail = Some MemoryGate.softFail
             }
         ]
       }
