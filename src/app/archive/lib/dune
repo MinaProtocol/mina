@@ -24,6 +24,7 @@
   sexplib0
   uri
   ;;local libraries
+  berkeley_types
   archive_health_queries
   block_time
   mina_stdlib
