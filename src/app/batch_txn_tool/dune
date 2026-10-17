@@ -34,4 +34,8 @@
   (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
  (preprocess
-  (pps ppx_version ppx_let ppx_mina)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

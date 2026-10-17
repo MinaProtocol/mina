@@ -58,12 +58,7 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_custom_printf
-   ppx_mina
-   ppx_version
-   ppx_let
-   ppx_sexp_conv
-   ppx_hash
-   ppx_compare
-   h_list.ppx
-   ppx_inline_test)))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

@@ -28,7 +28,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps graphql_ppx ppx_mina ppx_deriving.show ppx_base ppx_let ppx_version)))
+  (pps mina_ppx.graphql)))
 
 (executable
  (package signer)
@@ -40,7 +40,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps graphql_ppx ppx_mina ppx_deriving.show ppx_base ppx_let ppx_version)))
+  (pps mina_ppx.graphql)))
 
 (executable
  (package signer)
@@ -52,7 +52,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps graphql_ppx ppx_mina ppx_deriving.show ppx_base ppx_let ppx_version)))
+  (pps mina_ppx.graphql)))
 
 (executable
  (package signer)
@@ -64,4 +64,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps graphql_ppx ppx_mina ppx_deriving.show ppx_base ppx_let ppx_version)))
+  (pps mina_ppx.graphql)))

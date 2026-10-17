@@ -48,11 +48,4 @@
   with_hash)
  (modules main test_env convert_canonical_tests populate_genesis_accounts_tests)
  (preprocess
-  (pps
-   ppx_version
-   ppx_mina
-   ppx_let
-   ppx_hash
-   ppx_compare
-   ppx_sexp_conv
-   h_list.ppx)))
+  (pps mina_ppx -allow-unannotated-ignores -allow-toplevel-expression -dont-check-underscored-literal)))

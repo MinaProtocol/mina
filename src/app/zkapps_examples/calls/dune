@@ -29,4 +29,8 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version h_list.ppx)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
