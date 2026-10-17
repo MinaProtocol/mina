@@ -83,7 +83,6 @@
    ppx_let
    ppx_mina
    ppx_pipebang
-   ppx_register_event
    ppx_snarky
    ppx_version))
  (synopsis
