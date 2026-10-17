@@ -134,6 +134,14 @@
       "libs": 206,
       "opam": 54
     },
+    "exe:app/rosetta/search_bench:rosetta_search_bench": {
+      "libs": 204,
+      "opam": 55
+    },
+    "exe:app/rosetta/search_test:rosetta_search_test": {
+      "libs": 250,
+      "opam": 64
+    },
     "exe:app/rosetta:rosetta": {
       "libs": 204,
       "opam": 54
@@ -151,7 +159,7 @@
       "opam": 49
     },
     "exe:app/test_executive:test_executive": {
-      "libs": 239,
+      "libs": 240,
       "opam": 61
     },
     "exe:app/validate_keypair:validate_keypair": {
@@ -237,6 +245,10 @@
     "exe:lib/transaction_snark/test/zkapp_fuzzy:zkapp_fuzzy": {
       "libs": 144,
       "opam": 40
+    },
+    "exe:test/archive/archive_memory_bench:archive_memory_bench": {
+      "libs": 105,
+      "opam": 37
     },
     "exe:test/archive/patch_archive_test:patch_archive_test": {
       "libs": 248,

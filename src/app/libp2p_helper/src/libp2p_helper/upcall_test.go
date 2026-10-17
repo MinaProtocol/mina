@@ -5,6 +5,7 @@ import (
 	ipc "libp2p_ipc"
 	"math"
 	"testing"
+	"time"
 
 	logging "github.com/ipfs/go-log/v2"
 
@@ -285,6 +286,34 @@ func TestUpcalls(t *testing.T) {
 
 	t.Logf("checkGossipReceived: waiting")
 	checkGossipReceived(t, <-aTrap.GossipReceived, msg, subId, peerId(carolInfo))
+}
+
+func TestUpcallsReportPeersConnectedBeforeAdvertising(t *testing.T) {
+	_, _, _, aliceInfo := mkAppForUpcallTest(t, "alice")
+
+	bTrap := newUpcallTrap("bob", 64, 1<<ResourceUpdateChan)
+	bob, _ := newTestApp(t, nil, false)
+	bob.NoMDNS = true
+	bob.NoDHT = true
+	require.NoError(t, configurePubsub(bob, 32, nil, nil))
+
+	errChan := make(chan error, 1)
+	ctx, cancelF := context.WithCancel(context.Background())
+	handleErrChan(t, errChan, cancelF)
+	launchFeedUpcallTrap(bob.P2p.Logger, bob.OutChan, bTrap, errChan, ctx)
+
+	// Connect before the connection handlers are installed, as the DHT does
+	// with its bootstrap peers during configuration.
+	require.NoError(t, bob.P2p.Host.Connect(ctx, aliceInfo))
+
+	beginAdvertisingSendAndCheck(t, bob)
+
+	select {
+	case pc := <-bTrap.PeerConnected:
+		checkPeerConnected(t, pc, aliceInfo)
+	case <-time.After(testTimeout):
+		t.Fatal("connection established before advertising was never reported")
+	}
 }
 
 func checkGossipReceived(t *testing.T, m ipc.DaemonInterface_GossipReceived, msg []byte, subId uint64, senderPeerId string) {

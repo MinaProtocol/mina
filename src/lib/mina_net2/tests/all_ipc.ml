@@ -447,6 +447,10 @@ let%test_module "all-ipc test" =
 
     let carol c ad (pc, _) msgs =
       let aliceStatus = ref NotMet in
+      (* Bob bans Carol, but as the dialer Carol may still observe a
+         transient connection to Bob before his gating closes it, so this
+         status is not asserted on. The ban is checked by Bob requiring that
+         topic "a" gossip from Carol reaches him via Alice. *)
       let bobStatus = ref NotMet in
       let yotaStatus = ref NotMet in
       let pcLs =
@@ -491,8 +495,6 @@ let%test_module "all-ipc test" =
       let%bind () =
         Pubsub.publish_raw c ~topic:"topic/b" "not to be received"
       in
-
-      (match !bobStatus with Connected -> raise UnexpectedState | _ -> ()) ;
 
       (* Remove stream handler for the protocol, further stream
          connections will be rejected *)

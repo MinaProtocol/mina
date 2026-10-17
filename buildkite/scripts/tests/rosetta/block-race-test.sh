@@ -3,7 +3,7 @@
 # Main purpose of this is script is to wrap around  rosetta-block-race.sh
 # So env vars from docker buildkite step are passed down to the script
 
-LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger.tar"
+LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger-mesa.tar"
 LEDGER_DIR="ledger"
 
 mkdir -p "$LEDGER_DIR"
