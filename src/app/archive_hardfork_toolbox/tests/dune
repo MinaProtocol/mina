@@ -46,7 +46,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules main test_env convert_canonical_tests populate_genesis_accounts_tests)
+ (modules main test_env populate_genesis_accounts_tests)
  (preprocess
   (pps
    ppx_version

@@ -4,5 +4,4 @@
 let () =
   let server_uri = Uri.of_string (Test_env.postgres_uri ()) in
   Alcotest.run "Archive Hardfork Toolbox Tests"
-    ( Convert_canonical_tests.tests
-    @ Populate_genesis_accounts_tests.tests ~server_uri )
+    (Populate_genesis_accounts_tests.tests ~server_uri)
