@@ -274,8 +274,6 @@ let compute_metrics curve =
           |> Option.value ~default:0
       }
 
-let sanitize = String.map ~f:(function ' ' | ',' | '=' -> '_' | c -> c)
-
 let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
     ~measurement ~tags () =
   let%bind sampler = Mina_caqti.connect uri >>| ok_exn ~ctx:"connect" in
@@ -361,30 +359,26 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
     if Float.(ingest_seconds > 0.) then Float.of_int blocks_ok /. ingest_seconds
     else 0.
   in
-  let fields =
-    [ sprintf "blocks_ok=%di" blocks_ok
-    ; sprintf "blocks_failed=%di" blocks_failed
-    ; sprintf "zkapp_arrays=%di" m.arrays
-    ; sprintf "archive_rss_growth_kib=%di" m.archive_growth
-    ; sprintf "archive_rss_kib_per_1k_arrays=%.3f" m.archive_slope
-    ; sprintf "pg_backend_rss_peak_kib=%di" m.backend_peak
-    ; sprintf "pg_backend_rss_tail_avg_kib=%di" m.backend_tail_average
-    ; sprintf "pg_backend_rss_kib_per_1k_arrays=%.3f" m.backend_slope
-    ; sprintf "pg_backend_rss_slope_r2=%.3f" m.backend_slope_r2
-    ; sprintf "pg_backend_changes=%di" m.pid_changes
-    ; sprintf "pg_backends_max=%di" m.max_backends
-    ; sprintf "ingest_seconds=%di" (Float.iround_down_exn ingest_seconds)
-    ; sprintf "blocks_per_sec=%.3f" blocks_per_sec
-    ]
+  let point =
+    Influxdb_line_protocol.(
+      create ~tags ~measurement
+        [ ("blocks_ok", Int blocks_ok)
+        ; ("blocks_failed", Int blocks_failed)
+        ; ("zkapp_arrays", Int m.arrays)
+        ; ("archive_rss_growth_kib", Int m.archive_growth)
+        ; ("archive_rss_kib_per_1k_arrays", Float m.archive_slope)
+        ; ("pg_backend_rss_peak_kib", Int m.backend_peak)
+        ; ("pg_backend_rss_tail_avg_kib", Int m.backend_tail_average)
+        ; ("pg_backend_rss_kib_per_1k_arrays", Float m.backend_slope)
+        ; ("pg_backend_rss_slope_r2", Float m.backend_slope_r2)
+        ; ("pg_backend_changes", Int m.pid_changes)
+        ; ("pg_backends_max", Int m.max_backends)
+        ; ("ingest_seconds", Int (Float.iround_down_exn ingest_seconds))
+        ; ("blocks_per_sec", Float blocks_per_sec)
+        ])
   in
-  let line =
-    sprintf "%s,%s %s %d" (sanitize measurement)
-      ( List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-      |> String.concat ~sep:"," )
-      (String.concat ~sep:"," fields)
-      (Time_ns.to_int_ns_since_epoch (Time_ns.now ()))
-  in
-  Option.iter perf_file ~f:(fun path -> Out_channel.write_lines path [ line ]) ;
+  Option.iter perf_file ~f:(fun path ->
+      Influxdb_line_protocol.write_file path [ point ] ) ;
   printf "=== growth curve ===\n%s\n" Sample.header ;
   List.iter curve ~f:(fun s -> print_endline (Sample.row s)) ;
   printf "=== summary ===\n" ;
@@ -408,7 +402,8 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
        numbers understate the leak\n" ;
   printf "  ingest time                 : %.0f s\n" ingest_seconds ;
   printf "  throughput                  : %.3f blocks/s\n" blocks_per_sec ;
-  printf "=== influxdb line protocol ===\n%s\n" line ;
+  printf "=== influxdb line protocol ===\n%s\n"
+    (Influxdb_line_protocol.to_line point) ;
   let (module Conn : Mina_caqti.CONNECTION) = sampler in
   Conn.disconnect ()
 

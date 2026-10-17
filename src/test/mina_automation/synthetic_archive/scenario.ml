@@ -67,13 +67,16 @@ type timing =
   ; vesting_increment : int
   }
 
-(* the state of an account a block's accounts_accessed row records *)
+(* the state of an account an archive row records: in a block's
+   accounts_accessed, or in a genesis ledger *)
 type account_state =
   { state_of : account
   ; state_balance : int
   ; state_nonce : int
   ; state_timing : timing option
   }
+
+type genesis_account = { genesis_height : int; genesis_state : account_state }
 
 type t =
   { producer : account  (** creates every block without a [creator] *)
@@ -84,6 +87,7 @@ type t =
   ; mutable coinbases : coinbase list
   ; mutable accounts_created : account_created list
   ; mutable account_states : (block * account_state) list
+  ; mutable genesis_accounts : genesis_account list
   ; nonces : int String.Table.t
   ; mutable materialized : bool
   }
@@ -111,6 +115,7 @@ let create () =
   ; coinbases = []
   ; accounts_created = []
   ; account_states = []
+  ; genesis_accounts = []
   ; nonces = String.Table.create ()
   ; materialized = false
   }
@@ -259,4 +264,17 @@ let account_state ?(nonce = 0) ?timing t block account ~balance =
           ; state_nonce = nonce
           ; state_timing = timing
           } )
+      ]
+
+let genesis_account ?(nonce = 0) ?timing t ~genesis_height account ~balance =
+  t.genesis_accounts <-
+    t.genesis_accounts
+    @ [ { genesis_height
+        ; genesis_state =
+            { state_of = account
+            ; state_balance = balance
+            ; state_nonce = nonce
+            ; state_timing = timing
+            }
+        }
       ]

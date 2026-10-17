@@ -473,15 +473,6 @@ module TestScenarios = struct
     ]
 end
 
-let get_postgres_uri () =
-  match Sys.getenv "POSTGRES_URI" with
-  | Some uri ->
-      uri
-  | None ->
-      failwith
-        "POSTGRES_URI environment variable is not set. Please set it to run \
-         the tests."
-
 let add_block scenario ~built position (b : Block.t) =
   if b.id <> position + 1 then
     failwithf "block %s: id %d, but ids must be 1, 2, 3, ... in list order"
@@ -501,7 +492,7 @@ let setup_db db_name (blocks : Block.t list) =
   let open Deferred.Or_error.Let_syntax in
   let scenario = B.create () in
   List.iteri blocks ~f:(add_block scenario ~built:(Int.Table.create ())) ;
-  let conn_str = get_postgres_uri () in
+  let conn_str = Test_env.postgres_uri () in
   let%bind db =
     B.Db.create ~server_uri:(Uri.of_string conn_str) ~name:db_name ()
   in
@@ -795,31 +786,30 @@ let test_summary_counts () =
   check ~name:"summary_counts_rerun" ~blocks:orphaned_leftover_blocks
     ~expected:(3, 2, 0, 0)
 
-let () =
-  Alcotest.run "Archive Hardfork Toolbox Tests"
-    [ ( "convert_chain_to_canonical"
-      , List.map TestScenarios.all_scenarios ~f:(fun scenario ->
-            (scenario.name, `Quick, fun () -> make_test scenario) ) )
-    ; ( "convert_chain_to_canonical_extras"
-      , [ ( "test_auto_detect_latest_boundary"
-          , `Quick
-          , fun () ->
-              Thread_safe.block_on_async_exn test_auto_detect_latest_boundary
-              |> Or_error.ok_exn )
-        ; ( "test_dry_run_writes_nothing"
-          , `Quick
-          , fun () ->
-              Thread_safe.block_on_async_exn test_dry_run_writes_nothing
-              |> Or_error.ok_exn )
-        ; ( "test_same_protocol_version_fork"
-          , `Quick
-          , fun () ->
-              Thread_safe.block_on_async_exn test_same_protocol_version_fork
-              |> Or_error.ok_exn )
-        ; ( "test_summary_counts"
-          , `Quick
-          , fun () ->
-              Thread_safe.block_on_async_exn test_summary_counts
-              |> Or_error.ok_exn )
-        ] )
-    ]
+let tests =
+  [ ( "convert_chain_to_canonical"
+    , List.map TestScenarios.all_scenarios ~f:(fun scenario ->
+          (scenario.name, `Quick, fun () -> make_test scenario) ) )
+  ; ( "convert_chain_to_canonical_extras"
+    , [ ( "test_auto_detect_latest_boundary"
+        , `Quick
+        , fun () ->
+            Thread_safe.block_on_async_exn test_auto_detect_latest_boundary
+            |> Or_error.ok_exn )
+      ; ( "test_dry_run_writes_nothing"
+        , `Quick
+        , fun () ->
+            Thread_safe.block_on_async_exn test_dry_run_writes_nothing
+            |> Or_error.ok_exn )
+      ; ( "test_same_protocol_version_fork"
+        , `Quick
+        , fun () ->
+            Thread_safe.block_on_async_exn test_same_protocol_version_fork
+            |> Or_error.ok_exn )
+      ; ( "test_summary_counts"
+        , `Quick
+        , fun () ->
+            Thread_safe.block_on_async_exn test_summary_counts
+            |> Or_error.ok_exn )
+      ] )
+  ]
