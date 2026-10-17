@@ -150,6 +150,11 @@ let of_precomputed_v4 ~constraint_constants ~proof_cache_db
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
+(* The coinbase of the Berkeley era on mainnet, which the Mesa hard fork
+   halved along with the slot time. A block doesn't record its coinbase, so a
+   V3 block's transactions need it in place of the current one. *)
+let berkeley_coinbase_amount = Currency.Amount.of_mina_int_exn 720
+
 (* A V3 block's transactions are derived as a V4 block's are, from its diff
    converted to the latest version, which only extends zkApp states. Each
    command takes the Berkeley hash of the command it was converted from,
@@ -183,7 +188,8 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
       Map.find_exn
         (Lazy.force berkeley_hashes)
         (Transaction_hash.hash_command_with_hashes command) )
-    ~constraint_constants
+    ~constraint_constants:
+      { constraint_constants with coinbase_amount = berkeley_coinbase_amount }
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
     ~protocol_state:t.protocol_state ~staged_ledger_diff
