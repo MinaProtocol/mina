@@ -41,7 +41,6 @@
    ppx_compare
    ppx_custom_printf
    ppx_deriving.std
-   ppx_deriving_yojson
    ppx_fields_conv
    ppx_hash
    ppx_inline_test

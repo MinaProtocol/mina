@@ -23,4 +23,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let ppx_sexp_conv ppx_deriving_yojson ppx_mina)))
+  (pps ppx_version ppx_let ppx_sexp_conv ppx_mina)))

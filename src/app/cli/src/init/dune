@@ -132,7 +132,6 @@
   ../../../../graphql-ppx-config.inc)
  (preprocess
   (pps
-   ppx_deriving_yojson
    ppx_mina
    ppx_version
    ppx_base

@@ -44,7 +44,6 @@
    ppx_let
    ppx_inline_test
    ppx_compare
-   ppx_deriving_yojson
    ppx_assert))
  (instrumentation
   (backend bisect_ppx))
