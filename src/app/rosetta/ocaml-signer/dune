@@ -35,8 +35,7 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))
 
 (executable
  (package signer)
@@ -55,8 +54,7 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))
 
 (executable
  (package signer)
@@ -75,8 +73,7 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))
 
 (executable
  (package signer)
@@ -95,5 +92,4 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))

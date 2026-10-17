@@ -51,10 +51,8 @@
    ppx_mina
    ppx_version
    ppx_let
-   ppx_sexp_conv
    ppx_bin_prot
    ppx_custom_printf
-   ppx_compare
    ppx_deriving_yojson))
  (instrumentation
   (backend bisect_ppx))
