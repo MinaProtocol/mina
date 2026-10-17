@@ -149,6 +149,12 @@ module Diff : sig
         * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
 
       val to_latest : t -> V4.t
+
+      val coinbase :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> supercharge_coinbase:bool
+        -> t
+        -> Currency.Amount.t option
     end
 
     module Latest = V4
