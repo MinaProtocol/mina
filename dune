@@ -11,4 +11,21 @@
     %{target}
     (run %{<})))))
 
+;; Mock GraphQL schema introspection, written to _build only. The
+;; daemonStatus subtree is [Mina_graphql.Types.Make_daemon_status] itself,
+;; so it cannot drift; for the parallel types in [Mock_types], the subset
+;; check (mock ⊆ real) catches structural divergence.
+
+(rule
+ (target mock_schema.json)
+ (deps
+  (:< src/test/daemon/graphql_mock/mock_schema_dump.exe))
+ (action
+  (setenv
+   MINA_PROFILE
+   dev
+   (with-stdout-to
+    %{target}
+    (run %{<})))))
+
 (dirs :standard \ opam_switches)
