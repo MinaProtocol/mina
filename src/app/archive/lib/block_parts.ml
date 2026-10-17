@@ -157,9 +157,30 @@ let of_precomputed_v5 ~constraint_constants ~proof_cache_db
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
-let of_precomputed_v4 ~constraint_constants:_ ~proof_cache_db:_
-    (_ : Mina_block.Precomputed.Stable.V4.t) =
-  failwith "Block_parts.of_precomputed_v4: V4 has no derivation of its own yet"
+(* The protocol state and staged ledger diff are read at the versions a V4
+   block carries, so that a later change to either stops this compiling,
+   rather than letting a V4 block be read by the rules of a newer version. *)
+let of_precomputed_v4 ~constraint_constants ~proof_cache_db
+    (t : Mina_block.Precomputed.Stable.V4.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  of_protocol_state
+    ~state_hash:
+      (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
+    ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
+    ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
+      Staged_ledger.Pre_diff_info.get_transactions_stable_v3
+        ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
+        (t.staged_ledger_diff : Staged_ledger_diff.Stable.V3.t)
+      |> Result.map
+           ~f:
+             (List.map
+                ~f:
+                  (With_status.map
+                     ~f:
+                       (Transaction.write_all_proofs_to_disk ~signature_kind
+                          ~proof_cache_db ) ) ) )
+    ~protocol_version:t.protocol_version
+    ~proposed_protocol_version:t.proposed_protocol_version
 
 let of_precomputed ~constraint_constants ~proof_cache_db :
     Mina_block.Precomputed.Versioned.t -> t = function
