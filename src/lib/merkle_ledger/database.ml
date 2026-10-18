@@ -508,6 +508,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         ~key_data_pairs:token_owner_changes
   end)
 
+  let i_can_sync = ()
+
   let set_hash mdb location new_hash =
     set_hash_batch mdb [ (location, new_hash) ]
 

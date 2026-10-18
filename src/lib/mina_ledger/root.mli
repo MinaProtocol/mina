@@ -136,6 +136,8 @@ val get_inner_hash_at_addr_exn : t -> addr -> hash
       the values at the leaves. *)
 val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
+val i_can_sync : unit
+
 (** For each addr-account pair, replace the account in the root with the given
       account. This is done as a single batch write. *)
 val set_batch_accounts : t -> (addr * account) list -> unit

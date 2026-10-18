@@ -237,6 +237,8 @@ module type SYNC_RECIPIENT = sig
   include SYNC_CANDIDATE
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
+
+  val i_can_sync : unit
 end
 
 module Inputs = struct
@@ -479,6 +481,8 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
+    val i_can_sync : unit
+
     val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
 
     (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)
@@ -552,6 +556,8 @@ module Ledger = struct
       include S
 
       module Config : Config
+
+      val i_can_sync : unit
 
       val dbs_synced : primary_ledger -> converting_ledger -> bool
 

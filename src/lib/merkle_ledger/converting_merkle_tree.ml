@@ -264,6 +264,8 @@ struct
   include Make (Inputs) (Primary_db) (Converting_db)
   module Config = With_database_config
 
+  let i_can_sync = Primary_db.i_can_sync ; Converting_db.i_can_sync
+
   let dbs_synced db1 db2 =
     Primary_db.num_accounts db1 = Converting_db.num_accounts db2
     &&

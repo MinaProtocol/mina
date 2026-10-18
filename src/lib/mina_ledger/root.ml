@@ -368,6 +368,8 @@ module T = struct
     | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.set_all_accounts_rooted_at_exn db
 
+  let i_can_sync = Ledger.Db.i_can_sync
+
   let set_batch_accounts t =
     match t with
     | Stable_db db ->
