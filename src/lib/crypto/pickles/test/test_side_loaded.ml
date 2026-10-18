@@ -2,9 +2,9 @@
    -------
 
    Component: Pickles
-   Subject: Test side-loading proofs with a smaller wrap domain
+   Subject: Test side-loading proofs
    Invocation: \
-    dune exec src/lib/crypto/pickles/test/test_domain_too_small.exe
+    dune exec src/lib/crypto/pickles/test/test_side_loaded.exe
 *)
 
 open Pickles_types
@@ -313,7 +313,7 @@ end
 
 let () =
   let open Alcotest in
-  run "Pickles domain too small"
+  run "Pickles side-loaded"
     [ ("No recursion", [ test_case "verify" `Quick No_recursion.test_verify ])
     ; ( "Fake 1 recursion"
       , [ test_case "verify" `Quick Fake_1_recursion.test_verify ] )
