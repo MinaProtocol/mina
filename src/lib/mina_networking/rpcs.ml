@@ -331,7 +331,7 @@ module Answer_sync_ledger_query = struct
       type query = Ledger_hash.t * Sync_ledger.Query.t
 
       type response =
-        (( Sync_ledger.Answer.t
+        (( Sync_ledger.Answer.With_raw_accounts.t
          , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
@@ -368,7 +368,7 @@ module Answer_sync_ledger_query = struct
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V4.t
+        (( (Sync_ledger.Answer.With_raw_accounts.t[@version_asserted])
          , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
@@ -417,11 +417,12 @@ module Answer_sync_ledger_query = struct
           return (Or_error.error_string "No Frontier")
     in
     let result =
-      Result.map_error answer ~f:(fun e ->
-          Error.createf
-            !"Refusing to answer sync ledger query for ledger_hash: \
-              %{sexp:Ledger_hash.t}. Error: %s"
-            ledger_hash (Error.to_string_hum e) )
+      Result.map answer ~f:Sync_ledger.Answer.With_raw_accounts.of_answer
+      |> Result.map_error ~f:(fun e ->
+             Error.createf
+               !"Refusing to answer sync ledger query for ledger_hash: \
+                 %{sexp:Ledger_hash.t}. Error: %s"
+               ledger_hash (Error.to_string_hum e) )
     in
     let%map () =
       match result with
