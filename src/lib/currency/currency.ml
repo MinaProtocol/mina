@@ -925,12 +925,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       module type S = sig
         [%%versioned:
         module Stable : sig
+          [@@@no_toplevel_latest_type]
+
           module V1 : sig
             [@@@with_all_version_tags]
 
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
           end
         end]
+
+        type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
         (* Give a definition to var, it will be hidden at the interface level *)
         include
@@ -1045,6 +1049,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Balance = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Amount.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -1052,6 +1058,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
     include (Amount : Basic with type t := t with type var = Amount.var)
 

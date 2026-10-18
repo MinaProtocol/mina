@@ -226,6 +226,8 @@ module User_command = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t =
         ( (User_command.Stable.V3.t[@hash.ignore])
@@ -241,6 +243,8 @@ module User_command = struct
       let compare (x : t) (y : t) = T.compare x.hash y.hash
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, to_yojson]
 
   let create (c : User_command.Stable.Latest.t) : t =
     { data = c; hash = hash_command c }

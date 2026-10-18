@@ -23,6 +23,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module M = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Wire_types.global_slot = Since_genesis of T.Stable.V1.t
         [@@unboxed] [@@deriving hash, sexp, compare, equal]
@@ -48,6 +50,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Error "Global_slot.of_yojson: Expected `String"
       end
     end]
+
+    type t = Stable.Latest.t = Since_genesis of T.t
+    [@@unboxed] [@@deriving hash, sexp, compare, equal]
 
     module T = T
 

@@ -16,6 +16,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     (* Milliseconds since epoch *)
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = UInt64.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -31,6 +33,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         include Hashable.Make (T)
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
     let max_value = UInt64.max_int
 
@@ -121,6 +125,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module Span = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = UInt64.Stable.V1.t
           [@@deriving sexp, compare, equal, hash, yojson]
@@ -128,6 +134,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
       module Bits = B.UInt64
       include B.Snarkable.UInt64 (Tick)

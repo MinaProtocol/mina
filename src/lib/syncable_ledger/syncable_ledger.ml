@@ -13,6 +13,8 @@ let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 module Query = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type 'addr t =
         | What_child_hashes of 'addr * int
@@ -52,11 +54,29 @@ module Query = struct
             Num_accounts
     end
   end]
+
+  type 'addr t = 'addr Stable.Latest.t =
+    | What_child_hashes of 'addr * int
+        (** What are the hashes of the children of this address? 
+              If depth > 1 then we get the leaves of a subtree rooted
+              at address and of the given depth. 
+              For depth = 1 we have the simplest case with just the 2
+              direct children.
+              *)
+    | What_contents of 'addr
+        (** What accounts are at this address? addr must have depth
+              tree_depth - account_subtree_height *)
+    | Num_accounts
+        (** How many accounts are there? Used to size data structure and
+              figure out what part of the tree is filled in. *)
+  [@@deriving sexp, yojson, hash, compare]
 end
 
 module Answer = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('hash, 'account) t =
         | Child_hashes_are of
@@ -72,6 +92,18 @@ module Answer = struct
       [@@deriving sexp, yojson]
     end
   end]
+
+  type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
+    | Child_hashes_are of 'hash Mina_stdlib.Bounded_types.ArrayN4000.t
+        (** The requested addresses' children have these hashes.
+              May be any power of 2 number of children, and not necessarily 
+              immediate children  *)
+    | Contents_are of 'account list
+        (** The requested address has these accounts *)
+    | Num_accounts of int * 'hash
+        (** There are this many accounts and the smallest subtree that
+                  contains all non-empty nodes has this hash. *)
+  [@@deriving sexp, yojson]
 end
 
 type daemon_config = { max_subtree_depth : int; default_subtree_depth : int }

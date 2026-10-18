@@ -18,6 +18,8 @@ module T = Nat.Make32 ()
 module Make_str (_ : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Wire_types.global_slot_span = Global_slot_span of T.Stable.V1.t
       [@@unboxed] [@@deriving hash, sexp, compare, equal]
@@ -43,6 +45,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Error "Global_slot_span.of_yojson: expected string"
     end
   end]
+
+  type t = Stable.Latest.t = Global_slot_span of T.t
+  [@@unboxed] [@@deriving hash, sexp, compare, equal]
 
   let to_uint32 (Global_slot_span u32) : uint32 = u32
 

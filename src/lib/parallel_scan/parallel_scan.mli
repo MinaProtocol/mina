@@ -36,10 +36,14 @@ open Core_kernel
 module Sequence_number : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = int [@@deriving sexp]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 (**Each node on the tree is viewed as a job that needs to be completed. When a job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
@@ -62,10 +66,14 @@ end
 module Weight : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = { base : int; merge : int } [@@deriving sexp]
     end
   end]
+
+  type t = Stable.Latest.t = { base : int; merge : int } [@@deriving sexp]
 end
 
 (**Base Job: Proving new transactions*)
@@ -73,6 +81,8 @@ module Base : sig
   module Record : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'base t =
           { job : 'base
@@ -82,25 +92,38 @@ module Base : sig
         [@@deriving sexp]
       end
     end]
+
+    type 'base t = 'base Stable.Latest.t =
+      { job : 'base; seq_no : Sequence_number.t; status : Job_status.t }
+    [@@deriving sexp]
   end
 
   module Job : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'base t = Empty | Full of 'base Record.Stable.V1.t
         [@@deriving sexp]
       end
     end]
+
+    type 'base t = 'base Stable.Latest.t = Empty | Full of 'base Record.t
+    [@@deriving sexp]
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
       [@@deriving sexp]
     end
   end]
+
+  type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 end
 
 (** Merge Job: Merging two proofs*)
@@ -108,6 +131,8 @@ module Merge : sig
   module Record : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'merge t =
           { left : 'merge
@@ -118,11 +143,21 @@ module Merge : sig
         [@@deriving sexp]
       end
     end]
+
+    type 'merge t = 'merge Stable.Latest.t =
+      { left : 'merge
+      ; right : 'merge
+      ; seq_no : Sequence_number.t
+      ; status : Job_status.t
+      }
+    [@@deriving sexp]
   end
 
   module Job : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'merge t =
           | Empty
@@ -131,16 +166,26 @@ module Merge : sig
         [@@deriving sexp]
       end
     end]
+
+    type 'merge t = 'merge Stable.Latest.t =
+      | Empty
+      | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
+      | Full of 'merge Record.t
+    [@@deriving sexp]
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'merge t =
         (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
       [@@deriving sexp]
     end
   end]
+
+  type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 end
 
 (** An available job is an incomplete job that has enough information for one
@@ -159,11 +204,16 @@ end
 module Space_partition : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = { first : int * int; second : (int * int) option }
       [@@deriving sexp]
     end
   end]
+
+  type t = Stable.Latest.t = { first : int * int; second : (int * int) option }
+  [@@deriving sexp]
 end
 
 (**Per-tree counts reported by {!metrics}.*)
@@ -177,6 +227,8 @@ module Job_view : sig
   module Extra : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type t =
           { seq_no : Sequence_number.Stable.V1.t
@@ -185,11 +237,17 @@ module Job_view : sig
         [@@deriving sexp]
       end
     end]
+
+    type t = Stable.Latest.t =
+      { seq_no : Sequence_number.t; status : Job_status.t }
+    [@@deriving sexp]
   end
 
   module Node : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'a t =
           | BEmpty
@@ -200,15 +258,28 @@ module Job_view : sig
         [@@deriving sexp]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t =
+      | BEmpty
+      | BFull of ('a * Extra.t)
+      | MEmpty
+      | MPart of 'a
+      | MFull of ('a * 'a * Extra.t)
+    [@@deriving sexp]
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'a t = { position : int; value : 'a Node.Stable.V1.t }
       [@@deriving sexp]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { position : int; value : 'a Node.t }
+  [@@deriving sexp]
 end
 
 module State : sig

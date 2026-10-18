@@ -290,12 +290,16 @@ module type Full = sig
   module Fee : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, yojson, equal]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
     include Basic with type t := Stable.Latest.t
 
@@ -326,12 +330,16 @@ module type Full = sig
   module Amount : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, equal, yojson]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
     include Basic with type t := Stable.Latest.t
 
@@ -391,10 +399,14 @@ module type Full = sig
   module Balance : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type t [@@deriving sexp, compare, hash, yojson, equal]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
     include Basic with type t := Stable.Latest.t
 

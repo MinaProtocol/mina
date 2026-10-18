@@ -96,10 +96,14 @@ module type Account_id = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t [@@deriving sexp]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val public_key : t -> key
 

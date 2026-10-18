@@ -164,6 +164,8 @@ module Output = struct
   module Truncated = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash, yojson]
@@ -191,6 +193,8 @@ module Output = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
     include Codable.Make_base58_check (struct
       type t = Stable.Latest.t [@@deriving bin_io_unversioned]

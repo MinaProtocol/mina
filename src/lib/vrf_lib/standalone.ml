@@ -12,24 +12,35 @@ module Evaluation = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type 'scalar t = { c : 'scalar; s : 'scalar } [@@deriving sexp]
 
           let to_latest = Fn.id
         end
       end]
+
+      type 'scalar t = 'scalar Stable.Latest.t = { c : 'scalar; s : 'scalar }
+      [@@deriving sexp]
     end
   end
 
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('group, 'dleq) t =
           { discrete_log_equality : 'dleq; scaled_message_hash : 'group }
         [@@deriving sexp]
       end
     end]
+
+    type ('group, 'dleq) t = ('group, 'dleq) Stable.Latest.t =
+      { discrete_log_equality : 'dleq; scaled_message_hash : 'group }
+    [@@deriving sexp]
   end
 end
 

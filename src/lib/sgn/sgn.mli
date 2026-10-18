@@ -3,6 +3,8 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     type t = Sgn_type.Sgn.Stable.V1.t = Pos | Neg
     [@@deriving sexp, hash, compare, equal, yojson]
@@ -10,6 +12,7 @@ module Stable : sig
 end]
 
 type t = Stable.Latest.t = Pos | Neg
+[@@deriving sexp, hash, compare, equal, yojson]
 
 val to_field : t -> Field.t
 

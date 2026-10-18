@@ -12,6 +12,8 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = A.V2.t = { transaction : int; network : int; patch : int }
       [@@deriving compare, equal, sexp, yojson, fields]
@@ -19,6 +21,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { transaction : int; network : int; patch : int }
+  [@@deriving compare, equal, sexp, yojson, fields]
 
   include Comparable.Make (Stable.V2)
 

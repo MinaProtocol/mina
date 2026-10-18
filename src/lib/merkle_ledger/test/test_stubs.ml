@@ -88,6 +88,8 @@ module Key : sig
 end = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Mina_base.Account.Key.Stable.V1.t
       [@@deriving sexp, equal, compare, hash]
@@ -95,6 +97,8 @@ end = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
   let to_string = Signature_lib.Public_key.Compressed.to_base58_check
 
@@ -128,6 +132,8 @@ module Account_id : sig
 end = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Mina_base.Account_id.Stable.V2.t
       [@@deriving sexp, equal, compare, hash]
@@ -135,6 +141,8 @@ end = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

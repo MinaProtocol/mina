@@ -2,6 +2,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = { trust : float; banned : Banned_status.Stable.V1.t }
     [@@deriving yojson]
@@ -9,3 +11,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t = { trust : float; banned : Banned_status.t }
+[@@deriving yojson]
