@@ -190,6 +190,10 @@ module Instance = struct
             Frozen_ledger_hash.equal potential_snarked_ledger_hash
               snarked_ledger_hash
           then (
+            (* Opening a directory left over from an interrupted recovery would
+               reuse its accounts, so start from an empty one. *)
+            Root_ledger.Config.delete_any_backing
+              (Config.tmp_snarked_ledger factory) ;
             let snarked_ledger =
               Root_ledger.create ~logger ~depth:factory.ledger_depth
                 ~config:(Config.tmp_snarked_ledger factory)
