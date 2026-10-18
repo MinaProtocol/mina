@@ -22,8 +22,23 @@ if git rev-parse --verify -q origin/master >/dev/null && in_branch "master"; the
   exit 0
 fi
 
-# skip SSL verification for this fetch only (for CI)
-git -c http.sslVerify=false fetch origin
+FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-5}"
+FETCH_RETRY_DELAY="${FETCH_RETRY_DELAY:-15}"
+
+# GitHub resets connections from the CI agents in episodes, which surfaces
+# here as `gnutls_handshake() failed: Error in the pull function`.
+for attempt in $(seq 1 "${FETCH_ATTEMPTS}"); do
+  # skip SSL verification for this fetch only (for CI)
+  if git -c http.sslVerify=false fetch origin; then
+    break
+  fi
+  if [[ "${attempt}" -eq "${FETCH_ATTEMPTS}" ]]; then
+    echo "ERROR: could not fetch snarky's origin after ${FETCH_ATTEMPTS} attempts" >&2
+    exit 1
+  fi
+  echo "Fetching snarky's origin failed (attempt ${attempt}/${FETCH_ATTEMPTS}), retrying in ${FETCH_RETRY_DELAY}s" >&2
+  sleep "${FETCH_RETRY_DELAY}"
+done
 
 if (! in_branch "master"); then
   cat >&2 <<EOF
