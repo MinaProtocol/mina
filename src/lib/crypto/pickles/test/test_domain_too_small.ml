@@ -83,6 +83,11 @@ module No_recursion = struct
     (Field.Constant.zero, b0)
 
   let example_input, example_proof = example
+
+  let test_verify () =
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (example_input, example_proof) ] ) )
 end
 
 module Fake_1_recursion = struct
@@ -121,6 +126,11 @@ module Fake_1_recursion = struct
     (Field.Constant.zero, b0)
 
   let example_input, example_proof = example
+
+  let test_verify () =
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (example_input, example_proof) ] ) )
 end
 
 module Fake_2_recursion = struct
@@ -160,6 +170,11 @@ module Fake_2_recursion = struct
     (Field.Constant.zero, b0)
 
   let example_input, example_proof = example
+
+  let test_verify () =
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (example_input, example_proof) ] ) )
 end
 
 [@@@warning "-60"]
@@ -238,7 +253,7 @@ module Simple_chain = struct
 
   module Proof = (val p)
 
-  let _example1 =
+  let test_side_load_no_recursion () =
     let (), (), b1 =
       Common.time "b1" (fun () ->
           Promise.block_on_async_exn (fun () ->
@@ -255,10 +270,9 @@ module Simple_chain = struct
     in
     Or_error.ok_exn
       (Promise.block_on_async_exn (fun () ->
-           Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
-    (Field.Constant.one, b1)
+           Proof.verify_promise [ (Field.Constant.one, b1) ] ) )
 
-  let _example2 =
+  let test_side_load_fake_1_recursion () =
     let (), (), b2 =
       Common.time "b2" (fun () ->
           Promise.block_on_async_exn (fun () ->
@@ -275,10 +289,9 @@ module Simple_chain = struct
     in
     Or_error.ok_exn
       (Promise.block_on_async_exn (fun () ->
-           Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
-    (Field.Constant.one, b2)
+           Proof.verify_promise [ (Field.Constant.one, b2) ] ) )
 
-  let _example3 =
+  let test_side_load_fake_2_recursion () =
     let (), (), b3 =
       Common.time "b3" (fun () ->
           Promise.block_on_async_exn (fun () ->
@@ -295,6 +308,23 @@ module Simple_chain = struct
     in
     Or_error.ok_exn
       (Promise.block_on_async_exn (fun () ->
-           Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
-    (Field.Constant.one, b3)
+           Proof.verify_promise [ (Field.Constant.one, b3) ] ) )
 end
+
+let () =
+  let open Alcotest in
+  run "Pickles domain too small"
+    [ ("No recursion", [ test_case "verify" `Quick No_recursion.test_verify ])
+    ; ( "Fake 1 recursion"
+      , [ test_case "verify" `Quick Fake_1_recursion.test_verify ] )
+    ; ( "Fake 2 recursion"
+      , [ test_case "verify" `Quick Fake_2_recursion.test_verify ] )
+    ; ( "Simple chain"
+      , [ test_case "side-load no recursion" `Quick
+            Simple_chain.test_side_load_no_recursion
+        ; test_case "side-load fake 1 recursion" `Quick
+            Simple_chain.test_side_load_fake_1_recursion
+        ; test_case "side-load fake 2 recursion" `Quick
+            Simple_chain.test_side_load_fake_2_recursion
+        ] )
+    ]
