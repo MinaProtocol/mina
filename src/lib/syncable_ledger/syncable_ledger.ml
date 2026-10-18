@@ -840,7 +840,24 @@ end = struct
           all_done t ) ;
         Deferred.unit
     in
-    Linear_pipe.iter t.answers ~f:handle_answer
+    (* An answer that raises is dropped rather than stopping the syncer. This
+       is also right for an answer to a query the syncer no longer expects,
+       such as one asked for an earlier target. *)
+    Linear_pipe.iter t.answers ~f:(fun ((_, query, _) as answer) ->
+        match%map
+          Monitor.try_with ~here:[%here] ~rest:`Log (fun () ->
+              handle_answer answer )
+        with
+        | Ok () ->
+            ()
+        | Error exn ->
+            [%log error]
+              ~metadata:
+                [ ("query", Query.to_yojson Addr.to_yojson query)
+                ; ("error", Error_json.error_to_yojson (Error.of_exn exn))
+                ]
+              "Dropping the answer to sync ledger query $query, which raised \
+               $error" )
 
   let new_goal t h ~data ~equal =
     let open (val t.context) in
