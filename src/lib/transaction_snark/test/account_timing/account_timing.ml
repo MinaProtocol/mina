@@ -33,7 +33,6 @@ let%test_module "account timing check" =
            ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
 
     let checked_min_balance_and_timing account txn_amount txn_global_slot =
-      let account = Account.var_of_t account in
       let txn_amount = Amount.var_of_t txn_amount in
       let txn_global_slot =
         Mina_numbers.Global_slot_since_genesis.Checked.constant txn_global_slot
@@ -41,7 +40,9 @@ let%test_module "account timing check" =
       let%map `Min_balance min_balance, timing =
         Transaction_snark.Base.check_timing
           ~balance_check:Tick.Boolean.Assert.is_true
-          ~timed_balance_check:Tick.Boolean.Assert.is_true ~account
+          ~timed_balance_check:Tick.Boolean.Assert.is_true
+          ~balance:(Balance.var_of_t account.Account.balance)
+          ~timing:(Account.Timing.var_of_t account.timing)
           ~txn_amount:(Some txn_amount) ~txn_global_slot
       in
       (min_balance, timing)

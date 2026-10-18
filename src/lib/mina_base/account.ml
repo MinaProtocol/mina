@@ -548,33 +548,6 @@ let typ : (var, value) Typ.t =
   in
   typ' zkapp
 
-let var_of_t
-    ({ public_key
-     ; token_id
-     ; token_symbol
-     ; balance
-     ; nonce
-     ; receipt_chain_hash
-     ; delegate
-     ; voting_for
-     ; timing
-     ; permissions
-     ; zkapp
-     } :
-      value ) =
-  { Poly.public_key = Public_key.Compressed.var_of_t public_key
-  ; token_id = Token_id.Checked.constant token_id
-  ; token_symbol = Token_symbol.var_of_value token_symbol
-  ; balance = Balance.var_of_t balance
-  ; nonce = Nonce.Checked.constant nonce
-  ; receipt_chain_hash = Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate = Public_key.Compressed.var_of_t (delegate_opt delegate)
-  ; voting_for = State_hash.var_of_t voting_for
-  ; timing = Timing.var_of_t timing
-  ; permissions = Permissions.Checked.constant permissions
-  ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
-  }
-
 module Checked = struct
   module Unhashed = struct
     type t =
