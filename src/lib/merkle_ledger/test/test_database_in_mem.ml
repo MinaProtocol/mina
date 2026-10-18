@@ -664,6 +664,49 @@ module Make (Test : Test_intf) = struct
             check_holds_exactly mdb ~expected:[] ~removed:accounts ;
             assert (Option.is_none (MT.last_filled mdb)) ) )
 
+  let () =
+    add_test "set_all_accounts_rooted_at_exn evicts overwritten accounts"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let replacement =
+              Quickcheck.random_value
+                (Quickcheck.Generator.filter Account.gen ~f:(fun account ->
+                     not
+                       (List.mem accounts account ~equal:(fun a b ->
+                            Account_id.equal (Account.identifier a)
+                              (Account.identifier b) ) ) ) )
+            in
+            (* Overwrite account 12 with an account not in the ledger. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 3)
+              [ replacement; List.nth_exn accounts 13 ] ;
+            check_holds_exactly mdb
+              ~expected:
+                (indexed
+                   ( List.take accounts 12
+                   @ [ replacement; List.nth_exn accounts 13 ] ) )
+              ~removed:[ List.nth_exn accounts 12 ] ;
+            [%test_eq: int] 12
+              (MT.index_of_account_exn mdb (Account.identifier replacement)) ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn keeps accounts that move leaves"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let account_12 = List.nth_exn accounts 12 in
+            let account_13 = List.nth_exn accounts 13 in
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 3)
+              [ account_13; account_12 ] ;
+            check_holds_exactly mdb
+              ~expected:
+                (indexed (List.take accounts 12 @ [ account_13; account_12 ]))
+              ~removed:[] ;
+            [%test_eq: int] 13
+              (MT.index_of_account_exn mdb (Account.identifier account_12)) ;
+            [%test_eq: int] 12
+              (MT.index_of_account_exn mdb (Account.identifier account_13)) ) )
+
   let tests =
     let actual_tests = Stack.fold test_stack ~f:(fun l t -> t :: l) ~init:[] in
     (test_section_name, actual_tests)
