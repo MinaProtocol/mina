@@ -51,6 +51,8 @@ let of_yojson : Yojson.Safe.t -> (_, string) Result.t = function
 module T = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         [ `Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup ]
@@ -71,6 +73,8 @@ module T = struct
       include Hashable.Make (T)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, equal, enumerate]
 end
 
 include T

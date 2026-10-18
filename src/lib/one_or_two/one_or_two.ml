@@ -3,6 +3,8 @@ open Async_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type 'a t = [ `One of 'a | `Two of 'a * 'a ]
     [@@deriving equal, compare, hash, sexp, yojson]
@@ -24,6 +26,8 @@ module Stable = struct
           `Two (x, y)
   end
 end]
+
+type 'a t = 'a Stable.Latest.t [@@deriving equal, compare, hash, sexp, yojson]
 
 let length = function `One _ -> 1 | `Two _ -> 2
 
