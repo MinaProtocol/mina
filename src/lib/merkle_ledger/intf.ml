@@ -205,7 +205,7 @@ module type Key_value_database = sig
     -> 'b
 end
 
-module type SYNCABLE = sig
+module type SYNC_CANDIDATE = sig
   type root_hash
 
   type hash
@@ -300,7 +300,7 @@ module Ledger = struct
     module Location : LOCATION
 
     include
-      SYNCABLE
+      SYNC_CANDIDATE
         with type root_hash := root_hash
          and type hash := hash
          and type account := account

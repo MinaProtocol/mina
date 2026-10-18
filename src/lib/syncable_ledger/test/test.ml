@@ -4,7 +4,7 @@ open Pipe_lib
 open Network_peer
 
 module type Ledger_intf = sig
-  include Merkle_ledger.Intf.SYNCABLE
+  include Merkle_ledger.Intf.SYNC_CANDIDATE
 
   type account_id
 
