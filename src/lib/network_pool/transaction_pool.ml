@@ -435,6 +435,12 @@ struct
 
     let member t x = Indexed_pool.member t.pool x
 
+    let size t = Indexed_pool.size t.pool
+
+    let max_size t = t.config.pool_max_size
+
+    let min_fee t = Indexed_pool.min_fee t.pool
+
     let transactions t = Indexed_pool.transactions ~logger:t.logger t.pool
 
     let all_from_account { pool; _ } = Indexed_pool.all_from_account pool
