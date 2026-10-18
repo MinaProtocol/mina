@@ -241,7 +241,10 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
      building on a nonce the pool no longer has. Keeping the pool below its
      capacity avoids triggering that eviction in the first place. *)
   let pool_backpressure = ref pool_backpressure in
-  (* Number of commands we may send before polling the pool again. *)
+  (* Number of commands we may send before polling the pool again. Only a
+     quarter of the headroom seen at the last poll is spent, so that several
+     spammers sharing a pool do not each spend all of it and overshoot the
+     high watermark; near the watermark this polls before every command. *)
   let pool_budget = ref 0 in
   let rec wait_for_pool_capacity ~paused () =
     if (not !pool_backpressure) || !pool_budget > 0 then Deferred.return ()
@@ -280,7 +283,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
                 "txn burst tool: transaction pool holds %d of %d commands, \
                  resuming"
                 size max_size ;
-            pool_budget := pause_at - size ;
+            pool_budget := max 1 ((pause_at - size) / 4) ;
             Deferred.return () )
   in
 
