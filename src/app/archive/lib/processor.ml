@@ -4922,6 +4922,25 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
           time_ingest ~source:"precomputed" (fun () ->
               Strict_pipe.Writer.write precomputed_block_writer
                 (Precomputed.Versioned.of_latest precomputed_block) ) )
+    ; Async.Rpc.Rpc.implement Archive_rpc.versioned_precomputed_block
+        (fun () json ->
+          match
+            Or_error.try_with (fun () -> Yojson.Safe.from_string json)
+            |> Result.bind ~f:(fun json ->
+                   Precomputed.Versioned.of_yojson json
+                   |> Result.map_error ~f:Error.of_string )
+          with
+          | Error e ->
+              [%log warn]
+                "Could not read a versioned precomputed block sent to the \
+                 archive: $error"
+                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              return (Error e)
+          | Ok precomputed_block ->
+              time_ingest ~source:"precomputed" (fun () ->
+                  Strict_pipe.Writer.write precomputed_block_writer
+                    precomputed_block )
+              >>| fun () -> Ok () )
     ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
         (fun () extensional_block ->
           time_ingest ~source:"extensional" (fun () ->
