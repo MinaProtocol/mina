@@ -310,8 +310,6 @@ module Ledger = struct
          and type path = Path.t
          and type t := t
 
-    val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
-
     val set_batch_accounts : t -> (Addr.t * account) list -> unit
 
     (** list of accounts in the ledger *)
