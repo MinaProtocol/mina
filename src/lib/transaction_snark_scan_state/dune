@@ -46,7 +46,7 @@
   mina_wire_types
   internal_tracing)
  (preprocess
-  (pps mina_ppx))
+  (pps mina_ppx.no_pipebang))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Transaction-snark specialization of the parallel scan state"))
