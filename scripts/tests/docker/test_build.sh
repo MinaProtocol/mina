@@ -5,7 +5,7 @@ set -euo pipefail
 # Test suite for scripts/docker/build.sh
 #
 # Usage:
-#   bash scripts/docker/tests/test_build.sh
+#   bash scripts/tests/docker/test_build.sh
 #
 # The tests are black box: they run build.sh as a program, with a stub "docker"
 # program on the PATH. The stub writes each argument of "docker buildx build" on

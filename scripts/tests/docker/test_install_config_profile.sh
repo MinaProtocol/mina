@@ -5,7 +5,7 @@ set -euo pipefail
 # Regression test for dockerfiles/Dockerfile-install-config
 #
 # Usage:
-#   bash scripts/docker/tests/test_install_config_profile.sh
+#   bash scripts/tests/docker/test_install_config_profile.sh
 #
 # The per-network daemon image (mina-daemon:<version>-<network>) layers the
 # mina-<network>-config deb on a base daemon image. The node takes its profile
