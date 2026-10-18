@@ -352,4 +352,15 @@ let%test_module "Transaction hashes" =
       | Error err ->
           failwithf "Error hashing new transaction: %s\n"
             (Error.to_string_hum err) ()
+
+    let%test "hash with proof cache tags matches hash with proofs" =
+      let cmd : Mina_base.User_command.Stable.Latest.t =
+        Zkapp_command new_zkapp_txn
+      in
+      let cmd_with_tags =
+        Mina_base.User_command.write_all_proofs_to_disk ~signature_kind:Testnet
+          ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+          cmd
+      in
+      equal (hash_command cmd) (hash_command_with_hashes cmd_with_tags)
   end )
