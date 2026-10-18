@@ -218,6 +218,9 @@ module Instance = struct
                 Stop (Some snarked_ledger)
             | Error e ->
                 Root_ledger.close potential_snarked_ledger ;
+                Root_ledger.close snarked_ledger ;
+                Root_ledger.Config.delete_any_backing
+                  (Config.tmp_snarked_ledger factory) ;
                 List.iter potential_snarked_ledgers
                   ~f:Root_ledger.Config.delete_any_backing ;
                 Mina_stdlib_unix.File_system.rmrf
