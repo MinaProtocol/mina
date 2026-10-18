@@ -3,6 +3,8 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V3 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
@@ -14,6 +16,8 @@ module Stable : sig
     val to_latest : t -> t
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, yojson]
 
 type sparse_ledger = t
 

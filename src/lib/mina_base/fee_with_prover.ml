@@ -3,6 +3,8 @@ open Signature_lib
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = Mina_wire_types.Mina_base.Fee_with_prover.V1.t =
       { fee : Currency.Fee.Stable.V1.t
@@ -27,6 +29,10 @@ module Stable = struct
     include Comparable.Make (T)
   end
 end]
+
+type t = Stable.Latest.t =
+  { fee : Currency.Fee.t; prover : Public_key.Compressed.t }
+[@@deriving sexp, yojson, hash]
 
 include Comparable.Make (Stable.V1.T)
 

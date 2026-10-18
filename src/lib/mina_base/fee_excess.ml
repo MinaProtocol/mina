@@ -36,6 +36,8 @@ open Tick
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('token, 'fee) t =
             ('token, 'fee) Mina_wire_types.Mina_base.Fee_excess.Poly.V1.t =
@@ -89,6 +91,14 @@ module Poly = struct
     end
   end]
 
+  type ('token, 'fee) t = ('token, 'fee) Stable.Latest.t =
+    { fee_token_l : 'token
+    ; fee_excess_l : 'fee
+    ; fee_token_r : 'token
+    ; fee_excess_r : 'fee
+    }
+  [@@deriving compare, equal, hash, sexp, hlist]
+
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
   let typ (token_typ : ('token_var, 'token) Typ.t)
@@ -102,6 +112,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       ( Token_id.Stable.V2.t
@@ -112,6 +124,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
 
 type ('token, 'fee) poly = ('token, 'fee) Poly.t =
   { fee_token_l : 'token

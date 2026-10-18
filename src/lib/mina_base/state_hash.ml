@@ -6,6 +6,8 @@ include T
 module State_hashes = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { mutable state_body_hash : State_body_hash.Stable.V1.t option
@@ -16,6 +18,10 @@ module State_hashes = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { mutable state_body_hash : State_body_hash.t option; state_hash : T.t }
+  [@@deriving equal, sexp, to_yojson]
 
   let state_hash { state_hash; _ } = state_hash
 

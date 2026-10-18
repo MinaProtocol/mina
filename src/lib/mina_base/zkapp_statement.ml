@@ -4,11 +4,17 @@ open Snark_params.Tick
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'comm t = { account_update : 'comm; calls : 'comm }
       [@@deriving hlist, sexp, compare, yojson]
     end
   end]
+
+  type 'comm t = 'comm Stable.Latest.t =
+    { account_update : 'comm; calls : 'comm }
+  [@@deriving hlist, sexp, compare, yojson]
 
   let to_field_elements (t : 'c t) : 'c array =
     let [ x0; x1 ] = to_hlist t in
@@ -17,6 +23,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = Zkapp_command.Transaction_commitment.Stable.V1.t Poly.Stable.V1.t
     [@@deriving sexp, compare, yojson]
@@ -24,6 +32,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
 
 include Comparable.Make (Stable.Latest)
 

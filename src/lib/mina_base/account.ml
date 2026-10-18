@@ -12,6 +12,8 @@ open Mina_base_import
 module Index = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       module T = struct
         type t = int [@@deriving to_yojson, sexp, hash, compare]
@@ -24,6 +26,8 @@ module Index = struct
       include Hashable.Make_binable (T)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving to_yojson, sexp, hash, compare]
 
   include Hashable.Make_binable (Stable.Latest)
 
@@ -82,6 +86,8 @@ module Nonce = Account_nonce
 module Token_symbol = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       module T = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
@@ -120,6 +126,8 @@ module Token_symbol = struct
           end)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   [%%define_locally
   Stable.Latest.
@@ -197,6 +205,8 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ( 'pk
            , 'id
@@ -227,11 +237,51 @@ module Poly = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ( 'pk
+       , 'id
+       , 'token_symbol
+       , 'amount
+       , 'nonce
+       , 'receipt_chain_hash
+       , 'delegate
+       , 'state_hash
+       , 'timing
+       , 'permissions
+       , 'zkapp_opt )
+       t =
+        ( 'pk
+        , 'id
+        , 'token_symbol
+        , 'amount
+        , 'nonce
+        , 'receipt_chain_hash
+        , 'delegate
+        , 'state_hash
+        , 'timing
+        , 'permissions
+        , 'zkapp_opt )
+        Stable.Latest.t =
+    { public_key : 'pk
+    ; token_id : 'id
+    ; token_symbol : 'token_symbol
+    ; balance : 'amount
+    ; nonce : 'nonce
+    ; receipt_chain_hash : 'receipt_chain_hash
+    ; delegate : 'delegate
+    ; voting_for : 'state_hash
+    ; timing : 'timing
+    ; permissions : 'permissions
+    ; zkapp : 'zkapp_opt
+    }
+  [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
 end
 
 module Key = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -239,6 +289,8 @@ module Key = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, hash, compare, yojson]
 end
 
 module Identifier = Account_id
@@ -250,6 +302,8 @@ module Timing = Account_timing
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -271,12 +325,29 @@ module Binable_arg = struct
       let public_key (t : t) : key = t.public_key
     end
   end]
+
+  type t = Stable.Latest.t =
+    { public_key : Public_key.Compressed.t
+    ; token_id : Token_id.t
+    ; token_symbol : Token_symbol.t
+    ; balance : Balance.t
+    ; nonce : Nonce.t
+    ; receipt_chain_hash : Receipt.Chain_hash.t
+    ; delegate : Public_key.Compressed.t option
+    ; voting_for : State_hash.t
+    ; timing : Timing.t
+    ; permissions : Permissions.t
+    ; zkapp : Zkapp_account.t option
+    }
+  [@@deriving sexp, equal, hash, compare, yojson]
 end
 
 let check = Fn.id
 
 [%%versioned_binable
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V3 = struct
     type t = Binable_arg.Stable.V3.t =
       { public_key : Public_key.Compressed.Stable.V1.t
@@ -309,6 +380,21 @@ module Stable = struct
     let public_key (t : t) : key = t.public_key
   end
 end]
+
+type t = Stable.Latest.t =
+  { public_key : Public_key.Compressed.t
+  ; token_id : Token_id.t
+  ; token_symbol : Token_symbol.t
+  ; balance : Balance.t
+  ; nonce : Nonce.t
+  ; receipt_chain_hash : Receipt.Chain_hash.t
+  ; delegate : Public_key.Compressed.t option
+  ; voting_for : State_hash.t
+  ; timing : Timing.t
+  ; permissions : Permissions.t
+  ; zkapp : Zkapp_account.t option
+  }
+[@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
 
 [%%define_locally
 Stable.Latest.(sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson)]

@@ -19,6 +19,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         [@@@with_all_version_tags]
 
@@ -31,10 +33,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
         [@@deriving compare, sexp, hash, yojson, equal]
       end
     end]
+
+    type ('payload, 'pk, 'signature) t =
+          ('payload, 'pk, 'signature) Stable.Latest.t =
+      { payload : 'payload; signer : 'pk; signature : 'signature }
+    [@@deriving compare, sexp, hash, yojson, equal]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     [@@@with_top_version_tag]
 
     (* DO NOT DELETE VERSIONS!
@@ -116,6 +125,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         { payload; signer; signature }
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, sexp, hash, yojson]
 
   (* type of signed commands, pre-Berkeley hard fork *)
   let (_ : (t, (Payload.t, Public_key.t, Signature.t) Poly.t) Type_equal.t) =
@@ -373,6 +384,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module With_valid_signature = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t = Stable.V2.t [@@deriving sexp, equal, yojson, hash]
 
@@ -385,6 +398,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         module Gen = Gen
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash]
 
     module Gen = Stable.Latest.Gen
     include Comparable.Make (Stable.Latest)

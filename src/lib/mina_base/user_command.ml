@@ -4,6 +4,8 @@ open Mina_stdlib
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('u, 's) t =
             ('u, 's) Mina_wire_types.Mina_base.User_command.Poly.V2.t =
@@ -25,6 +27,11 @@ module Poly = struct
             failwith "Snapp_command"
     end
   end]
+
+  type ('u, 's) t = ('u, 's) Stable.Latest.t =
+    | Signed_command of 'u
+    | Zkapp_command of 's
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
@@ -172,11 +179,15 @@ let of_base64 s : Stable.Latest.t Or_error.t =
 module Zero_one_or_two = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = [ `Zero | `One of 'a | `Two of 'a * 'a ]
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Verifiable = struct

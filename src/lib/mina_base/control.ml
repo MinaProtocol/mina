@@ -3,6 +3,8 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('proof, 'signature) t =
             ('proof, 'signature) Mina_wire_types.Mina_base.Control.Poly.V1.t =
@@ -14,6 +16,12 @@ module Poly = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ('proof, 'signature) t = ('proof, 'signature) Stable.Latest.t =
+    | Proof of 'proof
+    | Signature of 'signature
+    | None_given
+  [@@deriving sexp, equal, yojson, hash, compare]
 end
 
 (* TODO: temporary hack *)

@@ -6,6 +6,8 @@ let length_in_bytes = length_in_bits / 8
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
     [@@deriving sexp, equal, compare, hash, yojson]
@@ -37,6 +39,8 @@ module Stable = struct
           Error "Aux_hash.of_yojson expected `String"
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
 [%%define_locally
 Stable.Latest.

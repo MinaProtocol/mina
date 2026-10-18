@@ -4,6 +4,8 @@ module Legacy_token = Mina_numbers.Nat.Make64 ()
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = Account_id.Digest.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare, hash]
@@ -22,6 +24,8 @@ module Stable = struct
       Legacy_token.to_field token_id |> Account_id.Digest.of_field
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, yojson, equal, compare, hash]
 
 [%%define_locally
 Account_id.Digest.

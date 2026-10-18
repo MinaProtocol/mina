@@ -2,6 +2,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type 'a t = 'a Mina_wire_types.Mina_base.With_status.V2.t =
       { data : 'a; status : Transaction_status.Stable.V2.t }
@@ -11,6 +13,9 @@ module Stable = struct
       { data = data_latest t.data; status = t.status }
   end
 end]
+
+type 'a t = 'a Stable.Latest.t = { data : 'a; status : Transaction_status.t }
+[@@deriving sexp, yojson, equal, compare, fields]
 
 let map ~f { data; status } = { data = f data; status }
 

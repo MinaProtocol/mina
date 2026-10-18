@@ -8,6 +8,8 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t =
         { fee : Currency.Fee.Stable.V1.t

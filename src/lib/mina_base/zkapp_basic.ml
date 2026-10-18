@@ -13,11 +13,16 @@ let int_of_bits =
 module Transition = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = { prev : 'a; next : 'a }
       [@@deriving hlist, sexp, equal, yojson, hash, compare]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { prev : 'a; next : 'a }
+  [@@deriving hlist, sexp, equal, yojson, hash, compare]
 
   let to_input { prev; next } ~f =
     Random_oracle_input.Chunked.append (f prev) (f next)
@@ -83,6 +88,8 @@ end
 module Set_or_keep = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Set_or_keep.V1.t =
         | Set of 'a
@@ -90,6 +97,9 @@ module Set_or_keep = struct
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = Set of 'a | Keep
+  [@@deriving sexp, equal, compare, hash, yojson]
 
   let map t ~f = match t with Keep -> Keep | Set x -> Set (f x)
 
@@ -211,6 +221,8 @@ end
 module Or_ignore = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Or_ignore.V1.t =
         | Check of 'a
@@ -218,6 +230,9 @@ module Or_ignore = struct
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = Check of 'a | Ignore
+  [@@deriving sexp, equal, compare, hash, yojson]
 
   let gen gen_a =
     let open Quickcheck.Let_syntax in
@@ -294,6 +309,8 @@ end
 module Account_state = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Empty | Non_empty | Any
       [@@deriving sexp, equal, yojson, hash, compare, enum]
@@ -301,6 +318,9 @@ module Account_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Empty | Non_empty | Any
+  [@@deriving sexp, equal, yojson, hash, compare, enum]
 
   module Encoding = struct
     type 'b t = { any : 'b; empty : 'b } [@@deriving hlist]

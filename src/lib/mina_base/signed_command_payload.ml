@@ -31,6 +31,8 @@ module Common = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
               ( 'fee
@@ -62,10 +64,22 @@ module Common = struct
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
+
+    type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
+          ('fee, 'public_key, 'nonce, 'global_slot, 'memo) Stable.Latest.t =
+      { fee : 'fee
+      ; fee_payer_pk : 'public_key
+      ; nonce : 'nonce
+      ; valid_until : 'global_slot
+      ; memo : 'memo
+      }
+    [@@deriving compare, equal, sexp, hash, yojson, hlist]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         ( Currency.Fee.Stable.V1.t
@@ -95,6 +109,8 @@ module Common = struct
       let to_latest _ = failwith "Not implemented"
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, equal, sexp, hash, yojson]
 
   let to_input_legacy ({ fee; fee_payer_pk; nonce; valid_until; memo } : t) =
     let bitstring = Random_oracle.Input.Legacy.bitstring in
@@ -175,6 +191,8 @@ end
 module Body = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
@@ -198,6 +216,11 @@ module Body = struct
       let to_latest _ = failwith "Not implemented"
     end
   end]
+
+  type t = Stable.Latest.t =
+    | Payment of Payment_payload.t
+    | Stake_delegation of Stake_delegation.t
+  [@@deriving sexp, compare, equal, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
 
@@ -233,6 +256,8 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -249,10 +274,16 @@ module Poly = struct
         { common; body }
     end
   end]
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    { common : 'common; body : 'body }
+  [@@deriving equal, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]
@@ -270,6 +301,8 @@ module Stable = struct
     let to_latest _ = failwith "Not implemented"
   end
 end]
+
+type t = Stable.Latest.t [@@deriving compare, equal, sexp, hash, yojson]
 
 let create ~fee ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
   { common =

@@ -17,6 +17,8 @@ let dummy_vk_hash =
 
 [%%versioned_binable
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     module T = struct
       type t = (Side_loaded_verification_key.t, F.t) With_hash.t
@@ -46,3 +48,5 @@ module Stable = struct
         (M)
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, yojson, equal, compare, hash]

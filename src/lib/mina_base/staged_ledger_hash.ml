@@ -23,6 +23,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
@@ -57,6 +59,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
+
     [%%define_locally
     Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
@@ -66,6 +70,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Non_snark = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = A.Non_snark.V1.t =
           { ledger_hash : Ledger_hash.Stable.V1.t
@@ -77,6 +83,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { ledger_hash : Ledger_hash.t
+      ; aux_hash : Aux_hash.t
+      ; pending_coinbase_aux : Pending_coinbase_aux.t
+      }
+    [@@deriving sexp, equal, compare, hash, yojson, fields]
 
     type value = t [@@deriving sexp, compare, hash, yojson]
 
@@ -142,6 +155,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('non_snark, 'pending_coinbase_hash) t =
               ('non_snark, 'pending_coinbase_hash) A.Poly.V1.t =
@@ -151,10 +166,17 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, equal, compare, hash, yojson, hlist]
       end
     end]
+
+    type ('non_snark, 'pending_coinbase_hash) t =
+          ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
+      { non_snark : 'non_snark; pending_coinbase_hash : 'pending_coinbase_hash }
+    [@@deriving sexp, equal, compare, hash, yojson, hlist]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
@@ -173,6 +195,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   type ('a, 'b) t_ = ('a, 'b) Poly.t
 

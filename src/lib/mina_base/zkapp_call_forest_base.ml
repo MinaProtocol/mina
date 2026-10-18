@@ -5,6 +5,8 @@ let empty = Outside_hash_image.t
 module Tree = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('account_update, 'account_update_digest, 'digest) t =
             ( 'account_update
@@ -24,6 +26,18 @@ module Tree = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ('account_update, 'account_update_digest, 'digest) t =
+        ('account_update, 'account_update_digest, 'digest) Stable.Latest.t =
+    { account_update : 'account_update
+    ; account_update_digest : 'account_update_digest
+    ; calls :
+        ( ('account_update, 'account_update_digest, 'digest) t
+        , 'digest )
+        With_stack_hash.t
+        list
+    }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let rec fold_forest (ts : (_ t, _) With_stack_hash.t list) ~f ~init =
     List.fold ts ~init ~f:(fun acc { elt; stack_hash = _ } ->
@@ -203,6 +217,8 @@ module Make_digest_types = struct
   module Account_update = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -210,11 +226,15 @@ module Make_digest_types = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
   end
 
   module Forest = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -222,11 +242,15 @@ module Make_digest_types = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
   end
 
   module Tree = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -234,6 +258,8 @@ module Make_digest_types = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
   end
 end
 
@@ -325,6 +351,8 @@ let iteri t ~(f : int -> 'a -> unit) : unit =
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type ('account_update, 'account_update_digest, 'digest) t =
       ( ('account_update, 'account_update_digest, 'digest) Tree.Stable.V1.t
@@ -336,6 +364,10 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type ('account_update, 'account_update_digest, 'digest) t =
+  ('account_update, 'account_update_digest, 'digest) Stable.Latest.t
+[@@deriving sexp, compare, equal, hash, yojson]
 
 module Shape = struct
   module I = struct
@@ -523,6 +555,8 @@ let forget_hashes_and_proofs_and_aux p =
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('update, 'data) t =
         ( 'update * 'data
@@ -534,6 +568,9 @@ module With_hashes_and_data = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ('update, 'data) t = ('update, 'data) Stable.Latest.t
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   let empty = Digest.Forest.empty
 

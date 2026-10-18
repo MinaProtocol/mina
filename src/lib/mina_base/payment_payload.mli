@@ -32,6 +32,8 @@ end
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V2 : sig
     type t =
       ( Public_key.Compressed.Stable.V1.t
@@ -53,6 +55,9 @@ module Stable : sig
     val to_latest : t -> Latest.t
   end
 end]
+
+type t = Stable.Latest.t
+[@@deriving compare, equal, sexp, hash, compare, yojson]
 
 val dummy : t
 

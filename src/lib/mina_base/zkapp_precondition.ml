@@ -11,6 +11,8 @@ module Impl = Pickles.Impls.Step
 module Closed_interval = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t =
             'a Mina_wire_types.Mina_base.Zkapp_precondition.Closed_interval.V1.t =
@@ -18,6 +20,9 @@ module Closed_interval = struct
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { lower : 'a; upper : 'a }
+  [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
 
   let gen gen_a compare_a =
     let open Quickcheck.Let_syntax in
@@ -153,11 +158,15 @@ module Numeric = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = 'a Closed_interval.Stable.V1.t Or_ignore.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let deriver name inner range_max obj =
     let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
@@ -453,6 +462,8 @@ end
 module Account = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
@@ -469,6 +480,18 @@ module Account = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { balance : Balance.t Numeric.t
+    ; nonce : Account_nonce.t Numeric.t
+    ; receipt_chain_hash : Receipt.Chain_hash.t Hash.t
+    ; delegate : Public_key.Compressed.t Eq_data.t
+    ; state : F.t Eq_data.t Zkapp_state.V.t
+    ; action_state : F.t Eq_data.t
+    ; proved_state : bool Eq_data.t
+    ; is_new : bool Eq_data.t
+    }
+  [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -780,6 +803,8 @@ module Protocol_state = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         (* TODO: Not sure if this should be frozen ledger hash or not *)
         type t =
@@ -796,6 +821,8 @@ module Protocol_state = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
     let deriver obj =
       let open Fields_derivers_zkapps.Derivers in
@@ -912,6 +939,8 @@ module Protocol_state = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ( 'snarked_ledger_hash
              , 'length
@@ -952,10 +981,43 @@ module Protocol_state = struct
         [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
       end
     end]
+
+    type ('snarked_ledger_hash, 'length, 'global_slot, 'amount, 'epoch_data) t =
+          ( 'snarked_ledger_hash
+          , 'length
+          , 'global_slot
+          , 'amount
+          , 'epoch_data )
+          Stable.Latest.t =
+      { (* TODO:
+                     We should include staged ledger hash again! It only changes once per
+                     block. *)
+        snarked_ledger_hash : 'snarked_ledger_hash
+      ; blockchain_length : 'length
+            (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
+               with global_slot_since_hard_fork.
+
+               epoch_count in [a, b]
+
+               should be equivalent to
+
+               global_slot_since_hard_fork in [slots_per_epoch * a, slots_per_epoch * b]
+
+               TODO: Now that we removed global_slot_since_hard_fork, maybe we want to add epoch_count back
+            *)
+      ; min_window_density : 'length
+      ; total_currency : 'amount
+      ; global_slot_since_genesis : 'global_slot
+      ; staking_epoch_data : 'epoch_data
+      ; next_epoch_data : 'epoch_data
+      }
+    [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
@@ -969,6 +1031,8 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -1050,6 +1114,8 @@ module Protocol_state = struct
   module View = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
@@ -1070,6 +1136,8 @@ module Protocol_state = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
     module Checked = struct
       type t =
@@ -1342,6 +1410,8 @@ end
 module Valid_while = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1349,6 +1419,8 @@ module Valid_while = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let deriver = Numeric.Derivers.global_slot_since_genesis
 
@@ -1377,6 +1449,8 @@ end
 module Account_type = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = User | Zkapp | None | Any
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1384,6 +1458,9 @@ module Account_type = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = User | Zkapp | None | Any
+  [@@deriving sexp, equal, yojson, hash, compare]
 
   let check (t : t) (a : A.t option) =
     match (a, t) with
@@ -1486,6 +1563,8 @@ module Other = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('account, 'account_transition, 'vk) t =
           { predicate : 'account
@@ -1495,10 +1574,20 @@ module Other = struct
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
+
+    type ('account, 'account_transition, 'vk) t =
+          ('account, 'account_transition, 'vk) Stable.Latest.t =
+      { predicate : 'account
+      ; account_transition : 'account_transition
+      ; account_vk : 'vk
+      }
+    [@@deriving hlist, sexp, equal, yojson, hash, compare]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t =
         ( Account.Stable.V3.t
@@ -1510,6 +1599,8 @@ module Other = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
   module Checked = struct
     type t =
@@ -1553,6 +1644,8 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('account, 'protocol_state, 'other, 'pk) t =
         { self_predicate : 'account
@@ -1566,6 +1659,15 @@ module Poly = struct
     end
   end]
 
+  type ('account, 'protocol_state, 'other, 'pk) t =
+        ('account, 'protocol_state, 'other, 'pk) Stable.Latest.t =
+    { self_predicate : 'account
+    ; other : 'other
+    ; fee_payer : 'pk
+    ; protocol_state_predicate : 'protocol_state
+    }
+  [@@deriving hlist, sexp, equal, yojson, hash, compare]
+
   let typ spec =
     let open Stable.Latest in
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -1574,6 +1676,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V3 = struct
     type t =
       ( Account.Stable.V3.t
@@ -1586,6 +1690,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
 module Digested = F
 

@@ -5,6 +5,8 @@ open Signature_lib
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     [@@@with_all_version_tags]
 
@@ -29,6 +31,10 @@ module Stable = struct
       V2.Set_delegate { new_delegate }
   end
 end]
+
+type t = Stable.Latest.t =
+  | Set_delegate of { new_delegate : Public_key.Compressed.t }
+[@@deriving compare, equal, sexp, hash, yojson]
 
 let receiver_pk = function Set_delegate { new_delegate } -> new_delegate
 

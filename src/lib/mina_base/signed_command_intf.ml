@@ -213,6 +213,8 @@ module type Full = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type ('payload, 'pk, 'signature) t =
               ( 'payload
@@ -223,10 +225,17 @@ module type Full = sig
         [@@deriving sexp, hash, yojson, equal, compare]
       end
     end]
+
+    type ('payload, 'pk, 'signature) t =
+          ('payload, 'pk, 'signature) Stable.Latest.t =
+      { payload : 'payload; signer : 'pk; signature : 'signature }
+    [@@deriving sexp, hash, yojson, equal, compare]
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     [@@@with_top_version_tag]
 
     module V2 : sig

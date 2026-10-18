@@ -4,6 +4,8 @@ open Mina_numbers
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ( 'epoch_ledger
            , 'epoch_seed
@@ -28,6 +30,28 @@ module Poly = struct
       [@@deriving annot, hlist, sexp, equal, compare, hash, yojson, fields]
     end
   end]
+
+  type ( 'epoch_ledger
+       , 'epoch_seed
+       , 'start_checkpoint
+       , 'lock_checkpoint
+       , 'length )
+       t =
+        ( 'epoch_ledger
+        , 'epoch_seed
+        , 'start_checkpoint
+        , 'lock_checkpoint
+        , 'length )
+        Stable.Latest.t =
+    { ledger : 'epoch_ledger
+    ; seed : 'epoch_seed
+    ; start_checkpoint : 'start_checkpoint
+          (* The lock checkpoint is the hash of the latest state in the seed update range, not including
+             the current state. *)
+    ; lock_checkpoint : 'lock_checkpoint
+    ; epoch_length : 'length
+    }
+  [@@deriving annot, hlist, sexp, equal, compare, hash, yojson, fields]
 end
 
 type var =
@@ -56,6 +80,8 @@ let if_ cond ~(then_ : var) ~(else_ : var) =
 module Value = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( Epoch_ledger.Value.Stable.V1.t
@@ -69,6 +95,8 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 type t = Value.Stable.V1.t [@@deriving sexp, compare, equal, hash, yojson]

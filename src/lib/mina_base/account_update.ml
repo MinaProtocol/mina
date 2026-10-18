@@ -19,6 +19,8 @@ module Zkapp_uri = Zkapp_account.Zkapp_uri
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       (* TODO: yojson for Field.t in snarky (#12591) *)
       type t =
@@ -31,6 +33,12 @@ module Authorization_kind = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    | Signature
+    | Proof of (Field.t[@version_asserted])
+    | None_given
+  [@@deriving sexp, equal, yojson, hash, compare]
 
   module Structured = struct
     type t =
@@ -132,6 +140,8 @@ end
 module May_use_token = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.May_use_token.V1.t =
         | No
@@ -150,6 +160,20 @@ module May_use_token = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    | No
+        (** No permission to use any token other than the default Mina
+                  token.
+              *)
+    | Parents_own_token
+        (** Has permission to use the token owned by the direct parent of
+                  this account update, which may be inherited by child account
+                  updates.
+              *)
+    | Inherit_from_parent
+        (** Inherit the token permission available to the parent. *)
+  [@@deriving sexp, equal, yojson, hash, compare]
 
   let gen =
     Quickcheck.Generator.of_list [ No; Parents_own_token; Inherit_from_parent ]
@@ -512,6 +536,8 @@ module Update = struct
   module Timing_info = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t =
               Mina_wire_types.Mina_base.Account_update.Update.Timing_info.V1.t =
@@ -526,6 +552,15 @@ module Update = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { initial_minimum_balance : Balance.t
+      ; cliff_time : Global_slot_since_genesis.t
+      ; cliff_amount : Amount.t
+      ; vesting_period : Global_slot_span.t
+      ; vesting_increment : Amount.t
+      }
+    [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
 
     type value = t
 
@@ -671,6 +706,8 @@ module Update = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
@@ -691,6 +728,18 @@ module Update = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { app_state : F.t Set_or_keep.t Zkapp_state.V.t
+    ; delegate : Public_key.Compressed.t Set_or_keep.t
+    ; verification_key : Verification_key_wire.t Set_or_keep.t
+    ; permissions : Permissions.t Set_or_keep.t
+    ; zkapp_uri : Zkapp_uri.t Set_or_keep.t
+    ; token_symbol : Account.Token_symbol.t Set_or_keep.t
+    ; timing : Timing_info.t Set_or_keep.t
+    ; voting_for : State_hash.t Set_or_keep.t
+    }
+  [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
 
   let gen ?(token_account = false) ?(zkapp_account = false) ?vk
       ?permissions_auth () : t Quickcheck.Generator.t =
@@ -939,6 +988,8 @@ end
 module Account_precondition = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Zkapp_precondition.Account.Stable.V3.t
       [@@deriving sexp, yojson, hash]
@@ -955,6 +1006,8 @@ module Account_precondition = struct
       [%%define_locally Zkapp_precondition.Account.(equal, compare)]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
   [%%define_locally Stable.Latest.(equal, compare)]
 
@@ -1009,6 +1062,8 @@ end
 module Preconditions = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V2.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
@@ -1022,6 +1077,14 @@ module Preconditions = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { network : Zkapp_precondition.Protocol_state.t
+    ; account : Account_precondition.t
+    ; valid_while :
+        Mina_numbers.Global_slot_since_genesis.t Zkapp_precondition.Numeric.t
+    }
+  [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -1101,6 +1164,8 @@ module Body = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
         [@@deriving sexp, equal, hash, compare, yojson]
@@ -1108,6 +1173,8 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, hash, compare, yojson]
   end
 
   module Actions' = struct
@@ -1117,6 +1184,8 @@ module Body = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
         [@@deriving sexp, equal, hash, compare, yojson]
@@ -1124,11 +1193,15 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, hash, compare, yojson]
   end
 
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1152,6 +1225,24 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { public_key : Public_key.Compressed.t
+      ; token_id : Token_id.t
+      ; update : Update.t
+      ; balance_change : (Amount.t, Sgn.t) Signed_poly.t
+      ; increment_nonce : bool
+      ; events : Events'.t
+      ; actions : Actions'.t
+      ; call_data : Pickles.Backend.Tick.Field.t
+      ; call_depth : int
+      ; preconditions : Preconditions.t
+      ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.t
+      ; authorization_kind : Authorization_kind.t
+      }
+    [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
     let deriver obj =
       let open Fields_derivers_zkapps in
@@ -1187,6 +1278,8 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1210,10 +1303,30 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { public_key : Public_key.Compressed.t
+      ; token_id : Token_id.t
+      ; update : Update.t
+      ; balance_change : (Amount.t, Sgn.t) Signed_poly.t
+      ; increment_nonce : bool
+      ; events : Events'.t
+      ; actions : Actions'.t
+      ; call_data : Pickles.Backend.Tick.Field.t
+      ; call_depth : int
+      ; preconditions : Preconditions.t
+      ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.t
+      ; authorization_kind : Authorization_kind.t
+      }
+    [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -1236,6 +1349,23 @@ module Body = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { public_key : Public_key.Compressed.t
+    ; token_id : Token_id.t
+    ; update : Update.t
+    ; balance_change : (Amount.t, Sgn.t) Signed_poly.t
+    ; increment_nonce : bool
+    ; events : Events'.t
+    ; actions : Actions'.t
+    ; call_data : Pickles.Backend.Tick.Field.t
+    ; preconditions : Preconditions.t
+    ; use_full_commitment : bool
+    ; implicit_account_creation_fee : bool
+    ; may_use_token : May_use_token.t
+    ; authorization_kind : Authorization_kind.t
+    }
+  [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
   let of_simple (p : Simple.t) : t =
     { public_key = p.public_key
@@ -1320,6 +1450,8 @@ module Body = struct
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1333,6 +1465,14 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { public_key : Public_key.Compressed.t
+      ; fee : Fee.t
+      ; valid_until : Global_slot_since_genesis.t option [@name "validUntil"]
+      ; nonce : Account_nonce.t
+      }
+    [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
@@ -1678,6 +1818,8 @@ module Poly = struct
   module Wire = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('body, 'authorization) t =
               ( 'body
@@ -1687,6 +1829,10 @@ module Poly = struct
         [@@deriving yojson, sexp]
       end
     end]
+
+    type ('body, 'authorization) t = ('body, 'authorization) Stable.Latest.t =
+      { body : 'body; authorization : 'authorization }
+    [@@deriving yojson, sexp]
   end
 
   (** An account update in a zkApp transaction *)
@@ -1718,6 +1864,8 @@ module T = struct
   module Without_aux = struct
     [%%versioned_binable
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('body, 'authorization) t = ('body, 'authorization, unit) Poly.t
         [@@deriving equal, hash, compare]
@@ -1736,11 +1884,16 @@ module T = struct
             end)
       end
     end]
+
+    type ('body, 'authorization) t = ('body, 'authorization) Stable.Latest.t
+    [@@deriving equal, hash, compare]
   end
 
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           ( Body.Graphql_repr.Stable.V2.t
@@ -1751,6 +1904,8 @@ module T = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
     let deriver obj =
       let open Poly in
@@ -1766,6 +1921,8 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
@@ -1774,6 +1931,8 @@ module T = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
   end
 
   [%%versioned
@@ -1884,6 +2043,8 @@ let forget_proofs_and_aux p = forget_proofs @@ forget_aux p
 module Fee_payer = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t
@@ -1894,6 +2055,10 @@ module Fee_payer = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { body : Body.Fee_payer.t; authorization : Signature.t }
+  [@@deriving sexp, annot, equal, hash, compare, fields, yojson]
 
   let make ~body ~authorization : t = { body; authorization }
 

@@ -3,6 +3,8 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     [@@@with_all_version_tags]
 
@@ -12,6 +14,8 @@ module Stable : sig
     include Codable.S with type t := t
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
 val gen : t Quickcheck.Generator.t
 

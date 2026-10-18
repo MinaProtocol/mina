@@ -13,6 +13,8 @@ end
 module Make_str (_ : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -44,6 +46,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       include Codable.Make_of_string (T)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
   [%%define_locally
   Stable.Latest.

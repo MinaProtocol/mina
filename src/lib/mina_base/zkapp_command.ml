@@ -4,6 +4,8 @@ open Signature_lib
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type 'account_updates t =
             'account_updates Mina_wire_types.Mina_base.Zkapp_command.V2.T.t =
@@ -16,11 +18,20 @@ module Poly = struct
       let to_latest = Fn.id
     end
   end]
+
+  type 'account_updates t = 'account_updates Stable.Latest.t =
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates : 'account_updates
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 end
 
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Account_update.Graphql_repr.Stable.V2.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -28,12 +39,16 @@ module Graphql_repr = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Account_update.Simple.Stable.V2.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -41,6 +56,8 @@ module Simple = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Call_forest = Zkapp_call_forest_base

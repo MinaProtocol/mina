@@ -10,6 +10,8 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { fee : Currency.Fee.Stable.V1.t
@@ -21,6 +23,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { fee : Currency.Fee.t; prover : Public_key.Compressed.t }
+  [@@deriving sexp, yojson, equal, compare]
+
   let create ~fee ~prover = Stable.Latest.{ fee; prover }
 
   module Digest = struct
@@ -28,6 +34,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned_binable
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, hash, compare, equal, yojson]
@@ -61,6 +69,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~back:Blake2.bits_to_string
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, hash, compare, equal, yojson]
 
     module Checked = struct
       open Snark_params.Tick
