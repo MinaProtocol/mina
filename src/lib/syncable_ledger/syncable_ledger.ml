@@ -152,6 +152,15 @@ module type S = sig
 
     val answer_query :
       t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t
+
+    (** Like [answer_query], but answers [What_contents] queries with the
+        contents that [get_contents] returns for the requested subtree. *)
+    val answer_query_with_contents :
+         get_contents:(merkle_tree -> addr -> (addr * 'contents) list)
+      -> contents_to_yojson:('contents -> Yojson.Safe.t)
+      -> t
+      -> query Envelope.Incoming.t
+      -> (hash, 'contents) Answer.t Or_error.t Deferred.t
   end
 
   val create :
@@ -307,9 +316,8 @@ end = struct
         -> t =
      fun mt f ~context ~trust_system -> { mt; f; context; trust_system }
 
-    let answer_query :
-        t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t =
-     fun { mt; f; context; trust_system } query_envelope ->
+    let answer_query_with_contents ~get_contents ~contents_to_yojson
+        { mt; f; context; trust_system } query_envelope =
       let open (val context) in
       let open Trust_system in
       let ledger_depth = MT.depth mt in
@@ -329,7 +337,7 @@ end = struct
               let addresses_and_accounts =
                 List.sort ~compare:(fun (addr1, _) (addr2, _) ->
                     Addr.compare addr1 addr2 )
-                @@ MT.get_all_accounts_rooted_at_exn mt a
+                @@ get_contents mt a
                 (* can't actually throw *)
               in
               let addresses, accounts = List.unzip addresses_and_accounts in
@@ -368,7 +376,7 @@ end = struct
                                ~f:(fun (addr, account) ->
                                  `Tuple
                                    [ Addr.to_yojson addr
-                                   ; Account.to_yojson account
+                                   ; contents_to_yojson account
                                    ] ) ) )
                       ]
                     "Missing an account at address: $missing_address inside \
@@ -428,6 +436,11 @@ end = struct
             Option.value_map ~default:"Violated protocol" (snd action) ~f:fst
           in
           Or_error.error_string err
+
+    let answer_query :
+        t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t =
+      answer_query_with_contents ~get_contents:MT.get_all_accounts_rooted_at_exn
+        ~contents_to_yojson:Account.to_yojson
   end
 
   type 'a t =
