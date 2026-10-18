@@ -207,11 +207,10 @@ val merkle_root : t -> Ledger_hash.t
 
 ### `Sync_ledger` (`sync_ledger.ml`)
 
-Instantiates `Syncable_ledger.Make` for three target types:
+Instantiates `Syncable_ledger.Make` for two target types:
 
 | Sub-module | Target ledger type |
 |---|---|
-| `Sync_ledger.Mask` | `Ledger.t` (mask) |
 | `Sync_ledger.Any_ledger` | `Ledger.Any_ledger.M.t` |
 | `Sync_ledger.Root` | `Root.t` |
 
