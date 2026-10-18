@@ -6,6 +6,8 @@ open Currency
 module Poly : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -43,11 +45,48 @@ module Poly : sig
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
     end
   end]
+
+  type ( 'staged_ledger_hash
+       , 'snarked_ledger_hash
+       , 'local_state
+       , 'time
+       , 'body_reference
+       , 'signed_amount
+       , 'pending_coinbase_stack
+       , 'fee_excess
+       , 'sok_digest )
+       t =
+        ( 'staged_ledger_hash
+        , 'snarked_ledger_hash
+        , 'local_state
+        , 'time
+        , 'body_reference
+        , 'signed_amount
+        , 'pending_coinbase_stack
+        , 'fee_excess
+        , 'sok_digest )
+        Stable.Latest.t =
+    { staged_ledger_hash : 'staged_ledger_hash
+    ; genesis_ledger_hash : 'snarked_ledger_hash
+    ; ledger_proof_statement :
+        ( 'snarked_ledger_hash
+        , 'signed_amount
+        , 'pending_coinbase_stack
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        Snarked_ledger_state.Poly.t
+    ; timestamp : 'time
+    ; body_reference : 'body_reference
+    }
+  [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
 end
 
 module Value : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
@@ -65,6 +104,8 @@ module Value : sig
       val to_latest : t -> t
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 end
 
 include

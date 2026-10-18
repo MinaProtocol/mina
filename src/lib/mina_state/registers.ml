@@ -4,6 +4,8 @@ module Impl = Pickles.Impls.Step
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type ('ledger, 'pending_coinbase_stack, 'local_state) t =
           ( 'ledger
@@ -18,6 +20,15 @@ module Stable = struct
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
   end
 end]
+
+type ('ledger, 'pending_coinbase_stack, 'local_state) t =
+      ('ledger, 'pending_coinbase_stack, 'local_state) Stable.Latest.t =
+  { first_pass_ledger : 'ledger
+  ; second_pass_ledger : 'ledger
+  ; pending_coinbase_stack : 'pending_coinbase_stack
+  ; local_state : 'local_state
+  }
+[@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in

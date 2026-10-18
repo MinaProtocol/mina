@@ -18,6 +18,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('slot_number, 'slots_per_epoch) t =
               ('slot_number, 'slots_per_epoch) A.Poly.V1.t =
@@ -25,10 +27,17 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, equal, compare, hash, yojson, hlist]
       end
     end]
+
+    type ('slot_number, 'slots_per_epoch) t =
+          ('slot_number, 'slots_per_epoch) Stable.Latest.t =
+      { slot_number : 'slot_number; slots_per_epoch : 'slots_per_epoch }
+    [@@deriving sexp, equal, compare, hash, yojson, hlist]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = (T.Stable.V1.t, Length.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
@@ -36,6 +45,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 

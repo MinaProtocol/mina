@@ -30,6 +30,8 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t =
         ( Blockchain_state.Value.Stable.V2.t
@@ -39,6 +41,8 @@ module Value : sig
       [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
 type value = Value.t

@@ -6,6 +6,8 @@ open Currency
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -43,6 +45,41 @@ module Poly = struct
       [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
     end
   end]
+
+  type ( 'staged_ledger_hash
+       , 'snarked_ledger_hash
+       , 'local_state
+       , 'time
+       , 'body_reference
+       , 'signed_amount
+       , 'pending_coinbase_stack
+       , 'fee_excess
+       , 'sok_digest )
+       t =
+        ( 'staged_ledger_hash
+        , 'snarked_ledger_hash
+        , 'local_state
+        , 'time
+        , 'body_reference
+        , 'signed_amount
+        , 'pending_coinbase_stack
+        , 'fee_excess
+        , 'sok_digest )
+        Stable.Latest.t =
+    { staged_ledger_hash : 'staged_ledger_hash
+    ; genesis_ledger_hash : 'snarked_ledger_hash
+    ; ledger_proof_statement :
+        ( 'snarked_ledger_hash
+        , 'signed_amount
+        , 'pending_coinbase_stack
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        Snarked_ledger_state.Poly.t
+    ; timestamp : 'time
+    ; body_reference : 'body_reference
+    }
+  [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
 end
 
 [%%define_locally
@@ -64,6 +101,8 @@ let snarked_local_state (t : _ Poly.t) =
 module Value = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         ( Staged_ledger_hash.Stable.V1.t
@@ -81,6 +120,8 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 end
 
 type var =
