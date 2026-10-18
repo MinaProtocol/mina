@@ -24,6 +24,14 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Archive_precomputed_blocks_test) ) )
         ] )
+    ; ( "v3_precomputed_blocks"
+      , [ test_case
+            "Archive precomputed blocks of version 3 sent from mock daemon"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
+                          (Archive_v3_precomputed_blocks_test) ) )
+        ] )
     ; ( "genesis_load"
       , [ test_case "Load mainnet genesis ledger without memory leak" `Quick
             (Runner.run_blocking
