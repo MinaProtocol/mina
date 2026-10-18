@@ -6,6 +6,7 @@
   archive_lib
   integers
   bignum
+  zarith
   async_kernel
   base.caml
   base.base_internalhash_types

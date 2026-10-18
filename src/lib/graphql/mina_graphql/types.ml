@@ -665,6 +665,38 @@ let pending_work =
           ~resolve:(fun _ w -> One_or_two.to_list w)
       ] )
 
+let transaction_pool_status :
+    (Mina_lib.t, Network_pool.Transaction_pool.Resource_pool.t option) typ =
+  let module Pool = Network_pool.Transaction_pool.Resource_pool in
+  obj "TransactionPoolStatus"
+    ~doc:
+      "Occupancy of the transaction pool. When the pool is full, admitting a \
+       new command evicts the command with the lowest fee per weight unit, \
+       together with every later-nonce command from the same fee payer"
+    ~fields:(fun _ ->
+      [ field "size" ~typ:(non_null int)
+          ~doc:"Number of commands currently in the pool"
+          ~args:Arg.[]
+          ~resolve:(fun _ pool -> Pool.size pool)
+      ; field "maxSize" ~typ:(non_null int)
+          ~doc:
+            "Number of commands the pool holds before it starts evicting \
+             commands"
+          ~args:Arg.[]
+          ~resolve:(fun _ pool -> Pool.max_size pool)
+      ; field "minimumFeePerWeightUnit" ~typ:string
+          ~doc:
+            "The lowest fee per weight unit of any command in the pool, in \
+             nanomina, as a decimal integer or a fraction 'n/d'. Null if the \
+             pool is empty. Once the pool is full, a new command must pay \
+             strictly more than this to be admitted. Payments and stake \
+             delegations have weight 1"
+          ~args:Arg.[]
+          ~resolve:(fun _ pool ->
+            Option.map (Pool.min_fee pool) ~f:(fun fee_rate ->
+                Q.to_string (Currency.Fee_rate.to_q fee_rate) ) )
+      ] )
+
 module Snark_work_bundle = struct
   type t =
     { spec : Work_selector.in_memory_work One_or_two.t
