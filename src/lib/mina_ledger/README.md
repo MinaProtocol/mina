@@ -207,12 +207,12 @@ val merkle_root : t -> Ledger_hash.t
 
 ### `Sync_ledger` (`sync_ledger.ml`)
 
-Instantiates `Syncable_ledger.Make` for two target types:
+Instantiates the ledger sync functors:
 
-| Sub-module | Target ledger type |
-|---|---|
-| `Sync_ledger.Any_ledger` | `Ledger.Any_ledger.M.t` |
-| `Sync_ledger.Root` | `Root.t` |
+| Sub-module | Functor | Ledger type |
+|---|---|---|
+| `Sync_ledger.Any_ledger` | `Syncable_ledger.Make_responder` (answers queries only) | `Ledger.Any_ledger.M.t` |
+| `Sync_ledger.Root` | `Syncable_ledger.Make` (syncs into the ledger) | `Root.t` |
 
 The synchronisation protocol downloads a remote ledger subtree-by-subtree: the
 syncing node queries peers for child hashes or account contents, and the

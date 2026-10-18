@@ -19,7 +19,7 @@ module Root_hash = struct
   let to_hash (h : t) = Ledger_hash.of_digest (h :> Random_oracle.Digest.t)
 end
 
-module Any_ledger = Syncable_ledger.Make (struct
+module Any_ledger = Syncable_ledger.Make_responder (struct
   module Addr = Ledger.Location.Addr
   module MT = Ledger.Any_ledger.M
   module Account = Account.Stable.Latest
