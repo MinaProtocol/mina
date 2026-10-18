@@ -3,6 +3,8 @@ open Core_kernel
 module Good = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = int
 
@@ -15,6 +17,8 @@ module Good = struct
       let to_latest = String.length
     end
   end]
+
+  type t = Stable.Latest.t
 
   (* make sure t is an int *)
   let is_42 t = Int.( = ) t 42

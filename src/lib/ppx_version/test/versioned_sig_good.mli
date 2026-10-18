@@ -3,6 +3,8 @@ open Core_kernel
 module Good : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t = int
     end
@@ -13,6 +15,8 @@ module Good : sig
       val to_latest : t -> V2.t
     end
   end]
+
+  type t = Stable.Latest.t
 
   (* make sure t is an int *)
   val is_42 : t -> bool
