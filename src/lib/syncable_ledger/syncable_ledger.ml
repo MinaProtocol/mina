@@ -650,13 +650,17 @@ end = struct
       Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
-  let empty_hash_at_height h =
-    assert (
-      h >= 0 || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
-    let rec go prev ctr =
-      if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
+  let empty_hash_at_height =
+    let cache =
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
     in
-    go Hash.empty_account 0
+    fun h ->
+      assert (
+        h >= 0
+        || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
+      cache h
 
   (** Given the hash of the smallest subtree that contains all accounts, the
       height of that hash in the tree and the height of the whole tree, compute
