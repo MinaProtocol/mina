@@ -51,10 +51,7 @@ module Make (Inputs : Inputs_intf) :
     Root_history.protocol_states_for_scan_state root_history state_hash
 
   let get_ledger_by_hash ~frontier ledger_hash =
-    let root_ledger =
-      Root_ledger.as_unmasked
-      @@ Transition_frontier.root_snarked_ledger frontier
-    in
+    let root_ledger = Transition_frontier.root_snarked_ledger frontier in
     let staking_epoch_ledger =
       Transition_frontier.consensus_local_state frontier
       |> Consensus.Data.Local_state.staking_epoch_ledger
@@ -63,10 +60,8 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.consensus_local_state frontier
       |> Consensus.Data.Local_state.next_epoch_ledger
     in
-    if
-      Ledger_hash.equal ledger_hash
-        (Ledger.Any_ledger.M.merkle_root root_ledger)
-    then Some root_ledger
+    if Ledger_hash.equal ledger_hash (Root_ledger.merkle_root root_ledger) then
+      Some root_ledger
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -77,7 +72,7 @@ module Make (Inputs : Inputs_intf) :
           _ ->
           None
       | Ledger_root ledger ->
-          Some (Root_ledger.as_unmasked ledger)
+          Some ledger
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -88,7 +83,7 @@ module Make (Inputs : Inputs_intf) :
           _ ->
           None
       | Ledger_root ledger ->
-          Some (Root_ledger.as_unmasked ledger)
+          Some ledger
     else None
 
   let answer_query :
@@ -97,7 +92,7 @@ module Make (Inputs : Inputs_intf) :
       -> Sync_ledger.Query.t Envelope.Incoming.t
       -> context:(module CONTEXT)
       -> trust_system:Trust_system.t
-      -> Sync_ledger.Answer.t Or_error.t Deferred.t =
+      -> Sync_ledger.Answer.With_raw_accounts.t Or_error.t Deferred.t =
    fun ~frontier hash query ~context:(module Context) ~trust_system ->
     match get_ledger_by_hash ~frontier hash with
     | None ->
@@ -108,11 +103,21 @@ module Make (Inputs : Inputs_intf) :
                 hash ) )
     | Some ledger ->
         let responder =
-          Sync_ledger.Any_ledger.Responder.create ledger ignore
+          Sync_ledger.Root.Responder.create ledger ignore
             ~context:(module Context)
             ~trust_system
         in
-        Sync_ledger.Any_ledger.Responder.answer_query responder query
+        (* Forward the accounts' stored encodings rather than decoding them
+           only to encode them again for the response. *)
+        Sync_ledger.Root.Responder.answer_query_with_contents responder query
+          ~get_contents:(fun ledger addr ->
+            List.map
+              (Root_ledger.get_all_raw_accounts_rooted_at_exn ledger addr)
+              ~f:(fun (addr, bytes) ->
+                (addr, Sync_ledger.Answer.Raw_account.Raw bytes) ) )
+          ~contents_to_yojson:(fun account ->
+            Account.to_yojson
+              (Sync_ledger.Answer.Raw_account.to_account account) )
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
       state_hash =

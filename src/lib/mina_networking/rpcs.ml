@@ -417,12 +417,11 @@ module Answer_sync_ledger_query = struct
           return (Or_error.error_string "No Frontier")
     in
     let result =
-      Result.map answer ~f:Sync_ledger.Answer.With_raw_accounts.of_answer
-      |> Result.map_error ~f:(fun e ->
-             Error.createf
-               !"Refusing to answer sync ledger query for ledger_hash: \
-                 %{sexp:Ledger_hash.t}. Error: %s"
-               ledger_hash (Error.to_string_hum e) )
+      Result.map_error answer ~f:(fun e ->
+          Error.createf
+            !"Refusing to answer sync ledger query for ledger_hash: \
+              %{sexp:Ledger_hash.t}. Error: %s"
+            ledger_hash (Error.to_string_hum e) )
     in
     let%map () =
       match result with
