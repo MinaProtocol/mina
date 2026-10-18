@@ -6,7 +6,7 @@ set -euo pipefail
 # Test suite for parallel-build and duplicate-output detection in build.sh
 #
 # Usage:
-#   bash scripts/debian/tests/test_build_parallel.sh
+#   bash scripts/tests/debian/test_build_parallel.sh
 ################################################################################
 
 ################################################################################
