@@ -22,24 +22,6 @@ let () = Snarky_backendless.Snark0.set_eval_constraints true
 
 open Impls.Step
 
-[@@@warning "-60"]
-
-module Statement = struct
-  [@@@warning "-32-34"]
-
-  type t = Field.t
-
-  let to_field_elements x = [| x |]
-
-  module Constant = struct
-    type t = Field.Constant.t [@@deriving bin_io]
-
-    [@@@warning "-32"]
-
-    let to_field_elements x = [| x |]
-  end
-end
-
 (* Currently, a circuit must have at least 1 of every type of constraint. *)
 let dummy_constraints () =
   Impl.(
