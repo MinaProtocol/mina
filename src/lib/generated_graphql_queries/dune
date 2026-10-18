@@ -18,7 +18,10 @@
   ../../../graphql_schema.json
   ../../graphql-ppx-config.inc)
  (preprocess
-  (pps mina_ppx.graphql -- %{read-lines:../../graphql-ppx-config.inc})))
+  (pps
+   mina_ppx.graphql.no_pipebang
+   --
+   %{read-lines:../../graphql-ppx-config.inc})))
 
 (rule
  (targets generated_graphql_queries.ml)
