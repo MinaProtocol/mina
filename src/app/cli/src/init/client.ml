@@ -2071,17 +2071,13 @@ let archive_blocks =
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
          in
-         let send_versioned_precomputed_block block ~json =
-           match archive_process_location with
-           | Some archive_process_location ->
+         let send_versioned_precomputed_block =
+           make_send_block
+             ~graphql_make:(fun block ->
+               Graphql_queries.Archive_versioned_precomputed_block.(
+                 make @@ makeVariables ~block ()) )
+             ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_versioned_precomputed_block
-                 archive_process_location json
-           | None ->
-               (* The daemon's GraphQL API takes only the latest version. *)
-               Deferred.Or_error.errorf
-                 "A precomputed block of version %d can only be sent to the \
-                  archive node directly, with --archive-address"
-                 (Mina_block.Precomputed.Versioned.version block)
          in
          let send_extensional_block =
            make_send_block
@@ -2119,8 +2115,7 @@ let archive_blocks =
                  | Some precomputed_block ->
                      send_precomputed_block precomputed_block
                  | None ->
-                     send_versioned_precomputed_block precomputed_block
-                       ~json:block_json
+                     send_versioned_precomputed_block block_json
                else if extensional_flag then
                  let%bind extensional_block =
                    Archive_lib.Extensional.Block.of_yojson block_json
