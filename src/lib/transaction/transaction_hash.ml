@@ -188,11 +188,7 @@ module User_command_with_valid_signature = struct
   let equal ({ hash = h1; _ } : t) ({ hash = h2; _ } : t) = T.equal h1 h2
 
   let create (c : User_command.Valid.t) : t =
-    { data = c
-    ; hash =
-        hash_command
-          (User_command.read_all_proofs_from_disk @@ User_command.forget_check c)
-    }
+    { data = c; hash = hash_command_with_hashes (User_command.forget_check c) }
 
   let data ({ data; _ } : t) = data
 
