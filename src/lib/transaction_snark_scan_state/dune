@@ -46,13 +46,7 @@
   mina_wire_types
   internal_tracing)
  (preprocess
-  (pps
-   ppx_base
-   ppx_mina
-   ppx_version
-   ppx_let
-   ppx_custom_printf
-   ppx_deriving_yojson))
+  (pps ppx_base ppx_mina ppx_version ppx_let ppx_custom_printf))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Transaction-snark specialization of the parallel scan state"))

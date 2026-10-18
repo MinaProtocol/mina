@@ -65,6 +65,5 @@
    ppx_sexp_conv
    ppx_hash
    ppx_compare
-   ppx_deriving_yojson
    h_list.ppx
    ppx_inline_test)))

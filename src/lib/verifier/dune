@@ -52,5 +52,4 @@
    ppx_here
    ppx_let
    ppx_deriving.std
-   ppx_deriving_yojson
    ppx_sexp_conv)))

@@ -64,7 +64,6 @@
    ppx_compare
    ppx_deriving.show
    ppx_deriving.make
-   ppx_deriving_yojson
    ppx_inline_test
    ppx_assert
    ppx_version

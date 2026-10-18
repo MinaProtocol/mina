@@ -19,7 +19,6 @@
    ppx_inline_test
    ppx_assert
    ppx_deriving.std
-   ppx_deriving_yojson
    h_list.ppx))
  (libraries
   ;; opam libraries

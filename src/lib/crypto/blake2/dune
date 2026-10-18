@@ -4,7 +4,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
+  (pps ppx_jane ppx_mina ppx_version))
  (inline_tests
   (flags -verbose -show-counts))
  (libraries

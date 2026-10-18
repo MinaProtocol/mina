@@ -51,7 +51,6 @@
    ppx_base
    ppx_let
    ppx_deriving.std
-   ppx_deriving_yojson
    ppx_custom_printf
    ppx_inline_test))
  (instrumentation

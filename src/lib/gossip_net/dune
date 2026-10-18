@@ -49,7 +49,6 @@
    ppx_inline_test
    ppx_compare
    ppx_deriving.make
-   ppx_deriving_yojson
    ppx_here
    ppx_sexp_conv
    ppx_fields_conv

@@ -7,7 +7,7 @@
   ../../../graphql_schema.json)
  (preprocess
   (pps ppx_base ppx_version ppx_let ppx_mina ppx_custom_printf
-   ppx_deriving.std ppx_deriving_yojson
+   ppx_deriving.std
    graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
  (libraries
   ;; opam libraries
