@@ -13,7 +13,7 @@
   snarky_blake2)
  (preprocess
   (pps
-   mina_ppx
+   mina_ppx.no_pipebang
    -allow-unannotated-ignores
    -allow-toplevel-expression
    -dont-check-underscored-literal)))

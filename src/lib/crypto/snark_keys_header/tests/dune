@@ -3,7 +3,7 @@
  (libraries alcotest core_kernel snark_keys_header)
  (preprocess
   (pps
-   mina_ppx
+   mina_ppx.no_pipebang
    -allow-unannotated-ignores
    -allow-toplevel-expression
    -dont-check-underscored-literal)))
