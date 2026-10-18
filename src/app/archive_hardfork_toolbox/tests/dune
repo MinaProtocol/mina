@@ -46,6 +46,14 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules main test_env convert_canonical_tests populate_genesis_accounts_tests)
+ (modules
+  main
+  test_env
+  convert_canonical_tests
+  populate_genesis_accounts_tests)
  (preprocess
-  (pps mina_ppx -allow-unannotated-ignores -allow-toplevel-expression -dont-check-underscored-literal)))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

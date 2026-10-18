@@ -28,7 +28,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps mina_ppx.graphql)))
+  (pps mina_ppx.graphql.no_pipebang)))
 
 (executable
  (package signer)
@@ -40,7 +40,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps mina_ppx.graphql)))
+  (pps mina_ppx.graphql.no_pipebang)))
 
 (executable
  (package signer)
@@ -52,7 +52,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps mina_ppx.graphql)))
+  (pps mina_ppx.graphql.no_pipebang)))
 
 (executable
  (package signer)
@@ -64,4 +64,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps mina_ppx.graphql)))
+  (pps mina_ppx.graphql.no_pipebang)))
