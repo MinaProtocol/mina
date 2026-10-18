@@ -14,7 +14,8 @@
   test_wrap
   test_wrap_hack
   test_encoding_regression
-  test_domain_too_small)
+  test_domain_too_small
+  test_side_loaded_feature_flags)
  (flags
   (:standard -warn-error +a)
   -open
