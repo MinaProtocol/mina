@@ -13,7 +13,8 @@
   test_step_verifier
   test_wrap
   test_wrap_hack
-  test_encoding_regression)
+  test_encoding_regression
+  test_domain_too_small)
  (flags
   (:standard -warn-error +a)
   -open
