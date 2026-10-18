@@ -5,10 +5,14 @@ open Mina_state
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V3 : sig
     type t [@@deriving sexp, yojson]
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, yojson]
 
 val create : state:Protocol_state.Value.t -> proof:Proof.t -> t
 

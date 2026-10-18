@@ -4,6 +4,8 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V3 = struct
     module T = struct
       type t =
@@ -34,10 +36,7 @@ module Stable = struct
   end
 end]
 
-include (
-  Stable.Latest :
-    sig
-      type t = Stable.Latest.t [@@deriving sexp, yojson]
-    end )
+type t = Stable.Latest.t = { state : Protocol_state.Value.t; proof : Proof.t }
+[@@deriving fields, sexp, yojson]
 
 [%%define_locally Stable.Latest.(create, state, proof)]
