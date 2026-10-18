@@ -237,8 +237,6 @@ module type SYNC_RECIPIENT = sig
   include SYNC_CANDIDATE
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
-
-  val i_can_sync : unit
 end
 
 module Inputs = struct
@@ -481,7 +479,7 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
-    val i_can_sync : unit
+    val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
 
     val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
 
@@ -557,7 +555,7 @@ module Ledger = struct
 
       module Config : Config
 
-      val i_can_sync : unit
+      val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
 
       val dbs_synced : primary_ledger -> converting_ledger -> bool
 
