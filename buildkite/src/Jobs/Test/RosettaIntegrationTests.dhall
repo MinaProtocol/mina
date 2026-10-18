@@ -22,6 +22,8 @@ let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let MemoryGate = ../../Constants/MemoryGate.dhall
+
 let network = Network.Type.Devnet
 
 let dirtyWhen =
@@ -83,6 +85,7 @@ in  Pipeline.build
             , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
+            , soft_fail = Some MemoryGate.softFail
             , depends_on =
                 DebianVersions.appDependsOn
                   DebianVersions.DepsSpec::{

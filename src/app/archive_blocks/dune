@@ -23,7 +23,8 @@
   mina_stdlib
   genesis_constants
   logger
-  mina_block)
+  mina_block
+  mina_caqti)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
