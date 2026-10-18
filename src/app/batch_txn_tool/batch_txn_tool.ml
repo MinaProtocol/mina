@@ -150,7 +150,8 @@ let get_keypair ~logger path pw_option =
 
 let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~txn_fee_option ~rate_limit ~rate_limit_level ~rate_limit_interval
-    ~origin_sender_secret_key_path
+    ~pool_backpressure ~pool_high_watermark ~pool_low_watermark
+    ~pool_poll_interval ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
     ~graphql_target_node_option ~minimum_user_command_fee ~signature_kind () =
@@ -231,6 +232,55 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
   let node_ingress_uri = ingress_uri ~graphql_target_node in
 
+  (* Back-pressure from the target node's transaction pool. Once the pool is
+     over capacity it evicts its lowest-fee commands along with every later
+     nonce from the same sender, which leaves all of our subsequent commands
+     building on a nonce the pool no longer has. Keeping the pool below its
+     capacity avoids triggering that eviction in the first place. *)
+  let pool_backpressure = ref pool_backpressure in
+  (* Number of commands we may send before polling the pool again. *)
+  let pool_budget = ref 0 in
+  let rec wait_for_pool_capacity ~paused () =
+    if (not !pool_backpressure) || !pool_budget > 0 then Deferred.return ()
+    else
+      match%bind
+        Client.get_transaction_pool_status ~logger node_ingress_uri
+      with
+      | Error e ->
+          [%log warn]
+            "txn burst tool: could not query the transaction pool status, \
+             disabling back-pressure: %s"
+            (Error.to_string_hum e) ;
+          pool_backpressure := false ;
+          Deferred.return ()
+      | Ok { size; max_size; _ } ->
+          let pause_at =
+            Float.(to_int (pool_high_watermark *. of_int max_size))
+          in
+          let resume_at =
+            Float.(to_int (pool_low_watermark *. of_int max_size))
+          in
+          if (paused && size > resume_at) || ((not paused) && size >= pause_at)
+          then (
+            if not paused then
+              [%log info]
+                "txn burst tool: transaction pool holds %d of %d commands, \
+                 pausing until it drains to %d"
+                size max_size resume_at ;
+            let%bind () =
+              Async.after (Time.Span.create ~ms:pool_poll_interval ())
+            in
+            wait_for_pool_capacity ~paused:true () )
+          else (
+            if paused then
+              [%log info]
+                "txn burst tool: transaction pool holds %d of %d commands, \
+                 resuming"
+                size max_size ;
+            pool_budget := pause_at - size ;
+            Deferred.return () )
+  in
+
   (* get the keypairs from files *)
   let%bind origin_keypair =
     get_keypair ~logger origin_sender_secret_key_path
@@ -256,6 +306,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       (pub_key_to_string receiver_kp.public_key)
       (Currency.Amount.to_string initial_send_amount)
       (Currency.Fee.to_string fee_amount) ;
+    let%bind () = wait_for_pool_capacity ~paused:false () in
+    decr pool_budget ;
     let%bind res =
       Client.sign_and_send_payment ~logger node_ingress_uri
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
@@ -369,6 +421,30 @@ let output_there_and_back_cmds =
            "NUM_MILLISECONDS Interval that the rate-limiter is applied over. \
             Used for rate limiting (default: 300000)"
          (optional_with_default 300000 int)
+     and pool_backpressure =
+       flag "--pool-backpressure" ~aliases:[ "pool-backpressure" ]
+         ~doc:
+           "TRUE/FALSE Whether to pause sending while the target node's \
+            transaction pool is nearly full (default: true)"
+         (optional_with_default true bool)
+     and pool_high_watermark =
+       flag "--pool-high-watermark" ~aliases:[ "pool-high-watermark" ]
+         ~doc:
+           "FRACTION Fraction of the transaction pool's capacity at which to \
+            pause sending (default: 0.9)"
+         (optional_with_default 0.9 float)
+     and pool_low_watermark =
+       flag "--pool-low-watermark" ~aliases:[ "pool-low-watermark" ]
+         ~doc:
+           "FRACTION Fraction of the transaction pool's capacity that the pool \
+            must drain to before sending resumes (default: 0.75)"
+         (optional_with_default 0.75 float)
+     and pool_poll_interval =
+       flag "--pool-poll-interval" ~aliases:[ "pool-poll-interval" ]
+         ~doc:
+           "NUM_MILLISECONDS How often to poll the transaction pool while \
+            paused (default: 1000)"
+         (optional_with_default 1000 int)
      and origin_sender_secret_key_path =
        flag "--origin-sender-sk-path"
          ~aliases:[ "origin-sender-sk-path" ]
@@ -407,9 +483,11 @@ let output_there_and_back_cmds =
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
-       ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
-       ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option ~minimum_user_command_fee
+       ~pool_backpressure ~pool_high_watermark ~pool_low_watermark
+       ~pool_poll_interval ~origin_sender_secret_key_path
+       ~origin_sender_secret_key_pw_option ~returner_secret_key_path
+       ~returner_secret_key_pw_option ~graphql_target_node_option
+       ~minimum_user_command_fee
        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
 let () =
