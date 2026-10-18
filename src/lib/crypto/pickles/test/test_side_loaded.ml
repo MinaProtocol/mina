@@ -207,7 +207,7 @@ struct
       ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
       ~feature_flags:Flags.feature_flags ~typ:Field.typ
 
-  let _tag, _, p, Provers.[ step ] =
+  let tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Input Field.typ)
           ~auxiliary_typ:Typ.unit
@@ -253,6 +253,14 @@ struct
                       } )
               }
             ] ) )
+
+  (* Finish the setup that compile_promise leaves pending, so that it cannot
+     interleave with that of another instance of this functor. *)
+  let () =
+    ignore
+      ( Promise.block_on_async_exn (fun () ->
+            Side_loaded.Verification_key.of_compiled_promise tag )
+        : Side_loaded.Verification_key.t )
 
   module Proof = (val p)
 
