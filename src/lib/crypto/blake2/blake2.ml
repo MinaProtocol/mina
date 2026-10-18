@@ -52,6 +52,8 @@ module Make () = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     (* it would be better to use `with_all_version_tags` on just
        the module where we need a version tag, but that doesn't
        (yet) work with %%versioned_binable
@@ -84,6 +86,8 @@ module Make () = struct
       include Mina_stdlib.Bounded_types.String.Of_stringable (Arg)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal]
 
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 

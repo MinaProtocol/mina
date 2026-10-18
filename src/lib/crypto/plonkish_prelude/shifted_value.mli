@@ -84,12 +84,17 @@ end
 module Type1 : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'f t = 'f Mina_wire_types.Pickles_types.Shifted_value.Type1.V1.t =
         | Shifted_value of 'f
       [@@deriving sexp, compare, equal, yojson, hash]
     end
   end]
+
+  type 'f t = 'f Stable.Latest.t = Shifted_value of 'f
+  [@@deriving sexp, compare, equal, yojson, hash]
 
   (** User beware: [equal] is not your regular equality predicate. *)
   val equal : ('a, 'res) Sigs.rel2 -> ('a t, 'res) Sigs.rel2

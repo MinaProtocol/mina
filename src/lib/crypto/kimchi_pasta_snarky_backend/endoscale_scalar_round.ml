@@ -2,6 +2,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type 'a t =
       { n0 : 'a
@@ -22,6 +24,24 @@ module Stable = struct
     [@@deriving sexp, fields, hlist]
   end
 end]
+
+type 'a t = 'a Stable.Latest.t =
+  { n0 : 'a
+  ; n8 : 'a
+  ; a0 : 'a
+  ; b0 : 'a
+  ; a8 : 'a
+  ; b8 : 'a
+  ; x0 : 'a
+  ; x1 : 'a
+  ; x2 : 'a
+  ; x3 : 'a
+  ; x4 : 'a
+  ; x5 : 'a
+  ; x6 : 'a
+  ; x7 : 'a
+  }
+[@@deriving sexp, fields, hlist]
 
 let map { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 } ~f =
   { n0 = f n0

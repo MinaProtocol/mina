@@ -7,6 +7,8 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     (* generate `With_top_version_tag` modules for compatibility
        used for original mainnet transaction hashes
     *)
@@ -16,6 +18,8 @@ module type S = sig
       type t [@@deriving sexp, compare, hash, equal, yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
   include Hashable.S with type t := t
 

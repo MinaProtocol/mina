@@ -3,6 +3,8 @@ module H_list = Snarky_backendless.H_list
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type 'a t =
       { xt : 'a
@@ -23,6 +25,24 @@ module Stable = struct
     [@@deriving sexp, fields, hlist]
   end
 end]
+
+type 'a t = 'a Stable.Latest.t =
+  { xt : 'a
+  ; yt : 'a
+  ; xp : 'a
+  ; yp : 'a
+  ; n_acc : 'a
+  ; xr : 'a
+  ; yr : 'a
+  ; s1 : 'a
+  ; s3 : 'a
+  ; b1 : 'a
+  ; b2 : 'a
+  ; b3 : 'a
+  ; b4 : 'a
+  ; inv : 'a
+  }
+[@@deriving sexp, fields, hlist]
 
 let map { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4; inv } ~f =
   { xt = f xt

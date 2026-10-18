@@ -4,11 +4,16 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type 'a t = Infinity | Finite of 'a
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
+
+type 'a t = 'a Stable.Latest.t = Infinity | Finite of 'a
+[@@deriving sexp, equal, compare, hash, yojson]
 
 [@@@warning "+4"]
 
