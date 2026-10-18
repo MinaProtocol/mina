@@ -382,6 +382,14 @@ module T = struct
     | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.get_all_accounts_rooted_at_exn db
 
+  let get_all_raw_accounts_rooted_at_exn t =
+    match t with
+    | Stable_db db ->
+        Ledger.Db.get_all_raw_accounts_rooted_at_exn db
+    | Converting_db ((module Converting_ledger), db, _) ->
+        Ledger.Db.get_all_raw_accounts_rooted_at_exn
+          (Converting_ledger.primary_ledger db)
+
   let unsafely_decompose_root t =
     match t with
     | Stable_db db ->

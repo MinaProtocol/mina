@@ -144,6 +144,11 @@ val set_batch_accounts : t -> (addr * account) list -> unit
     tree rooted at `address`. The accounts are ordered by their addresses. *)
 val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
 
+(** Like [get_all_accounts_rooted_at_exn], but returns each account's stored
+    bin_prot encoding without decoding it. *)
+val get_all_raw_accounts_rooted_at_exn :
+  t -> addr -> (addr * Core_kernel.Bigstring.t) list
+
 (** Decompose a root into its components parts. Users of this method must be
       careful to ensure that either the underlying databases remain in sync, or
       that they are not later used to back a root ledger. Use this on temporary
