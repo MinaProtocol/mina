@@ -175,8 +175,7 @@ module Token_symbol = struct
     in
     Field.Checked.Assert.equal t actual
 
-  let var_of_value x =
-    Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
+  let var_of_value x : var = Field.Var.constant (to_field x)
 
   let of_field (x : Field.t) : t =
     of_bits
