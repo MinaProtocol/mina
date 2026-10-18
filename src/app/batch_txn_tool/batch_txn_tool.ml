@@ -122,7 +122,9 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
     in
     match querry_result with
     | Ok res ->
-        return res.nonce
+        (* Prefer the nonce inferred from the transaction pool, so that we
+           build on any of our commands that are already pending. *)
+        return (Option.value res.inferred_nonce ~default:res.nonce)
     | Error _ ->
         [%log error] "txn burst tool: could not get nonce of pk"
           ~metadata:
