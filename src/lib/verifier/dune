@@ -50,7 +50,6 @@
    ppx_mina
    ppx_version
    ppx_here
-   ppx_bin_prot
    ppx_let
    ppx_deriving.std
    ppx_deriving_yojson

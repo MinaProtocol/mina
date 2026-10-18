@@ -67,7 +67,6 @@
   (pps
    lens.ppx_deriving
    ppx_assert
-   ppx_bin_prot
    ppx_compare
    ppx_custom_printf
    ppx_deriving.make

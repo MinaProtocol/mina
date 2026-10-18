@@ -11,7 +11,6 @@
    ppx_mina
    ppx_version
    ppx_snarky
-   ppx_bin_prot
    ppx_compare
    ppx_sexp_conv
    ppx_hash

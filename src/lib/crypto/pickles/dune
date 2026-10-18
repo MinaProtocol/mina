@@ -8,13 +8,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
-   ppx_compare
-   ppx_deriving_yojson
-   h_list.ppx))
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson h_list.ppx))
  (libraries
   ;; opam libraries
   stdio

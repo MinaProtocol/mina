@@ -40,13 +40,7 @@
   merkle_ledger
   visualization)
  (preprocess
-  (pps
-   ppx_compare
-   ppx_deriving.show
-   ppx_deriving_yojson
-   ppx_jane
-   ppx_mina
-   ppx_version))
+  (pps ppx_deriving.show ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Implementation of Merkle tree masks"))

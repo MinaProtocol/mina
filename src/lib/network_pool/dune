@@ -74,7 +74,6 @@
   (pps
    ppx_assert
    ppx_base
-   ppx_bin_prot
    ppx_custom_printf
    ppx_deriving.std
    ppx_deriving_yojson
@@ -83,8 +82,6 @@
    ppx_let
    ppx_mina
    ppx_pipebang
-   ppx_register_event
-   ppx_sexp_conv
    ppx_snarky
    ppx_version))
  (synopsis
