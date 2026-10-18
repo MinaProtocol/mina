@@ -108,7 +108,8 @@ module type S = sig
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
+    type nonrec t = Stable.Latest.t
+    [@@deriving sexp, compare, equal, yojson, hash]
   end
 
   module Coinbase_stack : sig
@@ -151,7 +152,8 @@ module type S = sig
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
+    type nonrec t = Stable.Latest.t
+    [@@deriving sexp, compare, equal, yojson, hash]
 
     val data : t -> Coinbase_stack.t
 

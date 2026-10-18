@@ -292,7 +292,8 @@ module State : sig
     end
   end]
 
-  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t [@@deriving sexp]
+  type nonrec ('merge, 'base) t = ('merge, 'base) Stable.Latest.t
+  [@@deriving sexp]
 
   val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t
 
