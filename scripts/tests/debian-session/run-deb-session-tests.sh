@@ -37,7 +37,7 @@ set -eux -o pipefail
 
 # Determine the directory of this test script and the session scripts directory
 TEST_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
-SESSION_SCRIPTS_DIR="$(realpath "$TEST_DIR/..")"
+SESSION_SCRIPTS_DIR="$(realpath "$TEST_DIR/../../debian/session")"
 
 SESSION_ENGINE="${SESSION_ENGINE:-bash}"
 DEB_TOOLKIT="${DEB_TOOLKIT:-deb-toolkit}"

@@ -10,7 +10,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let RunInToolchain = ./RunInToolchain.dhall
 
-let testScript = "./scripts/debian/session/tests/run-deb-session-tests.sh"
+let testScript = "./scripts/tests/debian-session/run-deb-session-tests.sh"
 
 in  { step =
         Command.build

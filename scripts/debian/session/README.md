@@ -431,7 +431,7 @@ All scripts include security protections:
 Run the test suite to verify all scripts work correctly:
 
 ```bash
-./tests/run-deb-session-tests.sh
+../../tests/debian-session/run-deb-session-tests.sh
 ```
 
 The test suite covers:
