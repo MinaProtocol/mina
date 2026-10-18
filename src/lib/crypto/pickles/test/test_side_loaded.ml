@@ -179,7 +179,10 @@ end
 
 [@@@warning "-60"]
 
-module Simple_chain = struct
+module Simple_chain (Flags : sig
+  val feature_flags : Opt.Flag.t Plonk_types.Features.t
+end) =
+struct
   type _ Snarky_backendless.Request.t +=
     | Prev_input : Field.Constant.t Snarky_backendless.Request.t
     | Proof : Side_loaded.Proof.t Snarky_backendless.Request.t
@@ -202,7 +205,7 @@ module Simple_chain = struct
   let side_loaded_tag =
     Side_loaded.create ~name:"foo"
       ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-      ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
+      ~feature_flags:Flags.feature_flags ~typ:Field.typ
 
   let _tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
@@ -311,6 +314,10 @@ module Simple_chain = struct
            Proof.verify_promise [ (Field.Constant.one, b3) ] ) )
 end
 
+module Simple_chain_no_features = Simple_chain (struct
+  let feature_flags = Plonk_types.Features.none
+end)
+
 let () =
   let open Alcotest in
   run "Pickles side-loaded"
@@ -321,10 +328,10 @@ let () =
       , [ test_case "verify" `Quick Fake_2_recursion.test_verify ] )
     ; ( "Simple chain"
       , [ test_case "side-load no recursion" `Quick
-            Simple_chain.test_side_load_no_recursion
+            Simple_chain_no_features.test_side_load_no_recursion
         ; test_case "side-load fake 1 recursion" `Quick
-            Simple_chain.test_side_load_fake_1_recursion
+            Simple_chain_no_features.test_side_load_fake_1_recursion
         ; test_case "side-load fake 2 recursion" `Quick
-            Simple_chain.test_side_load_fake_2_recursion
+            Simple_chain_no_features.test_side_load_fake_2_recursion
         ] )
     ]
