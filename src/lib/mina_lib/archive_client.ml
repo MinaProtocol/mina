@@ -66,10 +66,10 @@ let dispatch_precomputed_block =
 let dispatch_extensional_block =
   make_dispatch_block Archive_lib.Rpc.extensional_block
 
-let dispatch_versioned_precomputed_block ?max_tries archive_location block =
+let dispatch_versioned_precomputed_block ?max_tries archive_location json =
   make_dispatch_block Archive_lib.Rpc.versioned_precomputed_block ?max_tries
     archive_location
-    (Yojson.Safe.to_string (Mina_block.Precomputed.Versioned.to_yojson block))
+    (Yojson.Safe.to_string json)
   >>| Or_error.join
 
 let transfer

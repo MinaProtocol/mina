@@ -2071,11 +2071,11 @@ let archive_blocks =
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
          in
-         let send_versioned_precomputed_block block =
+         let send_versioned_precomputed_block block ~json =
            match archive_process_location with
            | Some archive_process_location ->
                Mina_lib.Archive_client.dispatch_versioned_precomputed_block
-                 archive_process_location block
+                 archive_process_location json
            | None ->
                (* The daemon's GraphQL API takes only the latest version. *)
                Deferred.Or_error.errorf
@@ -2120,6 +2120,7 @@ let archive_blocks =
                      send_precomputed_block precomputed_block
                  | None ->
                      send_versioned_precomputed_block precomputed_block
+                       ~json:block_json
                else if extensional_flag then
                  let%bind extensional_block =
                    Archive_lib.Extensional.Block.of_yojson block_json
