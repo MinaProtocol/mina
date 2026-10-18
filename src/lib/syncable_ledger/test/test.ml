@@ -775,3 +775,112 @@ module Diverged = struct
     assert !tampered ;
     check_synced ~local ~target (synced, errors)
 end
+
+(* Answers can arrive for a query the syncer no longer expects: here, one asked
+   for the target before the sync switched to another target and back. *)
+module Stale_answers = struct
+  open Db.DB16_subtree_depths86
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  (* Sync towards [target_a], holding back the answer to the first query that
+     satisfies [hold]. Then switch to another target and back to [target_a],
+     answer its account count, deliver the held answer, and finish the sync. *)
+  let sync_with_stale_answer ~hold =
+    let local, _ = Ledger.load_ledger 1 1 in
+    let target_a, _ = Ledger.load_ledger 130 2 in
+    let target_b, _ = Ledger.load_ledger 130 3 in
+    let root_a = Ledger.merkle_root target_a in
+    let root_b = Ledger.merkle_root target_b in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let responder =
+      Sync_responder.create target_a ignore
+        ~context:(module Context)
+        ~trust_system
+    in
+    let answer query =
+      let%map answer =
+        Sync_responder.answer_query responder (Envelope.Incoming.local query)
+      in
+      (root_a, query, Envelope.Incoming.local (Or_error.ok_exn answer))
+    in
+    let read_query () =
+      match%map Linear_pipe.read qr with
+      | `Ok q ->
+          q
+      | `Eof ->
+          failwith "query pipe closed"
+    in
+    let set_goal root =
+      ignore
+        ( Sync_ledger.new_goal lsync root ~data:() ~equal:(fun () () -> true)
+          : [ `New | `Repeat | `Update_data ] )
+    in
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        set_goal root_a ;
+        (* Answer queries for [target_a] until one is held back. *)
+        let rec answer_until_held () =
+          let%bind root, query = read_query () in
+          if Root_hash.equal root root_a && hold query then answer query
+          else
+            let%bind a = answer query in
+            let%bind () = Linear_pipe.write aw a in
+            answer_until_held ()
+        in
+        let%bind held = answer_until_held () in
+        set_goal root_b ;
+        set_goal root_a ;
+        (* Answer the new account count query for [target_a]. *)
+        let rec answer_num_accounts () =
+          let%bind root, query = read_query () in
+          match query with
+          | Num_accounts when Root_hash.equal root root_a ->
+              let%bind a = answer query in
+              Linear_pipe.write aw a
+          | _ ->
+              answer_num_accounts ()
+        in
+        let%bind () = answer_num_accounts () in
+        let%bind () = Linear_pipe.write aw held in
+        (* Answer every remaining query for [target_a]. *)
+        don't_wait_for
+          (Linear_pipe.iter qr ~f:(fun (root, query) ->
+               if Root_hash.equal root root_a then
+                 let%bind a = answer query in
+                 Linear_pipe.write aw a
+               else Deferred.unit ) ) ;
+        match%map
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.wait_until_valid lsync root_a)
+        with
+        | `Result (`Ok mt) ->
+            Root_hash.equal root_a (Ledger.merkle_root mt)
+        | `Result (`Target_changed _) | `Timeout ->
+            false )
+
+  let%test "sync ignores a stale answer for an account subtree" =
+    sync_with_stale_answer ~hold:(function
+      | Syncable_ledger.Query.What_contents _ ->
+          true
+      | _ ->
+          false )
+
+  let%test "sync ignores a stale answer for an inner node" =
+    sync_with_stale_answer ~hold:(function
+      | Syncable_ledger.Query.What_child_hashes (addr, _) ->
+          Ledger.Addr.depth addr > 0
+      | _ ->
+          false )
+
+  let%test "sync ignores a stale answer for the root" =
+    sync_with_stale_answer ~hold:(function
+      | Syncable_ledger.Query.What_child_hashes (addr, _) ->
+          Ledger.Addr.depth addr = 0
+      | _ ->
+          false )
+end
