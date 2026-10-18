@@ -56,7 +56,7 @@
   (flags -verbose -show-counts))
  (preprocess
   (pps
-   mina_ppx
+   mina_ppx.no_pipebang
    -allow-unannotated-ignores
    -allow-toplevel-expression
    -dont-check-underscored-literal))
