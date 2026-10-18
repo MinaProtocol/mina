@@ -114,7 +114,6 @@ module Pubsub = struct
 
   let subscribe_raw t topic ~handle_and_validate_incoming_message ~encode
       ~decode ~on_decode_failure =
-    let open Deferred.Or_error.Let_syntax in
     (* Linear scan over all subscriptions. Should generally be small, probably not a problem. *)
     let topic_subscription_already_exists =
       Hashtbl.data t.subscriptions
@@ -124,13 +123,18 @@ module Pubsub = struct
     if topic_subscription_already_exists then
       Deferred.Or_error.errorf "already subscribed to topic %s" topic
     else
-      let%map sub =
-        Subscription.subscribe ~helper:t.helper ~topic ~encode ~decode
-          ~on_decode_failure ~validator:handle_and_validate_incoming_message
+      let sub =
+        Subscription.create ~topic ~encode ~decode ~on_decode_failure
+          ~validator:handle_and_validate_incoming_message
       in
       Hashtbl.add_exn t.subscriptions ~key:(Subscription.id sub)
         ~data:(Subscription.E sub) ;
-      sub
+      match%map Subscription.subscribe ~helper:t.helper sub with
+      | Ok () ->
+          Ok sub
+      | Error e ->
+          Hashtbl.remove t.subscriptions (Subscription.id sub) ;
+          Error e
 
   let subscribe_encode t topic ~handle_and_validate_incoming_message ~bin_prot
       ~on_decode_failure =
