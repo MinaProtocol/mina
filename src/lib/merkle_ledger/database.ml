@@ -613,7 +613,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   (** Replace the accounts in the subtree at [address]: the given accounts fill
       its leftmost leaves, and any accounts in the leaves after them are
-      removed. *)
+      removed. An account overwritten by one with a different identifier is
+      removed first, so that it keeps no location or token entries for the
+      overwritten leaf. *)
   let set_all_accounts_rooted_at_exn mdb address accounts =
     let ledger_depth = mdb.depth in
     let first, last = Addr.Range.subtree_range ~ledger_depth address in
@@ -625,9 +627,28 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         "set_all_accounts_rooted_at_exn: %d accounts do not fit in a subtree \
          of %d leaves"
         num_accounts capacity () ;
-    set_batch_accounts mdb
-      (List.mapi accounts ~f:(fun i account ->
-           (Addr.of_int_exn ~ledger_depth (first + i), account) ) ) ;
+    let addresses_and_accounts =
+      List.mapi accounts ~f:(fun i account ->
+          (Addr.of_int_exn ~ledger_depth (first + i), account) )
+    in
+    let displaced =
+      List.filter_map
+        (List.zip_exn
+           (get_batch mdb
+              (List.map addresses_and_accounts ~f:(fun (addr, _) ->
+                   Location.Account addr ) ) )
+           accounts )
+        ~f:(fun ((location, occupant), account) ->
+          Option.bind occupant ~f:(fun occupant ->
+              Option.some_if
+                (not
+                   (Account_id.equal
+                      (Account.identifier occupant)
+                      (Account.identifier account) ) )
+                location ) )
+    in
+    remove_accounts_at_locations mdb displaced ;
+    set_batch_accounts mdb addresses_and_accounts ;
     let clear_from = first + num_accounts in
     let clear_to =
       Option.value_map (Account_location.last_location_address mdb)
