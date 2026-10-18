@@ -263,19 +263,23 @@ let listening_addrs t =
   result_get_list response |> List.map ~f:Multiaddr.of_libp2p_ipc
 
 let open_protocol t ~on_handler_error ~protocol f =
-  let open Deferred.Or_error.Let_syntax in
   let protocol_handler =
     { closed = false; on_handler_error; handler = f; protocol_name = protocol }
   in
   if Hashtbl.mem t.protocol_handlers protocol then
     Deferred.Or_error.errorf "already handling protocol %s" protocol
-  else
-    let%map _ =
+  else (
+    Hashtbl.add_exn t.protocol_handlers ~key:protocol ~data:protocol_handler ;
+    match%map
       Libp2p_helper.do_rpc t.helper
         (module Libp2p_ipc.Rpcs.AddStreamHandler)
         (Libp2p_ipc.Rpcs.AddStreamHandler.create_request ~protocol)
-    in
-    Hashtbl.add_exn t.protocol_handlers ~key:protocol ~data:protocol_handler
+    with
+    | Ok _ ->
+        Ok ()
+    | Error e ->
+        Hashtbl.remove t.protocol_handlers protocol ;
+        Error e )
 
 let close_protocol ?(reset_existing_streams = false) t ~protocol =
   let%map result =
