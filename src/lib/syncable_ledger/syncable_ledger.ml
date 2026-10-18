@@ -681,11 +681,16 @@ end = struct
     go (empty_hash_at_height start_height) hash start_height
 
   (** Given an address and the hash of the corresponding subtree, start getting
-      the children.
+      the children. If the subtree is empty, its accounts are removed instead.
   *)
   let handle_node t addr exp_hash =
     let open (val t.context) in
-    if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
+    let ledger_depth = MT.depth t.tree in
+    if
+      Hash.equal exp_hash
+        (empty_hash_at_height (Addr.height ~ledger_depth addr))
+    then MT.set_all_accounts_rooted_at_exn t.tree addr []
+    else if Addr.depth addr >= ledger_depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
