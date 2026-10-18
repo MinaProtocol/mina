@@ -222,21 +222,34 @@ let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
       Deferred.return `Continue )
     node_uri
 
+let archive_blocks_format_arg = function
+  | `Precomputed ->
+      "--precomputed"
+  | `Extensional ->
+      "--extensional"
+
 let archive_blocks t ~archive_address ~format blocks =
-  let format_arg =
-    match format with
-    | `Precomputed ->
-        "--precomputed"
-    | `Extensional ->
-        "--extensional"
-  in
   Executor.run t
     ~args:
       ( [ "advanced"
         ; "archive-blocks"
         ; "--archive-addres"
         ; string_of_int archive_address
-        ; format_arg
+        ; archive_blocks_format_arg format
+        ]
+      @ blocks )
+
+(** Like [archive_blocks], but sends the blocks to the archive through the
+    GraphQL API of the daemon listening on [rest_port], rather than
+    directly. *)
+let archive_blocks_through_daemon t ~rest_port ~format blocks =
+  Executor.run t
+    ~args:
+      ( [ "advanced"
+        ; "archive-blocks"
+        ; "--rest-server"
+        ; string_of_int rest_port
+        ; archive_blocks_format_arg format
         ]
       @ blocks )
 
@@ -261,7 +274,7 @@ let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
 let start ?hardfork_handling ?block_producer_key ?config_files ?env
     ?peer_list_url ?node_status_url ?node_error_url ?simplified_node_stats
-    ?(start_filtered_logs = default_init_log_filters) t =
+    ?archive_address ?(start_filtered_logs = default_init_log_filters) t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -316,6 +329,7 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     @ bool_flag "--simplified-node-stats" simplified_node_stats
     @ config_file_args
     @ opt_arg "--peer-list-url" peer_list_url
+    @ opt_arg "--archive-address" (Option.map archive_address ~f:Int.to_string)
     @ start_filtered_log_args
   in
   [%log debug] "Starting daemon" ;
