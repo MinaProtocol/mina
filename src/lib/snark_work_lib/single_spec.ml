@@ -3,6 +3,8 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('witness, 'ledger_proof) t =
         | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -13,6 +15,11 @@ module Poly = struct
       [@@deriving sexp, yojson]
     end
   end]
+
+  type ('witness, 'ledger_proof) t = ('witness, 'ledger_proof) Stable.Latest.t =
+    | Transition of Transaction_snark.Statement.t * 'witness
+    | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
+  [@@deriving sexp, yojson]
 
   let map ~f_witness ~f_proof = function
     | Transition (s, w) ->

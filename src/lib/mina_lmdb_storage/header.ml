@@ -5,6 +5,8 @@ open Lmdb_storage
 module Entry = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         | Header of Mina_block.Header.Stable.V3.t
@@ -20,6 +22,16 @@ module Entry = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    | Header of Mina_block.Header.t
+    | Invalid of
+        { parent_state_hash : State_hash.t
+        ; blockchain_length : Mina_numbers.Length.t
+              (* This field is set only if at the time of transition's
+                 invalidation, body was present in block storage *)
+        ; body_ref : Consensus.Body_reference.t option
+        }
 end
 
 module F (Db : Generic.Db) = struct

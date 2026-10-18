@@ -4,10 +4,14 @@ open Network_peer
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     type t
   end
 end]
+
+type t = Stable.Latest.t
 
 (** Securely generate a new keypair. *)
 val generate_random : Libp2p_helper.t -> t Deferred.t

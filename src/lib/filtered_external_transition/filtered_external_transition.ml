@@ -6,6 +6,8 @@ open Signature_lib
 module Fee_transfer_type = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Fee_transfer | Fee_transfer_via_coinbase
       [@@deriving quickcheck, compare, sexp]
@@ -13,6 +15,9 @@ module Fee_transfer_type = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Fee_transfer | Fee_transfer_via_coinbase
+  [@@deriving quickcheck, compare, sexp]
 end
 
 module Transactions = struct
@@ -43,6 +48,8 @@ end
 module Protocol_state = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
@@ -53,6 +60,12 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { previous_state_hash : State_hash.t
+    ; blockchain_state : Mina_state.Blockchain_state.Value.t
+    ; consensus_state : Consensus.Data.Consensus_state.Value.t
+    }
 end
 
 [%%versioned

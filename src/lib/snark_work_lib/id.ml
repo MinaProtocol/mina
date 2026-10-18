@@ -3,6 +3,8 @@ open Core_kernel
 module Single = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = { which_one : [ `First | `Second | `One ]; pairing_id : int64 }
       [@@deriving compare, hash, sexp, yojson, equal]
@@ -10,11 +12,17 @@ module Single = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { which_one : [ `First | `Second | `One ]; pairing_id : int64 }
+  [@@deriving compare, hash, sexp, yojson, equal]
 end
 
 module Range = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = { first : int; last : int }
       [@@deriving hash, sexp, equal, yojson]
@@ -29,12 +37,17 @@ module Range = struct
     end
   end]
 
+  type t = Stable.Latest.t = { first : int; last : int }
+  [@@deriving hash, sexp, equal, yojson]
+
   let compare = Stable.Latest.compare
 end
 
 module Sub_zkapp = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { which_one : [ `First | `Second | `One ]
@@ -47,6 +60,13 @@ module Sub_zkapp = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { which_one : [ `First | `Second | `One ]
+    ; pairing_id : int64
+    ; range : Range.t
+    }
+  [@@deriving compare, hash, sexp, yojson, equal]
+
   let of_single ~(range : Range.t) Single.{ which_one; pairing_id } =
     { which_one; pairing_id; range }
 
@@ -57,6 +77,8 @@ end
 module Any = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         | Single of Single.Stable.V1.t
@@ -66,4 +88,7 @@ module Any = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Single of Single.t | Sub_zkapp of Sub_zkapp.t
+  [@@deriving compare, hash, sexp, yojson, equal]
 end

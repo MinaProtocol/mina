@@ -90,10 +90,14 @@ end
 module Keypair : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t
     end
   end]
+
+  type t = Stable.Latest.t
 
   (** Formats this keypair to a comma-separated list of public key, secret key, and peer_id. *)
   val to_string : t -> string

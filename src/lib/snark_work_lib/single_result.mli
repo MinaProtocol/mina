@@ -3,6 +3,8 @@ open Core_kernel
 module Poly : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type ('single_spec, 'proof) t =
         { spec : 'single_spec
@@ -12,6 +14,10 @@ module Poly : sig
       [@@deriving to_yojson]
     end
   end]
+
+  type ('single_spec, 'proof) t = ('single_spec, 'proof) Stable.Latest.t =
+    { spec : 'single_spec; proof : 'proof; elapsed : Mina_stdlib.Time.Span.t }
+  [@@deriving to_yojson]
 
   val map : f_spec:('a -> 'b) -> f_proof:('c -> 'd) -> ('a, 'c) t -> ('b, 'd) t
 end

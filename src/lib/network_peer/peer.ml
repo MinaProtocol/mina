@@ -28,6 +28,8 @@ end
 module Inet_addr = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unix.Inet_addr.t [@@deriving sexp, compare, hash]
 
@@ -48,6 +50,8 @@ module Inet_addr = struct
       end)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
   [%%define_locally Stable.V1.(to_yojson, of_yojson)]
 end

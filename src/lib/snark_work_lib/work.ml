@@ -14,6 +14,8 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
@@ -50,6 +52,8 @@ end
 module Result = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('spec, 'single) t =
         { proofs : 'single One_or_two.Stable.V1.t
@@ -62,6 +66,15 @@ module Result = struct
       [@@deriving fields]
     end
   end]
+
+  type ('spec, 'single) t = ('spec, 'single) Stable.Latest.t =
+    { proofs : 'single One_or_two.t
+    ; metrics :
+        (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ]) One_or_two.t
+    ; spec : 'spec
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
+  [@@deriving fields]
 
   let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
     { proofs = One_or_two.map ~f:f_single proofs

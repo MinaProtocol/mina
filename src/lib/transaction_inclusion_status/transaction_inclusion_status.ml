@@ -7,12 +7,17 @@ open Network_pool
 module State = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
 
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Pending | Included | Unknown
+  [@@deriving equal, sexp, compare]
 
   let to_string = function
     | Pending ->

@@ -55,6 +55,8 @@ module Ledger_inner = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, equal, yojson]
@@ -75,6 +77,8 @@ module Ledger_inner = struct
           Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
     module Unstable = struct
       type t = Ledger_hash.Stable.V1.t
@@ -128,6 +132,8 @@ module Ledger_inner = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V3 = struct
         type t = Account.Stable.V3.t [@@deriving equal, compare, sexp]
 
@@ -142,6 +148,8 @@ module Ledger_inner = struct
         let token = Account.token_id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving equal, compare, sexp]
 
     let empty = Stable.Latest.empty
 

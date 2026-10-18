@@ -4,12 +4,17 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = Canonical | Orphaned | Pending [@@deriving yojson, equal]
 
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t = Canonical | Orphaned | Pending
+[@@deriving yojson, equal]
 
 let to_string = function
   | Canonical ->
