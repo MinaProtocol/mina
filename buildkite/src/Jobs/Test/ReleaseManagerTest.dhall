@@ -27,8 +27,8 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "scripts/docker")
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ReleaseManagerTest")
-          , S.exactly "buildkite/scripts/tests/release-manager/test" "sh"
-          , S.exactly "buildkite/scripts/tests/release-manager/lib" "sh"
+          , S.exactly "scripts/tests/release-manager/test" "sh"
+          , S.exactly "scripts/tests/release-manager/lib" "sh"
           ]
         , path = "Test"
         , name = "ReleaseManagerTest"
@@ -45,7 +45,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "AWS_DEFAULT_REGION=us-west-2 ./buildkite/scripts/tests/release-manager/test.sh"
+                  "AWS_DEFAULT_REGION=us-west-2 ./scripts/tests/release-manager/test.sh"
               ]
             , label = "Release Manager Tests"
             , key = command_key

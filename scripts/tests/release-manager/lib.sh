@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 BACKEND="local"
 
 # Mock Debian repository (MinIO container + synthetic fixture packages).
-# shellcheck source=buildkite/scripts/tests/release-manager/mock-repo.sh
+# shellcheck source=scripts/tests/release-manager/mock-repo.sh
 source "$(dirname "${BASH_SOURCE[0]}")/mock-repo.sh"
 
 # Repository configuration.
@@ -53,7 +53,7 @@ TESTS_TOTAL=0
 
 # Get script directory (resolves relative to the lib file itself)
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${_LIB_DIR}/../../../.." && pwd)"
+REPO_ROOT="$(cd "${_LIB_DIR}/../../.." && pwd)"
 MANAGER_SCRIPT="${REPO_ROOT}/buildkite/scripts/release/manager.sh"
 
 # Logging functions
