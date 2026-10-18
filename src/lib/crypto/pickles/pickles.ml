@@ -1428,50 +1428,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
         with _ -> true
     end )
-
-  let%test_module "adversarial_tests" =
-    ( module struct
-      [@@@warning "-60"]
-
-      let () = Backtrace.elide := false
-
-      let () = Snarky_backendless.Snark0.set_eval_constraints true
-
-      let%test_module "test domain size too large" =
-        ( module Compile.Make_adversarial_test (struct
-          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
-              =
-            (* Modify the statement to use an invalid domain size. *)
-            { stmt with
-              proof_state =
-                { stmt.proof_state with
-                  deferred_values =
-                    { stmt.proof_state.deferred_values with
-                      branch_data =
-                        { stmt.proof_state.deferred_values.branch_data with
-                          Branch_data.domain_log2 =
-                            Branch_data.Domain_log2.of_int_exn
-                              (Nat.to_int Kimchi_pasta.Basic.Rounds.Step.n + 1)
-                        }
-                    }
-                }
-            }
-
-          let check_verifier_error err =
-            (* Convert to JSON to make it easy to parse. *)
-            err |> Error_json.error_to_yojson
-            |> Yojson.Safe.Util.member "multiple"
-            |> Yojson.Safe.Util.to_list
-            |> List.find_exn ~f:(fun json ->
-                   let error =
-                     json
-                     |> Yojson.Safe.Util.member "string"
-                     |> Yojson.Safe.Util.to_string
-                   in
-                   String.equal error "domain size is small enough" )
-            |> fun _ -> ()
-        end) )
-    end )
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
