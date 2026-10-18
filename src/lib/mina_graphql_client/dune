@@ -12,7 +12,7 @@
  (libraries
   ;; opam libraries
   async async_kernel core_kernel core uri integers result
-  cohttp cohttp-async yojson ppx_deriving_yojson.runtime
+  zarith cohttp cohttp-async yojson ppx_deriving_yojson.runtime
   ;; local libraries
   graphql_lib generated_graphql_queries mina_graphql mina_base mina_base.import
   mina_transaction mina_numbers currency signature_lib logger with_hash
