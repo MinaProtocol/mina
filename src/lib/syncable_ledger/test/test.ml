@@ -625,3 +625,153 @@ module Db = struct
   module TestDB16_Content_Length =
     Make_test_content_length (DB16_subtree_depths86)
 end
+
+(* Syncing between ledgers that share their first accounts but then diverge,
+   as when a node's ledger comes from a fork that lost. *)
+module Diverged = struct
+  open Db.DB16_subtree_depths86
+  open Merkle_ledger_tests.Test_stubs
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  let build account_ids =
+    let ledger = Ledger.create ~depth:16 () in
+    List.iter account_ids ~f:(fun account_id ->
+        let T = Account_id.eq2 in
+        let account =
+          Account.create account_id (Currency.Balance.of_nanomina_int_exn 1)
+        in
+        ignore
+          ( Ledger.get_or_create_account ledger account_id account
+            |> Or_error.ok_exn
+            : [ `Added | `Existed ] * Ledger.Location.t ) ) ;
+    ledger
+
+  (* Sync [local] to [target], passing each answer through [tamper] first.
+     Returns whether the sync completed with the target's root, and the
+     errors the responder returned. *)
+  let sync ?(tamper = fun _query answer -> answer) ~local ~target () =
+    let desired_root = Ledger.merkle_root target in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create target ignore
+        ~context:(module Context)
+        ~trust_system
+    in
+    let errors = ref [] in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (root_hash, query) ->
+           match%bind
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           with
+           | Error e ->
+               errors := Error.to_string_hum e :: !errors ;
+               Deferred.unit
+           | Ok answer ->
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local (tamper query answer) ) ) ) ;
+    let synced =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          match%map
+            Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+              (Sync_ledger.fetch lsync desired_root ~data:()
+                 ~equal:(fun () () -> true) )
+          with
+          | `Result (`Ok mt) ->
+              Root_hash.equal desired_root (Ledger.merkle_root mt)
+          | `Result (`Target_changed _) | `Timeout ->
+              false )
+    in
+    (synced, !errors)
+
+  let check_synced ~local ~target (synced, errors) =
+    assert synced ;
+    [%test_eq: string list] [] errors ;
+    [%test_eq: int] (Ledger.num_accounts target) (Ledger.num_accounts local)
+
+  let check_absent ledger account_ids =
+    List.iter account_ids ~f:(fun account_id ->
+        let T = Account_id.eq2 in
+        assert (Option.is_none (Ledger.location_of_account ledger account_id)) ;
+        match
+          Ledger.get_or_create_account ledger account_id
+            (Account.create account_id (Currency.Balance.of_nanomina_int_exn 1))
+          |> Or_error.ok_exn
+        with
+        | `Added, _ ->
+            ()
+        | `Existed, _ ->
+            failwith "Account removed by the sync still has a location" )
+
+  let shared = Account_id.gen_accounts 100
+
+  let extra = Account_id.gen_accounts 40
+
+  let%test_unit "sync removes the accounts after the target's last account" =
+    let T = Account_id.eq2 in
+    let local_only = List.take extra 30 in
+    let local = build (shared @ local_only) in
+    let target = build shared in
+    check_synced ~local ~target (sync ~local ~target ()) ;
+    check_absent local local_only
+
+  let%test_unit "sync removes the accounts after the target's last account in \
+                 the same subtree" =
+    let T = Account_id.eq2 in
+    let local_only = List.take extra 5 in
+    let local = build (shared @ local_only) in
+    let target = build shared in
+    check_synced ~local ~target (sync ~local ~target ()) ;
+    check_absent local local_only
+
+  let%test_unit "sync removes the accounts that the target replaced" =
+    let T = Account_id.eq2 in
+    let local_only = List.take extra 3 in
+    let target_only = List.sub extra ~pos:3 ~len:3 in
+    let local = build (shared @ local_only) in
+    let target = build (shared @ target_only) in
+    check_synced ~local ~target (sync ~local ~target ()) ;
+    check_absent local local_only
+
+  let%test_unit "sync does not depend on the claimed number of accounts" =
+    let T = Account_id.eq2 in
+    let local = build (shared @ List.take extra 30) in
+    let target = build shared in
+    (* 70 accounts need a subtree of the same height as 100, so the claim is
+       consistent with the target's root and is accepted. *)
+    let tamper (query : Ledger.addr Syncable_ledger.Query.t) answer =
+      match (query, answer) with
+      | Num_accounts, Syncable_ledger.Answer.Num_accounts (_, content_root) ->
+          Syncable_ledger.Answer.Num_accounts (70, content_root)
+      | _ ->
+          answer
+    in
+    check_synced ~local ~target (sync ~tamper ~local ~target ())
+
+  let%test_unit "sync recovers from an answer with too few accounts" =
+    let T = Account_id.eq2 in
+    let local = build (List.take shared 1) in
+    let target = build (shared @ extra) in
+    let tampered = ref false in
+    let tamper (query : Ledger.addr Syncable_ledger.Query.t) answer =
+      match (query, answer) with
+      | ( What_contents _
+        , Syncable_ledger.Answer.Contents_are (_ :: _ :: _ as accounts) )
+        when not !tampered ->
+          tampered := true ;
+          Syncable_ledger.Answer.Contents_are (List.drop_last_exn accounts)
+      | _ ->
+          answer
+    in
+    let synced, errors = sync ~tamper ~local ~target () in
+    assert !tampered ;
+    check_synced ~local ~target (synced, errors)
+end
