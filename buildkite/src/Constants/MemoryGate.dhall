@@ -11,11 +11,9 @@ let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let B/ExitStatus =
       B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
 
-let exitStatus = 42
-
 let softFail
     : B/SoftFail
     = B/SoftFail.ListSoft_fail/Type
-        [ { exit_status = Some (B/ExitStatus.Number exitStatus) } ]
+        [ { exit_status = Some (B/ExitStatus.Number 42) } ]
 
-in  { exitStatus = exitStatus, softFail = softFail }
+in  { exitStatus = 42, softFail = softFail }
