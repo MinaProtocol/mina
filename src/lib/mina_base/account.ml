@@ -194,82 +194,6 @@ module Token_symbol = struct
   let if_ = Tick.Run.Field.if_
 end
 
-(* the `token_symbol` describes a token id owned by the account id
-   from this account, not the token id used by this account
-*)
-module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type ( 'pk
-           , 'id
-           , 'token_symbol
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'zkapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'id
-        ; token_symbol : 'token_symbol
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; zkapp : 'zkapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  type ( 'pk
-       , 'id
-       , 'token_symbol
-       , 'amount
-       , 'nonce
-       , 'receipt_chain_hash
-       , 'delegate
-       , 'state_hash
-       , 'timing
-       , 'permissions
-       , 'zkapp_opt )
-       t =
-        ( 'pk
-        , 'id
-        , 'token_symbol
-        , 'amount
-        , 'nonce
-        , 'receipt_chain_hash
-        , 'delegate
-        , 'state_hash
-        , 'timing
-        , 'permissions
-        , 'zkapp_opt )
-        Stable.Latest.t =
-    { public_key : 'pk
-    ; token_id : 'id
-    ; token_symbol : 'token_symbol
-    ; balance : 'amount
-    ; nonce : 'nonce
-    ; receipt_chain_hash : 'receipt_chain_hash
-    ; delegate : 'delegate
-    ; voting_for : 'state_hash
-    ; timing : 'timing
-    ; permissions : 'permissions
-    ; zkapp : 'zkapp_opt
-    }
-  [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
-end
-
 module Key = struct
   [%%versioned
   module Stable = struct
@@ -368,6 +292,9 @@ module Stable = struct
   end
 end]
 
+(* the `token_symbol` describes a token id owned by the account id
+   from this account, not the token id used by this account
+*)
 type t = Stable.Latest.t =
   { public_key : Public_key.Compressed.t
   ; token_id : Token_id.t
@@ -385,58 +312,6 @@ type t = Stable.Latest.t =
 
 [%%define_locally
 Stable.Latest.(sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson)]
-
-let to_poly
-    { public_key
-    ; token_id
-    ; token_symbol
-    ; balance
-    ; nonce
-    ; receipt_chain_hash
-    ; delegate
-    ; voting_for
-    ; timing
-    ; permissions
-    ; zkapp
-    } =
-  { Poly.public_key
-  ; token_id
-  ; token_symbol
-  ; balance
-  ; nonce
-  ; receipt_chain_hash
-  ; delegate
-  ; voting_for
-  ; timing
-  ; permissions
-  ; zkapp
-  }
-
-let of_poly
-    { Poly.public_key
-    ; token_id
-    ; token_symbol
-    ; balance
-    ; nonce
-    ; receipt_chain_hash
-    ; delegate
-    ; voting_for
-    ; timing
-    ; permissions
-    ; zkapp
-    } =
-  { public_key
-  ; token_id
-  ; token_symbol
-  ; balance
-  ; nonce
-  ; receipt_chain_hash
-  ; delegate
-  ; voting_for
-  ; timing
-  ; permissions
-  ; zkapp
-  }
 
 [%%define_locally Stable.Latest.(public_key)]
 
