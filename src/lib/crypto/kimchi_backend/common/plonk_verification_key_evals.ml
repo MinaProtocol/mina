@@ -3,6 +3,8 @@ module H_list = Snarky_backendless.H_list
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type 'comm t =
           'comm Mina_wire_types.Pickles_types.Plonk_verification_key_evals.V2.t =
@@ -19,6 +21,18 @@ module Stable = struct
     (* TODO: Remove unused annotations *)
   end
 end]
+
+type 'comm t = 'comm Stable.Latest.t =
+  { sigma_comm : 'comm Plonk_types.Permuts_vec.t
+  ; coefficients_comm : 'comm Plonk_types.Columns_vec.t
+  ; generic_comm : 'comm
+  ; psm_comm : 'comm
+  ; complete_add_comm : 'comm
+  ; mul_comm : 'comm
+  ; emul_comm : 'comm
+  ; endomul_scalar_comm : 'comm
+  }
+[@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 
 (* TODO: Remove unused functions *)
 

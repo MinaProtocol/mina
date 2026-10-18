@@ -41,6 +41,8 @@ module Features : sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'bool t =
             'bool Mina_wire_types.Pickles_types.Plonk_types.Features.V1.t =
@@ -56,6 +58,18 @@ module Features : sig
       [@@deriving sexp, compare, yojson, hash, equal, hlist]
     end
   end]
+
+  type 'bool t = 'bool Stable.Latest.t =
+    { range_check0 : 'bool
+    ; range_check1 : 'bool
+    ; foreign_field_add : 'bool
+    ; foreign_field_mul : 'bool
+    ; xor : 'bool
+    ; rot : 'bool
+    ; lookup : 'bool
+    ; runtime_tables : 'bool
+    }
+  [@@deriving sexp, compare, yojson, hash, equal, hlist]
 
   val to_full :
        or_:('bool -> 'bool -> 'bool)
@@ -329,6 +343,8 @@ module Openings : sig
   module Bulletproof : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type ('g, 'fq) t =
               ( 'g
@@ -344,6 +360,15 @@ module Openings : sig
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
+      { lr : ('g * 'g) array
+      ; z_1 : 'fq
+      ; z_2 : 'fq
+      ; delta : 'g
+      ; challenge_polynomial_commitment : 'g
+      }
+    [@@deriving compare, sexp, yojson, hash, equal]
 
     val typ :
          ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t

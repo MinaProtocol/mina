@@ -4,6 +4,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t = Pow_2_roots_of_unity of int
     [@@unboxed] [@@deriving sexp, equal, compare, hash, yojson]
@@ -11,6 +13,9 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t = Pow_2_roots_of_unity of int
+[@@unboxed] [@@deriving sexp, equal, compare, hash, yojson]
 
 [@@@warning "+4"]
 

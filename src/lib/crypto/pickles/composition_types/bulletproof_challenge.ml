@@ -1,5 +1,7 @@
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type 'challenge t =
           'challenge Mina_wire_types.Pickles_bulletproof_challenge.V1.t =
@@ -7,6 +9,9 @@ module Stable = struct
     [@@deriving sexp, compare, yojson, hash, equal]
   end
 end]
+
+type 'challenge t = 'challenge Stable.Latest.t = { prechallenge : 'challenge }
+[@@deriving sexp, compare, yojson, hash, equal]
 
 let pack { prechallenge } = prechallenge
 

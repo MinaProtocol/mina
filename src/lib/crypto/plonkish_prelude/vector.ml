@@ -516,11 +516,16 @@ module With_version (N : Nat.Intf) = struct
   module type S = sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'a t = ('a, N.n) vec
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, yojson, sexp, hash, equal]
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 

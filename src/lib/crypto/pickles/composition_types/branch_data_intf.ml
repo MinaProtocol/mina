@@ -5,16 +5,22 @@ module type S = sig
   module Domain_log2 : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type t [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving compare, sexp, yojson, hash, equal]
 
     val of_int_exn : int -> t
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t =
         { proofs_verified : Proofs_verified.Stable.V1.t
@@ -23,6 +29,10 @@ module type S = sig
       [@@deriving hlist, compare, sexp, yojson, hash, equal]
     end
   end]
+
+  type t = Stable.Latest.t =
+    { proofs_verified : Proofs_verified.t; domain_log2 : Domain_log2.t }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
   module Checked : sig
     module Step : sig

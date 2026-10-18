@@ -16,6 +16,8 @@ module Compressed = struct
     (* module with same type t as Stable below, to build functor argument *)
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         [@@@with_all_version_tags]
 
@@ -24,12 +26,16 @@ module Compressed = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t
   end
 
   let compress (x, y) = { Poly.x; is_odd = parity y }
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -67,6 +73,8 @@ module Compressed = struct
         compress uncompressed
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving equal, compare, hash]
 
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)
@@ -162,6 +170,8 @@ module Uncompressed = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -213,6 +223,8 @@ module Uncompressed = struct
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, equal, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)

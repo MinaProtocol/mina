@@ -4,12 +4,16 @@ open Tick
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     [@@@with_all_version_tags]
 
     type t = Field.t * Field.t [@@deriving sexp, hash, compare, yojson]
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
 include Comparable.S_binable with type t := t
 
@@ -27,16 +31,23 @@ module Compressed : sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type ('field, 'boolean) t =
               ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
           { x : 'field; is_odd : 'boolean }
       end
     end]
+
+    type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
+      { x : 'field; is_odd : 'boolean }
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       [@@@with_all_version_tags]
 
@@ -47,6 +58,8 @@ module Compressed : sig
       include Hashable.S_binable with type t := t
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
   include Codable.S with type t := t
 

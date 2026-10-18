@@ -2,11 +2,16 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type 'f t = 'f Kimchi_types.scalar_challenge = { inner : 'f }
     [@@deriving sexp, compare, equal, yojson, hash]
   end
 end]
+
+type 'f t = 'f Stable.Latest.t = { inner : 'f }
+[@@deriving sexp, compare, equal, yojson, hash]
 
 let create t = { inner = t }
 

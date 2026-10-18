@@ -70,10 +70,14 @@ module Side_loaded : sig
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V2 : sig
         type t [@@deriving sexp, equal, compare, hash, yojson]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
     include Codable.Base58_check_intf with type t := t
 
@@ -103,6 +107,8 @@ module Side_loaded : sig
   module Proof : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V2 : sig
         (* TODO: This should really be able to be any width up to the max width... *)
         type t = Verification_key.Max_width.n Proof.t
@@ -113,6 +119,8 @@ module Side_loaded : sig
         val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
     val of_proof : _ Proof.t -> t
 

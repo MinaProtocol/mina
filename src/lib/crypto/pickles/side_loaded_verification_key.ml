@@ -39,11 +39,15 @@ let bits = V.bits
 module Width : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = V.Width.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   open Impls.Step
 
@@ -64,11 +68,16 @@ module Width : sig
   module Max_at_most : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'a t = ('a, Max.n) At_most.t
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   module Length : Nat.Add.Intf_transparent
@@ -120,6 +129,8 @@ end
 module R = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
       [@@deriving sexp, equal, compare, yojson]
@@ -127,10 +138,14 @@ module R = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, yojson]
 end
 
 [%%versioned_binable
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     module T = struct
       type t =
@@ -251,6 +266,8 @@ module Stable = struct
     include Codable.Make_base64 (T)
   end
 end]
+
+type t = Stable.Latest.t [@@deriving hash]
 
 [%%define_locally
 Stable.Latest.

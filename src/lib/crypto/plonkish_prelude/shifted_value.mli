@@ -44,12 +44,14 @@ end
 module type S = sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'f t [@@deriving sexp, compare, equal, yojson, hash]
     end
   end]
 
-  type 'f t = 'f Stable.V1.t
+  type 'f t = 'f Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
 
   val typ :
        ('a, 'b) Kimchi_pasta_snarky_backend.Step_impl.Typ.t
@@ -127,11 +129,16 @@ end
 module Type2 : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type 'f t = Shifted_value of 'f
       [@@deriving sexp, compare, equal, yojson, hash]
     end
   end]
+
+  type 'f t = 'f Stable.Latest.t = Shifted_value of 'f
+  [@@deriving sexp, compare, equal, yojson, hash]
 
   (** User beware: [equal] is not your regular equality predicate. It's just a
       binary relation.

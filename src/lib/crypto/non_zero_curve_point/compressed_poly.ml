@@ -5,6 +5,8 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -14,4 +16,8 @@ module Poly = struct
       [@@deriving compare, equal, hash, hlist]
     end
   end]
+
+  type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
+    { x : 'field; is_odd : 'boolean }
+  [@@deriving compare, equal, hash, hlist]
 end

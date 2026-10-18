@@ -8,10 +8,14 @@ let max_log2_degree = 32
 module Width : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   val of_int_exn : int -> t
 
@@ -28,23 +32,32 @@ module Width : sig
   module Max_at_most : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type 'a t = ('a, Max.n) At_most.t
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   module Length : Nat.Add.Intf_transparent
 end = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = char [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   let zero = Char.of_int_exn 0
 
@@ -111,16 +124,23 @@ module Domains = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type 'a t = { h : 'a }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { h : 'a }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 end
 
 module Repr = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t
@@ -130,11 +150,20 @@ module Repr = struct
       [@@deriving sexp, equal, compare, yojson]
     end
   end]
+
+  type 'g t = 'g Stable.Latest.t =
+    { max_proofs_verified : Proofs_verified.t
+    ; actual_wrap_domain_size : Proofs_verified.t
+    ; wrap_index : 'g Plonk_verification_key_evals.t
+    }
+  [@@deriving sexp, equal, compare, yojson]
 end
 
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('g, 'proofs_verified, 'vk) t =
             ( 'g
@@ -149,6 +178,15 @@ module Poly = struct
       [@@deriving hash]
     end
   end]
+
+  type ('g, 'proofs_verified, 'vk) t =
+        ('g, 'proofs_verified, 'vk) Stable.Latest.t =
+    { max_proofs_verified : 'proofs_verified
+    ; actual_wrap_domain_size : 'proofs_verified
+    ; wrap_index : 'g Plonk_verification_key_evals.t
+    ; wrap_vk : 'vk option
+    }
+  [@@deriving hash]
 end
 
 let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =

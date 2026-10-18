@@ -8,6 +8,8 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     [@@@with_all_version_tags]
 
@@ -21,6 +23,8 @@ module Stable : sig
     val gen : t Quickcheck.Generator.t
   end
 end]
+
+type t = Stable.Latest.t [@@deriving compare, sexp]
 
 (** Generator for creating random private keys for testing *)
 val gen : t Quickcheck.Generator.t

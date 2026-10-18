@@ -3,6 +3,8 @@ open Snark_params.Tick
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     [@@@with_all_version_tags]
 
@@ -22,6 +24,8 @@ module Stable = struct
       gen_uniform_incl one upperbound
   end
 end]
+
+type t = Stable.Latest.t [@@deriving compare, sexp]
 
 [%%define_locally Stable.Latest.(gen)]
 

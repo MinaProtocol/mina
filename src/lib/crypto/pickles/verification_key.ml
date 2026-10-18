@@ -111,17 +111,23 @@ end
 module Data = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = { constraints : int } [@@deriving yojson]
 
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { constraints : int } [@@deriving yojson]
 end
 
 module Repr = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { commitments :
@@ -134,10 +140,18 @@ module Repr = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+    ; data : Data.t
+    }
+  [@@deriving to_yojson]
 end
 
 [%%versioned_binable
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
@@ -215,6 +229,20 @@ module Stable = struct
         end)
   end
 end]
+
+type t = Stable.Latest.t =
+  { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+  ; index :
+      (Impls.Wrap.Verification_key.t
+      [@to_yojson
+        Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
+          Backend.Tick.Field.to_yojson]
+      [@of_yojson
+        Verifier_index_json.of_yojson Backend.Tock.Field.of_yojson
+          Backend.Tick.Field.of_yojson] )
+  ; data : Data.t
+  }
+[@@deriving fields, to_yojson, of_yojson]
 
 let to_yojson = Stable.Latest.to_yojson
 
