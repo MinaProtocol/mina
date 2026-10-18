@@ -13,6 +13,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = A.V1.t =
         { receiver : Public_key.Compressed.Stable.V1.t
@@ -28,6 +30,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       let version_byte = Base58_check.Version_bytes.coinbase
     end
   end]
+
+  type t = Stable.Latest.t =
+    { receiver : Public_key.Compressed.t
+    ; amount : Currency.Amount.t
+    ; fee_transfer : Fee_transfer.t option
+    }
+  [@@deriving sexp, compare, equal, hash, yojson]
 
   module Base58_check = Codable.Make_base58_check (Stable.Latest)
 

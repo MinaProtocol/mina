@@ -101,28 +101,40 @@ module type S = sig
   module Hash_versioned : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type nonrec t = Hash.t [@@deriving sexp, compare, equal, yojson, hash]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
   end
 
   module Coinbase_stack : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type t = Field.t
       end
     end]
+
+    type t = Stable.Latest.t
   end
 
   module State_stack : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type t
       end
     end]
+
+    type t = Stable.Latest.t
 
     val init : t -> Field.t
 
@@ -132,10 +144,14 @@ module type S = sig
   module Stack_versioned : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type nonrec t [@@deriving sexp, compare, equal, yojson, hash]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
 
     val data : t -> Coinbase_stack.t
 
@@ -209,6 +225,8 @@ module type S = sig
     module Action : sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t =
             | Update_none
@@ -218,6 +236,13 @@ module type S = sig
           [@@deriving sexp, to_yojson]
         end
       end]
+
+      type t = Stable.Latest.t =
+        | Update_none
+        | Update_one
+        | Update_two_coinbase_in_first
+        | Update_two_coinbase_in_second
+      [@@deriving sexp, to_yojson]
 
       type var = Boolean.var * Boolean.var
 
@@ -229,21 +254,32 @@ module type S = sig
     module Poly : sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type ('action, 'coinbase_amount) t =
             { action : 'action; coinbase_amount : 'coinbase_amount }
           [@@deriving sexp]
         end
       end]
+
+      type ('action, 'coinbase_amount) t =
+            ('action, 'coinbase_amount) Stable.Latest.t =
+        { action : 'action; coinbase_amount : 'coinbase_amount }
+      [@@deriving sexp]
     end
 
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V1 : sig
         type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
     type var = (Action.var, Amount.var) Poly.t
 

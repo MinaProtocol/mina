@@ -44,6 +44,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = Pickles.Backend.Tick.Field.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
@@ -57,6 +59,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
     [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
@@ -107,6 +111,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Public_key.Compressed.Stable.V1.t * Digest.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
@@ -114,6 +120,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   let create key tid = (key, tid)
 

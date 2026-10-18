@@ -11,6 +11,8 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = A.V1.t =
         { receiver_pk : Public_key.Compressed.Stable.V1.t
@@ -25,6 +27,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let version_byte = Base58_check.Version_bytes.fee_transfer_single
     end
   end]
+
+  type t = Stable.Latest.t =
+    { receiver_pk : Public_key.Compressed.t; fee : Currency.Fee.t }
+  [@@deriving sexp, compare, equal, yojson, hash]
 
   let create ~receiver_pk ~fee = { receiver_pk; fee }
 

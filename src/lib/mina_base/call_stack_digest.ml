@@ -8,6 +8,8 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -15,6 +17,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
   open Pickles.Impls.Step
 

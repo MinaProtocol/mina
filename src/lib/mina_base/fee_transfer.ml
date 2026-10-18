@@ -15,6 +15,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Single = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t = A.Single.V2.t =
           { receiver_pk : Public_key.Compressed.Stable.V1.t
@@ -30,6 +32,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let version_byte = Base58_check.Version_bytes.fee_transfer_single
       end
     end]
+
+    type t = Stable.Latest.t =
+      { receiver_pk : Public_key.Compressed.t
+      ; fee : Currency.Fee.t
+      ; fee_token : Token_id.t
+      }
+    [@@deriving sexp, compare, equal, yojson, hash]
 
     include Comparable.Make (Stable.Latest)
     module Base58_check = Codable.Make_base58_check (Stable.Latest)
@@ -65,6 +74,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = Single.Stable.V2.t One_or_two.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson, hash]
@@ -72,6 +83,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson, hash]
 
   type single = Single.t =
     { receiver_pk : Public_key.Compressed.t

@@ -4,6 +4,8 @@ open Mina_base_import
 module type Full = sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = private
         { receiver_pk : Public_key.Compressed.Stable.V1.t
@@ -12,6 +14,10 @@ module type Full = sig
       [@@deriving sexp, compare, equal, yojson, hash]
     end
   end]
+
+  type t = Stable.Latest.t = private
+    { receiver_pk : Public_key.Compressed.t; fee : Currency.Fee.t }
+  [@@deriving sexp, compare, equal, yojson, hash]
 
   val create : receiver_pk:Public_key.Compressed.t -> fee:Currency.Fee.t -> t
 
