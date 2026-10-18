@@ -154,6 +154,17 @@
         },
         {
           "kind": "SCALAR",
+          "name": "VersionedPrecomputedBlock",
+          "description":
+            "Block encoded in precomputed block format, of any version the archive reads",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "PrecomputedBlock",
           "description": "Block encoded in precomputed block format",
           "fields": null,
@@ -5421,6 +5432,39 @@
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "PrecomputedBlock",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Applied",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "archiveVersionedPrecomputedBlock",
+              "description":
+                "Send a precomputed block of any version the archive reads to the archive, which reads it by the rules of its own version. The block is forwarded as given.",
+              "args": [
+                {
+                  "name": "block",
+                  "description":
+                    "Block encoded in precomputed block format, with its version",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "VersionedPrecomputedBlock",
                       "ofType": null
                     }
                   },
