@@ -557,16 +557,17 @@ end = struct
       (* We might write the wrong data to the underlying ledger here, but if so
          we'll requeue the address and it'll be overwritten. *)
       MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-      Addr.Table.remove t.waiting_content addr ;
-      [%log trace]
-        ~metadata:
-          [ ("address", Addr.to_yojson addr)
-          ; ("hash", Hash.to_yojson expected)
-          ]
-        "Found content addr $address, with hash $hash, removing from waiting \
-         content" ;
       let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-      if Hash.equal actual expected then `Success
+      if Hash.equal actual expected then (
+        Addr.Table.remove t.waiting_content addr ;
+        [%log trace]
+          ~metadata:
+            [ ("address", Addr.to_yojson addr)
+            ; ("hash", Hash.to_yojson expected)
+            ]
+          "Found content addr $address, with hash $hash, removing from waiting \
+           content" ;
+        `Success )
       else `Hash_mismatch (expected, actual) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
