@@ -12,7 +12,7 @@
   ppx_inline_test.config)
  (library_flags (-linkall))
  (preprocess
-  (pps mina_ppx))
+  (pps mina_ppx.no_pipebang))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Base58Check implementation"))

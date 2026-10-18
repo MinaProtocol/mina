@@ -27,4 +27,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps mina_ppx)))
+  (pps mina_ppx.no_pipebang)))

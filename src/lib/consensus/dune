@@ -79,7 +79,7 @@
   internal_tracing
   o1trace)
  (preprocess
-  (pps mina_ppx))
+  (pps mina_ppx.no_pipebang))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Consensus mechanisms"))
