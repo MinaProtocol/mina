@@ -50,7 +50,7 @@ func (m ValidationPush) handle(app *app) {
 	if st, found := app.RemoveValidator(seqno); found {
 		st.Completion <- res
 		if st.TimedOutAt != nil {
-			app.P2p.Logger.Errorf("validation for item %d took %d seconds", seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
+			app.P2p.Logger.Errorf("validation for item %d took %s", seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
 		}
 	} else {
 		app.P2p.Logger.Warnf("handleValidation: validation seqno %d unknown", seqno)
