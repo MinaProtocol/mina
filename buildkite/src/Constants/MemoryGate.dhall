@@ -3,4 +3,4 @@
 -- with `exitStatus`, and no other failure in these jobs uses that status. A
 -- failed gate fails its job.
 
-in  { exitStatus = 42 }
+{ exitStatus = 42 }
