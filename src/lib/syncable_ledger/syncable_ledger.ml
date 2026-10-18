@@ -108,7 +108,7 @@ module type Inputs_intf = sig
   end
 
   module MT :
-    Merkle_ledger.Intf.SYNC_CANDIDATE
+    Merkle_ledger.Intf.SYNC_RECIPIENT
       with type hash := Hash.t
        and type root_hash := Root_hash.t
        and type addr := Addr.t
