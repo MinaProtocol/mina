@@ -185,7 +185,7 @@ func (m SubscribeReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 			app.P2p.Logger.Info("unvalidated, ignoring :(")
 			return pubsub.ValidationIgnore
 		case res := <-ch:
-			validationTime := time.Since(deadline)
+			validationTime := time.Since(seenAt)
 			validationTimeMetric.Set(float64(validationTime.Nanoseconds()))
 			switch res {
 			case pubsub.ValidationReject:
