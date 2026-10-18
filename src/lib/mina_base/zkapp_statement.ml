@@ -4,8 +4,6 @@ open Snark_params.Tick
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'comm t = { account_update : 'comm; calls : 'comm }
       [@@deriving hlist, sexp, compare, yojson]
@@ -23,8 +21,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = Zkapp_command.Transaction_commitment.Stable.V1.t Poly.Stable.V1.t
     [@@deriving sexp, compare, yojson]

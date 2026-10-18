@@ -6,8 +6,6 @@ open Currency
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -101,8 +99,6 @@ let snarked_local_state (t : _ Poly.t) =
 module Value = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Staged_ledger_hash.Stable.V1.t

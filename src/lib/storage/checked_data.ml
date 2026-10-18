@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type 'a t = { checksum : Core_kernel.Md5.Stable.V1.t; data : 'a }
   end

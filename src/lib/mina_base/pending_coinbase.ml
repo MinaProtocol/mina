@@ -33,8 +33,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Coinbase_data = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
         [@@deriving sexp, to_yojson]
@@ -88,8 +86,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Stack_id : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t [@@deriving sexp, to_yojson, compare, equal]
       end
@@ -113,8 +109,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   end = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = int [@@deriving sexp, yojson, compare, equal]
 
@@ -168,8 +162,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         module T = struct
           type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
@@ -228,8 +220,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         module T = struct
           type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
@@ -256,8 +246,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type 'stack_hash t = 'stack_hash A.State_stack.Poly.V1.t =
             { init : 'stack_hash; curr : 'stack_hash }
@@ -272,8 +260,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Stack_hash.Stable.V1.t Poly.Stable.V1.t
         [@@deriving sexp, compare, hash, equal, yojson]
@@ -396,8 +382,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         module T = struct
           type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
@@ -433,8 +417,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Action = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t =
             | Update_none
@@ -498,8 +480,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type ('action, 'coinbase_amount) t =
             { action : 'action; coinbase_amount : 'coinbase_amount }
@@ -515,8 +495,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
@@ -557,8 +535,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type ('data_stack, 'state_stack) t =
                 ('data_stack, 'state_stack) A.Stack_versioned.Poly.V1.t =
@@ -575,8 +551,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t =
           (Coinbase_stack.Stable.V1.t, State_stack.Stable.V1.t) Poly.Stable.V1.t
@@ -596,8 +570,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Hash_versioned = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Hash_builder.Stable.V1.t
         [@@deriving equal, compare, sexp, yojson, hash]
@@ -612,8 +584,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Merkle_tree_versioned = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( Hash_versioned.Stable.V1.t
@@ -1352,8 +1322,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly_versioned = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('tree, 'stack_id) t = ('tree, 'stack_id) T.Poly.t =
           { tree : 'tree; pos_list : 'stack_id list; new_pos : 'stack_id }
@@ -1368,8 +1336,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Merkle_tree_versioned.Stable.V2.t

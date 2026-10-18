@@ -3,8 +3,6 @@ module H_list = Snarky_backendless.H_list
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type 'comm t =
           'comm Mina_wire_types.Pickles_types.Plonk_verification_key_evals.V2.t =

@@ -41,8 +41,6 @@ module Features : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'bool t =
             'bool Mina_wire_types.Pickles_types.Plonk_types.Features.V1.t =
@@ -343,8 +341,6 @@ module Openings : sig
   module Bulletproof : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type ('g, 'fq) t =
               ( 'g

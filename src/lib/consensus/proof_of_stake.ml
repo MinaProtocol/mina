@@ -96,8 +96,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Configuration = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t =
           { delta : int
@@ -205,8 +203,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Epoch_data_for_vrf = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V3 = struct
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
@@ -242,8 +238,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Slot_won = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V2 = struct
           type t =
             { delegator :
@@ -923,8 +917,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Optional_state_hash = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t = Mina_base.State_hash.Stable.V1.t option
           [@@deriving sexp, compare, hash, to_yojson]
@@ -1031,8 +1023,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           [%%versioned
           module Stable = struct
-            [@@@no_toplevel_latest_type]
-
             module V1 = struct
               type t =
                 ( Epoch_ledger.Value.Stable.V1.t
@@ -1061,8 +1051,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           [%%versioned
           module Stable = struct
-            [@@@no_toplevel_latest_type]
-
             module V1 = struct
               type t =
                 ( Epoch_ledger.Value.Stable.V1.t
@@ -1671,8 +1659,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Poly = struct
         [%%versioned
         module Stable = struct
-          [@@@no_toplevel_latest_type]
-
           module V1 = struct
             type ( 'length
                  , 'vrf_output
@@ -1756,8 +1742,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Value = struct
         [%%versioned
         module Stable = struct
-          [@@@no_toplevel_latest_type]
-
           module V3 = struct
             type t =
               ( Length.Stable.V1.t

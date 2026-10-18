@@ -44,8 +44,6 @@ end
 module type S = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'f t [@@deriving sexp, compare, equal, yojson, hash]
     end
@@ -86,8 +84,6 @@ end
 module Type1 : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'f t = 'f Mina_wire_types.Pickles_types.Shifted_value.Type1.V1.t =
         | Shifted_value of 'f
@@ -129,8 +125,6 @@ end
 module Type2 : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'f t = Shifted_value of 'f
       [@@deriving sexp, compare, equal, yojson, hash]

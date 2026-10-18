@@ -226,8 +226,6 @@ module User_command = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         ( (User_command.Stable.V3.t[@hash.ignore])

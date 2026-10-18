@@ -111,8 +111,6 @@ end
 module Data = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { constraints : int } [@@deriving yojson]
 
@@ -126,8 +124,6 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { commitments :
@@ -150,8 +146,6 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t

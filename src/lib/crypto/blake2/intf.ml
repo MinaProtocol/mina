@@ -7,8 +7,6 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     (* generate `With_top_version_tag` modules for compatibility
        used for original mainnet transaction hashes
     *)

@@ -6,8 +6,6 @@ let transaction_dummy = lazy (Dummy_values.transaction_proof ())
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = Pickles.Proof.Proofs_verified_2.Stable.V2.t
     [@@deriving equal, hash, sexp, yojson, compare]

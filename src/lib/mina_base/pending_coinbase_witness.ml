@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { pending_coinbases : Pending_coinbase.Stable.V2.t; is_new_stack : bool }

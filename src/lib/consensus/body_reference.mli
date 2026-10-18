@@ -2,8 +2,6 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     type t = Blake2.Stable.V1.t [@@deriving sexp, compare, yojson, equal, hash]
   end

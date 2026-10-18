@@ -8,8 +8,6 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     [@@@with_all_version_tags]
 

@@ -19,8 +19,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         [@@@with_all_version_tags]
 
@@ -42,8 +40,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     [@@@with_top_version_tag]
 
     (* DO NOT DELETE VERSIONS!
@@ -384,8 +380,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module With_valid_signature = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t = Stable.V2.t [@@deriving sexp, equal, yojson, hash]
 

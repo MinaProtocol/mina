@@ -8,8 +8,6 @@ module type Full = sig
     module Init_stack : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t =
             | Base of Pending_coinbase.Stack_versioned.Stable.V1.t
@@ -27,8 +25,6 @@ module type Full = sig
     module Poly : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type 'pending_coinbase t =
             { source : 'pending_coinbase; target : 'pending_coinbase }
@@ -56,8 +52,6 @@ module type Full = sig
 
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
         [@@deriving compare, equal, hash, sexp, yojson]
@@ -80,8 +74,6 @@ module type Full = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type ( 'ledger_hash
              , 'amount
@@ -205,8 +197,6 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
@@ -257,8 +247,6 @@ module type Full = sig
   module With_sok : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type t =
           ( Frozen_ledger_hash.Stable.V1.t

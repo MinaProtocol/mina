@@ -19,8 +19,6 @@ module Zkapp_uri = Zkapp_account.Zkapp_uri
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       (* TODO: yojson for Field.t in snarky (#12591) *)
       type t =
@@ -140,8 +138,6 @@ end
 module May_use_token = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.May_use_token.V1.t =
         | No
@@ -536,8 +532,6 @@ module Update = struct
   module Timing_info = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t =
               Mina_wire_types.Mina_base.Account_update.Update.Timing_info.V1.t =
@@ -706,8 +700,6 @@ module Update = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
@@ -988,8 +980,6 @@ end
 module Account_precondition = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Zkapp_precondition.Account.Stable.V3.t
       [@@deriving sexp, yojson, hash]
@@ -1062,8 +1052,6 @@ end
 module Preconditions = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V2.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
@@ -1164,8 +1152,6 @@ module Body = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
         [@@deriving sexp, equal, hash, compare, yojson]
@@ -1184,8 +1170,6 @@ module Body = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
         [@@deriving sexp, equal, hash, compare, yojson]
@@ -1200,8 +1184,6 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1278,8 +1260,6 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1325,8 +1305,6 @@ module Body = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -1450,8 +1428,6 @@ module Body = struct
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1818,8 +1794,6 @@ module Poly = struct
   module Wire = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('body, 'authorization) t =
               ( 'body
@@ -1864,8 +1838,6 @@ module T = struct
   module Without_aux = struct
     [%%versioned_binable
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('body, 'authorization) t = ('body, 'authorization, unit) Poly.t
         [@@deriving equal, hash, compare]
@@ -1892,8 +1864,6 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( Body.Graphql_repr.Stable.V2.t
@@ -1921,8 +1891,6 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
@@ -1937,8 +1905,6 @@ module T = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       (** A account_update to a zkApp transaction *)
       type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
@@ -2043,8 +2009,6 @@ let forget_proofs_and_aux p = forget_proofs @@ forget_aux p
 module Fee_payer = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t

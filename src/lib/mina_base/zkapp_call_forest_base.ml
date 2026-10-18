@@ -5,8 +5,6 @@ let empty = Outside_hash_image.t
 module Tree = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('account_update, 'account_update_digest, 'digest) t =
             ( 'account_update
@@ -217,8 +215,6 @@ module Make_digest_types = struct
   module Account_update = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -233,8 +229,6 @@ module Make_digest_types = struct
   module Forest = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -249,8 +243,6 @@ module Make_digest_types = struct
   module Tree = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]
@@ -351,8 +343,6 @@ let iteri t ~(f : int -> 'a -> unit) : unit =
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('account_update, 'account_update_digest, 'digest) t =
       ( ('account_update, 'account_update_digest, 'digest) Tree.Stable.V1.t
@@ -555,8 +545,6 @@ let forget_hashes_and_proofs_and_aux p =
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('update, 'data) t =
         ( 'update * 'data
@@ -619,8 +607,6 @@ module With_hashes = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Account_update.Stable.V2.t

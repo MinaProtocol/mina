@@ -23,8 +23,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
@@ -70,8 +68,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Non_snark = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = A.Non_snark.V1.t =
           { ledger_hash : Ledger_hash.Stable.V1.t
@@ -155,8 +151,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('non_snark, 'pending_coinbase_hash) t =
               ('non_snark, 'pending_coinbase_hash) A.Poly.V1.t =
@@ -175,8 +169,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases

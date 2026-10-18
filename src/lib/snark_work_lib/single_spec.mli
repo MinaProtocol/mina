@@ -3,8 +3,6 @@ open Core_kernel
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type ('witness, 'ledger_proof) t =
         | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -36,8 +34,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t =
       ( Transaction_witness.Stable.V3.t

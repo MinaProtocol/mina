@@ -4,8 +4,6 @@ open Mina_base_import
 module type Full = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = private
         { receiver_pk : Public_key.Compressed.Stable.V1.t

@@ -33,8 +33,6 @@ module Node_list = struct
     module Binable_arg = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t = State_hash.Stable.V1.t list
 
@@ -81,8 +79,6 @@ module Root_transition = struct
   module Lite_binable = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V5 = struct
         type t =
           { new_root : Root_data.Limited.Stable.V4.t
@@ -99,8 +95,6 @@ module Root_transition = struct
     module Binable_arg = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V5 = struct
           type t = Lite_binable.Stable.V5.t
 

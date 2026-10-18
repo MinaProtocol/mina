@@ -10,8 +10,6 @@ type t
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t
 

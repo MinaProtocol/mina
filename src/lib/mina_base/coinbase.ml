@@ -13,8 +13,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = A.V1.t =
         { receiver : Public_key.Compressed.Stable.V1.t

@@ -215,8 +215,6 @@ module Features = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'bool t =
             'bool Mina_wire_types.Pickles_types.Plonk_types.Features.V1.t =
@@ -499,8 +497,6 @@ end
 module Evals = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'a t = 'a Mina_wire_types.Pickles_types.Plonk_types.Evals.V2.t =
         { w : 'a Columns_vec.Stable.V1.t
@@ -1352,8 +1348,6 @@ module All_evals = struct
   module With_public_input = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('f, 'f_multi) t =
               ( 'f
@@ -1406,8 +1400,6 @@ module All_evals = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('f, 'f_multi) t =
         { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
@@ -1478,8 +1470,6 @@ module Openings = struct
   module Bulletproof = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('g, 'fq) t =
               ( 'g
@@ -1522,8 +1512,6 @@ module Openings = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('g, 'fq, 'fqv) t =
             ( 'g
@@ -1550,8 +1538,6 @@ module Poly_comm = struct
   module With_degree_bound = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'g_opt t =
           { unshifted : 'g_opt Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
@@ -1619,8 +1605,6 @@ module Poly_comm = struct
   module Without_degree_bound = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'g t = 'g Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal]
@@ -1643,8 +1627,6 @@ module Messages = struct
   module Lookup = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'g t =
               'g Mina_wire_types.Pickles_types.Plonk_types.Messages.Lookup.V1.t =
@@ -1717,8 +1699,6 @@ module Messages = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'g t = 'g Mina_wire_types.Pickles_types.Plonk_types.Messages.V2.t =
         { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
@@ -1817,8 +1797,6 @@ end
 module Proof = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('g, 'fq, 'fqv) t =
             ('g, 'fq, 'fqv) Mina_wire_types.Pickles_types.Plonk_types.Proof.V2.t =
@@ -1839,8 +1817,6 @@ module Shifts = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'field t = 'field Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
       [@@deriving sexp, compare, yojson, equal]

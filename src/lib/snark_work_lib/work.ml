@@ -14,8 +14,6 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
@@ -52,8 +50,6 @@ end
 module Result = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('spec, 'single) t =
         { proofs : 'single One_or_two.Stable.V1.t

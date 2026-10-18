@@ -1,8 +1,6 @@
 module Block_data = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t = Mina_state.Protocol_state.Body.Value.Stable.V3.t
       [@@deriving sexp]
@@ -21,8 +19,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type 'a t =
         { transaction : 'a
@@ -43,8 +39,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type 'a t = 'a Poly.Stable.V3.t [@@deriving sexp]
   end

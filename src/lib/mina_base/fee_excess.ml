@@ -36,8 +36,6 @@ open Tick
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('token, 'fee) t =
             ('token, 'fee) Mina_wire_types.Mina_base.Fee_excess.Poly.V1.t =
@@ -112,8 +110,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t =
       ( Token_id.Stable.V2.t

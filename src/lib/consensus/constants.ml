@@ -8,8 +8,6 @@ module Global_slot_since_hard_fork = Mina_numbers.Global_slot_since_hard_fork
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('length, 'global_slot_since_hard_fork, 'time, 'timespan) t =
         { k : 'length
@@ -59,8 +57,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Length.Stable.V1.t

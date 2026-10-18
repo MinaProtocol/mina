@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('caller, 'zkapp_command) t =
       { caller : 'caller; caller_caller : 'caller; calls : 'zkapp_command }
@@ -66,8 +64,6 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Zkapp_basic.F.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]

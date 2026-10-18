@@ -3,8 +3,6 @@ open Core_kernel
 module Good : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t = int
     end

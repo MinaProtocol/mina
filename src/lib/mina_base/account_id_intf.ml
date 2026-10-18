@@ -5,8 +5,6 @@ module type S = sig
   module Digest : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t [@@deriving sexp, equal, compare, hash, yojson]
       end
@@ -64,8 +62,6 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end

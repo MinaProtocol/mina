@@ -4,8 +4,6 @@ open Mina_base
 module Common = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V3.t
@@ -72,8 +70,6 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V4 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V3.t
@@ -126,8 +122,6 @@ end
 module Minimal = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
       [@@deriving fields]

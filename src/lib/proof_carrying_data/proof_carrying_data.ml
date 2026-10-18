@@ -4,8 +4,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('a, 'p) t = ('a, 'p) Mina_wire_types.Proof_carrying_data.V1.t =
       { data : 'a [@key "statement"]; proof : 'p }

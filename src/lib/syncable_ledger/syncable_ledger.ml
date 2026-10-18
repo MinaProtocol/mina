@@ -13,8 +13,6 @@ let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 module Query = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'addr t =
         | What_child_hashes of 'addr * int
@@ -75,8 +73,6 @@ end
 module Answer = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('hash, 'account) t =
         | Child_hashes_are of

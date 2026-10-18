@@ -16,8 +16,6 @@ open Mina_numbers
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('slot, 'slot_span, 'balance, 'amount) t =
         | Untimed
@@ -47,8 +45,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Global_slot_since_genesis.Stable.V1.t

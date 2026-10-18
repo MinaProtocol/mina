@@ -55,8 +55,6 @@ module Ledger_inner = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, equal, yojson]
@@ -132,8 +130,6 @@ module Ledger_inner = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V3 = struct
         type t = Account.Stable.V3.t [@@deriving equal, compare, sexp]
 

@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('a, 'field) t =
           ('a, 'field) Mina_wire_types.Mina_base.With_stack_hash.V1.t =

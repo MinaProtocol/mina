@@ -1,8 +1,6 @@
 module type S_base = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t [@@deriving hash, sexp, compare, equal, yojson]
     end

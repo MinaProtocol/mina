@@ -4,8 +4,6 @@ open Mina_numbers
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ( 'epoch_ledger
            , 'epoch_seed
@@ -80,8 +78,6 @@ let if_ cond ~(then_ : var) ~(else_ : var) =
 module Value = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         ( Epoch_ledger.Value.Stable.V1.t

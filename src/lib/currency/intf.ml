@@ -290,8 +290,6 @@ module type Full = sig
   module Fee : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         [@@@with_all_version_tags]
 
@@ -330,8 +328,6 @@ module type Full = sig
   module Amount : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         [@@@with_all_version_tags]
 
@@ -399,8 +395,6 @@ module type Full = sig
   module Balance : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t [@@deriving sexp, compare, hash, yojson, equal]
       end

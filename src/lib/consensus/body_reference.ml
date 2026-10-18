@@ -13,8 +13,6 @@ open Mina_base_util
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t = Blake2.Stable.V1.t [@@deriving sexp, yojson, hash, equal, compare]
 

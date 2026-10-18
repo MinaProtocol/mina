@@ -16,8 +16,6 @@ type t =
 module Display = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         { external_ip : Mina_stdlib.Bounded_types.String.Stable.V1.t

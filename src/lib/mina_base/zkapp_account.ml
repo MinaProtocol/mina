@@ -155,8 +155,6 @@ end
 module Zkapp_uri = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       module T = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
@@ -206,8 +204,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t =
         { app_state : 'app_state
@@ -278,8 +274,6 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t_ =
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       ( Zkapp_state.Value.Stable.V2.t

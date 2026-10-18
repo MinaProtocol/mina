@@ -4,8 +4,6 @@ open Mina_base
 module Input = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { descendant : State_hash.Stable.V1.t; generations : int }
       [@@deriving sexp]
@@ -23,8 +21,6 @@ module Output = State_hash
 module Proof = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = State_body_hash.Stable.V1.t list
 

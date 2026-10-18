@@ -7,8 +7,6 @@ module Constant = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_4.Stable.V1.t

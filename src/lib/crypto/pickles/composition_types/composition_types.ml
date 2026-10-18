@@ -35,8 +35,6 @@ module Wrap = struct
         module Minimal = struct
           [%%versioned
           module Stable = struct
-            [@@@no_toplevel_latest_type]
-
             module V1 = struct
               (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
                   all that's needed to derive all the values in the [In_circuit] version below.
@@ -195,8 +193,6 @@ module Wrap = struct
 
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           (** All the deferred values needed, comprising values from the PLONK IOP verification,
     values from the inner-product argument, and [which_branch] which is needed to know
@@ -262,8 +258,6 @@ module Wrap = struct
 
         [%%versioned
         module Stable = struct
-          [@@@no_toplevel_latest_type]
-
           module V1 = struct
             (* 'fp is unused in Minimal but kept for type compatibility with
                In_circuit. We suppress the warning instead of using a phantom
@@ -405,8 +399,6 @@ module Wrap = struct
     module Messages_for_next_wrap_proof = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type ('g1, 'bulletproof_challenges) t =
                 ( 'g1
@@ -447,8 +439,6 @@ module Wrap = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ( 'plonk
              , 'scalar_challenge
@@ -510,8 +500,6 @@ module Wrap = struct
     module Minimal = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type ( 'challenge
                , 'scalar_challenge
@@ -740,8 +728,6 @@ module Wrap = struct
   module Statement = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ( 'plonk
              , 'scalar_challenge
@@ -810,8 +796,6 @@ module Wrap = struct
     module Minimal = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type ( 'challenge
                , 'scalar_challenge
@@ -1109,8 +1093,6 @@ module Step = struct
         module Minimal = struct
           [%%versioned
           module Stable = struct
-            [@@@no_toplevel_latest_type]
-
             module V1 = struct
               (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
                   all that's needed to derive all the values in the [In_circuit] version below.

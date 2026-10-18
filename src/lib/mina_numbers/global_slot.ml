@@ -5,8 +5,6 @@ type uint32 = Unsigned.uint32
 module type S = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t [@@deriving sexp, compare]
     end

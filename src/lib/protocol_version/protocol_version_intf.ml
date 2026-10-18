@@ -3,8 +3,6 @@ open Core_kernel
 module type Full = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t [@@deriving compare, equal, sexp, yojson]
     end

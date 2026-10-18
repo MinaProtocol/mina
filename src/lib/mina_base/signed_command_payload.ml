@@ -31,8 +31,6 @@ module Common = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
               ( 'fee
@@ -78,8 +76,6 @@ module Common = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Currency.Fee.Stable.V1.t
@@ -191,8 +187,6 @@ end
 module Body = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
@@ -256,8 +250,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -282,8 +274,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]

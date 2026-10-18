@@ -6,8 +6,6 @@ let length_in_bytes = length_in_bits / 8
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
     [@@deriving sexp, equal, compare, hash, yojson]

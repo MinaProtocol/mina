@@ -4,8 +4,6 @@ module type Full = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type ('slot_number, 'slots_per_epoch) t
         [@@deriving sexp, equal, compare, hash, yojson]
@@ -19,8 +17,6 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t =
         ( Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t

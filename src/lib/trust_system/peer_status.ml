@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t = { trust : float; banned : Banned_status.Stable.V1.t }
     [@@deriving yojson]

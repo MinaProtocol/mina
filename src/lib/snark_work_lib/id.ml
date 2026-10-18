@@ -3,8 +3,6 @@ open Core_kernel
 module Single = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { which_one : [ `First | `Second | `One ]; pairing_id : int64 }
       [@@deriving compare, hash, sexp, yojson, equal]
@@ -21,8 +19,6 @@ end
 module Range = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { first : int; last : int }
       [@@deriving hash, sexp, equal, yojson]
@@ -46,8 +42,6 @@ end
 module Sub_zkapp = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         { which_one : [ `First | `Second | `One ]
@@ -77,8 +71,6 @@ end
 module Any = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         | Single of Single.Stable.V1.t

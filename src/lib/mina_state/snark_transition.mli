@@ -30,8 +30,6 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t =
         ( Blockchain_state.Value.Stable.V2.t

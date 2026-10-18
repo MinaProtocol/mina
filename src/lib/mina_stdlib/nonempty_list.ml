@@ -3,8 +3,6 @@ open Core_kernel
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type 'a t = 'a * 'a list [@@deriving sexp, compare, equal, hash, to_yojson]
   end

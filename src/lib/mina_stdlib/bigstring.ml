@@ -4,8 +4,6 @@ open Core_kernel
 
 [%%versioned_binable
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t = Bigstring.Stable.V1.t [@@deriving sexp, compare]
 

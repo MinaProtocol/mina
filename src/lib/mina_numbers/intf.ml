@@ -140,8 +140,6 @@ end
 module type UInt32_A = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       [@@@with_all_version_tags]
 
@@ -164,8 +162,6 @@ module type UInt32 = UInt32_A with type Stable.V1.t = Unsigned_extended.UInt32.t
 module type UInt64_A = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       [@@@with_all_version_tags]
 

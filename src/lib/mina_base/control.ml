@@ -3,8 +3,6 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('proof, 'signature) t =
             ('proof, 'signature) Mina_wire_types.Mina_base.Control.Poly.V1.t =
@@ -27,8 +25,6 @@ end
 (* TODO: temporary hack *)
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Pickles.Side_loaded.Proof.Stable.V2.t

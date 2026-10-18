@@ -4,8 +4,6 @@ open Snark_params.Tick
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       ( Ledger_hash.Stable.V1.t

@@ -4,8 +4,6 @@ open Tick
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     [@@@with_all_version_tags]
 
@@ -31,8 +29,6 @@ module Compressed : sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type ('field, 'boolean) t =
               ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
@@ -46,8 +42,6 @@ module Compressed : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       [@@@with_all_version_tags]
 

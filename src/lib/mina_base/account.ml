@@ -12,8 +12,6 @@ open Mina_base_import
 module Index = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       module T = struct
         type t = int [@@deriving to_yojson, sexp, hash, compare]
@@ -86,8 +84,6 @@ module Nonce = Account_nonce
 module Token_symbol = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       module T = struct
         type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
@@ -205,8 +201,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ( 'pk
            , 'id
@@ -280,8 +274,6 @@ end
 module Key = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -302,8 +294,6 @@ module Timing = Account_timing
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -346,8 +336,6 @@ let check = Fn.id
 
 [%%versioned_binable
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t = Binable_arg.Stable.V3.t =
       { public_key : Public_key.Compressed.Stable.V1.t

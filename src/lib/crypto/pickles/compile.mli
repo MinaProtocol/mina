@@ -70,8 +70,6 @@ module Side_loaded : sig
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type t [@@deriving sexp, equal, compare, hash, yojson]
       end
@@ -107,8 +105,6 @@ module Side_loaded : sig
   module Proof : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         (* TODO: This should really be able to be any width up to the max width... *)
         type t = Verification_key.Max_width.n Proof.t

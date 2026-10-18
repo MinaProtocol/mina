@@ -899,8 +899,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         [@@@with_all_version_tags]
 
@@ -925,8 +923,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       module type S = sig
         [%%versioned:
         module Stable : sig
-          [@@@no_toplevel_latest_type]
-
           module V1 : sig
             [@@@with_all_version_tags]
 
@@ -1005,8 +1001,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           [@@@with_all_version_tags]
 
@@ -1049,8 +1043,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Balance = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Amount.Stable.V1.t
         [@@deriving sexp, compare, equal, hash, yojson]

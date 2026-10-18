@@ -23,8 +23,6 @@ end
 module type Constants = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t
     end
@@ -279,8 +277,6 @@ module type S = sig
   module Configuration : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t =
           { delta : int
@@ -446,8 +442,6 @@ module type S = sig
     module Prover_state : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V3 : sig
           type t
 
@@ -477,8 +471,6 @@ module type S = sig
       module Value : sig
         [%%versioned:
         module Stable : sig
-          [@@@no_toplevel_latest_type]
-
           module V1 : sig
             type t [@@deriving sexp, to_yojson]
           end
@@ -495,8 +487,6 @@ module type S = sig
     module Consensus_time : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t [@@deriving compare, sexp, yojson]
         end
@@ -539,8 +529,6 @@ module type S = sig
       module Value : sig
         [%%versioned:
         module Stable : sig
-          [@@@no_toplevel_latest_type]
-
           module V3 : sig
             type t [@@deriving hash, equal, compare, sexp, yojson]
           end
@@ -674,8 +662,6 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V3 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
@@ -711,8 +697,6 @@ module type S = sig
     module Slot_won : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t =
             { delegator :

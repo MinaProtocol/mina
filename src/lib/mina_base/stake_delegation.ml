@@ -5,8 +5,6 @@ open Signature_lib
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     [@@@with_all_version_tags]
 

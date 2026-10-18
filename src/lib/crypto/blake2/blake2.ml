@@ -52,8 +52,6 @@ module Make () = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     (* it would be better to use `with_all_version_tags` on just
        the module where we need a version tag, but that doesn't
        (yet) work with %%versioned_binable

@@ -90,8 +90,6 @@ end
 module Keypair : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t
     end

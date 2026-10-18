@@ -75,8 +75,6 @@ module UInt64 = struct
   module Int64_for_version_tags = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = (Int64.t[@version_asserted])
 
@@ -93,8 +91,6 @@ module UInt64 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -148,8 +144,6 @@ module UInt32 = struct
   module Int32_for_version_tags = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = (Int32.t[@version_asserted])
 
@@ -166,8 +160,6 @@ module UInt32 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 

@@ -4,8 +4,6 @@ open Snark_params.Tick
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -20,8 +18,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     [@@@with_all_version_tags]
 

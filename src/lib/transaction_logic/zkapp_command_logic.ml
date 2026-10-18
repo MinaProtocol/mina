@@ -192,8 +192,6 @@ module Local_state = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ( 'stack_frame
            , 'call_stack
@@ -327,8 +325,6 @@ module Local_state = struct
   module Value = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t =
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
@@ -1013,8 +1009,6 @@ module Start_data = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('account_updates, 'field, 'bool) t =
         { account_updates : 'account_updates

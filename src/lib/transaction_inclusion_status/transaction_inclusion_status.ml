@@ -7,8 +7,6 @@ open Network_pool
 module State = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
 

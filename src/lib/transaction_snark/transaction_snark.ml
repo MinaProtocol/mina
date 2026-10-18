@@ -48,8 +48,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Proof_type = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = [ `Base | `Merge ]
         [@@deriving compare, equal, hash, sexp, yojson]
@@ -69,8 +67,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Proof = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t = Pickles.Proof.Proofs_verified_2.Stable.V2.t
         [@@deriving yojson, compare, equal, sexp, hash]
@@ -84,8 +80,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
@@ -137,8 +131,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Basic = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t = Opt_signed_opt_signed | Opt_signed | Proved
           [@@deriving sexp, yojson]

@@ -4,8 +4,6 @@ module Impl = Pickles.Impls.Step
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('ledger, 'pending_coinbase_stack, 'local_state) t =
           ( 'ledger

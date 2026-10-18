@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type ('magnitude, 'sgn) t =
           ('magnitude, 'sgn) Mina_wire_types.Signed_poly.V1.t =

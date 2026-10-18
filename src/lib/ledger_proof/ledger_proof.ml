@@ -5,8 +5,6 @@ module type S = Ledger_proof_intf.S
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = Transaction_snark.Stable.V2.t
     [@@deriving compare, equal, sexp, yojson, hash]

@@ -5,8 +5,6 @@ open Lmdb_storage
 module Entry = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         | Header of Mina_block.Header.Stable.V3.t

@@ -4,8 +4,6 @@ open Mina_base
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ( 'blockchain_state
            , 'consensus_transition
@@ -34,8 +32,6 @@ end
 module Value = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Blockchain_state.Value.Stable.V2.t

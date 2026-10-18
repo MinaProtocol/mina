@@ -16,8 +16,6 @@ module Compressed = struct
     (* module with same type t as Stable below, to build functor argument *)
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         [@@@with_all_version_tags]
 
@@ -34,8 +32,6 @@ module Compressed = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -170,8 +166,6 @@ module Uncompressed = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 

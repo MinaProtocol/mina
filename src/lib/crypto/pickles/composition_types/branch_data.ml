@@ -17,8 +17,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Domain_log2 = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = char [@@deriving compare, sexp, yojson, hash, equal]
 
@@ -48,8 +46,6 @@ module Make_str (A : Wire_types.Concrete) = struct
      Next 8 bits: domain_log2 *)
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = A.V1.t =
         { proofs_verified : Proofs_verified.Stable.V1.t

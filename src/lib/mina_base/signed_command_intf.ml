@@ -213,8 +213,6 @@ module type Full = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type ('payload, 'pk, 'signature) t =
               ( 'payload
@@ -234,8 +232,6 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     [@@@with_top_version_tag]
 
     module V2 : sig

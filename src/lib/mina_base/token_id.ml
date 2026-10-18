@@ -4,8 +4,6 @@ module Legacy_token = Mina_numbers.Nat.Make64 ()
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = Account_id.Digest.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare, hash]

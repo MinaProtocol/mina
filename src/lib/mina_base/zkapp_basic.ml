@@ -13,8 +13,6 @@ let int_of_bits =
 module Transition = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = { prev : 'a; next : 'a }
       [@@deriving hlist, sexp, equal, yojson, hash, compare]
@@ -88,8 +86,6 @@ end
 module Set_or_keep = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Set_or_keep.V1.t =
         | Set of 'a
@@ -221,8 +217,6 @@ end
 module Or_ignore = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Or_ignore.V1.t =
         | Check of 'a
@@ -309,8 +303,6 @@ end
 module Account_state = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Empty | Non_empty | Any
       [@@deriving sexp, equal, yojson, hash, compare, enum]

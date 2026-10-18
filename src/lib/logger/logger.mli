@@ -43,8 +43,6 @@ end
 module Metadata : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = Yojson.Safe.t String.Map.t [@@deriving yojson]
     end

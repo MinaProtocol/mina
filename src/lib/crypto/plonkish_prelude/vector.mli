@@ -65,8 +65,6 @@ module With_version (N : Nat.Intf) : sig
   module type S = sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'a t = ('a, N.n) vec
         [@@deriving compare, yojson, sexp, hash, equal]

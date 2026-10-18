@@ -81,8 +81,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -98,8 +96,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -117,8 +113,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -136,8 +130,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t [@@deriving compare, equal, hash]
 
@@ -157,8 +149,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -180,8 +170,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t
 
@@ -203,8 +191,6 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t
 
@@ -280,8 +266,6 @@ module Output = struct
     module type Basic_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -295,8 +279,6 @@ module Output = struct
     module type Sexp_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -312,8 +294,6 @@ module Output = struct
     module type Yojson_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -329,8 +309,6 @@ module Output = struct
     module type Full_compare_eq_hash_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t [@@deriving compare, equal, hash]
 
@@ -348,8 +326,6 @@ module Output = struct
     module type Full_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t
 
@@ -369,8 +345,6 @@ module Output = struct
     module type Basic_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t
 
@@ -390,8 +364,6 @@ module Output = struct
     module type Sexp_intf = sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t
 

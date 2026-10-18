@@ -41,8 +41,6 @@ module Ledger_hash = Ledger_hash0
 module Auth_required = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Permissions.Auth_required.V2.t =
         | None
@@ -366,8 +364,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('controller, 'txn_version) t =
             ( 'controller
@@ -428,8 +424,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Auth_required.Stable.V2.t

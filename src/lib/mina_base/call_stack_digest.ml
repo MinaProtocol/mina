@@ -8,8 +8,6 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]

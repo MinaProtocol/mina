@@ -36,8 +36,6 @@ open Core_kernel
 module Sequence_number : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = int [@@deriving sexp]
     end
@@ -50,8 +48,6 @@ end
 module Job_status : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = Todo | Done [@@deriving sexp]
     end
@@ -66,8 +62,6 @@ end
 module Weight : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = { base : int; merge : int } [@@deriving sexp]
     end
@@ -81,8 +75,6 @@ module Base : sig
   module Record : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'base t =
           { job : 'base
@@ -101,8 +93,6 @@ module Base : sig
   module Job : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'base t = Empty | Full of 'base Record.Stable.V1.t
         [@@deriving sexp]
@@ -115,8 +105,6 @@ module Base : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
       [@@deriving sexp]
@@ -131,8 +119,6 @@ module Merge : sig
   module Record : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'merge t =
           { left : 'merge
@@ -156,8 +142,6 @@ module Merge : sig
   module Job : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'merge t =
           | Empty
@@ -176,8 +160,6 @@ module Merge : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'merge t =
         (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
@@ -204,8 +186,6 @@ end
 module Space_partition : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = { first : int * int; second : (int * int) option }
       [@@deriving sexp]
@@ -227,8 +207,6 @@ module Job_view : sig
   module Extra : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t =
           { seq_no : Sequence_number.Stable.V1.t
@@ -246,8 +224,6 @@ module Job_view : sig
   module Node : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'a t =
           | BEmpty
@@ -270,8 +246,6 @@ module Job_view : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'a t = { position : int; value : 'a Node.Stable.V1.t }
       [@@deriving sexp]
@@ -285,8 +259,6 @@ end
 module State : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type nonrec ('merge, 'base) t [@@deriving sexp]
     end

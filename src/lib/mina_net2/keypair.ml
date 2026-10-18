@@ -4,8 +4,6 @@ open Network_peer
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t =
       { secret : Mina_stdlib.Bounded_types.String.Stable.V1.t

@@ -4,8 +4,6 @@ open Core_kernel
 module Single : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       (** Case `One` indicate no need to pair. ID is still needed because zkapp command
          might be left in pool of half completion. *)
@@ -24,8 +22,6 @@ end
 module Range : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = { first : int; last : int }
       [@@deriving compare, hash, sexp, equal, yojson]
@@ -44,8 +40,6 @@ end
 module Sub_zkapp : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       (** Case `One` indicate no need to pair. ID is still needed because zkapp command
          might be left in pool of half completion. *)
@@ -75,8 +69,6 @@ end
 module Any : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t =
         | Single of Single.Stable.V1.t

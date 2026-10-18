@@ -22,8 +22,6 @@ module Body : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, hash, yojson]
     end
@@ -47,8 +45,6 @@ module Common : sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
               ( 'fee
@@ -92,8 +88,6 @@ module Common : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t =
         ( Currency.Fee.Stable.V1.t
@@ -147,8 +141,6 @@ end
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type ('common, 'body) t =
             ( 'common
@@ -172,8 +164,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]

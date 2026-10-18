@@ -51,8 +51,6 @@ let of_yojson : Yojson.Safe.t -> (_, string) Result.t = function
 module T = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         [ `Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup ]

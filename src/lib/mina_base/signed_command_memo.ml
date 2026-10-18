@@ -13,8 +13,6 @@ end
 module Make_str (_ : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 

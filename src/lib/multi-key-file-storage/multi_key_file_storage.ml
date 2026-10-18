@@ -8,8 +8,6 @@ module type S = Intf.S
 module Tag = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('filename_key, 'a) t =
         { filename_key : 'filename_key; offset : int64; size : int }

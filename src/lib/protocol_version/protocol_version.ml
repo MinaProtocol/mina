@@ -12,8 +12,6 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = A.V2.t = { transaction : int; network : int; patch : int }
       [@@deriving compare, equal, sexp, yojson, fields]

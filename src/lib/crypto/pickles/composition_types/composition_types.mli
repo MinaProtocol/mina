@@ -43,8 +43,6 @@ module Wrap : sig
         module Minimal : sig
           [%%versioned:
           module Stable : sig
-            [@@@no_toplevel_latest_type]
-
             module V1 : sig
               (** Challenges from the PLONK IOP. These, plus the evaluations
                   that are already in the proof, are all that's needed to derive
@@ -236,8 +234,6 @@ module Wrap : sig
       module Minimal : sig
         [%%versioned:
         module Stable : sig
-          [@@@no_toplevel_latest_type]
-
           module V1 : sig
             type ( 'challenge
                  , 'scalar_challenge
@@ -487,8 +483,6 @@ module Wrap : sig
     module Minimal : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type ( 'challenge
                , 'scalar_challenge

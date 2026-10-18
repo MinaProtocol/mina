@@ -4,8 +4,6 @@ open Network_peer
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { node_ip_addr : Peer.Inet_addr.Stable.V1.t

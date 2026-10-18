@@ -36,8 +36,6 @@ module type S = sig
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type t [@@deriving to_yojson, of_yojson]
       end
@@ -102,8 +100,6 @@ module type S = sig
     module Proofs_verified_2 : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t = Make(Nat.N2).t
           [@@deriving sexp, compare, equal, yojson, hash]
@@ -317,8 +313,6 @@ module type S = sig
     module Verification_key : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           type t [@@deriving sexp, equal, compare, hash, yojson]
         end
@@ -356,8 +350,6 @@ module type S = sig
     module Proof : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V2 : sig
           (* TODO: This should really be able to be any width up to the max width... *)
           type t = Verification_key.Max_width.n Proof.t

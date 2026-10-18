@@ -3,8 +3,6 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
         | Predicate [@value 1]
@@ -110,8 +108,6 @@ module Failure = struct
     module Display = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t = (int * Stable.V2.t list) list
           [@@deriving equal, compare, yojson, sexp, hash]
@@ -125,8 +121,6 @@ module Failure = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Stable.V2.t list list
         [@@deriving equal, compare, yojson, sexp, hash]
@@ -528,8 +522,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
       | Applied

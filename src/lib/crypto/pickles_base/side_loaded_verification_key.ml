@@ -8,8 +8,6 @@ let max_log2_degree = 32
 module Width : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end
@@ -32,8 +30,6 @@ module Width : sig
   module Max_at_most : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type 'a t = ('a, Max.n) At_most.t
         [@@deriving compare, sexp, yojson, hash, equal]
@@ -48,8 +44,6 @@ module Width : sig
 end = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = char [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -72,8 +66,6 @@ end = struct
   module Max_vector = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a Vector.Vector_2.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
@@ -93,8 +85,6 @@ end = struct
   module Max_at_most = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a At_most.At_most_2.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
@@ -124,8 +114,6 @@ module Domains = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = { h : 'a }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
@@ -139,8 +127,6 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t
@@ -162,8 +148,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('g, 'proofs_verified, 'vk) t =
             ( 'g

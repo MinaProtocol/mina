@@ -5,8 +5,6 @@ open Snark_params.Tick
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('ledger_hash, 'amount) t =
             ( 'ledger_hash
@@ -25,8 +23,6 @@ end
 module Value = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         (Frozen_ledger_hash0.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t

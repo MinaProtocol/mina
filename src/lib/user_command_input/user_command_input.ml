@@ -8,8 +8,6 @@ module Payload = struct
   module Common = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( Currency.Fee.Stable.V1.t
@@ -67,8 +65,6 @@ module Payload = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Common.Stable.V2.t
@@ -101,8 +97,6 @@ end
 module Sign_choice = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         | Signature of Signature.Stable.V1.t
@@ -123,8 +117,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Payload.Stable.V2.t

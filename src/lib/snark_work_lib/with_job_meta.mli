@@ -1,7 +1,5 @@
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     type ('spec, 'job_id) t =
       { spec : 'spec

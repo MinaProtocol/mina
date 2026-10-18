@@ -4,8 +4,6 @@ open Signature_lib
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'account_updates t =
             'account_updates Mina_wire_types.Mina_base.Zkapp_command.V2.T.t =
@@ -30,8 +28,6 @@ end
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Account_update.Graphql_repr.Stable.V2.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -47,8 +43,6 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Account_update.Simple.Stable.V2.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -74,8 +68,6 @@ module T = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     [@@@with_top_version_tag]
 
     (* DO NOT DELETE VERSIONS!

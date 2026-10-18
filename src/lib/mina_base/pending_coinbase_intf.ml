@@ -101,8 +101,6 @@ module type S = sig
   module Hash_versioned : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type nonrec t = Hash.t [@@deriving sexp, compare, equal, yojson, hash]
       end
@@ -115,8 +113,6 @@ module type S = sig
   module Coinbase_stack : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t = Field.t
       end
@@ -128,8 +124,6 @@ module type S = sig
   module State_stack : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t
       end
@@ -145,8 +139,6 @@ module type S = sig
   module Stack_versioned : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type nonrec t [@@deriving sexp, compare, equal, yojson, hash]
       end
@@ -227,8 +219,6 @@ module type S = sig
     module Action : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t =
             | Update_none
@@ -256,8 +246,6 @@ module type S = sig
     module Poly : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type ('action, 'coinbase_amount) t =
             { action : 'action; coinbase_amount : 'coinbase_amount }
@@ -273,8 +261,6 @@ module type S = sig
 
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]

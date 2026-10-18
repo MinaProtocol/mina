@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type 'f t = 'f Kimchi_types.scalar_challenge = { inner : 'f }
     [@@deriving sexp, compare, equal, yojson, hash]

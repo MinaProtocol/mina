@@ -98,8 +98,6 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
     end
@@ -201,8 +199,6 @@ module type Full = sig
     module Basic : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type t = Opt_signed_opt_signed | Opt_signed | Proved
           [@@deriving sexp, yojson]

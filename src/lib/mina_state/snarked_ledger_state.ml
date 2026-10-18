@@ -34,8 +34,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Init_stack = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type t =
             | Base of Pending_coinbase.Stack_versioned.Stable.V1.t
@@ -55,8 +53,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type 'pending_coinbase t =
             { source : 'pending_coinbase; target : 'pending_coinbase }
@@ -87,8 +83,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* State of the coinbase stack for the current transaction snark *)
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
         [@@deriving sexp, hash, compare, equal, yojson]
@@ -120,8 +114,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ( 'ledger_hash
              , 'amount
@@ -232,8 +224,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
@@ -390,8 +380,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module With_sok = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t

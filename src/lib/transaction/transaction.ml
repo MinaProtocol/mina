@@ -4,8 +4,6 @@ open Mina_base
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type 'command t = 'command Mina_wire_types.Mina_transaction.Poly.V2.t =
         | Command of 'command
@@ -39,8 +37,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t = User_command.Stable.V3.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]

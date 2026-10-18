@@ -5,8 +5,6 @@ module type S = sig
   module Domain_log2 : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type t [@@deriving compare, sexp, yojson, hash, equal]
       end
@@ -19,8 +17,6 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t =
         { proofs_verified : Proofs_verified.Stable.V1.t

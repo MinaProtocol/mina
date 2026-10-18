@@ -3,8 +3,6 @@ open Snark_params.Tick
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     [@@@with_all_version_tags]
 

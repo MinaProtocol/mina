@@ -9,8 +9,6 @@ module Payload : sig
   module Common : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type t [@@deriving sexp, to_yojson]
       end
@@ -23,8 +21,6 @@ module Payload : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t [@@deriving sexp, to_yojson]
     end
@@ -38,8 +34,6 @@ end
 module Sign_choice : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t =
         | Signature of Signature.Stable.V1.t
@@ -58,8 +52,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t =
       ( Payload.Stable.V2.t

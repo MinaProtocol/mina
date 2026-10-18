@@ -16,8 +16,6 @@ module Permuts_minus_1_vec = Vector.Vector_6
 module Commitments : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t =
             Mina_wire_types.Pickles.Concrete_.Wrap_wire_proof.Commitments.V1.t =
@@ -50,8 +48,6 @@ end
 module Evaluations : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t =
             Mina_wire_types.Pickles.Concrete_.Wrap_wire_proof.Evaluations.V1.t =
@@ -109,8 +105,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     type t = Mina_wire_types.Pickles.Concrete_.Wrap_wire_proof.V1.t =
       { commitments : Commitments.Stable.V1.t

@@ -34,8 +34,6 @@ end
 module Pre_diff_two : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type ('a, 'b) t =
         { completed_works : 'a list
@@ -61,8 +59,6 @@ end
 module Pre_diff_one : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type ('a, 'b) t =
         { completed_works : 'a list

@@ -18,8 +18,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('slot_number, 'slots_per_epoch) t =
               ('slot_number, 'slots_per_epoch) A.Poly.V1.t =
@@ -36,8 +34,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = (T.Stable.V1.t, Length.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]

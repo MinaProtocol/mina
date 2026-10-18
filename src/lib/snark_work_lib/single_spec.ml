@@ -3,8 +3,6 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('witness, 'ledger_proof) t =
         | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -55,8 +53,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Transaction_witness.Stable.V3.t

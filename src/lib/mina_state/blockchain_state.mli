@@ -6,8 +6,6 @@ open Currency
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -85,8 +83,6 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t

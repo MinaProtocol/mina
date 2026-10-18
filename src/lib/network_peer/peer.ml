@@ -6,8 +6,6 @@ open Core
 module Id = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
       [@@deriving compare, hash, equal, sexp]
@@ -28,8 +26,6 @@ end
 module Inet_addr = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Unix.Inet_addr.t [@@deriving sexp, compare, hash]
 
@@ -58,8 +54,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t =
       { host : Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
@@ -148,8 +142,6 @@ end
 module Display = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         { host : Mina_stdlib.Bounded_types.String.Stable.V1.t

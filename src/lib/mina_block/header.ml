@@ -17,8 +17,6 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t = A.V3.t =
         { protocol_state : Protocol_state.Value.Stable.V3.t

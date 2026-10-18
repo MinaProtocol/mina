@@ -13,8 +13,6 @@ open Signature_lib
 module User_command = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       (* for `command_type` and `status`, a string is enough
          in any case, there aren't existing string conversions for the
@@ -77,8 +75,6 @@ end
 module Internal_command = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       (* for `command_type`, a string is enough
          no existing string conversion for the original OCaml type
@@ -123,8 +119,6 @@ end
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { sequence_no : int
@@ -166,8 +160,6 @@ end
 module Block = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     [@@@with_versioned_json]
 
     module V3 = struct

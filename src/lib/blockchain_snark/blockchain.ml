@@ -4,8 +4,6 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     module T = struct
       type t =

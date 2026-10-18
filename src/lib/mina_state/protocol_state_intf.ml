@@ -6,8 +6,6 @@ module type Full = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V1 : sig
         type ('state_hash, 'body) t =
           { previous_state_hash : 'state_hash; body : 'body }
@@ -29,8 +27,6 @@ module type Full = sig
     module Poly : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V1 : sig
           type ('a, 'b, 'c, 'd) t [@@deriving sexp]
         end
@@ -43,8 +39,6 @@ module type Full = sig
     module Value : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V3 : sig
           type t =
             ( State_hash.Stable.V1.t
@@ -91,8 +85,6 @@ module type Full = sig
   module Value : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V3 : sig
         type t =
           (State_hash.Stable.V1.t, Body.Value.Stable.V3.t) Poly.Stable.V1.t

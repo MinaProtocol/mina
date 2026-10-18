@@ -61,8 +61,6 @@ let two_to_the (type f) (module F : Field_intf with type t = f) =
 module type S = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type 'f t [@@deriving sexp, compare, equal, yojson, hash]
     end
@@ -102,8 +100,6 @@ end
 module Type1 = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'f t = 'f Mina_wire_types.Pickles_types.Shifted_value.Type1.V1.t =
         | Shifted_value of 'f
@@ -172,8 +168,6 @@ end
 module Type2 = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'f t = Shifted_value of 'f
       [@@deriving sexp, compare, equal, yojson, hash]

@@ -11,8 +11,6 @@ module Impl = Pickles.Impls.Step
 module Closed_interval = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t =
             'a Mina_wire_types.Mina_base.Zkapp_precondition.Closed_interval.V1.t =
@@ -158,8 +156,6 @@ module Numeric = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = 'a Closed_interval.Stable.V1.t Or_ignore.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -462,8 +458,6 @@ end
 module Account = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
@@ -803,8 +797,6 @@ module Protocol_state = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         (* TODO: Not sure if this should be frozen ledger hash or not *)
         type t =
@@ -939,8 +931,6 @@ module Protocol_state = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ( 'snarked_ledger_hash
              , 'length
@@ -1016,8 +1006,6 @@ module Protocol_state = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
@@ -1114,8 +1102,6 @@ module Protocol_state = struct
   module View = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
@@ -1410,8 +1396,6 @@ end
 module Valid_while = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1449,8 +1433,6 @@ end
 module Account_type = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = User | Zkapp | None | Any
       [@@deriving sexp, equal, yojson, hash, compare]
@@ -1563,8 +1545,6 @@ module Other = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('account, 'account_transition, 'vk) t =
           { predicate : 'account
@@ -1586,8 +1566,6 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         ( Account.Stable.V3.t
@@ -1644,8 +1622,6 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('account, 'protocol_state, 'other, 'pk) t =
         { self_predicate : 'account
@@ -1676,8 +1652,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       ( Account.Stable.V3.t

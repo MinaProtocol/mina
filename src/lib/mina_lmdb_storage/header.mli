@@ -3,8 +3,6 @@ open Mina_base
 module Entry : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t =
         | Header of Mina_block.Header.Stable.V3.t

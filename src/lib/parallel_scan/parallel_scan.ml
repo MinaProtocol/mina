@@ -18,8 +18,6 @@ which they were added*)
 module Sequence_number = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = int [@@deriving sexp]
 
@@ -35,8 +33,6 @@ job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
 module Job_status = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Todo | Done [@@deriving sexp]
 
@@ -55,8 +51,6 @@ end
 module Weight = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { base : int; merge : int } [@@deriving sexp]
 
@@ -72,8 +66,6 @@ module Base = struct
   module Record = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'base t =
           { job : 'base
@@ -94,8 +86,6 @@ module Base = struct
   module Job = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'base t = Empty | Full of 'base Record.Stable.V1.t
         [@@deriving sexp]
@@ -113,8 +103,6 @@ module Base = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
       [@@deriving sexp]
@@ -131,8 +119,6 @@ module Merge = struct
   module Record = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'merge t =
           { left : 'merge
@@ -159,8 +145,6 @@ module Merge = struct
   module Job = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'merge t =
           | Empty
@@ -196,8 +180,6 @@ module Merge = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'merge t =
         (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
@@ -230,8 +212,6 @@ end
 module Space_partition = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { first : int * int; second : (int * int) option }
       [@@deriving sexp]
@@ -256,8 +236,6 @@ module Job_view = struct
   module Extra = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type t =
           { seq_no : Sequence_number.Stable.V1.t
@@ -277,8 +255,6 @@ module Job_view = struct
   module Node = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t =
           | BEmpty
@@ -301,8 +277,6 @@ module Job_view = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = { position : int; value : 'a Node.Stable.V1.t }
       [@@deriving sexp]
@@ -321,8 +295,6 @@ end
 module Tree = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('merge_t, 'base_t) t =
         | Leaf of 'base_t
@@ -886,8 +858,6 @@ module T = struct
   module Binable_arg = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('merge, 'base) t =
           { trees :
@@ -906,8 +876,6 @@ module T = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type ('merge, 'base) t = ('merge, 'base) Binable_arg.Stable.V1.t =
         { trees :

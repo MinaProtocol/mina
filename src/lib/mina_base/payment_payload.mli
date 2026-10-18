@@ -32,8 +32,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t =
       ( Public_key.Compressed.Stable.V1.t

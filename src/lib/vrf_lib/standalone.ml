@@ -12,8 +12,6 @@ module Evaluation = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           type 'scalar t = { c : 'scalar; s : 'scalar } [@@deriving sexp]
 
@@ -29,8 +27,6 @@ module Evaluation = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('group, 'dleq) t =
           { discrete_log_equality : 'dleq; scaled_message_hash : 'group }
