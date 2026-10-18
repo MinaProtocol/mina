@@ -98,10 +98,14 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, equal, sexp, yojson, hash]
 
   val create : statement:Statement.With_sok.t -> proof:Mina_base.Proof.t -> t
 
@@ -197,11 +201,16 @@ module type Full = sig
     module Basic : sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t = Opt_signed_opt_signed | Opt_signed | Proved
           [@@deriving sexp, yojson]
         end
       end]
+
+      type t = Stable.Latest.t = Opt_signed_opt_signed | Opt_signed | Proved
+      [@@deriving sexp, yojson]
 
       val to_single_list : t -> Spec.single list
     end

@@ -9,20 +9,28 @@ module Payload : sig
   module Common : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V2 : sig
         type t [@@deriving sexp, to_yojson]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
     val fee_payer : t -> Account_id.t
   end
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   val fee_payer : t -> Account_id.t
 end
@@ -30,6 +38,8 @@ end
 module Sign_choice : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t =
         | Signature of Signature.Stable.V1.t
@@ -38,10 +48,18 @@ module Sign_choice : sig
       [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t = Stable.Latest.t =
+    | Signature of Signature.t
+    | Hd_index of Unsigned_extended.UInt32.t
+    | Keypair of Keypair.t
+  [@@deriving sexp, to_yojson]
 end
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V2 : sig
     type t =
       ( Payload.Stable.V2.t
@@ -51,6 +69,8 @@ module Stable : sig
     [@@deriving sexp, to_yojson]
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
 val fee_payer : t -> Account_id.t
 

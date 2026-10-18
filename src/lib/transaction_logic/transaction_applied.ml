@@ -8,6 +8,8 @@ module Signed_command_applied = struct
   module Common = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           { user_command : Signed_command.Stable.V2.t With_status.Stable.V2.t }
@@ -16,11 +18,16 @@ module Signed_command_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t = { user_command : Signed_command.t With_status.t }
+    [@@deriving sexp, to_yojson]
   end
 
   module Body = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           | Payment of { new_accounts : Account_id.Stable.V2.t list }
@@ -32,10 +39,19 @@ module Signed_command_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      | Payment of { new_accounts : Account_id.t list }
+      | Stake_delegation of
+          { previous_delegate : Public_key.Compressed.t option }
+      | Failed
+    [@@deriving sexp, to_yojson]
   end
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = { common : Common.Stable.V2.t; body : Body.Stable.V2.t }
       [@@deriving sexp, to_yojson]
@@ -43,6 +59,9 @@ module Signed_command_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { common : Common.t; body : Body.t }
+  [@@deriving sexp, to_yojson]
 
   let new_accounts (t : t) =
     match t.body with
@@ -134,6 +153,8 @@ end
 module Fee_transfer_applied = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { fee_transfer : Fee_transfer.Stable.V2.t With_status.Stable.V2.t
@@ -145,11 +166,20 @@ module Fee_transfer_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { fee_transfer : Fee_transfer.t With_status.t
+    ; new_accounts : Account_id.t list
+    ; burned_tokens : Currency.Amount.t
+    }
+  [@@deriving sexp, to_yojson]
 end
 
 module Coinbase_applied = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { coinbase : Coinbase.Stable.V1.t With_status.Stable.V2.t
@@ -161,6 +191,13 @@ module Coinbase_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { coinbase : Coinbase.t With_status.t
+    ; new_accounts : Account_id.t list
+    ; burned_tokens : Currency.Amount.t
+    }
+  [@@deriving sexp, to_yojson]
 end
 
 module Varying : sig

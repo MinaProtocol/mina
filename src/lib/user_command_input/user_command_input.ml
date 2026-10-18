@@ -8,6 +8,8 @@ module Payload = struct
   module Common = struct
     [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V2 = struct
         type t =
           ( Currency.Fee.Stable.V1.t
@@ -21,6 +23,8 @@ module Payload = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
     let create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo : t =
       { fee; fee_payer_pk; nonce; valid_until; memo }
@@ -63,6 +67,8 @@ module Payload = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         ( Common.Stable.V2.t
@@ -73,6 +79,8 @@ module Payload = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   let create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t =
     { common = Common.create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo
@@ -93,6 +101,8 @@ end
 module Sign_choice = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         | Signature of Signature.Stable.V1.t
@@ -103,10 +113,18 @@ module Sign_choice = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    | Signature of Signature.t
+    | Hd_index of Unsigned_extended.UInt32.t
+    | Keypair of Keypair.t
+  [@@deriving sexp, to_yojson]
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       ( Payload.Stable.V2.t
@@ -118,6 +136,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
 [%%define_locally Stable.Latest.(to_yojson)]
 
