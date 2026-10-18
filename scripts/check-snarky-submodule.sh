@@ -5,8 +5,6 @@ set -eu
 cd src/lib/snarky
 
 CURR=$(git rev-parse HEAD)
-# skip SSL verification for this fetch only (for CI)
-git -c http.sslVerify=false fetch origin
 
 function in_branch {
   if git merge-base --is-ancestor "${CURR}" origin/"$1"; then
@@ -16,6 +14,16 @@ function in_branch {
     false
   fi
 }
+
+# snarky's master only moves forward, so a commit that is an ancestor of the
+# local copy of origin/master is an ancestor of the remote one too. The pin
+# rarely changes, so this usually answers without touching the network.
+if git rev-parse --verify -q origin/master >/dev/null && in_branch "master"; then
+  exit 0
+fi
+
+# skip SSL verification for this fetch only (for CI)
+git -c http.sslVerify=false fetch origin
 
 if (! in_branch "master"); then
   cat >&2 <<EOF
