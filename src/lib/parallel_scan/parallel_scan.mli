@@ -46,10 +46,14 @@ end
 module Job_status : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type t = Todo | Done [@@deriving sexp]
     end
   end]
+
+  type t = Stable.Latest.t = Todo | Done [@@deriving sexp]
 
   val to_string : t -> string
 end
@@ -210,10 +214,14 @@ end
 module State : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec ('merge, 'base) t [@@deriving sexp]
     end
   end]
+
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t [@@deriving sexp]
 
   val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t
 

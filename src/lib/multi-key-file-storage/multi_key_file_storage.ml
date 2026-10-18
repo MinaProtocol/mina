@@ -8,6 +8,8 @@ module type S = Intf.S
 module Tag = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('filename_key, 'a) t =
         { filename_key : 'filename_key; offset : int64; size : int }
@@ -36,6 +38,9 @@ module Tag = struct
         { filename_key = filename_key_of_sexp filename_key; offset; size }
     end
   end]
+
+  type ('filename_key, 'a) t = ('filename_key, 'a) Stable.Latest.t =
+    { filename_key : 'filename_key; offset : int64; size : int }
 
   [%%define_locally Stable.Latest.(compare, equal, t_of_sexp, sexp_of_t)]
 end

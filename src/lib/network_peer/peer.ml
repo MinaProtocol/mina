@@ -6,6 +6,8 @@ open Core
 module Id = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
       [@@deriving compare, hash, equal, sexp]
@@ -13,6 +15,8 @@ module Id = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, hash, equal, sexp]
 
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x

@@ -49,6 +49,8 @@ end
 module Metadata = struct
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Yojson.Safe.t String.Map.t
 
@@ -70,6 +72,8 @@ module Metadata = struct
           end)
     end
   end]
+
+  type t = Stable.Latest.t
 
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 

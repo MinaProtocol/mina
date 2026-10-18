@@ -81,12 +81,16 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
           include Higher_order_creatable_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Sexp_intf = sig
@@ -94,6 +98,8 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
@@ -102,6 +108,8 @@ module Input = struct
           include Partial.Sexp_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Yojson_intf = sig
@@ -109,6 +117,8 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
@@ -117,6 +127,8 @@ module Input = struct
           include Partial.Yojson_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Full_compare_eq_hash_intf = sig
@@ -124,6 +136,8 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t [@@deriving compare, equal, hash]
 
@@ -134,6 +148,8 @@ module Input = struct
           include Partial.Yojson_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving compare, equal, hash]
     end
 
     module type Full_intf = sig
@@ -141,6 +157,8 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
@@ -151,6 +169,8 @@ module Input = struct
           include Partial.Yojson_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
   end
 
@@ -160,6 +180,8 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V2 : sig
           type t
 
@@ -172,6 +194,8 @@ module Input = struct
           include Higher_order_creatable_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Sexp_intf = sig
@@ -179,6 +203,8 @@ module Input = struct
 
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V2 : sig
           type t
 
@@ -197,6 +223,8 @@ module Input = struct
           val to_latest : t -> V2.t
         end
       end]
+
+      type t = Stable.Latest.t
     end
   end
 end
@@ -252,17 +280,23 @@ module Output = struct
     module type Basic_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
           include Creatable_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Sexp_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
@@ -271,11 +305,15 @@ module Output = struct
           include Partial.Sexp_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Yojson_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
@@ -284,11 +322,15 @@ module Output = struct
           include Partial.Yojson_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Full_compare_eq_hash_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t [@@deriving compare, equal, hash]
 
@@ -299,11 +341,15 @@ module Output = struct
           include Partial.Yojson_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving compare, equal, hash]
     end
 
     module type Full_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V1 : sig
           type t
 
@@ -314,6 +360,8 @@ module Output = struct
           include Partial.Yojson_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
   end
 
@@ -321,6 +369,8 @@ module Output = struct
     module type Basic_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V2 : sig
           type t
 
@@ -333,11 +383,15 @@ module Output = struct
           include Creatable_intf with type t := t
         end
       end]
+
+      type t = Stable.Latest.t
     end
 
     module type Sexp_intf = sig
       [%%versioned:
       module Stable : sig
+        [@@@no_toplevel_latest_type]
+
         module V2 : sig
           type t
 
@@ -356,6 +410,8 @@ module Output = struct
           val to_latest : t -> V2.t
         end
       end]
+
+      type t = Stable.Latest.t
     end
   end
 end

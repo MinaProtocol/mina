@@ -4,6 +4,8 @@ open Core_kernel
 module Tag : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type ('filename_key, 'a) t
 
@@ -26,6 +28,8 @@ module Tag : sig
         (Sexp.t -> 'filename_key) -> Sexp.t -> ('filename_key, 'a) t
     end
   end]
+
+  type ('filename_key, 'a) t = ('filename_key, 'a) Stable.Latest.t
 
   val compare :
        ('filename_key -> 'filename_key -> int)

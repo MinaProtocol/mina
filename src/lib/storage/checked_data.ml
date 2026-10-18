@@ -2,10 +2,14 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type 'a t = { checksum : Core_kernel.Md5.Stable.V1.t; data : 'a }
   end
 end]
+
+type 'a t = 'a Stable.Latest.t = { checksum : Core_kernel.Md5.t; data : 'a }
 
 let md5 (tc : 'a Binable.m) data = Md5.digest_string (Binable.to_string tc data)
 
