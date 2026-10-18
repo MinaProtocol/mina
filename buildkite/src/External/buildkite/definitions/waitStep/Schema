@@ -1,0 +1,23 @@
+{ Type = { allow_dependency_failure : Optional (./properties/allow_dependency_failure/Type ) 
+, continue_on_failure : Optional (./properties/continue_on_failure/Type ) 
+, depends_on : Optional (./properties/depends_on/Type ) 
+, id : Optional (./properties/id/Type ) 
+, identifier : Optional (./properties/identifier/Type ) 
+, `if` : Optional (./properties/if/Type ) 
+, key : Optional (./properties/key/Type ) 
+, type : Optional (./properties/type/Type ) 
+, wait : Optional (./properties/wait/Type ) 
+, waiter : Optional (./properties/waiter/Type ) 
+} 
+, default = { allow_dependency_failure = None ((./properties/allow_dependency_failure/Type )) 
+, continue_on_failure = None ((./properties/continue_on_failure/Type )) 
+, depends_on = None ((./properties/depends_on/Type )) 
+, id = None ((./properties/id/Type )) 
+, identifier = None ((./properties/identifier/Type )) 
+, `if` = None ((./properties/if/Type )) 
+, key = None ((./properties/key/Type )) 
+, type = None ((./properties/type/Type )) 
+, wait = None ((./properties/wait/Type )) 
+, waiter = None ((./properties/waiter/Type )) 
+} 
+}

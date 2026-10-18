@@ -181,7 +181,10 @@ let%test_module "Block storage tests" =
       let n = 300 in
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1
         ~f:(fun make_breadcrumb ->
-          let frontier = create_frontier () in
+          let frontier =
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                create_frontier ~epoch_ledger_backing_type:Stable_db () )
+          in
           let root = Full_frontier.root frontier in
           let reader, writer = Pipe.create () in
           with_helper ~writer (fun conf_dir helper ->
@@ -208,7 +211,10 @@ let%test_module "Block storage tests" =
     let%test_unit "Write a block body to db and read it" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
-          let frontier = create_frontier () in
+          let frontier =
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                create_frontier ~epoch_ledger_backing_type:Stable_db () )
+          in
           let root = Full_frontier.root frontier in
           let reader, writer = Pipe.create () in
           with_helper ~writer (fun conf_dir helper ->

@@ -1,14 +1,38 @@
-version: "3.9"
-
+# The Mina dev container.
+#
+# Image: docker.io/minaprotocol/mina-toolchain. Override the pinned tag with
+# MINA_TOOLCHAIN_IMAGE if you want a different one (e.g. bookworm/noble, or
+# when this pin has been pruned from docker.io). Browse current tags at
+# https://hub.docker.com/r/minaprotocol/mina-toolchain/tags.
+#
+# Always invoke this compose file via `make` in this directory (or with
+# `docker compose -f dev/docker-compose.yml`). The bind-mount (`..:/mina`)
+# and entrypoint path (`/mina/dev/dev-uid-fixup.sh`) assume the file lives
+# at <repo>/dev/docker-compose.yml.
 services:
   mina:
     container_name: mina
-    image: gcr.io/o1labs-192920/mina-toolchain@sha256:966863de43c72c294e14762ae567404005f99654c54338a9a89b999476a36d1f
+    image: ${MINA_TOOLCHAIN_IMAGE:-docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet}
+    # Start as root so the entrypoint can remap `opam` to the host UID/GID
+    # before dropping privileges. The script lives in this directory and
+    # is reached through the bind-mounted repo at /mina/dev/. Keeping the
+    # entrypoint out-of-image means no toolchain rebuild is needed.
+    user: "0:0"
+    entrypoint: ["/mina/dev/dev-uid-fixup.sh"]
+    command: ["bash"]
+    environment:
+      # Set by dev/Makefile from `id -u`/`id -g` so bind-mounted files land
+      # with host ownership. Intentionally NOT defaulted — if these are
+      # unset, the entrypoint refuses to start rather than silently picking
+      # the wrong UID. Always invoke via `make`.
+      MINA_HOST_UID: "${HOST_UID}"
+      MINA_HOST_GID: "${HOST_GID}"
     volumes:
       - "..:/mina" # mount the mina folder so that changes are reflected in the container
       - "_opam:/mina/_opam" # exclude any existing local switch
       - "_build:/mina/_build" # exclude any existing local build
       - "opam:/home/opam/.opam" # cache opam stuff
+      - "${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock" # let Docker commands use the host Docker daemon
     stdin_open: true # docker run -i
     tty: true # docker run -t
 

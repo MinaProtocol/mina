@@ -22,10 +22,10 @@ let transactions_impl ~get_transactions ~constraint_constants header
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      { header : Header.Stable.V2.t
-      ; body : Staged_ledger_diff.Body.Stable.V1.t
+      { header : Header.Stable.V3.t
+      ; body : Staged_ledger_diff.Body.Stable.V2.t
       }
     [@@deriving fields, sexp]
 
@@ -114,9 +114,12 @@ let account_ids_accessed ~constraint_constants t =
   |> List.dedup_and_sort
        ~compare:[%compare: Account_id.t * [ `Accessed | `Not_accessed ]]
 
-let write_all_proofs_to_disk ~proof_cache_db { Stable.Latest.header; body } =
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+    { Stable.Latest.header; body } =
   { header
-  ; body = Staged_ledger_diff.Body.write_all_proofs_to_disk ~proof_cache_db body
+  ; body =
+      Staged_ledger_diff.Body.write_all_proofs_to_disk ~signature_kind
+        ~proof_cache_db body
   }
 
 let read_all_proofs_from_disk { header; body } =

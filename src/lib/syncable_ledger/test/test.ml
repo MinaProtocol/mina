@@ -299,6 +299,125 @@ module Make_test_edge_cases (Input : Input_intf) = struct
         Deferred.any [ deferred_res; Ivar.read got_failure_ivar ] )
 end
 
+module Make_test_content_length (Input : Input_intf) = struct
+  open Input
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  let num_accts = 1026
+
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
+  let%test "sync completes despite a mismatched Contents_are answer" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    let adjusted = ref false in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (root_hash, query) ->
+           let%bind answ_or_error =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
+           let answ = Or_error.ok_exn answ_or_error in
+           (* Once, return a Contents_are answer with some extra accounts. *)
+           let answ =
+             match (query, answ) with
+             | ( Syncable_ledger.Query.What_contents _
+               , Syncable_ledger.Answer.Contents_are accounts )
+               when not !adjusted ->
+                 adjusted := true ;
+                 Syncable_ledger.Answer.Contents_are
+                   (accounts @ List.init 100 ~f:(fun _ -> List.hd_exn accounts))
+             | _ ->
+                 answ
+           in
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ) )
+      ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        match%map
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+                 true ) )
+        with
+        | `Result (`Ok mt) ->
+            Root_hash.equal desired_root (Ledger.merkle_root mt)
+        | `Result (`Target_changed _) ->
+            false
+        | `Timeout ->
+            false )
+end
+
+(* A malicious peer can answer a [Num_accounts] sync query with a count whose
+   [ceil_log2] exceeds the tree depth. Before the fix, [handle_num_accounts] fed
+   that to [complete_with_empties], which starts above the tree height and loops
+   effectively forever, hanging the syncer (and this test). The count is now
+   range-checked and rejected, the [Num_accounts] query is requeued, and a
+   subsequent honest answer lets the sync complete. Instantiated against a single
+   healthy context (unlike [Make_test_edge_cases], which also covers degenerate
+   subtree depths that legitimately produce failing answers). *)
+module Make_test_num_accounts_dos (Input : Input_intf) = struct
+  open Input
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  let num_accts = 20
+
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
+  let%test "out-of-range num_accounts is rejected without hanging" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    let injected = ref false in
+    don't_wait_for
+      (Linear_pipe.iter qr ~f:(fun (root_hash, query) ->
+           match query with
+           | Syncable_ledger.Query.Num_accounts when not !injected ->
+               injected := true ;
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local
+                     (Syncable_ledger.Answer.Num_accounts
+                        (Int.max_value, desired_root) ) )
+           | _ ->
+               let%bind answ =
+                 Sync_responder.answer_query sr (Envelope.Incoming.local query)
+               in
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local (Or_error.ok_exn answ) ) ) ) ;
+    match
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+              true ) )
+    with
+    | `Ok mt ->
+        Root_hash.equal desired_root (Ledger.merkle_root mt)
+    | `Target_changed _ ->
+        false
+end
+
 module Root_hash = struct
   include Merkle_ledger_tests.Test_stubs.Hash
 
@@ -326,19 +445,19 @@ module Db = struct
       let to_hash = Fn.id
     end
 
-    module Location = Merkle_ledger.Location.T
+    module Location = Merkle_ledger.Location
 
     module Location_binable = struct
       module Arg = struct
         type t = Location.t =
-          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
           | Account of Location.Addr.Stable.Latest.t
           | Hash of Location.Addr.Stable.Latest.t
         [@@deriving bin_io_unversioned, hash, sexp, compare]
       end
 
       type t = Arg.t =
-        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Generic of Mina_stdlib.Bigstring.t
         | Account of Location.Addr.t
         | Hash of Location.Addr.t
       [@@deriving hash, sexp, compare]
@@ -458,6 +577,9 @@ module Db = struct
         let num_accts = 20
       end)
 
+  module TestDB16_Num_accounts_dos =
+    Make_test_num_accounts_dos (DB16_subtree_depths86)
+
   module TestDB16_1024 =
     Make_test
       (DB16_subtree_depths86)
@@ -500,6 +622,8 @@ module Db = struct
     Make_test_edge_cases (DB16_subtree_depths81)
   module TestDB16_Edge_Cases_subtree_depth80 =
     Make_test_edge_cases (DB16_subtree_depths80)
+  module TestDB16_Content_Length =
+    Make_test_content_length (DB16_subtree_depths86)
 end
 
 module Mask = struct

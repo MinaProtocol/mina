@@ -237,4 +237,8 @@ module Read_write (F_func : F) = struct
 
   let remove ~env:t db key =
     with_env t ~perm:Rw ~default:() ~f:(fun env -> remove_impl ~env db key)
+
+  let batch_remove ~env:t db keys =
+    with_env t ~perm:Rw ~default:() ~f:(fun env ->
+        Queue.iter keys ~f:(remove_impl ~env db) )
 end

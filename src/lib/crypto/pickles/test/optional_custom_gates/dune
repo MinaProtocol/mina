@@ -1,0 +1,99 @@
+(tests
+ (names
+  test_fix_domains
+  pickles_test_optional_custom_gates
+  lookup_range_check
+  test_mmap_cache_mixed)
+ (modules :standard \ test_mmap_cache)
+ (libraries
+  ;; opam libraries
+  alcotest
+  stdio
+  integers
+  result
+  base.caml
+  bignum.bigint
+  core_kernel
+  base64
+  digestif
+  ppx_inline_test.config
+  sexplib0
+  base
+  async_kernel
+  bin_prot.shape
+  async
+  async_unix
+  ;; local libraries
+  mina_wire_types
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_pasta.constraint_system
+  bitstring_lib
+  snarky.intf
+  pickles.backend
+  pickles_types
+  snarky.backendless
+  snarky_group_map
+  sponge
+  pickles
+  pickles.pseudo
+  pickles.limb_vector
+  pickles_base
+  kimchi_backend
+  base58_check
+  codable
+  random_oracle_input
+  pickles.composition_types
+  pickles.plonk_checks
+  pickles_base.one_hot_vector
+  snarky_log
+  group_map
+  snarky_curve
+  key_cache
+  key_cache.native
+  snark_keys_header
+  tuple_lib
+  promise
+  kimchi_backend_common
+  logger
+  logger.context_logger
+  ppx_version.runtime
+  error_json
+  pickles_optional_custom_gates_circuits)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+; test_mmap_cache refuses to run with MINA_USE_MMAP_CACHE disabled, since then
+; Pickles takes the MessagePack cache path and the test exercises nothing, so
+; pin the variable rather than inherit it.
+
+(test
+ (name test_mmap_cache)
+ (modules test_mmap_cache)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  core
+  core_kernel
+  ;; local libraries
+  key_cache
+  key_cache.native
+  pickles
+  pickles.backend
+  pickles_types
+  snarky.backendless)
+ (action
+  (setenv
+   MINA_USE_MMAP_CACHE
+   1
+   (run %{test})))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

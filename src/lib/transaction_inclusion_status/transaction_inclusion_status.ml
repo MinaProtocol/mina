@@ -113,7 +113,7 @@ let%test_module "transaction_status" =
 
     (* TODO: Generate zkApps txns *)
     let gen_user_command =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      let signature_kind = Mina_signature_kind.Testnet in
       Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
         ~max_amount:100 ~fee_range:10 ~key_gen ~nonce:(Account_nonce.of_int 1)
         ()
@@ -125,6 +125,7 @@ let%test_module "transaction_status" =
           ~slot_tx_end:None
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
           ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+          ~signature_kind:Testnet
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config

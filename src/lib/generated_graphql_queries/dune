@@ -30,4 +30,7 @@
  (deps
   (:< gen/gen.exe))
  (action
-  (run %{<} %{targets})))
+  (setenv
+   MINA_PROFILE
+   dev
+   (run %{<} %{targets}))))

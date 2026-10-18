@@ -20,15 +20,18 @@ let Size = ../../Command/Size.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
+let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DebVersion.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
+let lintStep =
+          \(submodules : Bool)
+      ->  \(script : Text)
+      ->  RunInToolchain.runInToolchain
+            RunInToolchain.Config::{
+            , submodules = submodules
+            , environment =
+                DebianVersions.overrideEnvs # [ "MINA_PROFILE=devnet" ]
+            , innerScript = script
+            }
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
@@ -39,16 +42,14 @@ let buildTestCmd
       ->  Command.build
             Command.Config::{
             , commands =
-                  RunInToolchain.runInToolchain
-                    ([] : List Text)
-                    "buildkite/scripts/dump-mina-type-shapes.sh"
-                # RunInToolchain.runInToolchain
-                    ([] : List Text)
+                  lintStep True "buildkite/scripts/dump-mina-type-shapes.sh"
+                # lintStep
+                    False
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
-                # RunInToolchain.runInToolchain
-                    ([] : List Text)
+                # lintStep
+                    False
                     "buildkite/scripts/version-linter.sh ${release_branch}"
-            , label = "Versioned type linter for ${release_branch}"
+            , label = "Versioned type linter (devnet) for ${release_branch}"
             , key = "version-linter-${release_branch}"
             , soft_fail = Some soft_fail
             , target = cmd_target
@@ -67,6 +68,8 @@ in  Pipeline.build
                 , S.exactly
                     "buildkite/scripts/version-linter-patch-missing-type-shapes"
                     "sh"
+                , S.exactly "buildkite/scripts/dump-mina-type-shapes" "sh"
+                , S.exactly "buildkite/scripts/gsutil-upload" "sh"
                 ]
 
           in  JobSpec::{

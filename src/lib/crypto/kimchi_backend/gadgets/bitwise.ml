@@ -5,11 +5,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-let tests_enabled = true
-
-(* Auxiliary functions *)
-
-(* returns a field containing the all one word of length bits *)
+(** Returns a field containing the all one word of length bits. *)
 let all_ones_field (length : int) =
   Common.bignum_bigint_to_field
   @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one)
@@ -21,12 +17,11 @@ let fits_in_bits_as_prover (word : Circuit.Field.t) (length : int) =
       field_to_bignum_bigint (cvar_field_to_field_as_prover word)
       < pow (of_int 2) (of_int length)) )
 
-(* ROT64 *)
-
-(* Side of rotation *)
+(** Side of rotation. *)
 type rot_mode = Left | Right
 
-(* Performs the 64bit rotation and returns rotated word, excess, and shifted *)
+(** Performs the 64-bit rotation and returns rotated word, excess, and
+    shifted. *)
 let rot_aux ?(check64 = false) (word : Circuit.Field.t) (bits : int)
     (mode : rot_mode) : Circuit.Field.t * Circuit.Field.t * Circuit.Field.t =
   let open Circuit in
@@ -118,53 +113,53 @@ let rot_aux ?(check64 = false) (word : Circuit.Field.t) (bits : int)
 
   (rotated, excess, shifted)
 
-(* 64-bit Rotation of rot_bits to the `mode` side
- *   Inputs
- *     - check: whether to check the input word is at most 64 bits (default is false)
- *     - word of maximum 64 bits to be rotated
- *     - rot_bits: number of bits to be rotated
- *     - mode: Left or Right
- * Output: rotated word
- *)
+(** 64-bit rotation of [rot_bits] to the [mode] side.
+
+    @param check64 whether to check the input word is at most 64 bits
+                   (default is false)
+    @param word word of maximum 64 bits to be rotated
+    @param rot_bits number of bits to be rotated
+    @param mode Left or Right
+    @return rotated word *)
 let rot64 ?(check64 : bool = false) (word : Circuit.Field.t) (rot_bits : int)
     (mode : rot_mode) : Circuit.Field.t =
   let rotated, _excess, _shifted = rot_aux ~check64 word rot_bits mode in
 
   rotated
 
-(* 64-bit bitwise logical shift of bits to the left side
- * Inputs
- *  - check64: whether to check the input word is at most 64 bits (default is false)
- *  - word of maximum 64 bits to be shifted
- *  - bits: number of bits to be shifted
- * Output: left shifted word (with bits 0s at the least significant positions)
- *)
+(** 64-bit bitwise logical shift of bits to the left side.
+
+    @param check64 whether to check the input word is at most 64 bits
+                   (default is false)
+    @param word word of maximum 64 bits to be shifted
+    @param bits number of bits to be shifted
+    @return left shifted word (with 0s at the least significant positions) *)
 let lsl64 ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
     Circuit.Field.t =
   let _rotated, _excess, shifted = rot_aux ~check64 word bits Left in
 
   shifted
 
-(* 64-bit bitwise logical shift of bits to the right side
-   * Inputs
-   *  - check64: whether to check the input word is at most 64 bits (default is false)
-   *  - word of maximum 64 bits to be shifted
-   *  - bits: number of bits to be shifted
-   * Output: right shifted word (with bits 0s at the most significant positions)
-*)
+(** 64-bit bitwise logical shift of bits to the right side.
+
+    @param check64 whether to check the input word is at most 64 bits
+                   (default is false)
+    @param word word of maximum 64 bits to be shifted
+    @param bits number of bits to be shifted
+    @return right shifted word (with 0s at the most significant positions) *)
 let lsr64 ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
     Circuit.Field.t =
   let _rotated, excess, _shifted = rot_aux ~check64 word bits Right in
 
   excess
 
-(* XOR *)
+(** Boolean XOR of [length] bits.
 
-(* Boolean Xor of length bits
- * input1 and input2 are the inputs to the Xor gate
- * length is the number of bits to Xor
- * len_xor is the number of bits of the lookup table (default is 4)
- *)
+    @param len_xor number of bits of the lookup table (default is 4)
+    @param input1 first input to the XOR gate
+    @param input2 second input to the XOR gate
+    @param length number of bits to XOR
+    @return XOR of input1 and input2 *)
 let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   (* Auxiliar function to compute the next variable for the chain of Xors *)
@@ -343,31 +338,27 @@ let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
   (* Convert back to field *)
   output_xor
 
-(* Boolean Xor of 16 bits
- * This is a special case of Xor for 16 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to Xor together, of maximum 16 bits each.
- * Returns the Xor of the two words.
- *)
+(** Boolean XOR of 16 bits. This is a special case of XOR for 16 bits using a
+    4-bit lookup table. Receives two input words of maximum 16 bits each.
+    Returns the XOR of the two words. *)
 let bxor16 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
     Circuit.Field.t =
   bxor input1 input2 16 ~len_xor:4
 
-(* Boolean Xor of 64 bits
- * This is a special case of Xor for 64 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to Xor together, of maximum 64 bits each.
- * Returns the Xor of the two words.
- *)
+(** Boolean XOR of 64 bits. This is a special case of XOR for 64 bits using a
+    4-bit lookup table. Receives two input words of maximum 64 bits each.
+    Returns the XOR of the two words. *)
 let bxor64 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
     Circuit.Field.t =
   bxor input1 input2 64 ~len_xor:4
 
-(* AND *)
+(** Boolean AND of [length] bits.
 
-(* Boolean And of length bits
- *  input1 and input2 are the two inputs to AND
- *  length is the number of bits to AND
- *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
- *)
+    @param len_xor number of bits of the XOR lookup table (default is 4)
+    @param input1 first input to AND
+    @param input2 second input to AND
+    @param length number of bits to AND
+    @return AND of input1 and input2 *)
 let band ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   let open Circuit in
@@ -399,23 +390,22 @@ let band ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
 
   and_output
 
-(* Boolean And of 64 bits
- * This is a special case of And for 64 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to And together, of maximum 64 bits each.
- * Returns the And of the two words.
- *)
+(** Boolean AND of 64 bits. This is a special case of AND for 64 bits using a
+    4-bit XOR lookup table. Receives two input words of maximum 64 bits each.
+    Returns the AND of the two words. *)
 let band64 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
     Circuit.Field.t =
   band input1 input2 64
 
-(* NOT *)
+(** Boolean NOT of [length] bits with checked length (uses XOR gadgets inside
+    to constrain the length).
 
-(* Boolean Not of length bits for checked length (uses Xor gadgets inside to constrain the length)
- *   - input of word to negate
- *   - length of word to negate
- *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
- * Note that the length needs to be less than the bit length of the field.
- *)
+    Note: the length must be less than the bit length of the field.
+
+    @param len_xor length of the XOR lookup table to use (default 4)
+    @param input word to negate
+    @param length number of bits
+    @return negated word *)
 let bnot_checked ?(len_xor = 4) (input : Circuit.Field.t) (length : int) :
     Circuit.Field.t =
   let open Circuit in
@@ -433,17 +423,21 @@ let bnot_checked ?(len_xor = 4) (input : Circuit.Field.t) (length : int) :
 
   out_not
 
-(* Negates a word of 64 bits with checked length of 64 bits.
- * This means that the bound in lenght is constrained in the circuit. *)
+(** Negates a word of 64 bits with checked length of 64 bits. This means that
+    the bound in length is constrained in the circuit. *)
 let bnot64_checked (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_checked input 64
 
-(* Boolean Not of length bits for unchecked length (uses Generic subtractions inside)
- *  - input of word to negate
- *  - length of word to negate
- * (Note that this can negate two words per row, but it inputs need to be a copy of another
- * variable with a correct length in order to make sure that the length is correct)
- *)
+(** Boolean NOT of [length] bits with unchecked length (uses Generic
+    subtractions inside).
+
+    Note: this can negate two words per row, but inputs need to be a copy of
+    another variable with a correct length in order to ensure the length is
+    correct.
+
+    @param input word to negate
+    @param length number of bits
+    @return negated word *)
 let bnot_unchecked (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
   (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
@@ -464,347 +458,7 @@ let bnot_unchecked (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   (* [2^len - 1] - input = not (input) *)
   Generic.sub all_ones_var input
 
-(* Negates a word of 64 bits, but its length goes unconstrained in the circuit
-   (unless it is copied from a checked length value) *)
+(** Negates a word of 64 bits, but its length goes unconstrained in the circuit
+    (unless it is copied from a checked length value). *)
 let bnot64_unchecked (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_unchecked input 64
-
-(**************)
-(* UNIT TESTS *)
-(**************)
-
-let%test_unit "bitwise rotation gadget" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-
-    (* Helper to test ROT gadget
-     *   Input operands and expected output: word len mode rotated
-     *   Returns unit if constraints are satisfied, error otherwise.
-     *)
-    let test_rot ?cs word length mode result =
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and output *)
-            let word =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string word )
-            in
-            let result =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string result )
-            in
-            (* Use the rot gate gadget *)
-            let output_rot = rot64 word length mode in
-            Field.Assert.equal output_rot result
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *) )
-      in
-      cs
-    in
-    (* Positive tests *)
-    let _cs = test_rot "0" 0 Left "0" in
-    let _cs = test_rot "0" 32 Right "0" in
-    let _cs = test_rot "1" 1 Left "2" in
-    let _cs = test_rot "1" 63 Left "9223372036854775808" in
-    let cs = test_rot "256" 4 Right "16" in
-    (* 0x5A5A5A5A5A5A5A5A is 0xA5A5A5A5A5A5A5A5 both when rotate 4 bits Left or Right*)
-    let _cs =
-      test_rot ~cs "6510615555426900570" 4 Right "11936128518282651045"
-    in
-    let _cs = test_rot "6510615555426900570" 4 Left "11936128518282651045" in
-    let cs = test_rot "1234567890" 32 Right "5302428712241725440" in
-    let _cs = test_rot ~cs "2651214356120862720" 32 Right "617283945" in
-    let _cs = test_rot ~cs "1153202983878524928" 32 Right "268500993" in
-
-    (* Negatve tests *)
-    assert (Common.is_error (fun () -> test_rot "0" 1 Left "1")) ;
-    assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
-    assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ) ;
-  ()
-
-let%test_unit "bitwise shift gadgets" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-
-    (* Helper to test LSL and LSR gadgets
-     *   Input operands and expected output: word len mode shifted
-     *   Returns unit if constraints are satisfied, error otherwise.
-     *)
-    let test_shift ?cs word length mode result =
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and output *)
-            let word =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string word )
-            in
-            let result =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string result )
-            in
-            (* Use the xor gate gadget *)
-            let output_shift =
-              match mode with
-              | Left ->
-                  lsl64 word length
-              | Right ->
-                  lsr64 word length
-            in
-            Field.Assert.equal output_shift result )
-      in
-      cs
-    in
-    (* Positive tests *)
-    let cs1l = test_shift "0" 1 Left "0" in
-    let cs1r = test_shift "0" 1 Right "0" in
-    let _cs = test_shift ~cs:cs1l "1" 1 Left "2" in
-    let _cs = test_shift ~cs:cs1r "1" 1 Right "0" in
-    let _cs = test_shift "256" 4 Right "16" in
-    let _cs = test_shift "256" 20 Right "0" in
-    let _cs = test_shift "6510615555426900570" 16 Right "99344109427290" in
-    (* All 1's word *)
-    let cs_allones =
-      test_shift "18446744073709551615" 15 Left "18446744073709518848"
-    in
-    (* Random value ADCC7E30EDCAC126 -> ADCC7E30 -> EDCAC12600000000*)
-    let _cs = test_shift "12523523412423524646" 32 Right "2915860016" in
-    let _cs =
-      test_shift "12523523412423524646" 32 Left "17134720101237391360"
-    in
-
-    (* Negatve tests *)
-    assert (Common.is_error (fun () -> test_shift "0" 1 Left "1")) ;
-    assert (Common.is_error (fun () -> test_shift "1" 64 Left "1")) ;
-    assert (Common.is_error (fun () -> test_shift ~cs:cs_allones "0" 0 Left "0"))
-    ) ;
-  ()
-
-let%test_unit "bitwise xor gadget" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-
-    (* Helper to test XOR gadget
-     *   Inputs operands and expected output: left_input xor right_input
-     *   Returns true if constraints are satisfied, false otherwise.
-     *)
-    let test_xor ?cs left_input right_input output_xor length =
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and output *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex right_input )
-            in
-            let output_xor =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex output_xor )
-            in
-            (* Use the xor gate gadget *)
-            let result = bxor left_input right_input length in
-
-            (* Check that the result is equal to the expected output *)
-            Field.Assert.equal output_xor result )
-      in
-      cs
-    in
-
-    (* Positive tests *)
-    let cs16 = test_xor "1" "0" "1" 16 in
-    let _cs = test_xor ~cs:cs16 "0" "1" "1" 16 in
-    let _cs = test_xor ~cs:cs16 "2" "1" "3" 16 in
-    let _cs = test_xor ~cs:cs16 "a8ca" "ddd5" "751f" 16 in
-    let _cs = test_xor ~cs:cs16 "0" "0" "0" 8 in
-    let _cs = test_xor ~cs:cs16 "0" "0" "0" 1 in
-    let _cs = test_xor ~cs:cs16 "1" "0" "1" 1 in
-    let _cs = test_xor ~cs:cs16 "0" "0" "0" 4 in
-    let _cs = test_xor ~cs:cs16 "1" "1" "0" 4 in
-    let cs32 = test_xor "bb5c6" "edded" "5682b" 20 in
-    let cs64 =
-      test_xor "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "ffffffffffffffff" 64
-    in
-    let _cs =
-      test_xor ~cs:cs64 "f1f1f1f1f1f1f1f1" "0f0f0f0f0f0f0f0f" "fefefefefefefefe"
-        64
-    in
-    let _cs =
-      test_xor ~cs:cs64 "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4"
-        64
-    in
-
-    (* Negatve tests *)
-    assert (
-      Common.is_error (fun () ->
-          (* Reusing right CS with bad witness *)
-          test_xor ~cs:cs32 "ed1ed1" "ed1ed1" "010101" 20 ) ) ;
-    assert (
-      Common.is_error (fun () ->
-          (* Reusing wrong CS with right witness *)
-          test_xor ~cs:cs32 "1" "1" "0" 16 ) ) ;
-
-    assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1" "0" "1" 0)) ;
-    assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1" "0" "0" 1)) ;
-    assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1111" "2222" "0" 16)) ;
-    assert (Common.is_error (fun () -> test_xor "0" "0" "0" 256)) ;
-    assert (Common.is_error (fun () -> test_xor "0" "0" "0" (-4))) ;
-    assert (
-      Common.is_error (fun () -> test_xor ~cs:cs32 "bb5c6" "edded" "ed1ed1" 20) )
-    ) ;
-  ()
-
-let%test_unit "bitwise and gadget" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-    (* Helper to test AND gadget
-     *   Inputs operands and expected output: left_input and right_input = output
-     *   Returns true if constraints are satisfied, false otherwise.
-     *)
-    let test_and ?cs left_input right_input output_and length =
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex right_input )
-            in
-            let output_and =
-              exists Field.typ ~compute:(fun () ->
-                  Common.field_of_hex output_and )
-            in
-            (* Use the and gate gadget *)
-            let result = band left_input right_input length in
-            Field.Assert.equal output_and result )
-      in
-      cs
-    in
-
-    (* Positive tests *)
-    let cs = test_and "0" "0" "0" 16 in
-    let _cs = test_and ~cs "457" "8ae" "6" 16 in
-    let _cs = test_and ~cs "a8ca" "ddd5" "88c0" 16 in
-    let _cs = test_and "0" "0" "0" 8 in
-    let cs = test_and "1" "1" "1" 1 in
-    let _cs = test_and ~cs "1" "0" "0" 1 in
-    let _cs = test_and ~cs "0" "1" "0" 1 in
-    let _cs = test_and ~cs "0" "0" "0" 1 in
-    let _cs = test_and "f" "f" "f" 4 in
-    let _cs = test_and "bb5c6" "edded" "a95c4" 20 in
-    let cs = test_and "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "0" 64 in
-    let cs =
-      test_and ~cs "385e243cb60654fd" "010fde9342c0d700" "e041002005400" 64
-    in
-    (* Negatve tests *)
-    assert (
-      Common.is_error (fun () ->
-          (* Reusing right CS with wrong witness *) test_and ~cs "1" "1" "0" 20 ) ) ;
-    assert (
-      Common.is_error (fun () ->
-          (* Reusing wrong CS with right witness *) test_and ~cs "1" "1" "1" 1 ) ) ;
-    assert (Common.is_error (fun () -> test_and "1" "1" "0" 1)) ;
-    assert (Common.is_error (fun () -> test_and "ff" "ff" "ff" 7)) ;
-    assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ) ;
-  ()
-
-let%test_unit "bitwise not gadget" =
-  if tests_enabled then (
-    let (* Import the gadget test runner *)
-    open Kimchi_gadgets_test_runner in
-    (* Initialize the SRS cache. *)
-    let () =
-      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-    (* Helper to test NOT gadget with both checked and unchecked length procedures
-     *   Input and expected output and desired length : not(input) = output
-     *   Returns true if constraints are satisfied, false otherwise.
-     *)
-    let test_not ?cs input output length =
-      let cs, _proof_keypair, _proof =
-        Runner.generate_and_verify_proof ?cs (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for input and output *)
-            let input =
-              exists Field.typ ~compute:(fun () -> Common.field_of_hex input)
-            in
-
-            let output =
-              exists Field.typ ~compute:(fun () -> Common.field_of_hex output)
-            in
-
-            (* Use the not gate gadget *)
-            let result_checked = bnot_checked input length in
-            let result_unchecked = bnot_unchecked input length in
-            Field.Assert.equal output result_checked ;
-            Field.Assert.equal output result_unchecked )
-      in
-      cs
-    in
-
-    (* Positive tests *)
-    let _cs = test_not "0" "1" 1 in
-    let _cs = test_not "0" "f" 4 in
-    let _cs = test_not "0" "ff" 8 in
-    let _cs = test_not "0" "7ff" 11 in
-    let cs16 = test_not "0" "ffff" 16 in
-    let _cs = test_not ~cs:cs16 "a8ca" "5735" 16 in
-    let _cs = test_not "bb5c6" "44a39" 20 in
-    let cs64 = test_not "a5a5a5a5a5a5a5a5" "5a5a5a5a5a5a5a5a" 64 in
-    let _cs = test_not ~cs:cs64 "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" 64 in
-    let _cs = test_not ~cs:cs64 "7b3f28d7496d75f0" "84c0d728b6928a0f" 64 in
-    let _cs = test_not ~cs:cs64 "ffffffffffffffff" "0" 64 in
-    let _cs = test_not ~cs:cs64 "00000fffffffffff" "fffff00000000000" 64 in
-    let _cs = test_not ~cs:cs64 "fffffffffffff000" "fff" 64 in
-    let _cs = test_not ~cs:cs64 "0" "ffffffffffffffff" 64 in
-    let _cs = test_not ~cs:cs64 "0" "ffffffffffffffff" 64 in
-    let _cs =
-      test_not
-        "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0"
-        254
-    in
-
-    (* Negative tests *)
-    assert (
-      Common.is_error (fun () ->
-          (* Reusing right CS with bad witness *)
-          test_not ~cs:cs64 "0" "ff" 64 ) ) ;
-    assert (
-      Common.is_error (fun () ->
-          (* Reusing wrong CS with right witness *)
-          test_not ~cs:cs16 "1" "0" 1 ) ) ;
-    assert (Common.is_error (fun () -> test_not "0" "0" 1)) ;
-    assert (Common.is_error (fun () -> test_not "ff" "0" 4)) ;
-    assert (
-      Common.is_error (fun () ->
-          test_not
-            "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
-            "0" 255 ) ) ) ;
-  ()

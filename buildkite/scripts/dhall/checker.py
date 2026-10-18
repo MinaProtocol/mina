@@ -149,7 +149,7 @@ subparsers.add_parser('names')
 args = parser.parse_args()
 
 pipelinesInfo = [PipelineInfoBuilder(args.root, file).build()
-                 for file in os.listdir(path=args.root)]
+                 for file in os.listdir(path=args.root) if file.endswith(".yml")]
 
 if args.cmd == "deps":
 

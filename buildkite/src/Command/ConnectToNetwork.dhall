@@ -4,27 +4,45 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
+let DebianVersions = ../Constants/DebianVersions.dhall
+
 let RunInToolchain = ./RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
-in  { step =
-            \(dependsOn : List Command.TaggedKey.Type)
-        ->  \(mina_suffix : Text)
-        ->  \(testnet : Text)
-        ->  \(wait_between_graphql_poll : Text)
-        ->  \(wait_before_final_check : Text)
-        ->  \(soft_fail : B/SoftFail)
+let Spec =
+      { Type =
+          { dependsOn : List Command.TaggedKey.Type
+          , mina_suffix : Text
+          , mina_profile : Text
+          , testnet : Text
+          , wait_between_graphql_poll : Text
+          , stall_timeout : Text
+          , hard_timeout : Text
+          , soft_fail : B/SoftFail
+          , peer_list_url : Text
+          }
+      , default =
+          { wait_between_graphql_poll = "40s"
+          , stall_timeout = "8min"
+          , hard_timeout = "60min"
+          , soft_fail = B/SoftFail.Boolean False
+          }
+      }
+
+in  { Spec = Spec
+    , step =
+            \(spec : Spec.Type)
         ->  Command.build
               Command.Config::{
               , commands =
-                  RunInToolchain.runInToolchain
-                    ([] : List Text)
-                    "./buildkite/scripts/connect/connect-to-network.sh ${mina_suffix} ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check} "
-              , label = "Connect to ${testnet}"
-              , soft_fail = Some soft_fail
-              , key = "connect-to-${testnet}"
-              , target = Size.Large
-              , depends_on = dependsOn
+                  RunInToolchain.runInDefaultToolchain
+                    DebianVersions.overrideEnvs
+                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --mina-profile ${spec.mina_profile} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --stall-timeout ${spec.stall_timeout} --hard-timeout ${spec.hard_timeout} --peer-list-url ${spec.peer_list_url}"
+              , label = "Connect to ${spec.testnet}"
+              , soft_fail = Some spec.soft_fail
+              , key = "connect-to-${spec.testnet}"
+              , target = Size.Generic
+              , depends_on = spec.dependsOn
               }
     }

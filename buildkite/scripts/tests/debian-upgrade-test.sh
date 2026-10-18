@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+
+# Test script for verifying debian package upgrades work correctly.
+# This test:
+# 1. Installs the current (pre-split) mina-devnet from packages.o1test.net
+# 2. Records config files and version before upgrade
+# 3. Downloads the new debian(s) from Hetzner cache
+# 4. Upgrades to the new layout: the monolithic mina-devnet is replaced by
+#    mina-generic (binaries) + mina-devnet-config (config + service),
+#    which declare Replaces/Breaks against the old mina-devnet.
+# 5. Verifies config files and version after upgrade
+
+set -euox pipefail
+
+CLEAR='\033[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+
+# Configuration - can be overridden via environment variables
+REPO="${REPO:-packages.o1test.net}"
+CODENAME="${CODENAME:-bookworm}"
+CHANNEL="${CHANNEL:-alpha}"
+# PACKAGE is the pre-split package we install from the public repo (step 1) and
+# whose migration we are exercising.
+PACKAGE="${PACKAGE:-mina-devnet}"
+# INSTALL_PACKAGES is the comma-separated set we upgrade TO from cache (step 4).
+# In the split layout the daemon is mina-generic + mina-devnet-config.
+INSTALL_PACKAGES="${INSTALL_PACKAGES:-mina-generic,mina-devnet-config}"
+NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bookworm/mina-generic_*.deb"
+
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
+
+git config --global --add safe.directory /workdir
+source buildkite/scripts/export-git-env-vars.sh
+
+# Where the new debs come from: this build's cache by default, or a directory of
+# debs the job packaged itself when LOCAL_DEB_SOURCE_DIR is set.
+# shellcheck source=buildkite/scripts/debian/fetch_debs.sh
+source ./buildkite/scripts/debian/fetch_debs.sh
+
+
+function log_info() {
+    echo -e "${GREEN}[INFO]${CLEAR} $*"
+}
+
+function log_warn() {
+    echo -e "${YELLOW}[WARN]${CLEAR} $*"
+}
+
+function log_error() {
+    echo -e "${RED}[ERROR]${CLEAR} $*"
+}
+
+function usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Test debian package upgrade from packages.o1test.net to a new version from cache."
+    echo ""
+    echo "Options:"
+    echo "  -r, --repo          Repository URL (default: packages.o1test.net)"
+    echo "  -c, --codename      Debian codename (default: bookworm)"
+    echo "  -C, --channel       Repository channel (default: alpha)"
+    echo "  -p, --package       Pre-split package to install from repo (default: mina-devnet)"
+    echo "  -i, --install-packages  Comma-separated packages to upgrade to (default: mina-generic,mina-devnet-config)"
+    echo "  -n, --new-debian    Path to new debian in cache, used to derive version (required)"
+    echo "  -h, --help          Show this help message"
+    echo ""
+    echo "Example:"
+    echo "  $0 --new-debian 'debians/bookworm/mina-generic_*.deb'"
+}
+
+# Function to extract the first 8 characters of the commit hash from a version string
+get_short_commit() {
+    local version_str="$1"
+    echo "$version_str" | grep -oP '[\da-f]{8,40}' | head -1 | cut -c1-8 || echo "unknown"
+}
+
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -r|--repo)
+            REPO="$2"
+            shift 2
+            ;;
+        -c|--codename)
+            CODENAME="$2"
+            shift 2
+            ;;
+        -C|--channel)
+            CHANNEL="$2"
+            shift 2
+            ;;
+        -p|--package)
+            PACKAGE="$2"
+            shift 2
+            ;;
+        -i|--install-packages)
+            INSTALL_PACKAGES="$2"
+            shift 2
+            ;;
+        -n|--new-debian)
+            NEW_DEBIAN_PATH="$2"
+            shift 2
+            ;;
+        -b|--build-id)
+            BUILDKITE_BUILD_ID="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            log_error "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# Validate required parameters
+if [[ -z "${NEW_DEBIAN_PATH}" ]]; then
+    log_error "New debian path is required. Use --new-debian option."
+    usage
+    exit 1
+fi
+
+if [[ -z "${BUILDKITE_BUILD_ID:-}" ]]; then
+    log_error "BUILDKITE_BUILD_ID must be set (or use --build-id option)"
+    exit 1
+fi
+
+# Detect sudo
+if [[ "${EUID}" -eq 0 ]]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
+
+CONFIG_DIR="/var/lib/coda"
+LOCAL_DEB_DIR="/tmp/debian-upgrade-test"
+
+log_info "=== Debian Upgrade Test ==="
+log_info "Repository: ${REPO}"
+log_info "Codename: ${CODENAME}"
+log_info "Channel: ${CHANNEL}"
+log_info "Package: ${PACKAGE}"
+log_info "New debian path: ${NEW_DEBIAN_PATH}"
+
+# Step 1: Install current mina from packages.o1test.net
+
+./buildkite/scripts/debian/install_official.sh --repo "${REPO}" --codename "${CODENAME}" --channel "${CHANNEL}" --package "${PACKAGE}"
+
+$SUDO apt-get install -y -qq lsb-release ca-certificates wget gnupg
+
+log_info "Available versions of ${PACKAGE}:"
+apt-cache policy "${PACKAGE}"
+
+# Step 2: Record pre-upgrade state
+log_info "--- Step 2: Recording pre-upgrade state ---"
+
+PRE_COMMIT=$(mina --version 2>&1 || echo "version check failed")
+log_info "Pre-upgrade mina version: ${PRE_COMMIT}"
+
+# Extract the first 7 characters of the commit hash
+PRE_COMMIT_SHORT=$(get_short_commit "${PRE_COMMIT}")
+log_info "Pre-upgrade mina short commit: ${PRE_COMMIT_SHORT}"
+
+# List config files before upgrade
+log_info "Config file before upgrade:"
+PRE_CONFIG_FILE=${CONFIG_DIR}/config_${PRE_COMMIT_SHORT}.json
+
+if [[ -f "${PRE_CONFIG_FILE}" ]]; then
+    log_info "Found config file: ${PRE_CONFIG_FILE}"
+    log_info "  - $(basename "$PRE_CONFIG_FILE"): $(stat -c %s "$PRE_CONFIG_FILE") bytes"
+else
+    log_error "No config_${PRE_COMMIT_SHORT}.json file found before upgrade"
+    exit 1
+fi
+
+# Step 3: Download new debian from cache
+log_info "--- Step 3: Downloading new debian from cache ---"
+
+mkdir -p "${LOCAL_DEB_DIR}"
+
+fetch_deb "${LOCAL_DEB_DIR}" "${NEW_DEBIAN_PATH}"
+
+NEW_DEB_FILE=$(ls "${LOCAL_DEB_DIR}"/*.deb 2>/dev/null | head -1)
+if [[ -z "${NEW_DEB_FILE}" ]]; then
+    log_error "No .deb file found in ${LOCAL_DEB_DIR}"
+    exit 1
+fi
+
+log_info "Downloaded from cache: ${NEW_DEB_FILE}"
+
+# Extract version from the downloaded deb filename to pass to install.sh.
+# Filename format: {package}_{version}_{arch}.deb — grab the middle field so
+# this works regardless of which package name we derive the version from.
+NEW_DEB_BASENAME=$(basename "${NEW_DEB_FILE}")
+FORCE_VERSION=$(echo "${NEW_DEB_BASENAME}" | sed -E 's/^.*_([^_]+)_[^_]+\.deb$/\1/')
+export FORCE_VERSION
+log_info "Extracted version from deb: ${FORCE_VERSION}"
+
+# Step 4: Upgrade to the new (split) package layout.  install.sh pulls these
+# from the build cache at ${FORCE_VERSION}; mina-generic/-config declare
+# Replaces/Breaks on the old mina-devnet, so apt removes it during the upgrade.
+log_info "--- Step 4: Upgrading package(s): ${INSTALL_PACKAGES} ---"
+
+if [[ -n "$SUDO" ]]; then
+    source buildkite/scripts/debian/install.sh "${INSTALL_PACKAGES}" 1
+else
+    source buildkite/scripts/debian/install.sh "${INSTALL_PACKAGES}"
+fi
+
+# Step 5: Verify post-upgrade state
+log_info "--- Step 5: Verifying post-upgrade state ---"
+
+POST_COMMIT=$(mina --version 2>&1)
+log_info "Post-upgrade mina version: ${POST_COMMIT}"
+
+POST_COMMIT_SHORT=$(get_short_commit "${POST_COMMIT}")
+log_info "Post-upgrade commit: ${POST_COMMIT_SHORT}"
+
+# Function to verify file existence and log details
+# Arguments:
+#   1: File path
+#   2: Human-readable name/description for error messages
+verify_required_file() {
+    local file_path="$1"
+    local description="$2"
+
+    if [[ -f "$file_path" ]]; then
+        log_info "Found ${description}: ${file_path}"
+        log_info "  - $(basename "$file_path"): $(stat -c %s "$file_path") bytes"
+    else
+        log_error "No ${file_path} file found after upgrade (${description})"
+        exit 1
+    fi
+}
+
+# --- Usage ---
+
+POST_CONFIG_FILE="${CONFIG_DIR}/config_${POST_COMMIT_SHORT}.json"
+verify_required_file "$POST_CONFIG_FILE" "config file"
+
+verify_required_file "/etc/coda/build_config/PROFILE" "profile file"
+
+log_info "=== Debian Upgrade Test PASSED ==="
+log_info "Successfully upgraded from ${PRE_COMMIT} to ${POST_COMMIT}"
+
+# Cleanup
+rm -rf "${LOCAL_DEB_DIR}"

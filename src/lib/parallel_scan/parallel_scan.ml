@@ -194,6 +194,13 @@ module Space_partition = struct
   end]
 end
 
+(**Per-tree counts for the daemon's gauges, oldest tree first.*)
+module Tree_metrics = struct
+  type t =
+    { available_space : int; base_jobs_todo : int; merge_jobs_todo : int }
+  [@@deriving equal, sexp]
+end
+
 (**View of a job for json output*)
 module Job_view = struct
   module Extra = struct
@@ -1326,21 +1333,14 @@ let incr_sequence_no : type a b. (a, b) t -> (unit, a, b) State_or_error.t =
     put state
   else put { state with curr_job_seq_no = state.curr_job_seq_no + 1 }
 
-let update_metrics t =
-  Or_error.try_with (fun () ->
-      List.rev (Mina_stdlib.Nonempty_list.to_list t.trees)
-      |> List.iteri ~f:(fun i t ->
-             let name = sprintf "tree%d" i in
-             Mina_metrics.(
-               Gauge.set (Scan_state_metrics.scan_state_available_space ~name))
-               (Int.to_float @@ Tree.available_space t) ;
-             let base_job_count, merge_job_count = Tree.todo_job_count t in
-             Mina_metrics.(
-               Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name))
-               (Int.to_float @@ base_job_count) ;
-             Mina_metrics.(
-               Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
-               (Int.to_float @@ merge_job_count) ) )
+let metrics t =
+  Mina_stdlib.Nonempty_list.to_list t.trees
+  |> List.rev_map ~f:(fun tree ->
+         let base_jobs_todo, merge_jobs_todo = Tree.todo_job_count tree in
+         { Tree_metrics.available_space = Tree.available_space tree
+         ; base_jobs_todo
+         ; merge_jobs_todo
+         } )
 
 let update_helper :
        data:'base list
@@ -1429,25 +1429,6 @@ let free_space t = t.max_base_jobs
 let last_emitted_value t = t.acc
 
 let current_job_sequence_number t = t.curr_job_seq_no
-
-let base_jobs_on_latest_tree t =
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  List.filter_map
-    (Tree.jobs_on_level ~depth ~level:depth
-       (Mina_stdlib.Nonempty_list.head t.trees) )
-    ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
-
-(* 0-based indexing, so 0 indicates next-to-latest tree *)
-let base_jobs_on_earlier_tree t ~index =
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  let earlier_trees = Mina_stdlib.Nonempty_list.tail t.trees in
-  match List.nth earlier_trees index with
-  | None ->
-      []
-  | Some tree ->
-      let jobs = Tree.jobs_on_level ~depth ~level:depth tree in
-      List.filter_map jobs ~f:(fun job ->
-          match job with Base d -> Some d | Merge _ -> None )
 
 let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
  fun t ->

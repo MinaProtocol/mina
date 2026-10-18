@@ -28,7 +28,7 @@
   blake2
   error_json
   child_processes
-  file_system
+  mina_stdlib_unix
   logger
   lmdb_storage
   network_peer
@@ -50,10 +50,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_mina
-   ppx_version
-   ppx_jane
-   ppx_deriving.std
-   ppx_let
-   ppx_deriving_yojson)))
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))

@@ -152,7 +152,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
-    (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
+    (* this check checks if every single peer in the network is connected to
+       every other peer, in graph theory this network would be a complete graph.
+       this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
       let get_node_infra_id p =
@@ -187,13 +189,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~connected_peers )
 
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
-    (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
+    (* this check checks that the network does NOT become partitioned into
+       isolated subgraphs, even if n nodes are hypothetically removed from the
+       network.*)
     let _, responses = List.unzip nodes_and_responses in
     let () =
       Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
           G.output_graph c (graph_of_adjacency_list responses) )
     in
-    (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
+    (* Check that the network cannot be disconnected by removing up to
+       max_disconnections number of nodes. *)
     match
       Mina_stdlib.Nat.take
         (Mina_stdlib.Graph_algorithms.connectivity (module String) responses)
@@ -410,33 +415,69 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ]
       ~f:Fn.id
 
-  (* [logs] is a string containing the entire replayer output *)
+  (* [logs] is a string containing the entire replayer --log-json output *)
   let check_replayer_logs ~logger logs =
-    let error_log_substring = "Error" in
-    let fatal_log_substring = "Fatal" in
-    let info_log_substring = "Info" in
-    let split_logs = String.split logs ~on:'\n' in
-    let error_logs =
-      split_logs
-      |> List.filter ~f:(fun log ->
-             String.is_substring log ~substring:error_log_substring
-             || String.is_substring log ~substring:fatal_log_substring )
+    let open Yojson.Safe.Util in
+    let replay_errors, block_applieds, replay_done_blocks =
+      String.split logs ~on:'\n'
+      |> List.filter ~f:(Fn.non String.is_empty)
+      |> List.fold ~init:([], 0, None)
+           ~f:(fun (errors, n_applied, done_blocks) line ->
+             let json = Yojson.Safe.from_string line in
+             let level = member "level" json |> to_string in
+             let errors' =
+               if String.equal level "Error" || String.equal level "Fatal" then
+                 line :: errors
+               else errors
+             in
+             let metadata_kv =
+               match member "metadata" json with
+               | `Assoc kvs ->
+                   kvs
+               | _ ->
+                   []
+               | exception _ ->
+                   []
+             in
+             let find = List.Assoc.find metadata_kv ~equal:String.equal in
+             let n_applied' =
+               match find "replayer_event" with
+               | Some (`String "block_applied") ->
+                   n_applied + 1
+               | _ ->
+                   n_applied
+             in
+             let done_blocks' =
+               match find "replayer_event" with
+               | Some (`String "replay_done") -> (
+                   match find "blocks_replayed" with
+                   | Some (`Int n) ->
+                       Some n
+                   | _ ->
+                       None )
+               | _ ->
+                   done_blocks
+             in
+             (errors', n_applied', done_blocks') )
     in
-    let info_logs =
-      split_logs
-      |> List.filter ~f:(fun log ->
-             String.is_substring log ~substring:info_log_substring )
-    in
-    if Mina_stdlib.List.Length.Compare.(info_logs < 25) then
-      Malleable_error.hard_error_string
-        (sprintf "Replayer output contains suspiciously few (%d) Info logs"
-           (List.length info_logs) )
-    else if List.is_empty error_logs then (
-      [%log info] "The replayer encountered no errors" ;
-      Malleable_error.return () )
-    else
-      let error = String.concat error_logs ~sep:"\n  " in
+    if not (List.is_empty replay_errors) then
+      let error = String.concat (List.rev replay_errors) ~sep:"\n  " in
       Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error)
+    else
+      match replay_done_blocks with
+      | None ->
+          Malleable_error.hard_error_string
+            "No replay_done event found in replayer output"
+      | Some expected ->
+          if block_applieds <> expected then
+            Malleable_error.hard_error_string
+              (sprintf
+                 "Replayer block_applied count %d does not match expected %d \
+                  from replay_done event"
+                 block_applieds expected )
+          else (
+            [%log info] "The replayer encountered no errors" ;
+            Malleable_error.return expected )
 
   let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment : Mina_base.Account_timing.t =

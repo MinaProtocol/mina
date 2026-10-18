@@ -247,6 +247,120 @@ module Runtime = struct
         register default info collector )
 end
 
+module Process_memory = struct
+  let subsystem = "Process_memory"
+
+  (* Read RSS (Resident Set Size) from /proc/<pid>/status *)
+  let read_rss_kb pid_opt =
+    try
+      let proc_file =
+        match pid_opt with
+        | None ->
+            "/proc/self/status"
+        | Some pid ->
+            Printf.sprintf "/proc/%d/status" (Pid.to_int pid)
+      in
+      let ic = In_channel.create proc_file in
+      let rec find_vmrss () =
+        let%bind.Option line = In_channel.input_line ic in
+        match
+          Option.try_with (fun () -> Scanf.sscanf line "VmRSS: %f" Fn.id)
+        with
+        | None ->
+            find_vmrss ()
+        | Some kb ->
+            Some kb
+      in
+      let result = find_vmrss () in
+      In_channel.close ic ; result
+    with _ -> None
+
+  (* Functor to create RSS gauge for a specific process type *)
+  module Make_rss_gauge (Config : sig
+    val process_name : string
+
+    val is_daemon : bool
+  end) =
+  struct
+    let process_pid : Pid.t option ref = ref None
+
+    let gauge =
+      let name = Printf.sprintf "rss_%s" Config.process_name in
+      let help =
+        Printf.sprintf "Resident Set Size (RSS) in kilobytes for %s process"
+          Config.process_name
+      in
+      Gauge.v name ~help ~namespace ~subsystem
+
+    let set_pid pid = process_pid := Some pid
+
+    let clear_pid () =
+      process_pid := None ;
+      Gauge.set gauge 0.
+
+    let update () =
+      if Config.is_daemon || Option.is_some !process_pid then
+        Option.iter (read_rss_kb !process_pid) ~f:(Gauge.set gauge)
+  end
+
+  module Daemon = Make_rss_gauge (struct
+    let process_name = "daemon"
+
+    let is_daemon = true
+  end)
+
+  module Prover = Make_rss_gauge (struct
+    let process_name = "prover"
+
+    let is_daemon = false
+  end)
+
+  module Verifier = Make_rss_gauge (struct
+    let process_name = "verifier"
+
+    let is_daemon = false
+  end)
+
+  module Snark_worker = Make_rss_gauge (struct
+    let process_name = "snark_worker"
+
+    let is_daemon = false
+  end)
+
+  module Uptime_snark_worker = Make_rss_gauge (struct
+    let process_name = "uptime_snark_worker"
+
+    let is_daemon = false
+  end)
+
+  module Vrf_evaluator = Make_rss_gauge (struct
+    let process_name = "vrf_evaluator"
+
+    let is_daemon = false
+  end)
+
+  module Libp2p_helper = Make_rss_gauge (struct
+    let process_name = "libp2p_helper"
+
+    let is_daemon = false
+  end)
+
+  (* Update interval for RSS metrics *)
+  let rss_update_interval_mins = ref 1.
+
+  (* Background loop to update all RSS metrics periodically *)
+  let rec update_rss_metrics () =
+    let%bind () = after (Time_ns.Span.of_min !rss_update_interval_mins) in
+    Daemon.update () ;
+    Prover.update () ;
+    Verifier.update () ;
+    Snark_worker.update () ;
+    Uptime_snark_worker.update () ;
+    Vrf_evaluator.update () ;
+    Libp2p_helper.update () ;
+    update_rss_metrics ()
+end
+
 module Cryptography = struct
   let subsystem = "Cryptography"
 
@@ -273,11 +387,11 @@ module Cryptography = struct
     let help = "time elapsed while doing base proof for a zkapp transaction" in
     Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
 
-  let snark_work_base_time_sec =
+  let snark_work_nonzkapp_base_time_sec =
     let help =
       "time elapsed while doing base proof for a non-zkapp transaction"
     in
-    Counter.v "snark_work_base_time_sec" ~help ~namespace ~subsystem
+    Counter.v "snark_work_nonzkapp_base_time_sec" ~help ~namespace ~subsystem
 
   let snark_work_zkapp_base_submissions =
     let help =
@@ -285,11 +399,11 @@ module Cryptography = struct
     in
     Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
 
-  let snark_work_base_submissions =
+  let snark_work_nonzkapp_base_submissions =
     let help =
       "Number of base transactions snarks for non-zkapp transactions submitted"
     in
-    Counter.v "snark_work_base_submissions" ~help ~namespace ~subsystem
+    Counter.v "snark_work_nonzkapp_base_submissions" ~help ~namespace ~subsystem
 
   let zkapp_transaction_length =
     let help = "Number of updates in a zkapp transaction" in
@@ -1712,14 +1826,27 @@ type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
   O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
+  O1trace.background_thread "collect_rss_metrics"
+    Process_memory.update_rss_metrics ;
   O1trace.thread "serve_metrics"
     (generic_server ?forward_uri ~port ~logger
        ~registry:CollectorRegistry.default )
 
 module Archive = struct
+  (* How long the archive held one block ingest request, in milliseconds.
+     The interesting range is wide: an idle archive answers in about 0 ms,
+     while the daemon that sent the block gives up at the RPC heartbeat
+     timeout of 60 s. Buckets 1, 4, 16, ... 16384 ms cover both ends. *)
+  module Ingest_duration_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1. 4. 8
+  end)
+
   type t =
     { registry : CollectorRegistry.t
     ; gauge_metrics : (string, Gauge.t) Hashtbl.t
+    ; ingest_duration_ms : string -> Ingest_duration_histogram.t
+          (** Keyed by the source that sent the block: see
+              {!Mina_metrics.Archive.ingest_duration_ms}. *)
     }
 
   let subsystem = "Archive"
@@ -1752,6 +1879,18 @@ module Archive = struct
     let name = "missing_blocks" in
     find_or_add t ~name ~help ~subsystem
 
+  (** [ingest_duration_ms t source] is the histogram of how long the archive
+      held an ingest request from [source], which names the RPC that carried
+      the block: "diff" for the daemon feed, "precomputed" or "extensional"
+      for a block pushed by a client.
+
+      This is the time the sender waits: from accepting the call until the
+      ingest loop takes the block off its queue. It is the time spent
+      queueing behind blocks already being written, and does not include the
+      block's own write. Each source has its own queue, so one source does
+      not queue behind another. *)
+  let ingest_duration_ms t = t.ingest_duration_ms
+
   let create_archive_server ?forward_uri ~port ~logger () =
     let open Async_kernel.Deferred.Let_syntax in
     let archive_registry = CollectorRegistry.create () in
@@ -1760,6 +1899,13 @@ module Archive = struct
     in
     { registry = archive_registry
     ; gauge_metrics = Hashtbl.create (module String)
+    ; ingest_duration_ms =
+        Ingest_duration_histogram.v_label ~label_name:"source"
+          ~registry:archive_registry
+          ~help:
+            "Time a block ingest request waited before the archive took the \
+             block off its queue, in milliseconds, by the source that sent it"
+          ~namespace ~subsystem "ingest_duration_ms"
     }
 end
 

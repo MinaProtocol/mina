@@ -1,34 +1,36 @@
+-- block-prod-prio runs only on demand, when RUN_OPT_TESTS is set in the
+-- environment that generates the pipeline. It became optional in 54a718e25c
+-- (2022-03) because it failed and took more than an hour to run.
+
 let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
+
+let Command = ../../Command/Base.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
+let IntegrationImages = ../../Constants/IntegrationImages.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let dependsOn = IntegrationImages.dependsOn
 
-let Network = ../../Constants/Network.dhall
+let runOptionalTests =
+      merge
+        { Some = \(_ : Text) -> True, None = False }
+        (Some env:RUN_OPT_TESTS as Text ? None Text)
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let optionalSteps =
+            if runOptionalTests
 
-let dependsOn =
-        Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
-          Artifacts.Type.Daemon
-      # Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
-          Artifacts.Type.Archive
+      then  [ TestExecutive.executeDocker "block-prod-prio" dependsOn ]
+
+      else  [] : List Command.Type
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -39,8 +41,10 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
+          , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
-              (S.contains "buildkite/scripts/run-test-executive-local")
+              (S.contains "buildkite/scripts/run-test-executive-docker")
+          , S.strictlyStart (S.contains "buildkite/scripts/apps")
           ]
         , path = "Test"
         , name = "TestnetIntegrationTests"
@@ -49,21 +53,22 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
-        , mode = PipelineMode.Type.Stable
+        , scope = PipelineScope.AllButPullRequest
         }
       , steps =
-        [ TestExecutive.executeLocal "block-prod-prio" dependsOn
-        , TestExecutive.executeLocal "block-reward" dependsOn
-        , TestExecutive.executeLocal "chain-reliability" dependsOn
-        , TestExecutive.executeLocal "epoch-ledger" dependsOn
-        , TestExecutive.executeLocal "gossip-consis" dependsOn
-        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
-        , TestExecutive.executeLocal "payments" dependsOn
-        , TestExecutive.executeLocal "peers-reliability" dependsOn
-        , TestExecutive.executeLocal "slot-end" dependsOn
-        , TestExecutive.executeLocal "verification-key" dependsOn
-        , TestExecutive.executeLocal "zkapps" dependsOn
-        , TestExecutive.executeLocal "zkapps-timing" dependsOn
-        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
-        ]
+            [ TestExecutive.executeDocker "block-reward" dependsOn
+            , TestExecutive.executeDocker "chain-reliability" dependsOn
+            , TestExecutive.executeDocker "epoch-ledger" dependsOn
+            , TestExecutive.executeDocker "genesis-export" dependsOn
+            , TestExecutive.executeDocker "gossip-consis" dependsOn
+            , TestExecutive.executeDocker "medium-bootstrap" dependsOn
+            , TestExecutive.executeDocker "payments" dependsOn
+            , TestExecutive.executeDocker "peers-reliability" dependsOn
+            , TestExecutive.executeDocker "slot-end" dependsOn
+            , TestExecutive.executeDocker "verification-key" dependsOn
+            , TestExecutive.executeDocker "zkapps" dependsOn
+            , TestExecutive.executeDocker "zkapps-timing" dependsOn
+            , TestExecutive.executeDocker "zkapps-nonce" dependsOn
+            ]
+          # optionalSteps
       }

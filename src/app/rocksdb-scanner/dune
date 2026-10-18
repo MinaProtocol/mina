@@ -1,0 +1,15 @@
+(executable
+ (package rocksdb_scanner)
+ (name rocksdb_scanner)
+ (public_name mina_rocksdb_scanner)
+ (modes native)
+ (libraries
+  async
+  core
+  hex
+  logger
+  rocksdb)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version)))

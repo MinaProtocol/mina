@@ -17,6 +17,7 @@ module Config = struct
     ; t.postgres_uri
     ; "--server-port"
     ; string_of_int t.server_port
+    ; "--log-json"
     ]
 
   let create ~config_file ~postgres_uri ~server_port =
@@ -34,6 +35,7 @@ module Paths = struct
   let official_name = "mina-archive"
 end
 
+module Scripts = Archive_scripts
 module Executor = Executor.Make (Paths)
 
 type t = { config : Config.t; executor : Executor.t }
@@ -53,21 +55,31 @@ module Process = struct
   *)
   let force_kill t = Utils.force_kill t.process
 
-  (** [start_logging t] starts logging the stdout of the given process [t].
+  (** [start_logging t ~log_file] starts logging the stdout of the given process [t].
     It creates a logger and asynchronously iterates over the stdout pipe of the process,
     logging each line with a debug level and attaching the stdout content as metadata.
+    Also writes the output to the specified log file.
 
     @param t The process whose stdout will be logged.
+    @param log_file The filename where stdout will be written.
   *)
-  let start_logging t =
+  let start_logging t ~log_file =
     let logger = Logger.create () in
     don't_wait_for
     @@ Pipe.iter
-         (Process.stdout t.process |> Reader.pipe)
+         (Process.stdout t.process |> Reader.lines)
          ~f:(fun stdout ->
+           let%bind () =
+             Writer.with_file log_file ~append:true ~f:(fun writer ->
+                 Writer.write_line writer stdout ;
+                 Writer.flushed writer )
+           in
            return
            @@ [%log debug] "Archive stdout: $stdout"
                 ~metadata:[ ("stdout", `String stdout) ] )
+
+  let get_memory_usage_mib t =
+    Utils.get_memory_usage_mib @@ (Process.pid t.process |> Pid.to_int)
 end
 
 (** [start t] starts the archive process using the given configuration [t].
@@ -79,9 +91,11 @@ let start t =
   let open Deferred.Let_syntax in
   let args = Config.to_args t.config in
   let%bind _, process = Executor.run_in_background t.executor ~args () in
-
-  (* TODO: wait until ready *)
-  Core.Unix.sleep 5 ;
-
-  let archive_process : Process.t = { process; config = t.config } in
-  Deferred.return archive_process
+  (* Callers that need to gate on archive readiness must use
+     [Archive_healthcheck.wait_db_and_server_ready] rather than relying
+     on this fixed sleep: on a slow agent the archive takes longer than
+     5 s to start listening, and a block sent before then is silently
+     lost.  [wait_db_ready] alone is not a gate either — the schema is
+     loaded before this process starts. *)
+  let%map () = after (Time.Span.of_sec 5.) in
+  Process.{ process; config = t.config }

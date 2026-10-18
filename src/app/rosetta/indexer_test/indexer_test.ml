@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 
-type async_pool = (Caqti_async.connection, Caqti_error.t) Caqti_async.Pool.t
+type async_pool = (Caqti_async.connection, Caqti_error.t) Mina_caqti.Pool.t
 
 type pool = { uri : Uri.t; pool : async_pool }
 
@@ -14,7 +14,7 @@ let archive_uri_arg =
       let uri = Uri.of_string s in
       let%map pool =
         Result.map_error ~f:(fun e -> `Msg (Caqti_error.show e))
-        @@ Caqti_async.connect_pool uri
+        @@ Mina_caqti.connect_pool uri
       in
       { uri; pool }
     in
@@ -31,7 +31,7 @@ let ok_or_failwith show result =
 
 let with_db pool f =
   let open Deferred.Let_syntax in
-  Caqti_async.Pool.use (fun db -> f db) pool >>| ok_or_failwith Caqti_error.show
+  Mina_caqti.Pool.use (fun db -> f db) pool >>| ok_or_failwith Caqti_error.show
 
 module Ops = Lib.Search.Transactions_info.T (Deferred.Result)
 
@@ -85,7 +85,7 @@ module Test_values = struct
     type t
 
     val get_values :
-      Caqti_async.connection -> (t T.t, Caqti_error.t) Deferred.Result.t
+      (module Mina_caqti.CONNECTION) -> (t T.t, Caqti_error.t) Deferred.Result.t
   end) =
   struct
     type t = M.t
@@ -120,26 +120,26 @@ module Test_values = struct
   module Txn_hash = Make (struct
     type t = string
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query table =
         [%string "SELECT hash FROM %{table} ORDER BY RANDOM() LIMIT 1000"]
       in
       let%bind user_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "user_commands" )
           ()
       in
       let%bind internal_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "internal_commands" )
           ()
       in
       let%map zkapp_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "zkapp_commands" )
           ()
       in
@@ -155,9 +155,9 @@ module Test_values = struct
           Result.return (pk, token_id) )
         ~decode:(fun (pk, token_id) ->
           Result.return (`Pk pk, `Token_id token_id) )
-        Caqti_type.(tup2 string string)
+        Caqti_type.(t2 string string)
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query =
         [%string
@@ -171,7 +171,7 @@ module Test_values = struct
       |sql}]
       in
       let%map user_commands =
-        Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
+        Conn.collect_list (Mina_caqti.collect_req Caqti_type.unit typ query) ()
       in
       let internal_commands = user_commands in
       let zkapp_commands = user_commands in
@@ -211,7 +211,7 @@ module Test_values = struct
         ~decode:(fun pk -> Result.return (`Pk pk))
         Caqti_type.string
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query =
         [%string
@@ -223,7 +223,7 @@ module Test_values = struct
       |sql}]
       in
       let%map user_commands =
-        Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
+        Conn.collect_list (Mina_caqti.collect_req Caqti_type.unit typ query) ()
       in
       let internal_commands = user_commands in
       let zkapp_commands = user_commands in
@@ -248,11 +248,11 @@ module Test_values = struct
   module Max_block = struct
     type t = int64
 
-    let deferred_generator _ (module Conn : Caqti_async.CONNECTION) =
+    let deferred_generator _ (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let%map max_height =
         Conn.find
-          (Caqti_request.find Caqti_type.unit Caqti_type.int64
+          (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
              "SELECT MAX(height) FROM blocks" )
           ()
       in
@@ -293,7 +293,7 @@ module Make (T : sig
 
   val deferred_generator :
        [ `User_commands | `Internal_commands | `Zkapp_commands ]
-    -> Caqti_async.connection
+    -> (module Mina_caqti.CONNECTION)
     -> (t Quickcheck.Generator.t, Caqti_error.t) Deferred.Result.t
 end) (I : sig
   type t = T.t
@@ -506,10 +506,10 @@ module Account_identifier = struct
           |sql}]
       in
       let%map values =
-        with_db pool (fun (module Conn : Caqti_async.CONNECTION) ->
+        with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
             Conn.collect_list
-              (Caqti_request.collect Caqti_type.unit
-                 Caqti_type.(tup2 string string)
+              (Mina_caqti.collect_req Caqti_type.unit
+                 Caqti_type.(t2 string string)
                  query )
               () )
       in
@@ -801,6 +801,141 @@ module Offset_limit = struct
       ] )
 end
 
+(* The two zkApp regressions below build the exact archive they need with
+   Synthetic_archive, each in a database of its own on the
+   indexer's server. *)
+module B = Synthetic_archive
+
+let with_built_archive ~(pool : pool) ~name scenario f =
+  B.Db.with_fresh ~server_uri:pool.uri ~name (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize scenario db in
+      let%map.Deferred result =
+        B.Db.with_connection db (fun conn -> f conn built)
+      in
+      Ok result )
+  >>| Or_error.ok_exn
+
+let zkapp_commands_of_block (module Conn : Mina_caqti.CONNECTION) block_id =
+  Lib.Block.Sql.Zkapp_commands.run (module Conn) block_id
+  >>| ok_or_failwith Caqti_error.show
+  >>| Lib.Block.Sql.Zkapp_commands.to_command_infos
+
+module Zkapp_account_update_multiplicity = struct
+  (* Regression test for the zkApp [= ANY (zkapp_account_updates_ids)] bug: when a
+     zkApp command's account-updates array repeats an id (identical account
+     updates share one zkapp_account_update row), the /block query must still
+     produce one account update -- and hence one balance-change operation -- per
+     array element; the buggy [= ANY] join collapses the repeat to one. *)
+  let test pool =
+    let open Deferred.Let_syntax in
+    let s = B.create () in
+    let payer = B.account s "payer" in
+    let block = B.block s ~name:"block" ~height:1 Canonical in
+    let update = B.account_update ~balance_change:1 (B.account s "zkapp") in
+    let command =
+      B.zkapp_command s ~name:"repeated-update" ~fee_payer:payer
+        ~account_updates:[ update; update ]
+        ~in_:[ (block, Applied) ]
+    in
+    let%map account_updates =
+      with_built_archive ~pool ~name:"test_indexer_zkapp_update_multiplicity" s
+        (fun conn built ->
+          let%map commands =
+            zkapp_commands_of_block conn (B.block_id built block)
+          in
+          let info =
+            List.find_exn commands ~f:(fun info ->
+                String.equal info.Lib.Commands_common.Zkapp_command_info.hash
+                  (B.zkapp_command_hash command) )
+          in
+          info.Lib.Commands_common.Zkapp_command_info.account_updates )
+    in
+    Alcotest.(check int)
+      "one account update per zkapp_account_updates_ids element" 2
+      (List.length account_updates)
+
+  let test_suite =
+    let open Alcotest_async in
+    ( "zkapp-account-update-multiplicity"
+    , [ test_case ~timeout:(sec 60.)
+          "duplicate account-update id emits one op per occurrence" `Quick test
+      ] )
+end
+
+module Zkapp_account_creation_fee = struct
+  (* Regression test for the two ways a zkApp command can pay the account-creation
+     fee for an account it creates. The discriminator is the created account's own
+     [implicit_account_creation_fee] flag:
+     - flag SET: the ledger charged the fee to that account update by shrinking its
+       own [balance_change], so the final balance is [balance_change - fee]. Rosetta
+       must emit an [account_creation_fee_via_zkapp] op, else it over-reports by the
+       fee.
+     - flag UNSET: the fee is funded by *other* account updates' negative balance
+       changes (already emitted as [zkapp_balance_update] ops) and the created
+       account's final balance is exactly its [balance_change]. Rosetta must emit NO
+       fee op -- emitting one double-counts the fee and, whenever the created account's
+       [balance_change] is 0, drives its Rosetta balance negative and aborts check:data.
+     Both commands land in the same block, so one /block query exercises both. *)
+  let test pool =
+    let open Deferred.Let_syntax in
+    let s = B.create () in
+    let payer = B.account s "payer" in
+    let implicit = B.account s "created-implicit-fee" in
+    let funded = B.account s "created-funded-fee" in
+    let block = B.block s ~name:"block" ~height:1 Canonical in
+    let created account ~implicit_account_creation_fee name =
+      let (_ : B.zkapp_command) =
+        B.zkapp_command s ~name ~fee_payer:payer
+          ~account_updates:
+            [ B.account_update ~implicit_account_creation_fee account ]
+          ~in_:[ (block, Applied) ]
+      in
+      B.account_created s block account
+    in
+    created implicit ~implicit_account_creation_fee:true "implicit-fee" ;
+    created funded ~implicit_account_creation_fee:false "funded-fee" ;
+    let%bind commands =
+      with_built_archive ~pool ~name:"test_indexer_zkapp_account_creation_fee" s
+        (fun conn built ->
+          zkapp_commands_of_block conn (B.block_id built block) )
+    in
+    let module Zkapp_ops =
+      Lib.Commands_common.Zkapp_command_info.T (Deferred.Result) in
+    let%map ops =
+      Deferred.List.concat_map commands ~f:(fun command ->
+          Zkapp_ops.to_operations command
+          >>| ok_or_failwith Rosetta_lib.Errors.show )
+    in
+    let creation_fee_ops_for account =
+      List.count ops ~f:(fun op ->
+          String.equal op.Rosetta_models.Operation._type
+            "account_creation_fee_via_zkapp"
+          && Option.value_map op.Rosetta_models.Operation.account ~default:false
+               ~f:(fun a ->
+                 String.equal a.Rosetta_models.Account_identifier.address
+                   (B.public_key account) ) )
+    in
+    Alcotest.(check int)
+      "one account_creation_fee_via_zkapp op when the created account pays the \
+       fee implicitly"
+      1
+      (creation_fee_ops_for implicit) ;
+    Alcotest.(check int)
+      "no account_creation_fee_via_zkapp op when the fee is funded by another \
+       account update"
+      0
+      (creation_fee_ops_for funded)
+
+  let test_suite =
+    let open Alcotest_async in
+    ( "zkapp-account-creation-fee"
+    , [ test_case ~timeout:(sec 60.)
+          "fee op emitted only for an implicitly-charged created account" `Quick
+          test
+      ] )
+end
+
 let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
       Alcotest_async.(
@@ -813,4 +948,6 @@ let () =
           ; Op_type.test_suite
           ; Max_block.test_suite
           ; Offset_limit.test_suite
+          ; Zkapp_account_update_multiplicity.test_suite
+          ; Zkapp_account_creation_fee.test_suite
           ]) )

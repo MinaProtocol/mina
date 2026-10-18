@@ -17,9 +17,9 @@ end
 module type PathFinder = sig
   module Paths : AppPaths
 
-  val standalone_path : string option Deferred.t
+  val standalone_path : unit -> string option Deferred.t
 
-  val standalone_path_exn : string Deferred.t
+  val standalone_path_exn : unit -> string Deferred.t
 end
 
 (* application ran inside docker container *)
@@ -33,9 +33,6 @@ let logger = Logger.create ()
 module Make_PathFinder (P : AppPaths) = struct
   module Paths = P
 
-  let paths =
-    Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH")
-
   let built_name = Printf.sprintf "_build/default/%s" P.dune_name
 
   let exists_at_path path prefix =
@@ -45,21 +42,23 @@ module Make_PathFinder (P : AppPaths) = struct
     | _ ->
         Deferred.return None
 
-  let standalone_path =
+  (* looked up on use: at module load it would run (and, for the _exn form,
+     raise) in every program that merely links an app's module *)
+  let standalone_path () =
     match%bind Sys.file_exists built_name with
     | `Yes ->
         Deferred.return (Some built_name)
     | _ -> (
         match%bind
-          Deferred.List.find_map ~f:(exists_at_path P.official_name) paths
+          Deferred.List.find_map ~f:(exists_at_path P.official_name) Utils.paths
         with
         | Some _ ->
             Deferred.return (Some P.official_name)
         | _ ->
             Deferred.return None )
 
-  let standalone_path_exn =
-    let%bind path = standalone_path in
+  let standalone_path_exn () =
+    let%bind path = standalone_path () in
     match path with
     | Some p ->
         Deferred.return p
@@ -128,12 +127,12 @@ module Make (P : AppPaths) = struct
     | AutoDetect -> (
         match%bind Sys.file_exists PathFinder.built_name with
         | `Yes ->
-            f_local ~args ~prefix:PathFinder.built_name ?env ()
+            f_local ~args ~prefix:"" ?env ()
         | _ -> (
             match%bind
               Deferred.List.find_map
                 ~f:(PathFinder.exists_at_path PathFinder.Paths.official_name)
-                PathFinder.paths
+                Utils.paths
             with
             | Some prefix ->
                 f_debian ~args ~prefix ?env ()
@@ -144,7 +143,7 @@ module Make (P : AppPaths) = struct
     | Debian ->
         f_debian ~args ~prefix:"" ?env ()
     | Local ->
-        f_local ~args ~prefix:PathFinder.built_name ?env ()
+        f_local ~args ~prefix:"" ?env ()
     | Docker ctx ->
         f_docker ~args ~ctx ()
 

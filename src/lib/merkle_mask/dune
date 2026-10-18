@@ -16,6 +16,7 @@
  (modules_without_implementation
   base_merkle_tree_intf
   inputs_intf
+  mask_maps_intf
   maskable_merkle_tree_intf
   masking_merkle_tree_intf)
  (libraries
@@ -34,19 +35,12 @@
   stdio
   yojson
   ;; local libraries
-  debug_assert
   mina_stdlib
   logger
   merkle_ledger
   visualization)
  (preprocess
-  (pps
-   ppx_compare
-   ppx_deriving.show
-   ppx_deriving_yojson
-   ppx_jane
-   ppx_mina
-   ppx_version))
+  (pps ppx_deriving.show ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Implementation of Merkle tree masks"))

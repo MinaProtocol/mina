@@ -11,6 +11,8 @@ let conf_dir_name = ".mina-config"
 
 let stop_time = 168
 
+let stop_time_interval = 9
+
 let receiver_key_warning =
   "Warning: If the key is from a zkApp account, the account's receive \
    permission must be None."

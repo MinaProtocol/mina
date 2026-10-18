@@ -12,23 +12,16 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let Network = ../../Constants/Network.dhall
+let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
 let dependsOn =
-        DebianVersions.dependsOn
-          DebianVersions.DebVersion.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Lightnet
-      # DebianVersions.dependsOn
-          DebianVersions.DebVersion.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
+        DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
+      # DebianVersions.appDependsOn
+          DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let buildTestCmd
     : Size -> Command.Type
@@ -38,8 +31,12 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
-                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
+                    RunInToolchain.runInDefaultToolchain
+                      (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                          , "COVERALLS_TOKEN"
+                          ]
+                        # DebianVersions.overrideEnvs
+                      )
                       "buildkite/scripts/single-node-tests.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 , label = "single-node-tests"
                 , key = key

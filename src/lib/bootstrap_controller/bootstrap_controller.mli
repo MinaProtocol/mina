@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
@@ -23,7 +25,7 @@ type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
     it would return a transition frontier with the root breadcrumb and a list
     of transitions collected during bootstrap.
 
-    Bootstrap controller would do the following steps to contrust the
+    Bootstrap controller would do the following steps to construct the
     transition frontier:
     1. Download the root snarked_ledger.
     2. Download the scan state and pending coinbases.

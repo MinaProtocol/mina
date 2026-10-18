@@ -141,7 +141,7 @@ module Checked = struct
 
   include Mina_transaction_logic.Zkapp_command_logic.Local_state.Checked
 
-  let assert_equal (t1 : t) (t2 : t) =
+  let assert_equal_with_ledger ~f_ledger (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
     let f eq f =
       Impl.with_label (Core_kernel.Field.name f) (fun () ->
@@ -154,11 +154,20 @@ module Checked = struct
       ~full_transaction_commitment:(f Field.Assert.equal)
       ~excess:(f !Currency.Amount.Signed.Checked.assert_equal)
       ~supply_increase:(f !Currency.Amount.Signed.Checked.assert_equal)
-      ~ledger:(f !Ledger_hash.assert_equal)
+      ~ledger:(f_ledger f)
       ~success:(f Impl.Boolean.Assert.( = ))
       ~account_update_index:(f !Mina_numbers.Index.Checked.Assert.equal)
       ~failure_status_tbl:(f (fun () () -> ()))
       ~will_succeed:(f Impl.Boolean.Assert.( = ))
+
+  let assert_equal t1 t2 =
+    let ( ! ) f x y = Impl.run_checked (f x y) in
+    assert_equal_with_ledger
+      ~f_ledger:(fun f -> f !Ledger_hash.assert_equal)
+      t1 t2
+
+  let assert_equal_ignoring_ledger t1 t2 =
+    assert_equal_with_ledger ~f_ledger:(fun _ _ -> ()) t1 t2
 
   let equal' (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in

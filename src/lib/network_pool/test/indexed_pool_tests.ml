@@ -407,8 +407,11 @@ let dummy_state_view =
     let compile_time_genesis =
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+        ~genesis_ledger:
+          (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+        ~genesis_epoch_data:
+          (Consensus.Genesis_data.Epoch.to_hashed
+             Consensus.Genesis_data.Epoch.for_unit_tests )
         ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         ~constraint_constants ~consensus_constants
     in
@@ -440,11 +443,18 @@ let init_permissionless_ledger ledger account_info =
       let _tag, account, location =
         Or_error.ok_exn (get_or_create ledger account_id)
       in
-      set ledger location
-        { account with balance; permissions = Permissions.empty } )
+      (* The zkApp commands built by [make_zkapp_command_payment] debit the
+         sender and increment nonces without any authorization. *)
+      let permissions =
+        { Permissions.user_default with
+          send = Permissions.Auth_required.None
+        ; increment_nonce = None
+        }
+      in
+      set ledger location { account with balance; permissions } )
 
 let apply_to_ledger ledger cmd =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let signature_kind = Mina_signature_kind.Testnet in
   match Transaction_hash.User_command_with_valid_signature.command cmd with
   | User_command.Signed_command c ->
       let (`If_this_is_used_it_should_have_a_comment_justifying_it v) =

@@ -1,0 +1,7 @@
+{ Type = { wait : Optional (./properties/wait/Type ) 
+, waiter : Optional (./properties/waiter/Type ) 
+} 
+, default = { wait = None ((./properties/wait/Type )) 
+, waiter = None ((./properties/waiter/Type )) 
+} 
+}

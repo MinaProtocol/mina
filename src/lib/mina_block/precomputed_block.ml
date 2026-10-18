@@ -73,18 +73,18 @@ module Stable = struct
 
   [@@@with_versioned_json]
 
-  module V3 = struct
+  module V4 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
-      ; protocol_state : Protocol_state.Value.Stable.V2.t
+      ; protocol_state : Protocol_state.Value.Stable.V3.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
-      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V1.t
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V2.t
             (* TODO: Delete this or find out why it is here. *)
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
       ; protocol_version : Protocol_version.Stable.V2.t
       ; proposed_protocol_version : Protocol_version.Stable.V2.t option
-      ; accounts_accessed : (int * Account.Stable.V2.t) list
+      ; accounts_accessed : (int * Account.Stable.V3.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
@@ -100,7 +100,7 @@ end]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~scheduled_time ~staged_ledger block_with_hash =
+    ~scheduled_time ~staged_ledger ~accounts_created block_with_hash =
   let ledger = Staged_ledger.ledger staged_ledger in
   let block = With_hash.data block_with_hash in
   let state_hash =
@@ -145,13 +145,7 @@ let of_block ~logger
       ] ;
   let accounts_created =
     let account_creation_fee = constraint_constants.account_creation_fee in
-    let previous_block_state_hash =
-      Mina_state.Protocol_state.previous_state_hash
-        (Header.protocol_state header)
-    in
-    List.map
-      (Staged_ledger.latest_block_accounts_created staged_ledger
-         ~previous_block_state_hash ) ~f:(fun acct_id ->
+    List.map accounts_created ~f:(fun acct_id ->
         (acct_id, account_creation_fee) )
   in
   let tokens_used =
@@ -189,3 +183,40 @@ let of_block ~logger
   ; accounts_created
   ; tokens_used
   }
+
+module Versioned = struct
+  type t = V4 of Stable.V4.t
+
+  let version = function V4 _ -> 4
+
+  let of_latest (t : Stable.Latest.t) = V4 t
+
+  let to_yojson = function V4 t -> Stable.V4.to_yojson t
+
+  let of_yojson json =
+    let open Result.Let_syntax in
+    let%bind version =
+      match json with
+      | `Assoc fields -> (
+          match List.Assoc.find fields ~equal:String.equal "version" with
+          | Some (`Int version) ->
+              Ok version
+          | _ ->
+              Error "Precomputed.Versioned.of_yojson: missing version tag" )
+      | _ ->
+          Error "Precomputed.Versioned.of_yojson: expected an object"
+    in
+    match version with
+    | 4 ->
+        Stable.V4.of_yojson json >>| fun t -> V4 t
+    | _ ->
+        Error
+          (sprintf "Precomputed.Versioned.of_yojson: unsupported version %d"
+             version )
+
+  module V4 = struct
+    let state_hashes (t : Stable.V4.t) = Protocol_state.hashes t.protocol_state
+  end
+
+  let state_hashes = function V4 t -> V4.state_hashes t
+end

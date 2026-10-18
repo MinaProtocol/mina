@@ -40,6 +40,7 @@
   base_quickcheck
   ;;local libraries
   mina_stdlib
+  mina_stdlib_unix
   snark_profiler_lib
   archive_lib
   mina_wire_types
@@ -91,7 +92,6 @@
   transaction_snark_tests
   transaction_protocol_state
   test_util
-  file_system
   daemon_rpcs
   trust_system
   secrets
@@ -122,7 +122,9 @@
   string_sign
   zkapp_command_builder
   internal_tracing
-  transaction_snark_scan_state)
+  transaction_snark_scan_state
+  chain_id
+  )
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps
@@ -136,7 +138,6 @@
    ppx_base
    ppx_assert
    ppx_bench
-   ppx_bin_prot
    ppx_custom_printf
    ppx_fields_conv
    ppx_fixed_literal

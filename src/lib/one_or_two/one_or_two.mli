@@ -24,8 +24,6 @@ val to_list : 'a t -> 'a list
 
 val to_numbered_list : 'a t -> (int * 'a) list
 
-val group_sequence : 'a Sequence.t -> 'a t Sequence.t
-
 val group_list : 'a list -> 'a t list
 
 val zip : 'a t -> 'b t -> ('a * 'b) t Or_error.t

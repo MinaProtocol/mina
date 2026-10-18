@@ -32,6 +32,8 @@ module type S = sig
 
   val get_uuid : t -> Uuid.t
 
+  type maps_t
+
   type accumulated_t
 
   module Attached : sig
@@ -88,6 +90,10 @@ module type S = sig
     val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
 
     val to_accumulated : t -> accumulated_t
+
+    val append_maps : t -> maps_t -> unit
+
+    val get_maps : t -> maps_t
 
     (** Drop accumulated structure, a method used in safeguard against
         unwanted modification of ancestor's mask *)

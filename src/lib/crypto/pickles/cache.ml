@@ -1,0 +1,431 @@
+open Core_kernel
+
+(* Check if circuit data dumping is enabled via environment variable *)
+let should_dump_circuit_data () =
+  match Sys.getenv_opt "MINA_DUMP_CIRCUIT_DATA" with
+  | Some "true" | Some "1" | Some "yes" ->
+      true
+  | _ ->
+      false
+
+(* The mmap-backed proving-key cache trades a MessagePack deserialization
+   step for a POD file format that can be loaded in a single [mmap(2)]
+   syscall and ~one memcpy per field element. It is on by default; setting the
+   [MINA_USE_MMAP_CACHE] environment variable to [0], [false] or [no] selects
+   the old MessagePack path instead. *)
+let use_mmap_cache () =
+  match Sys.getenv_opt "MINA_USE_MMAP_CACHE" with
+  | Some "false" | Some "0" | Some "no" ->
+      false
+  | _ ->
+      true
+
+module Step = struct
+  module Key = struct
+    module Proving = struct
+      type t =
+        Type_equal.Id.Uid.t
+        * Snark_keys_header.t
+        * int
+        * Backend.Tick.R1CS_constraint_system.t
+
+      let to_string : t -> _ = function
+        | _id, header, n, _h ->
+            sprintf !"step-%s-%s-%d-%s" header.kind.type_ header.kind.identifier
+              n header.identifying_hash
+    end
+
+    module Verification = struct
+      type t = Type_equal.Id.Uid.t * Snark_keys_header.t * int * Md5.t
+      [@@deriving sexp]
+
+      let to_string : t -> _ = function
+        | _id, header, n, _h ->
+            sprintf !"vk-step-%s-%s-%d-%s" header.kind.type_
+              header.kind.identifier n header.identifying_hash
+    end
+  end
+
+  type storable =
+    (Key.Proving.t, Backend.Tick.Keypair.t) Key_cache.Sync.Disk_storable.t
+
+  type vk_storable =
+    ( Key.Verification.t
+    , Kimchi_bindings.Protocol.VerifierIndex.Fp.t )
+    Key_cache.Sync.Disk_storable.t
+
+  let legacy_storable, storable =
+    let read_legacy (header : Snark_keys_header.t) ~path ~cs =
+      Or_error.try_with_join (fun () ->
+          let open Or_error.Let_syntax in
+          let%map header_read, index =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset ->
+                Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
+                  (Backend.Tick.Keypair.load_urs ()) )
+              path
+          in
+          [%test_eq: int] header.header_version header_read.header_version ;
+          [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+          [%test_eq: Snark_keys_header.Constraint_constants.t]
+            header.constraint_constants header_read.constraint_constants ;
+          [%test_eq: string] header.constraint_system_hash
+            header_read.constraint_system_hash ;
+          { Backend.Tick.Keypair.index; cs } )
+    in
+    let read_mmap (key : Key.Proving.t) ~path ~cs =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          let index =
+            Kimchi_bindings.Protocol.Index.Fp.read_cached identifier
+              (Backend.Tick.Keypair.load_urs ())
+              path
+          in
+          { Backend.Tick.Keypair.index; cs } )
+    in
+    let write_legacy (header : Snark_keys_header.t) cs
+        (t : Backend.Tick.Keypair.t) path =
+      (* Conditionally dump extra circuit data based on environment variable *)
+      if should_dump_circuit_data () then (
+        let logger = Logger.create () in
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Dumping Step circuit data to %s" path ;
+        Kimchi_pasta_constraint_system.Vesta_constraint_system
+        .dump_extra_circuit_data cs path ) ;
+      Or_error.try_with (fun () ->
+          Snark_keys_header.write_with_header
+            ~expected_max_size_log2:33 (* 8 GB should be enough *)
+            ~append_data:
+              (Kimchi_bindings.Protocol.Index.Fp.write (Some true) t.index)
+            header path )
+    in
+    let write_mmap (key : Key.Proving.t) (t : Backend.Tick.Keypair.t) path =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          Kimchi_bindings.Protocol.Index.Fp.write_cached identifier t.index path )
+    in
+    (* The two formats never share a file: a process in one mode must not
+       overwrite, or fail to read, a key written in the other. *)
+    let file_name key =
+      if use_mmap_cache () then Key.Proving.to_string key ^ ".mmap"
+      else Key.Proving.to_string key
+    in
+    ( Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
+        (fun (_, header, _, cs) ~path -> read_legacy header ~path ~cs)
+        (fun (_, header, _, cs) t path -> write_legacy header cs t path)
+    , Key_cache.Sync.Disk_storable.simple file_name
+        (fun ((_, header, _, cs) as key) ~path ->
+          if use_mmap_cache () then read_mmap key ~path ~cs
+          else read_legacy header ~path ~cs )
+        (fun ((_, header, _, cs) as key) t path ->
+          if use_mmap_cache () then write_mmap key t path
+          else write_legacy header cs t path ) )
+
+  let vk_storable =
+    Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
+      (fun (_, header, _, _) ~path ->
+        Or_error.try_with_join (fun () ->
+            let open Or_error.Let_syntax in
+            let%map header_read, index =
+              Snark_keys_header.read_with_header
+                ~read_data:(fun ~offset path ->
+                  Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
+                    (Backend.Tick.Keypair.load_urs ())
+                    path )
+                path
+            in
+            [%test_eq: int] header.header_version header_read.header_version ;
+            [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+            [%test_eq: Snark_keys_header.Constraint_constants.t]
+              header.constraint_constants header_read.constraint_constants ;
+            [%test_eq: string] header.constraint_system_hash
+              header_read.constraint_system_hash ;
+            index ) )
+      (fun (_, header, _, _) x path ->
+        Or_error.try_with (fun () ->
+            Snark_keys_header.write_with_header
+              ~expected_max_size_log2:33 (* 8 GB should be enough *)
+              ~append_data:
+                (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
+              header path ) )
+
+  (* In mmap mode, a key missing from the mmap cache may still be available in
+     the legacy format (for example, keys installed with a package), so convert
+     it rather than generating it again. *)
+  let read_legacy_to_convert cache ~s_p k_p =
+    if use_mmap_cache () && phys_equal s_p storable then
+      Result.ok (Key_cache.Sync.read cache legacy_storable k_p)
+    else None
+
+  (* After writing a key to the mmap cache, read it back so that this process
+     holds the mapped copy rather than the heap copy that it just wrote. *)
+  let read_back_written cache ~s_p k_p (pk, dirty) =
+    if use_mmap_cache () then
+      match Key_cache.Sync.read cache s_p k_p with
+      | Ok (mapped, _) ->
+          (mapped, dirty)
+      | Error _ ->
+          (pk, dirty)
+    else (pk, dirty)
+
+  let read_or_generate ~prev_challenges cache ?(s_p = storable)
+      ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
+    let open Impls.Step in
+    let load_or_generate k_p =
+      match
+        Common.time "step keypair read" (fun () ->
+            Key_cache.Sync.read cache s_p k_p )
+      with
+      | Ok (pk, dirty) ->
+          Common.time "step keypair create" (fun () -> (pk, dirty))
+      | Error _e ->
+          let pk, dirty =
+            match read_legacy_to_convert cache ~s_p k_p with
+            | Some legacy ->
+                legacy
+            | None ->
+                let _, _, _, sys = k_p in
+                let r =
+                  Common.time "stepkeygen" (fun () ->
+                      Keypair.generate ~prev_challenges sys ~lazy_mode )
+                in
+                Timer.clock __LOC__ ;
+                (Keypair.pk r, `Generated_something)
+          in
+          ignore (Key_cache.Sync.write cache s_p k_p pk : unit Or_error.t) ;
+          read_back_written cache ~s_p k_p (pk, dirty)
+    in
+    let pk = lazy (Promise.map (Lazy.force k_p) ~f:load_or_generate) in
+    let vk =
+      lazy
+        (let%bind.Promise k_v = Lazy.force k_v in
+         match
+           Common.time "step vk read" (fun () ->
+               Key_cache.Sync.read cache s_v k_v )
+         with
+         | Ok (vk, _) ->
+             Promise.return (vk, `Cache_hit)
+         | Error _e ->
+             (* Only keep the proving key if this process already wants it;
+                otherwise, load it just long enough to derive the verification
+                key. *)
+             let%map.Promise pk, c =
+               if Lazy.is_val pk then Lazy.force pk
+               else Promise.map (Lazy.force k_p) ~f:load_or_generate
+             in
+             let vk = Backend.Tick.Keypair.vk pk in
+             ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
+             (vk, c) )
+    in
+    (pk, vk)
+end
+
+module Wrap = struct
+  module Key = struct
+    module Verification = struct
+      type t = Type_equal.Id.Uid.t * Snark_keys_header.t * Md5.t
+      [@@deriving sexp]
+
+      let equal ((_, x1, y1) : t) ((_, x2, y2) : t) =
+        [%equal: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
+
+      let to_string : t -> _ = function
+        | _id, header, _h ->
+            sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
+              header.identifying_hash
+    end
+
+    module Proving = struct
+      type t =
+        Type_equal.Id.Uid.t
+        * Snark_keys_header.t
+        * Backend.Tock.R1CS_constraint_system.t
+
+      let to_string : t -> _ = function
+        | _id, header, _h ->
+            sprintf !"wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
+              header.identifying_hash
+    end
+  end
+
+  type storable =
+    (Key.Proving.t, Backend.Tock.Keypair.t) Key_cache.Sync.Disk_storable.t
+
+  type vk_storable =
+    (Key.Verification.t, Verification_key.t) Key_cache.Sync.Disk_storable.t
+
+  let legacy_storable, storable =
+    let read_legacy (header : Snark_keys_header.t) ~path ~cs =
+      Or_error.try_with_join (fun () ->
+          let open Or_error.Let_syntax in
+          let%map header_read, index =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset ->
+                Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
+                  (Backend.Tock.Keypair.load_urs ()) )
+              path
+          in
+          [%test_eq: int] header.header_version header_read.header_version ;
+          [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+          [%test_eq: Snark_keys_header.Constraint_constants.t]
+            header.constraint_constants header_read.constraint_constants ;
+          [%test_eq: string] header.constraint_system_hash
+            header_read.constraint_system_hash ;
+          { Backend.Tock.Keypair.index; cs } )
+    in
+    let read_mmap (key : Key.Proving.t) ~path ~cs =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          let index =
+            Kimchi_bindings.Protocol.Index.Fq.read_cached identifier
+              (Backend.Tock.Keypair.load_urs ())
+              path
+          in
+          { Backend.Tock.Keypair.index; cs } )
+    in
+    let write_legacy (header : Snark_keys_header.t) cs
+        (t : Backend.Tock.Keypair.t) path =
+      if should_dump_circuit_data () then (
+        let logger = Logger.create () in
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Dumping Wrap circuit data to %s" path ;
+        Kimchi_pasta_constraint_system.Pallas_constraint_system
+        .dump_extra_circuit_data cs path ) ;
+      Or_error.try_with (fun () ->
+          Snark_keys_header.write_with_header
+            ~expected_max_size_log2:33 (* 8 GB should be enough *)
+            ~append_data:
+              (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
+            header path )
+    in
+    let write_mmap (key : Key.Proving.t) (t : Backend.Tock.Keypair.t) path =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          Kimchi_bindings.Protocol.Index.Fq.write_cached identifier t.index path )
+    in
+    (* The two formats never share a file: a process in one mode must not
+       overwrite, or fail to read, a key written in the other. *)
+    let file_name key =
+      if use_mmap_cache () then Key.Proving.to_string key ^ ".mmap"
+      else Key.Proving.to_string key
+    in
+    ( Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
+        (fun (_, header, cs) ~path -> read_legacy header ~path ~cs)
+        (fun (_, header, cs) t path -> write_legacy header cs t path)
+    , Key_cache.Sync.Disk_storable.simple file_name
+        (fun ((_, header, cs) as key) ~path ->
+          if use_mmap_cache () then read_mmap key ~path ~cs
+          else read_legacy header ~path ~cs )
+        (fun ((_, header, cs) as key) t path ->
+          if use_mmap_cache () then write_mmap key t path
+          else write_legacy header cs t path ) )
+
+  let vk_storable =
+    Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
+      (fun (_, header, _cs) ~path ->
+        Or_error.try_with_join (fun () ->
+            let open Or_error.Let_syntax in
+            let%map header_read, index =
+              Snark_keys_header.read_with_header
+                ~read_data:(fun ~offset path ->
+                  In_channel.with_file ~binary:true path ~f:(fun in_channel ->
+                      In_channel.seek in_channel (Int64.of_int offset) ;
+                      Binable.of_string
+                        (module Verification_key.Stable.Latest)
+                        (In_channel.input_all in_channel) ) )
+                path
+            in
+            [%test_eq: int] header.header_version header_read.header_version ;
+            [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+            [%test_eq: Snark_keys_header.Constraint_constants.t]
+              header.constraint_constants header_read.constraint_constants ;
+            [%test_eq: string] header.constraint_system_hash
+              header_read.constraint_system_hash ;
+            index ) )
+      (fun (_, header, _) t path ->
+        Or_error.try_with (fun () ->
+            Snark_keys_header.write_with_header
+              ~expected_max_size_log2:33 (* 8 GB should be enough *)
+              ~append_data:(fun path ->
+                Out_channel.with_file ~append:true path ~f:(fun file ->
+                    Out_channel.output_string file
+                      (Binable.to_string
+                         (module Verification_key.Stable.Latest)
+                         t ) ) )
+              header path ) )
+
+  (* In mmap mode, a key missing from the mmap cache may still be available in
+     the legacy format (for example, keys installed with a package), so convert
+     it rather than generating it again. *)
+  let read_legacy_to_convert cache ~s_p k_p =
+    if use_mmap_cache () && phys_equal s_p storable then
+      Result.ok (Key_cache.Sync.read cache legacy_storable k_p)
+    else None
+
+  (* After writing a key to the mmap cache, read it back so that this process
+     holds the mapped copy rather than the heap copy that it just wrote. *)
+  let read_back_written cache ~s_p k_p (pk, dirty) =
+    if use_mmap_cache () then
+      match Key_cache.Sync.read cache s_p k_p with
+      | Ok (mapped, _) ->
+          (mapped, dirty)
+      | Error _ ->
+          (pk, dirty)
+    else (pk, dirty)
+
+  let read_or_generate ~prev_challenges cache ?(s_p = storable)
+      ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
+    let module Vk = Verification_key in
+    let open Impls.Wrap in
+    let load_or_generate k =
+      match
+        Common.time "wrap key read" (fun () -> Key_cache.Sync.read cache s_p k)
+      with
+      | Ok (pk, d) ->
+          (pk, d)
+      | Error _e ->
+          let pk, dirty =
+            match read_legacy_to_convert cache ~s_p k with
+            | Some legacy ->
+                legacy
+            | None ->
+                let _, _, sys = k in
+                let r =
+                  Common.time "wrapkeygen" (fun () ->
+                      Keypair.generate ~lazy_mode ~prev_challenges sys )
+                in
+                (Keypair.pk r, `Generated_something)
+          in
+          ignore (Key_cache.Sync.write cache s_p k pk : unit Or_error.t) ;
+          read_back_written cache ~s_p k (pk, dirty)
+    in
+    let pk = lazy (Promise.map (Lazy.force k_p) ~f:load_or_generate) in
+    let vk =
+      lazy
+        (let%bind.Promise k_v = Lazy.force k_v in
+         match Key_cache.Sync.read cache s_v k_v with
+         | Ok (vk, d) ->
+             Promise.return (vk, d)
+         | Error _e ->
+             (* Only keep the proving key if this process already wants it;
+                otherwise, load it just long enough to derive the verification
+                key. *)
+             let%map.Promise pk, _dirty =
+               if Lazy.is_val pk then Lazy.force pk
+               else Promise.map (Lazy.force k_p) ~f:load_or_generate
+             in
+             let vk = Backend.Tock.Keypair.vk pk in
+             let vk : Vk.t =
+               { index = vk
+               ; commitments =
+                   Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
+               ; data =
+                   (let open Kimchi_bindings.Protocol.Index.Fq in
+                   { constraints = domain_d1_size pk.index })
+               }
+             in
+             ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
+             (vk, `Generated_something) )
+    in
+    (pk, vk)
+end

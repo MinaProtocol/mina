@@ -10,38 +10,3 @@
  (preprocess
   (pps ppx_version)))
 
-(executable
- (package archive)
- (name archive_testnet_signatures)
- (public_name archive-testnet)
- (modules archive_testnet_signatures)
- (modes native)
- (libraries
-  archive_cli
-  async
-  async_unix
-  core_kernel
-  mina_signature_kind.testnet
-  mina_version)
- (instrumentation
-  (backend bisect_ppx --bisect-sigterm))
- (preprocess
-  (pps ppx_version)))
-
-(executable
- (package archive)
- (name archive_mainnet_signatures)
- (public_name archive-mainnet)
- (modules archive_mainnet_signatures)
- (modes native)
- (libraries
-  archive_cli
-  async
-  async_unix
-  core_kernel
-  mina_signature_kind.mainnet
-  mina_version)
- (instrumentation
-  (backend bisect_ppx --bisect-sigterm))
- (preprocess
-  (pps ppx_version)))

@@ -1687,7 +1687,7 @@ module Messages = struct
     let lookup =
       Lookup.opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
         ~runtime_tables ~dummy:[| dummy |]
-        (wo [ 1 ])
+        (wo [ z ])
     in
     of_hlistable
       [ Plonkish_prelude.Vector.typ (wo w_lens) Columns.n
@@ -1718,7 +1718,7 @@ module Messages = struct
     let lookup =
       Lookup.wrap_opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
         ~runtime_tables ~dummy:[| dummy |]
-        (wo [ 1 ])
+        (wo [ z ])
     in
     of_hlistable
       [ Plonkish_prelude.Vector.wrap_typ (wo w_lens) Columns.n

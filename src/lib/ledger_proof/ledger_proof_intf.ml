@@ -32,6 +32,8 @@ module type S = sig
 
   val statement_with_sok : t -> Mina_state.Snarked_ledger_state.With_sok.t
 
+  val sok_digest : t -> Sok_message.Digest.t
+
   val statement_with_sok_target :
        Mina_state.Snarked_ledger_state.With_sok.t
     -> ( Frozen_ledger_hash.t

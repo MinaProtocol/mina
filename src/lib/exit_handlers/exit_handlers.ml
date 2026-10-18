@@ -1,29 +1,39 @@
-(* exit_handlers -- code to call at daemon exit *)
+(* exit_handlers -- coordinated, tiered daemon shutdown *)
 
 open Core_kernel
 open Async_kernel
 open Async_unix
 
-(* register a thunk to be called at exit; log registration and execution *)
-let register_handler ~logger ~description (f : unit -> unit) =
-  [%log info] "Registering exit handler: $description"
-    ~metadata:[ ("description", `String description) ] ;
-  let logging_thunk () =
-    [%log info] "Running exit handler: $description"
-      ~metadata:[ ("description", `String description) ] ;
-    (* if there's an exception, log it, allow other handlers to run *)
-    try f ()
-    with exn ->
-      [%log info] "When running exit handler: $description, got exception $exn"
-        ~metadata:
-          [ ("description", `String description)
-          ; ("exn", `String (Exn.to_string exn))
-          ]
-  in
-  Stdlib.at_exit logging_thunk
+(* Shutdown tiers, listed in execution order.
+   At shutdown, all handlers in the first tier run sequentially to completion,
+   then all handlers in the second tier, and so on. *)
+type shutdown_tier =
+  | FlushPersistentFrontier
+  | DestroyConfigAndLedgers
+  | ReleaseDaemonLockfile
+[@@deriving equal, enumerate]
 
-(* register a Deferred.t thunk to be called at Async shutdown; log registration and execution *)
-let register_async_shutdown_handler ~logger ~description
+(* Handlers accumulate in reverse registration order (cons-list) *)
+let handlers : (shutdown_tier * (unit -> unit Deferred.t)) list ref = ref []
+
+let initialized = ref false
+
+let run_shutdown_handlers () =
+  Deferred.List.iter all_of_shutdown_tier ~f:(fun tier ->
+      let tier_handlers =
+        List.filter_map (List.rev !handlers) ~f:(fun (t, f) ->
+            if equal_shutdown_tier t tier then Some f else None )
+      in
+      Deferred.List.iter tier_handlers ~f:(fun f -> f ()) )
+
+let ensure_shutdown_hook_registered () =
+  if not !initialized then (
+    initialized := true ;
+    Shutdown.at_shutdown run_shutdown_handlers )
+
+(* register a Deferred.t thunk to be called at Async shutdown in the given
+   tier; log registration and execution *)
+let register_async_shutdown_handler ~logger ~description ~tier
     (f : unit -> unit Deferred.t) =
   [%log debug] "Registering async shutdown handler: $description"
     ~metadata:[ ("description", `String description) ] ;
@@ -46,4 +56,13 @@ let register_async_shutdown_handler ~logger ~description
     in
     ()
   in
-  Shutdown.at_shutdown logging_thunk
+  ensure_shutdown_hook_registered () ;
+  handlers := (tier, logging_thunk) :: !handlers
+
+module For_testing = struct
+  let run_shutdown_handlers = run_shutdown_handlers
+
+  let reset () =
+    handlers := [] ;
+    initialized := false
+end

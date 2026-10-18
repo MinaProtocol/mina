@@ -2,7 +2,8 @@
  (name rocksdb)
  (public_name rocksdb)
  (library_flags -linkall)
- (flags -open Core_kernel)
+ (flags
+  (:standard -warn-error +a))
  (libraries
   ;; opam libraries
   async
@@ -18,7 +19,7 @@
   rocks
   sexplib0
   ;; local libraries
-  file_system
+  mina_stdlib_unix
   key_value_database)
  (preprocess
   (pps ppx_version ppx_jane))

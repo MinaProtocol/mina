@@ -13,6 +13,7 @@
   async_unix
   async.async_command
   ;;local libraries
+  cli_lib
   kimchi_pasta
   kimchi_pasta.basic
   pickles
@@ -34,8 +35,7 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))
 
 (executable
  (package signer)
@@ -54,8 +54,7 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))
 
 (executable
  (package signer)
@@ -74,8 +73,7 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))
 
 (executable
  (package signer)
@@ -94,5 +92,4 @@
    ppx_deriving_yojson
    ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_version)))

@@ -25,6 +25,7 @@ val create :
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
   -> transition_receipt_time:Time.t option
+  -> accounts_created:Account_id.t list
   -> t
 
 val build :
@@ -84,6 +85,10 @@ val display : t -> display
 val name : t -> string
 
 val staged_ledger_hash : t -> Staged_ledger_hash.t
+
+(** The accounts created in the block that this breadcrumb represents
+    For convenience of implementation, it's by definition an empty list for the root *)
+val accounts_created : t -> Account_id.t list
 
 module For_tests : sig
   val gen :

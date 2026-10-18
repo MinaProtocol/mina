@@ -10,7 +10,7 @@ module Types : sig
 
     module Data : sig
       module Consensus_state : sig
-        module Value : V2S0
+        module Value : V3S0
       end
     end
   end
@@ -91,7 +91,7 @@ module type Concrete = sig
       end
 
       module Value : sig
-        module V2 : sig
+        module V3 : sig
           type t =
             ( Mina_numbers.Length.V1.t
             , Consensus_vrf.Output.Truncated.V1.t

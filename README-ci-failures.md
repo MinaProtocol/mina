@@ -1,16 +1,25 @@
 ## Jobs not starting
 
-CI jobs are dispatched by a script which responds to both the `ci-build-me`
-label and comments by MinaProtocol organization members containing exactly
-`!ci-build-me`. If your CI job has not started after adding the `ci-build-me`
-label, please comment on the pull request with `!ci-build-me` to attempt to
-re-trigger the script.
+CI jobs are dispatched by a script which responds to **comments** by
+MinaProtocol organization members containing exactly `!ci-build-me`. Adding a
+label does not start a build: the script handles `issue_comment.created` events
+only, and the older label-triggered path no longer exists. If your CI job has
+not started, comment `!ci-build-me` on the pull request.
+
+The comment must be *exactly* the command and nothing else -- most commands are
+matched against the whole comment body, so appending an explanation to it stops
+the script from recognising it. Put any explanation in a separate comment.
+
 If no CI jobs started, check that your membership to O(1) Labs/mina organisation
-is public. If your membership is private, the jobs will not started and
+is public. If your membership is private, the jobs will not start and
 `!ci-build-me` won't have an impact.
 
-If CI jobs are not running after applying both the `ci-build-me` label and
-comment, you may be able to find and fix the error in the script. The script
+Note also that the script is a Google Cloud Function deployed by hand, so a
+command that exists in `src/index.js` on your branch does nothing until someone
+redeploys it.
+
+If CI jobs are still not running, you may be able to find and fix the error in
+the script. The script
 lives in `frontend/ci-build-me/src/index.js`, and instructions for deploying
 the new version are in the readme at `frontend/ci-build-me/README.md`. You
 should still follow normal procedure: submit a pull request and await approval

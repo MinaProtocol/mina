@@ -2,10 +2,21 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
-  module Transaction_witness = Int
+  module Transaction_witness = struct
+    type t = Int.t
+
+    let transaction = Fn.id
+  end
+
   module Ledger_hash = Int
   module Sparse_ledger = Int
-  module Transaction = Int
+
+  module Transaction = struct
+    type t = Int.t
+
+    let yojson_summary t = `Int t
+  end
+
   module Ledger_proof_statement = Fee
 
   module Transaction_protocol_state = struct
@@ -79,7 +90,25 @@ module Test_inputs = struct
 
     let work = Fn.id
 
-    let all_work_pairs t ~get_state:_ = Ok (One_or_two.group_list t)
+    (* In the test inputs a "job" is just a fully-formed spec, so materialisation
+       is the identity and the witness is the [int] inside a [Transition]. *)
+    module Available_job = struct
+      type t = (int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
+    end
+
+    let all_work_jobs t = One_or_two.group_list t
+
+    let statement_of_job (j : Available_job.t) =
+      Some (Snark_work_lib.Work.Single.Spec.statement j)
+
+    let job_transaction (j : Available_job.t) =
+      match j with
+      | Snark_work_lib.Work.Single.Spec.Transition (_, w) ->
+          Some (Transaction_witness.transaction w)
+      | Merge _ ->
+          None
+
+    let single_spec_of_job ~get_state:_ (j : Available_job.t) = Ok j
   end
 
   module Transition_frontier = struct

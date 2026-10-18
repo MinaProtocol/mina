@@ -33,7 +33,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInDefaultToolchain
                   ([] : List Text)
                   "cd src/app/trace-tool ; PATH=/home/opam/.cargo/bin:\$PATH cargo check"
             , label = "Rust lint steps; trace-tool"

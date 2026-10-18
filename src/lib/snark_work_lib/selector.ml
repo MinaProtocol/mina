@@ -23,8 +23,8 @@ module Spec = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t = Single.Spec.Stable.V1.t Work.Spec.Stable.V1.t
+    module V2 = struct
+      type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
       [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
@@ -32,13 +32,6 @@ module Spec = struct
   end]
 
   type t = Single.Spec.t Work.Spec.t
-
-  let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    Work.Spec.map ~f:Single.Spec.read_all_proofs_from_disk
-
-  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-      Stable.Latest.t -> t =
-    Work.Spec.map ~f:(Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
 end
 
 module Result = struct
@@ -46,9 +39,9 @@ module Result = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        (Spec.Stable.V1.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
+        (Spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
 
       let to_latest = Fn.id
 
@@ -59,14 +52,4 @@ module Result = struct
   end]
 
   type t = (Spec.t, Ledger_proof.Cached.t) Work.Result.Stable.V1.t
-
-  let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    Work.Result.map ~f_spec:Spec.read_all_proofs_from_disk
-      ~f_single:Ledger_proof.Cached.read_proof_from_disk
-
-  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-      Stable.Latest.t -> t =
-    Work.Result.map
-      ~f_spec:(Spec.write_all_proofs_to_disk ~proof_cache_db)
-      ~f_single:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
 end

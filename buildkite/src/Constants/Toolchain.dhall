@@ -1,47 +1,68 @@
 let DebianVersions = ./DebianVersions.dhall
 
+let ContainerImages = ./ContainerImages.dhall
+
 let RunInToolchain = ../Command/RunInToolchain.dhall
 
-let ContainerImages = ./ContainerImages.dhall
+let Arch = ./Arch.dhall
+
+let Cmd = ../Lib/Cmds.dhall
 
 let SelectionMode
     : Type
-    = < ByDebian | Custom : Text >
+    = < ByDebianAndArch | Custom : Text >
 
-let runner =
-          \(debVersion : DebianVersions.DebVersion)
+let Spec =
+      { Type =
+          { mode : SelectionMode
+          , debVersion : DebianVersions.DebVersion
+          , arch : Arch.Type
+          , submodules : Bool
+          }
+      , default =
+          { mode = SelectionMode.ByDebianAndArch
+          , arch = Arch.Type.Amd64
+          , submodules = False
+          }
+      }
+
+let imageFor
+    : DebianVersions.DebVersion -> Arch.Type -> Text
+    =     \(debVersion : DebianVersions.DebVersion)
+      ->  \(arch : Arch.Type)
       ->  merge
-            { Bookworm = RunInToolchain.runInToolchainBookworm
-            , Bullseye = RunInToolchain.runInToolchain
-            , Jammy = RunInToolchain.runInToolchain
-            , Focal = RunInToolchain.runInToolchain
-            , Noble = RunInToolchain.runInToolchainNoble
+            { Bookworm =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainBookworm.amd64
+                  , Arm64 = ContainerImages.minaToolchainBookworm.arm64
+                  }
+                  arch
+            , Bullseye = ContainerImages.minaToolchainBullseye.amd64
+            , Jammy = ContainerImages.minaToolchainJammy.amd64
+            , Focal = ContainerImages.minaToolchainBullseye.amd64
+            , Noble = ContainerImages.minaToolchainNoble.amd64
             }
             debVersion
 
-let select =
-          \(mode : SelectionMode)
-      ->  \(debVersion : DebianVersions.DebVersion)
-      ->  merge
-            { ByDebian = runner debVersion
-            , Custom =
-                \(image : Text) -> RunInToolchain.runInToolchainImage image
-            }
-            mode
+let select
+    : Spec.Type -> List Text -> Text -> List Cmd.Type
+    =     \(spec : Spec.Type)
+      ->  \(environment : List Text)
+      ->  \(innerScript : Text)
+      ->  let image =
+                merge
+                  { ByDebianAndArch = imageFor spec.debVersion spec.arch
+                  , Custom = \(image : Text) -> image
+                  }
+                  spec.mode
 
-let image =
-          \(debVersion : DebianVersions.DebVersion)
-      ->  merge
-            { Bookworm = ContainerImages.minaToolchainBookworm
-            , Bullseye = ContainerImages.minaToolchain
-            , Jammy = ContainerImages.minaToolchain
-            , Focal = ContainerImages.minaToolchain
-            , Noble = ContainerImages.minaToolchainNoble
-            }
-            debVersion
+          in  RunInToolchain.runInToolchain
+                RunInToolchain.Config::{
+                , submodules = spec.submodules
+                , image = image
+                , arch = spec.arch
+                , environment = environment
+                , innerScript = innerScript
+                }
 
-in  { SelectionMode = SelectionMode
-    , select = select
-    , runner = runner
-    , image = image
-    }
+in  { SelectionMode = SelectionMode, Spec = Spec, select = select }

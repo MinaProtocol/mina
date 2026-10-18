@@ -1,0 +1,79 @@
+let S = ../../Lib/SelectFiles.dhall
+
+let Pipeline = ../../Pipeline/Dsl.dhall
+
+let PipelineTag = ../../Pipeline/Tag.dhall
+
+let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+
+let MemoryGate = ../../Constants/MemoryGate.dhall
+
+let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
+
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
+let FixPermissions = ../../Command/FixPermissions.dhall
+
+let Arch = ../../Constants/Arch.dhall
+
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let dependsOn =
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.None }
+
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec = JobSpec::{
+        , dirtyWhen =
+          [ S.strictlyStart (S.contains "src/lib/mina_caqti")
+          , S.strictlyStart (S.contains "src/app/archive")
+          , S.strictlyStart (S.contains "src/app/archive_blocks")
+          , S.strictlyStart (S.contains "src/test/archive/sample_zkapp_heavy")
+          , S.strictlyStart
+              (S.contains "buildkite/src/Jobs/Test/ArchiveMemoryBench")
+          , S.exactly "buildkite/scripts/tests/archive-memory-bench" "sh"
+          , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
+          , S.strictlyStart (S.contains "src/test/archive/archive_memory_bench")
+          ]
+        , path = "Test"
+        , name = "ArchiveMemoryBench"
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          , PipelineTag.Type.Archive
+          ]
+        }
+      , steps =
+        [ RunPerformanceTest.command
+            RunPerformanceTest.Spec::{
+            , key = "archive-memory-bench"
+            , label = "Archive node end-to-end memory bench"
+            , dependsOn = dependsOn
+            , runCommands =
+              [ FixPermissions.command Arch.Type.Amd64
+              , RunWithPostgres.runInToolchainWithPostgresAndDebs
+                  [ "BUILDKITE_BRANCH"
+                  , "BUILDKITE_COMMIT"
+                  , "BUILDKITE_BUILD_ID"
+                  , "MINA_DEB_CODENAME=bookworm"
+                  , "APPS_BARE_BINARIES=archive_blocks.exe:mina-archive-blocks"
+                  ]
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Script
+                          "src/app/archive/create_schema.sql"
+                      )
+                  )
+                  ContainerImages.minaToolchain
+                  ""
+                  "./buildkite/scripts/tests/archive-memory-bench.sh"
+              ]
+            , softFail = Some MemoryGate.softFail
+            }
+        ]
+      }

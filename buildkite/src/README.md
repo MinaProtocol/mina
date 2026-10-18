@@ -2,6 +2,12 @@
 
 This folder contains all dhall code which is a backbone for our CI related code for buildkite.
 
+> **New here?** If you want to *add* a job, start with
+> [`../HOWTO-add-a-job.md`](../HOWTO-add-a-job.md). This README is a system
+> reference (modes, stages, filters, entrypoints) — it explains how the
+> pipeline is wired, not how to write a job for it. To run a job locally
+> see [`../local/README.md`](../local/README.md).
+
 # Structure
 
 Buildkite CI consist of two layers dhall and scripts. Basically idea is to use [Dhall](https://dhall-lang.org/) to create pipeline configuration in yaml. Pipeline configuration defines execution setup for scripts under `buildkite/scripts` folder. All Dhall files can be find in `buildkite/src` files. Each individual job is placed in `buildkite/src/Jobs` folder. Then `Prepare.dhall` file generates jobs collection based on content of `buildkite/src/Jobs`. Another important module is `Monorepo.dhall` which selects which jobs are meant to run (based on `BUILDKITE_PIPELINE_MODE` env in pipeline definition)
@@ -26,7 +32,7 @@ steps:
           - "BUILDKITE_PIPELINE_MODE=PullRequest"
           - "BUILDKITE_PIPELINE_STAGE=Test"
           - "BUILDKITE_PIPELINE_FILTER=AllTests"
-        image: codaprotocol/ci-toolchain-base:v3
+        image: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4
         mount-buildkite-agent: true
         propagate-environment: true
 
@@ -137,7 +143,7 @@ steps:
           - "CODENAMES=Focal,Bullseye"
           - "FROM_CHANNEL=Unstable"
           - "TO_CHANNEL=Experimental"
-        image: codaprotocol/ci-toolchain-base:v3
+        image: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4
         mount-buildkite-agent: true
         propagate-environment: true
 ```
@@ -166,7 +172,8 @@ All list of available parameters:
 
 - TO_CHANNEL                  Target debian channel. By default: Unstable. All available profiles are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
 
-- PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io
+- DOCKER_REPO                 The Docker repository. If defined, script will publish docker to target repository. Otherwise it will only create docker image locally
+"
 
 
 #### Examples 

@@ -9,7 +9,8 @@ open Mina_transaction
 let create_accounts ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
     (privkey_path, key_prefix, num_accounts, fee, amount) =
-  let keys_per_zkapp = 8 in
+  (* 30 receiving account updates, one sender, one fee payer => 16 segments *)
+  let keys_per_zkapp = 30 in
   let zkapps_per_block = 10 in
   let pk_check_wait = Time.Span.of_sec 10. in
   let pk_check_timeout = Time.Span.of_min 30. in

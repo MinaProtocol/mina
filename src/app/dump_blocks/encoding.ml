@@ -8,7 +8,7 @@ type 'a content =
 
 let append_newline s = s ^ "\n"
 
-let block_of_breadcrumb ?with_parent_statehash breadcrumb =
+let block_of_breadcrumb ?with_parent_statehash ~accounts_created:_ breadcrumb =
   let open Mina_block in
   let block = Frontier_base.Breadcrumb.block breadcrumb in
   match with_parent_statehash with
@@ -37,7 +37,10 @@ module type S = sig
   val name : string
 
   val of_breadcrumb :
-    ?with_parent_statehash:string -> Frontier_base.Breadcrumb.t -> t
+       ?with_parent_statehash:string
+    -> accounts_created:Mina_base.Account_id.t list
+    -> Frontier_base.Breadcrumb.t
+    -> t
 
   val to_string : t -> string
 
@@ -80,9 +83,12 @@ let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
 let constraint_constants = precomputed_values.constraint_constants
 
-let precomputed_of_breadcrumb ?with_parent_statehash breadcrumb =
+let precomputed_of_breadcrumb ?with_parent_statehash ~accounts_created
+    breadcrumb =
   let open Frontier_base in
-  let block = block_of_breadcrumb ?with_parent_statehash breadcrumb in
+  let block =
+    block_of_breadcrumb ?with_parent_statehash ~accounts_created breadcrumb
+  in
   let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger breadcrumb in
   let scheduled_time =
     Mina_block.Stable.Latest.header block
@@ -93,6 +99,7 @@ let precomputed_of_breadcrumb ?with_parent_statehash breadcrumb =
   Mina_block.Precomputed.of_block ~logger ~constraint_constants ~staged_ledger
     ~scheduled_time
     (Breadcrumb.block_with_hash breadcrumb)
+    ~accounts_created
 
 module Sexp_precomputed : S with type t = Mina_block.Precomputed.t = struct
   type t = Mina_block.Precomputed.t

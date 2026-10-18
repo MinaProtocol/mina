@@ -1,0 +1,32 @@
+;; Hermetic alcotest smoke tests for mina-archive-healthcheck.
+;;
+;; These exercise only the subcommands that don't require a running
+;; archive PostgreSQL: --help at the top level and per-subcommand,
+;; plus the single-JSON-record contract for each subcommand against a
+;; non-routable [postgres://...:1/...] URI.
+
+(test
+ (name test_mina_archive_healthcheck)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_unix
+  stdio
+  uri
+  yojson
+  async
+  async_kernel
+  async_unix
+  ;; local libraries
+  mina_automation
+  mina_automation.synthetic_archive)
+ (deps
+  ../mina_archive_healthcheck.exe
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_deriving_yojson)))

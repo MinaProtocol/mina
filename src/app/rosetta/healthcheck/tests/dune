@@ -1,0 +1,23 @@
+;; Hermetic alcotest smoke tests for rosetta-healthcheck.
+;;
+;; These exercise only the subcommands that don't require a running
+;; Rosetta server: --help at the top level, the flag bounds, and the
+;; single-JSON-record contract for [ready --json] / [tip-recency --json]
+;; / [connectivity --json] against a dead port.  The spawning and the
+;; assertions live in rosetta_cli_test_helpers, shared with the
+;; rosetta-client suite.
+
+(test
+ (name test_rosetta_healthcheck)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  yojson
+  ;; local libraries
+  rosetta_cli_test_helpers)
+ (deps ../rosetta_healthcheck.exe)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

@@ -10,13 +10,23 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Cmd = ../../Lib/Cmds.dhall
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
+let FixPermissions = ../../Command/FixPermissions.dhall
+
+let Arch = ../../Constants/Arch.dhall
+
+let key = "emergency-hf-test"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.strictlyStart (S.contains "scripts/archive/emergency_hf")
+          [ S.strictlyStart (S.contains "src/app/archive_hardfork_toolbox")
           , S.strictlyStart (S.contains "src/app/archive")
           ]
         , path = "Test"
@@ -31,9 +41,14 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  "PSQL=\"docker exec replayer-postgres psql\" ./scripts/archive/emergency_hf/test/runner.sh "
-              ]
+                  RunInToolchain.submodulesInit True
+                # [ FixPermissions.command Arch.Type.Amd64 ]
+                # [ RunWithPostgres.runInDockerWithPostgresConn
+                      ([] : List Text)
+                      (None RunWithPostgres.ScriptOrArchive)
+                      ContainerImages.minaToolchain
+                      "./scripts/tests/archive-hardfork-toolbox/test-convert-canonical-blocks.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
+                  ]
             , label = "Emergency HF test"
             , key = "emergency-hf-test"
             , target = Size.Large

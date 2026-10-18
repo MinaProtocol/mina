@@ -1,5 +1,7 @@
 (library
  (name blockchain_snark)
+ (flags
+  (:standard -warn-error +a))
  (public_name blockchain_snark)
  (library_flags -linkall)
  (libraries
@@ -40,7 +42,7 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_compare ppx_jane ppx_mina ppx_snarky ppx_version))
+  (pps ppx_jane ppx_mina ppx_snarky ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "blockchain state transition snarking library"))

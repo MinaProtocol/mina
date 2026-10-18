@@ -8,20 +8,13 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let PatchArchiveTest = ../../Command/PatchArchiveTest.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let Dockers = ../../Constants/DockerVersions.dhall
+let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
-        Artifacts.Type.FunctionalTestSuite
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -38,6 +31,7 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Archive
           ]
         }
       , steps = [ PatchArchiveTest.step dependsOn ]

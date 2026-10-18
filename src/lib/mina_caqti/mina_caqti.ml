@@ -2,18 +2,68 @@
 
 open Async
 open Core_kernel
-open Caqti_async
 open Mina_base
 
 (* custom Caqti types for generating type annotations on queries *)
-type _ Caqti_type.field +=
-  | Array_nullable_int : int option array Caqti_type.field
+let find_req t u s = Caqti_request.Infix.(t ->! u) s
 
-type _ Caqti_type.field +=
-  | Array_nullable_int64 : int64 option array Caqti_type.field
+let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
 
-type _ Caqti_type.field +=
-  | Array_nullable_string : string option array Caqti_type.field
+let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+
+let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s
+
+module type CONNECTION = sig
+  include Caqti_async.CONNECTION
+
+  (** Code expects any queries to differing sources to never interfere. *)
+  val source : Uri.t
+end
+
+module Wrap
+    (Conn : Caqti_async.CONNECTION) (Arg : sig
+      val source : Uri.t
+    end) : CONNECTION = struct
+  include Conn
+  include Arg
+end
+
+let wrap_conn (module Conn : Caqti_async.CONNECTION) ~source =
+  let module Conn =
+    Wrap
+      (Conn)
+      (struct
+        let source = source
+      end)
+  in
+  (module Conn : CONNECTION)
+
+module Pool = struct
+  type ('a, 'e) t = { source : Uri.t; pool : ('a, 'e) Caqti_async.Pool.t }
+
+  let wrap ~source pool = { source; pool }
+
+  let use (f : (module CONNECTION) -> 'a) pool =
+    Caqti_async.Pool.use
+      (fun (module Conn : Caqti_async.CONNECTION) ->
+        f (wrap_conn (module Conn) ~source:pool.source) )
+      pool.pool
+end
+
+let connect_pool ?max_size uri =
+  let size = max_size in
+  let%map.Result pool =
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ?max_size:size ()))
+      uri
+  in
+  Pool.wrap ~source:uri pool
+
+let connect uri =
+  let%map.Deferred.Result conn = Caqti_async.connect uri in
+  wrap_conn ~source:uri conn
 
 module Type_spec = struct
   type (_, _) t =
@@ -26,7 +76,7 @@ module Type_spec = struct
      | [] ->
          (Caqti_type.unit : tuple Caqti_type.t)
      | rep :: spec ->
-         Caqti_type.tup2 rep (to_rep spec)
+         Caqti_type.t2 rep (to_rep spec)
 
   let rec hlist_to_tuple :
             'hlist 'tuple.
@@ -189,59 +239,14 @@ let make_coding (type a) ~(elem_to_string : a -> string)
   in
   (encode, decode)
 
-(* register coding for nullable int arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
+(** this type may require type annotations in queries, eg.
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
+*)
+let array_nullable_int_typ =
   let encode, decode =
     make_coding ~elem_to_string:Int.to_string ~elem_of_string:Int.of_string
   in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_int ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_int { get_coding }
-
-(* register coding for nullable int64 arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
-  let encode, decode =
-    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
-  in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_int64 ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_int64 { get_coding }
-
-(* register coding for nullable string arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
-  let encode, decode =
-    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
-  in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_string ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_string { get_coding }
-
-(* this type may require type annotations in queries, eg.
-   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
-*)
-let array_nullable_int_typ : int option array Caqti_type.t =
-  Caqti_type.field Array_nullable_int
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_int_typ : int array Caqti_type.t =
   let open Result.Let_syntax in
@@ -254,11 +259,14 @@ let array_int_typ : int array Caqti_type.t =
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
 
-(* this type may require type annotations in queries, eg.
+(** this type may require type annotations in queries, eg.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::bigint[]`
 *)
-let array_nullable_int64_typ : int64 option array Caqti_type.t =
-  Caqti_type.field Array_nullable_int64
+let array_nullable_int64_typ =
+  let encode, decode =
+    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
+  in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_int64_typ : int64 array Caqti_type.t =
   let open Result.Let_syntax in
@@ -271,11 +279,14 @@ let array_int64_typ : int64 array Caqti_type.t =
   in
   Caqti_type.custom array_nullable_int64_typ ~encode ~decode
 
-(* this type may require type annotations in queries, e.g.
+(*** this type may require type annotations in queries, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
 *)
-let array_nullable_string_typ : string option array Caqti_type.t =
-  Caqti_type.field Array_nullable_string
+let array_nullable_string_typ =
+  let encode, decode =
+    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
+  in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_string_typ : string array Caqti_type.t =
   let open Result.Let_syntax in
@@ -365,16 +376,29 @@ let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
    The optional `tannot` function maps column names to type annotations.
    No type annotation is included if `tannot` returns an empty string. *)
 let insert_into_cols ~(returning : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
-    : string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list)
+    ?(on_conflict : string option) () : string =
   let values =
     List.map cols ~f:(fun col ->
         match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot )
     |> String.concat ~sep:", "
   in
-  sprintf "INSERT INTO %s (%s) VALUES (%s) RETURNING %s" table_name
-    (String.concat ~sep:", " cols)
-    values returning
+  let insert =
+    sprintf "INSERT INTO %s (%s) VALUES (%s)" table_name
+      (String.concat ~sep:", " cols)
+      values
+  in
+  match on_conflict with
+  | Some col ->
+      let assignments =
+        String.split col ~on:',' |> List.map ~f:String.strip
+        |> List.map ~f:(fun col -> sprintf "%s = EXCLUDED.%s" col col)
+        |> String.concat ~sep:", "
+      in
+      sprintf "%s ON CONFLICT (%s) DO UPDATE SET %s RETURNING %s" insert col
+        assignments returning
+  | None ->
+      sprintf "%s RETURNING %s" insert returning
 
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
@@ -384,7 +408,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
-    ( Caqti_request.find_opt (snd cols) (snd select)
+    ( Caqti_request.Infix.(snd cols ->? snd select)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
@@ -393,7 +417,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       return id
   | None ->
       Conn.find
-        ( Caqti_request.find (snd cols) (snd select)
+        ( Caqti_request.Infix.(snd cols ->! snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
@@ -415,7 +439,11 @@ let insert_multi_into_col ~(table_name : string)
       (sep_by_comma ~parenthesis:true values)
       (fst col)
   in
-  let%bind () = Conn.exec (Caqti_request.exec Caqti_type.unit insert) () in
+  let%bind () =
+    Conn.exec
+      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
+      ()
+  in
   let search =
     sprintf
       {sql| SELECT %s, id FROM %s
@@ -423,17 +451,80 @@ let insert_multi_into_col ~(table_name : string)
       (fst col) table_name (fst col) (sep_by_comma values)
   in
   Conn.collect_list
-    (Caqti_request.collect Caqti_type.unit
-       Caqti_type.(tup2 (snd col) int)
-       search )
+    Caqti_request.Infix.(
+      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
     ()
 
-let query ~f pool =
-  match%bind Caqti_async.Pool.use f pool with
+(* Like the [None] branch of [select_insert_into_cols]: always INSERT and return
+   the new [returning] value. Performs NO content lookup/dedup, so it is safe for
+   columns without a UNIQUE constraint or index (e.g. the unbounded int[]
+   zkapp_events/zkapp_field_array.element_ids whose UNIQUE/index was dropped). *)
+let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
+    (module Conn : CONNECTION) (value : 'cols) =
+  Conn.find
+    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    @@ insert_into_cols ~returning:(fst returning) ~table_name ?tannot
+         ~cols:(fst cols) () )
+    value
+
+(* Like [insert_into_cols] but generates an upsert:
+   INSERT INTO table (cols) VALUES (params)
+   ON CONFLICT (on_conflict) DO UPDATE SET on_conflict = EXCLUDED.on_conflict
+   RETURNING returning.
+   The DO UPDATE is a no-op that returns the existing row's id when a conflict
+   occurs, preventing UNIQUE violation errors under concurrent insertion. *)
+let upsert_into_cols ~(on_conflict : string) ~(returning : string)
+    ~(table_name : string) ?(tannot : string -> string option = Fn.const None)
+    ~(cols : string list) () : string =
+  insert_into_cols ~returning ~table_name ~tannot ~cols ~on_conflict ()
+
+(* Upsert with ON CONFLICT, returning the id of either the newly inserted row
+   or the existing row that caused the conflict. *)
+let upsert_into_cols_returning ~(on_conflict : string)
+    ~(returning : string * 'r Caqti_type.t) ~(table_name : string) ?tannot
+    ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
+    (value : 'cols) =
+  Conn.find
+    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
+         ?tannot ~cols:(fst cols) () )
+    value
+
+(* No-dedup multi-row insert of one column's pre-rendered SQL literals, returning
+   the new ids in VALUES order (a single INSERT ... RETURNING returns rows in
+   VALUES order in PostgreSQL). Unlike [insert_multi_into_col] there is NO
+   ON CONFLICT and NO content SELECT-back, so it does not require a UNIQUE
+   constraint and never deduplicates: identical inputs yield distinct rows. Used
+   for zkapp_field_array.element_ids after its UNIQUE/index was dropped. *)
+let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
+    (module Conn : CONNECTION) (values : string list) =
+  let open Deferred.Result.Let_syntax in
+  match values with
+  | [] ->
+      return []
+  | _ ->
+      let insert =
+        sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table_name col
+          (sep_by_comma ~parenthesis:true values)
+      in
+      Conn.collect_list
+        Caqti_request.Infix.((Caqti_type.unit ->* Caqti_type.int) insert)
+        ()
+
+(** Unwrap a Caqti result, raising on error. [ctx] names the operation being
+    performed and is prepended to the message. *)
+let ok_exn ?ctx = function
   | Ok v ->
-      return v
+      v
   | Error msg ->
-      failwithf "Error querying db, error: %s" (Caqti_error.show msg) ()
+      failwithf "%sError querying db, error: %s"
+        (Option.value_map ctx ~default:"" ~f:(sprintf "%s: "))
+        (Caqti_error.show msg) ()
+
+let query ~f pool =
+  let%map res = Pool.use f pool in
+  ok_exn res
 
 (** functions to retrieve an item from the db, where the input has
     option type; the resulting option is converted to a suitable type
@@ -441,11 +532,8 @@ let query ~f pool =
 let make_get_opt ~of_option ~f item_opt =
   let%map res_opt =
     Option.value_map item_opt ~default:(return None) ~f:(fun item ->
-        match%map f item with
-        | Ok v ->
-            Some v
-        | Error msg ->
-            failwithf "Error querying db, error: %s" (Caqti_error.show msg) () )
+        let%map res = f item in
+        Some (ok_exn res) )
   in
   of_option res_opt
 

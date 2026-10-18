@@ -4,21 +4,24 @@ let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let SelectFiles = ../Lib/SelectFiles.dhall
 
-in  { executeLocal =
+in  { executeDocker =
             \(testName : Text)
         ->  \(dependsOn : List Command.TaggedKey.Type)
         ->  Command.build
               Command.Config::{
               , commands =
                 [ Cmd.run
-                    "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-local.sh ${testName}"
+                    "MINA_DEB_CODENAME=bookworm ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-docker.sh ${testName} ${DockerRepo.show
+                                                                                                                                                                        DockerRepo.Type.InternalEurope}"
                 ]
               , artifact_paths =
-                [ SelectFiles.exactly "." "${testName}.local.test.log" ]
-              , label = "${testName} integration test local"
-              , key = "integration-test-${testName}-local"
+                [ SelectFiles.contains "${testName}*.local.test.log" ]
+              , label = "${testName} integration test docker"
+              , key = "integration-test-${testName}-docker"
               , target = Size.Integration
               , depends_on = dependsOn
               }

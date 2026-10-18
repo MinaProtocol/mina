@@ -292,7 +292,7 @@ end)
       Strict_pipe.(
         create ~name:"Network pool transition frontier diffs" Synchronous)
     in
-    let t, locals, remotes =
+    let t, remotes, locals =
       of_resource_pool_and_diffs
         (Resource_pool.create ~constraint_constants ~consensus_constants
            ~time_controller ~config ~logger ~frontier_broadcast_pipe
@@ -302,5 +302,5 @@ end)
     in
     O1trace.background_thread rebroadcast_loop_thread_label (fun () ->
         rebroadcast_loop t logger ) ;
-    (t, locals, remotes)
+    (t, remotes, locals)
 end

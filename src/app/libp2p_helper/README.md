@@ -53,6 +53,27 @@ See [Go Protocol buffers - avoiding
 conflicts](https://github.com/bazelbuild/rules_go/blob/master/proto/core.rst#avoiding-conflicts): [Option 2: Use pre-generated .pb.go files](https://github.com/bazelbuild/rules_go/blob/master/proto/core.rst#option-2-use-pre-generated-pb-go-files).
 for more info.
 
+## Configuration
+
+### Environment Variables
+
+#### LIBP2P_ENABLE_MDNS
+
+Controls whether mDNS (Multicast DNS) local network peer discovery is enabled.
+
+- **Default**: `false` (mDNS is **disabled** for security)
+- **Values**: `"true"` to enable, any other value or unset to disable
+- **Use case**: mDNS is only needed for local development/testing where multiple nodes run on the same network. **Production deployments should keep this disabled** as nodes discover each other via seed peers and DHT.
+- **Security**: Disabling mDNS prevents the node from broadcasting on cloud provider internal networks and discovering other VMs, which can trigger abuse reports.
+
+#### MINA_LIBP2P_DISCOVERY_MIN_INTERVAL / MINA_LIBP2P_DISCOVERY_MAX_INTERVAL
+
+Bound the interval at which the node re-queries the DHT for peers while it is below its low-water peer mark. The wait starts at the minimum and doubles up to the maximum until enough peers are found.
+
+- **Defaults**: `1s` and `5m`
+- **Values**: any Go duration string, e.g. `500ms`, `30s`, `2m`; an unset or unparseable value falls back to the default
+- **Use case**: shorten both in small test networks that need to converge quickly, lengthen them to reduce DHT query load.
+
 ## How it works
 
 libp2p_helper serves as a middleware between libp2p and Ocaml process. They communicate using a number of internal messages.

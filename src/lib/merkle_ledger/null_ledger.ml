@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Make (Inputs : Intf.Inputs.Intf) : sig
   include
     Intf.Ledger.NULL
@@ -93,6 +95,8 @@ end = struct
   let set_at_index_exn _t =
     failwith "set_at_index_exn: null ledgers cannot be mutated"
 
+  let get_at_index _t _index = None
+
   let get_at_index_exn _t = failwith "get_at_index_exn: null ledgers are empty"
 
   let set_batch ?hash_cache:_ _t =
@@ -127,6 +131,8 @@ end = struct
   let token_owners _t = Account_id.Set.empty
 
   let tokens _t _pk = Token_id.Set.empty
+
+  let iteri_untrusted _t ~f:_ = ()
 
   let iteri _t ~f:_ = ()
 
@@ -169,4 +175,6 @@ end = struct
   let depth t = t.depth
 
   let detached_signal _ = Async_kernel.Deferred.never ()
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end

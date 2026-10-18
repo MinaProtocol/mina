@@ -4,6 +4,8 @@
     containing the indexed column
 */
 
+DROP TABLE genesis_accounts;
+
 DROP TABLE blocks_internal_commands;
 
 DROP TABLE blocks_user_commands;
@@ -105,3 +107,7 @@ DROP TABLE zkapp_events;
 DROP TABLE token_symbols;
 
 DROP TABLE voting_for;
+
+DROP TABLE zkapp_field;
+
+DROP TABLE zkapp_verification_key_hashes;
