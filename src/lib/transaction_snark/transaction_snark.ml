@@ -946,12 +946,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             With_hash.of_data account ~hash_data:(fun a ->
                 lazy
                   (let a =
-                     { a with
-                       zkapp =
+                     Account.Checked.Unhashed.to_var a
+                       ~zkapp:
                          ( Zkapp_account.Checked.digest a.zkapp
                          , exists (Typ.prover_value ()) ~compute:(fun () ->
                                None ) )
-                     }
                    in
                    run_checked (Account.Checked.digest a) ) )
 
@@ -963,7 +962,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             { account with data = { account.data with timing } }
 
           let is_timed ({ data = account; _ } : t) =
-            let open Account.Poly in
             let open Account.Timing.As_record in
             let { is_timed; _ } = account.timing in
             is_timed
@@ -2627,7 +2625,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~then_:(Account_id.Checked.public_key fee_payer)
                     ~else_:account.delegate
                 in
-                { Account.Poly.balance
+                { Account.Var.balance
                 ; public_key
                 ; token_id
                 ; token_symbol = account.token_symbol
@@ -2842,7 +2840,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                         ~else_:account.token_id )
                 in
-                { Account.Poly.balance
+                { Account.Var.balance
                 ; public_key
                 ; token_id
                 ; token_symbol = account.token_symbol
@@ -3009,7 +3007,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    of [user_command_fails], but we throw the resulting hash away
                    in [final_root] below, so it shouldn't matter.
                 *)
-                { Account.Poly.balance
+                { Account.Var.balance
                 ; public_key = account.public_key
                 ; token_id = account.token_id
                 ; token_symbol = account.token_symbol
