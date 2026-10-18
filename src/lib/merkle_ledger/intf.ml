@@ -483,6 +483,11 @@ module Ledger = struct
 
     val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
+    (** Like [get_all_accounts_rooted_at_exn], but returns each account's
+        stored bin_prot encoding without decoding it. *)
+    val get_all_raw_accounts_rooted_at_exn :
+      t -> Addr.t -> (Addr.t * Bigstring.t) list
+
     module For_tests : sig
       val gen_account_location :
         ledger_depth:int -> Location.t Quickcheck.Generator.t
