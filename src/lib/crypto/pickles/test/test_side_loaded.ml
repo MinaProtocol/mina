@@ -326,6 +326,11 @@ module Simple_chain_no_features = Simple_chain (struct
   let feature_flags = Plonk_types.Features.none
 end)
 
+module Simple_chain_maybe_features = Simple_chain (struct
+  let feature_flags =
+    Plonk_types.Features.(map none ~f:(fun _ -> Opt.Flag.Maybe))
+end)
+
 let () =
   let open Alcotest in
   run "Pickles side-loaded"
@@ -334,12 +339,20 @@ let () =
       , [ test_case "verify" `Quick Fake_1_recursion.test_verify ] )
     ; ( "Fake 2 recursion"
       , [ test_case "verify" `Quick Fake_2_recursion.test_verify ] )
-    ; ( "Simple chain"
+    ; ( "Simple chain, no features"
       , [ test_case "side-load no recursion" `Quick
             Simple_chain_no_features.test_side_load_no_recursion
         ; test_case "side-load fake 1 recursion" `Quick
             Simple_chain_no_features.test_side_load_fake_1_recursion
         ; test_case "side-load fake 2 recursion" `Quick
             Simple_chain_no_features.test_side_load_fake_2_recursion
+        ] )
+    ; ( "Simple chain, maybe features"
+      , [ test_case "side-load no recursion" `Quick
+            Simple_chain_maybe_features.test_side_load_no_recursion
+        ; test_case "side-load fake 1 recursion" `Quick
+            Simple_chain_maybe_features.test_side_load_fake_1_recursion
+        ; test_case "side-load fake 2 recursion" `Quick
+            Simple_chain_maybe_features.test_side_load_fake_2_recursion
         ] )
     ]

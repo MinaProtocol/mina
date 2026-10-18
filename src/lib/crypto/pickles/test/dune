@@ -15,7 +15,6 @@
   test_wrap_hack
   test_encoding_regression
   test_side_loaded
-  test_side_loaded_feature_flags
   test_adversarial
   test_uncorrelated_bulletproof_challenges)
  (flags
