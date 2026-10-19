@@ -746,6 +746,46 @@ let pending_work_spec =
           ~resolve:(fun _ w -> w)
       ] )
 
+module Scan_state = struct
+  module Tree_metrics = Staged_ledger.Scan_state.Tree_metrics
+
+  type t = { state_hash : State_hash.t; trees : Tree_metrics.t list }
+
+  let tree : (Mina_lib.t, Tree_metrics.t option) typ =
+    obj "ScanStateTree"
+      ~doc:"Free space and outstanding snark work in one tree of the scan state"
+      ~fields:(fun _ ->
+        [ field "availableSpace" ~typ:(non_null int)
+            ~doc:"Number of transaction slots still free in this tree"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.available_space; _ } ->
+              available_space )
+        ; field "baseJobsTodo" ~typ:(non_null int)
+            ~doc:"Number of base jobs in this tree that are yet to be done"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.base_jobs_todo; _ } -> base_jobs_todo)
+        ; field "mergeJobsTodo" ~typ:(non_null int)
+            ~doc:"Number of merge jobs in this tree that are yet to be done"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.merge_jobs_todo; _ } ->
+              merge_jobs_todo )
+        ] )
+
+  let obj : (Mina_lib.t, t option) typ =
+    obj "ScanState" ~doc:"Status of the scan state as of a block"
+      ~fields:(fun _ ->
+        [ field "stateHash" ~typ:(non_null state_hash)
+            ~doc:"State hash of the block whose scan state this is"
+            ~args:Arg.[]
+            ~resolve:(fun _ { state_hash; _ } -> state_hash)
+        ; field "trees"
+            ~typ:(non_null @@ list @@ non_null tree)
+            ~doc:"Status of each tree in the scan state, oldest first"
+            ~args:Arg.[]
+            ~resolve:(fun _ { trees; _ } -> trees)
+        ] )
+end
+
 let state_stack =
   let module M = Pending_coinbase.State_stack in
   obj "StateStack" ~fields:(fun _ ->
