@@ -38,7 +38,7 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           , PipelineTag.Type.Release
           ]
-        , scope = PipelineScope.PullRequestOnly
+        , scope = PipelineScope.InfraOnly
         }
       , steps =
         [ Command.build
