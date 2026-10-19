@@ -791,7 +791,7 @@ let%test_unit "tokens test" =
     in
     execute_zkapp_command_transaction create_token ;
     (* Check that token_owner exists *)
-    ledger_get_exn ledger token_owner_pk Token_id.default |> ignore ;
+    ignore (ledger_get_exn ledger token_owner_pk Token_id.default : Account.t) ;
     execute_zkapp_command_transaction token_minting ;
     check_token_balance token_account1 100 ;
     execute_zkapp_command_transaction token_transfers ;

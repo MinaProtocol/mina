@@ -18,4 +18,4 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_annot ppx_jane ppx_version)))
+  (pps mina_ppx)))

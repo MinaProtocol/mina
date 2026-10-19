@@ -131,26 +131,4 @@
   ../../../../../graphql_schema.json
   ../../../../graphql-ppx-config.inc)
  (preprocess
-  (pps
-   ppx_mina
-   ppx_version
-   ppx_base
-   ppx_assert
-   ppx_bench
-   ppx_custom_printf
-   ppx_fields_conv
-   ppx_fixed_literal
-   ppx_here
-   ppx_inline_test
-   ppx_let
-   ppx_module_timer
-   ppx_optional
-   ppx_pipebang
-   ppx_sexp_message
-   ppx_sexp_value
-   ppx_string
-   ppx_typerep_conv
-   ppx_variants_conv
-   graphql_ppx
-   --
-   %{read-lines:../../../../graphql-ppx-config.inc})))
+  (pps mina_ppx.graphql -- %{read-lines:../../../../graphql-ppx-config.inc})))

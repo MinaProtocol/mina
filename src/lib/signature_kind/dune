@@ -3,7 +3,11 @@
  (public_name mina_signature_kind)
  (libraries mina_signature_kind.type)
  (preprocess
-  (pps ppx_version ppx_deriving_yojson))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (virtual_modules mina_signature_kind)

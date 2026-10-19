@@ -5,4 +5,4 @@
     yojson
     )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_deriving_yojson ppx_jane ppx_version )))
+ (preprocess (pps mina_ppx)))

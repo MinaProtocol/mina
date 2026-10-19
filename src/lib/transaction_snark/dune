@@ -61,7 +61,7 @@
   tuple_lib
   with_hash)
  (preprocess
-  (pps h_list.ppx ppx_deriving.std ppx_jane ppx_mina ppx_snarky ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Transaction state transition snarking library"))

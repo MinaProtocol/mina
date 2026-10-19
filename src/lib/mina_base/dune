@@ -75,26 +75,7 @@
   unsigned_extended
   with_hash)
  (preprocess
-  (pps
-   base_quickcheck.ppx_quickcheck
-   h_list.ppx
-   ppx_annot
-   ppx_assert
-   ppx_base
-   ppx_bench
-   ppx_custom_printf
-   ppx_deriving.enum
-   ppx_deriving.make
-   ppx_deriving.ord
-   ppx_fields_conv
-   ppx_here
-   ppx_inline_test
-   ppx_let
-   ppx_mina
-   ppx_pipebang
-   ppx_snarky
-   ppx_variants_conv
-   ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snarks and friends necessary for keypair generation"))

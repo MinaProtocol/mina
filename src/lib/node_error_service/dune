@@ -38,7 +38,7 @@
   consensus
   mina_numbers)
  (preprocess
-  (pps ppx_jane ppx_deriving.std ppx_mina ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis
