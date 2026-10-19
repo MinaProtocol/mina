@@ -191,8 +191,19 @@ if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
     done
     exit 0
 fi
+# "docker tag <src> <dst>" fails for an image in STUB_UNTAGGABLE that has not
+# been loaded since: another job removed the tag after it was inspected.
+if [[ "${1:-}" == "tag" ]]; then
+    for gone in ${STUB_UNTAGGABLE:-}; do
+        if [[ "$2" == "$gone" ]] && ! grep -qx -- "$2" "${STUB_LOADED_FILE:-/dev/null}" 2>/dev/null; then
+            exit 1
+        fi
+    done
+    exit 0
+fi
 # "docker save <tags>" writes the tags, one on each line, as the archive.
 if [[ "${1:-}" == "save" ]]; then
+    [[ -n "${STUB_SAVE_FAILS:-}" ]] && { echo "partial"; exit 1; }
     shift
     printf '%s\n' "$@"
     exit 0
@@ -242,6 +253,9 @@ run_build() {
       KEEP_MY_TAGS_INTACT="true" \
       STUB_TAG_IN_REGISTRY="${STUB_TAG_IN_REGISTRY:-}" \
       STUB_MISSING_IMAGES="${STUB_MISSING_IMAGES:-}" \
+      STUB_UNTAGGABLE="${STUB_UNTAGGABLE:-}" \
+      STUB_SAVE_FAILS="${STUB_SAVE_FAILS:-}" \
+      BUILDKITE_JOB_ID="testjob" \
       STUB_LOADED_FILE="${STUB_DIR}/loaded" \
       GAR_CACHE_DISABLED=true \
       FORCE_DOCKER_OVERWRITE="${FORCE_DOCKER_OVERWRITE:-}" \
@@ -484,8 +498,77 @@ test_base_cache_dir_loads_a_missing_base() {
 
     assert_eq "exit code" 0 "$LAST_EXIT"
     assert_called "the base is loaded" "${args}.calls" "^load$"
-    assert_has_line "FROM names the registry, not gar-cache" "$args" \
-        "docker_repo=testreg"
+    assert_has_line "FROM names the job-private tag, not gar-cache" "$args" \
+        "docker_repo=job-testjob"
+    assert_called "the job-private tag is made" "${args}.calls" \
+        "^tag ${base} job-testjob/mina-daemon:3.1.0-devnet-generic$"
+    assert_called "the job-private tag is removed at exit" "${args}.calls" \
+        "^rmi job-testjob/mina-daemon:3.1.0-devnet-generic$"
+}
+
+# The refs a job owns: the tags it built, and a base it loaded. A base that was
+# already local belongs to the job that loaded it.
+test_owned_refs_file_lists_built_and_loaded_images() {
+    local args="${STUB_DIR}/owned.args"
+    local owned="${STUB_DIR}/owned-refs"
+    local base="testreg/mina-daemon:3.1.0-devnet-generic"
+    rm -f "$owned"
+    mkdir -p "${STUB_DIR}/owned-base/mina-daemon"
+    echo "$base" > "${STUB_DIR}/owned-base/mina-daemon/3.1.0-devnet-generic.tar.zst"
+    STUB_MISSING_IMAGES="$base" run_build "$args" \
+        --service mina-daemon-configured --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet \
+        --load-only --base-cache-dir "${STUB_DIR}/owned-base" \
+        --owned-refs-file "$owned"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_has_line "the loaded base" "$owned" "$base"
+    assert_has_line "the version tag" "$owned" \
+        "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet"
+    assert_has_line "the hash tag" "$owned" "testreg/mina-daemon:abcdefg-bullseye-devnet"
+
+    rm -f "$owned"
+    run_build "$args" \
+        --service mina-daemon-configured --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet \
+        --load-only --base-cache-dir "${STUB_DIR}/owned-base" \
+        --owned-refs-file "$owned"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_not_called "a local base is not loaded" "${args}.calls" "^load$"
+    assert_no_line "a local base is not owned" "$owned" "$base"
+}
+
+# Another job removed the shared base tag between the check and the tag: the
+# base is loaded again, not lost.
+test_base_removed_by_another_job_is_loaded_again() {
+    local args="${STUB_DIR}/race.args"
+    local base="testreg/mina-daemon:3.1.0-devnet-generic"
+    mkdir -p "${STUB_DIR}/race-base/mina-daemon"
+    echo "$base" > "${STUB_DIR}/race-base/mina-daemon/3.1.0-devnet-generic.tar.zst"
+    STUB_UNTAGGABLE="$base" run_build "$args" \
+        --service mina-daemon-configured --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --deb-profile devnet \
+        --load-only --base-cache-dir "${STUB_DIR}/race-base"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the base is loaded again" "${args}.calls" "^load$"
+    assert_has_line "FROM names the job-private tag" "$args" "docker_repo=job-testjob"
+}
+
+# A failed save leaves no partial archive in the cache.
+test_failed_save_leaves_no_partial_archive() {
+    local args="${STUB_DIR}/savefail.args"
+    STUB_SAVE_FAILS=1 run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --load-only \
+        --build-cache-dir "${STUB_DIR}/savefail"
+
+    assert_eq "exit code" 1 "$LAST_EXIT"
+    assert_eq "no partial archive is left" "" \
+        "$(find "${STUB_DIR}/savefail" -name '*.partial.*')"
+    assert_file_absent "no archive is published" \
+        "${STUB_DIR}/savefail/mina-daemon/3.1.0.tar.zst"
 }
 
 # A base that is neither local nor cached stops the build before buildx, with
@@ -855,6 +938,9 @@ main() {
     run_test test_build_cache_dir_without_hash_tag
     run_test test_base_cache_dir_loads_a_missing_base
     run_test test_base_cache_dir_missing_archive_fails
+    run_test test_owned_refs_file_lists_built_and_loaded_images
+    run_test test_base_removed_by_another_job_is_loaded_again
+    run_test test_failed_save_leaves_no_partial_archive
     run_test test_published_tag_is_not_overwritten
     run_test test_force_overwrite_pushes_over_a_published_tag
     run_test test_load_only_ignores_the_published_tag

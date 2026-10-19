@@ -46,7 +46,6 @@
   consensus
   child_processes
   node_addrs_and_ports
-  mina_plugins
   logger.file_system
   cli_lib
   genesis_constants
@@ -78,10 +77,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_mina
-   ppx_version
-   ppx_here
-   ppx_let
-   ppx_sexp_conv
-   ppx_deriving_yojson)))
+  (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv)))

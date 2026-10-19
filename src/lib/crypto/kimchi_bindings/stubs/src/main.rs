@@ -401,6 +401,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fp_plonk_index_domain_d8_size => "domain_d8_size");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_read => "read");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_write => "write");
+                decl_func!(w, env, caml_pasta_fp_plonk_index_read_cached => "read_cached");
+                decl_func!(w, env, caml_pasta_fp_plonk_index_write_cached => "write_cached");
             });
 
             decl_module!(w, env, "Fq", {
@@ -414,6 +416,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_index_domain_d8_size => "domain_d8_size");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_read => "read");
                 decl_func!(w, env, caml_pasta_fq_plonk_index_write => "write");
+                decl_func!(w, env, caml_pasta_fq_plonk_index_read_cached => "read_cached");
+                decl_func!(w, env, caml_pasta_fq_plonk_index_write_cached => "write_cached");
             });
         });
 

@@ -67,11 +67,9 @@
   (pps
    lens.ppx_deriving
    ppx_assert
-   ppx_bin_prot
    ppx_compare
    ppx_custom_printf
    ppx_deriving.make
-   ppx_deriving_yojson
    ppx_fields_conv
    ppx_inline_test
    ppx_let

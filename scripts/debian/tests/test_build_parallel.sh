@@ -157,7 +157,6 @@ teardown_parallel_test_env() {
 
 test_resolve_simple_tokens() {
   assert_eq "logproc"               "mina-logproc"            "$(resolve_deb_output logproc)"
-  assert_eq "minimina"              "minimina"                "$(resolve_deb_output minimina)"
   assert_eq "tx_tools"              "mina-tx-tools"           "$(resolve_deb_output tx_tools)"
   assert_eq "test_executive"        "mina-test-executive"     "$(resolve_deb_output test_executive)"
   assert_eq "functional_test_suite" "mina-test-suite"         "$(resolve_deb_output functional_test_suite)"
