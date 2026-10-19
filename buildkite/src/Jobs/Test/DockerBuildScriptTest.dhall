@@ -20,12 +20,11 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.exactly "scripts/docker/build" "sh"
           , S.exactly "scripts/docker/helper" "sh"
-          , S.strictlyStart (S.contains "scripts/docker/tests")
+          , S.strictlyStart (S.contains "scripts/tests/docker")
           , S.strictlyStart (S.contains "dockerfiles")
           , S.exactly "scripts/export-git-env-vars" "sh"
           , S.exactly "buildkite/src/Jobs/Test/DockerBuildScriptTest" "dhall"
           , S.exactly "buildkite/scripts/docker/publish_from_cache" "sh"
-          , S.strictlyStart (S.contains "buildkite/scripts/docker/tests")
           ]
         , path = "Test"
         , name = "DockerBuildScriptTest"
@@ -40,10 +39,9 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./scripts/docker/tests/test_build.sh"
-              , Cmd.run "./scripts/docker/tests/test_install_config_profile.sh"
-              , Cmd.run
-                  "./buildkite/scripts/docker/tests/test_publish_from_cache.sh"
+              [ Cmd.run "./scripts/tests/docker/test_build.sh"
+              , Cmd.run "./scripts/tests/docker/test_install_config_profile.sh"
+              , Cmd.run "./scripts/tests/docker/test_publish_from_cache.sh"
               ]
             , label = "Docker build script tests"
             , key = "docker-build-script-tests"

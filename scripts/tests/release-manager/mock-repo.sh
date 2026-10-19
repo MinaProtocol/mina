@@ -106,7 +106,7 @@ Priority: optional
 Architecture: ${__arch}
 Maintainer: O(1) Labs <build@o1labs.org>
 Description: Synthetic ${__name} fixture for the release-manager test suite
- Built by buildkite/scripts/tests/release-manager/mock-repo.sh. It carries no
+ Built by scripts/tests/release-manager/mock-repo.sh. It carries no
  Mina code: it exists so that the release manager has a package to publish,
  promote, reversion and verify.
 EOF

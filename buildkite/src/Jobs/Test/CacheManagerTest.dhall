@@ -13,6 +13,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "buildkite/scripts/cache")
+          , S.strictlyStart (S.contains "scripts/tests/buildkite-cache")
           , S.exactly "buildkite/src/Jobs/Test/CacheManagerTest" "dhall"
           , S.exactly "buildkite/src/Command/CacheManagerTest" "dhall"
           ]

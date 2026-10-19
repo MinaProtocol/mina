@@ -22,7 +22,7 @@
 set -eux -o pipefail
 
 TEST_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
-MANAGER_SH="$(realpath "$TEST_DIR/../manager.sh")"
+MANAGER_SH="$(realpath "$TEST_DIR/../../../buildkite/scripts/cache/manager.sh")"
 
 CACHE_ENGINE="${CACHE_ENGINE:-bash}"
 BCM="${BCM:-buildkite-cache-manager}"

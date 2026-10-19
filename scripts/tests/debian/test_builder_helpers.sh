@@ -5,7 +5,7 @@ set -euo pipefail
 # Test suite for build_*_deb functions in builder-helpers.sh
 #
 # Usage:
-#   bash scripts/debian/tests/test_builder_helpers.sh
+#   bash scripts/tests/debian/test_builder_helpers.sh
 #
 # This test suite:
 # - Creates a temporary directory with mock source files (executables, configs)
