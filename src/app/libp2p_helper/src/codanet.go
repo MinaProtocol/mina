@@ -818,6 +818,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		},
 	}
 
+	// The peerstore persists across restarts, so it may still hold
+	// addresses for peers banned in the initial gating config.
+	h.forgetBannedPeers()
+
 	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil
 }
