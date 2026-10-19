@@ -369,11 +369,7 @@ let
             src/app/logproc/logproc.exe \
             src/app/cli/src/mina.exe \
             src/app/batch_txn_tool/batch_txn_tool.exe \
-            src/app/cli/src/mina_testnet_signatures.exe \
-            src/app/cli/src/mina_mainnet_signatures.exe \
             src/app/rosetta/rosetta.exe \
-            src/app/rosetta/rosetta_testnet_signatures.exe \
-            src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
             src/app/archive/archive.exe \
             src/app/archive_blocks/archive_blocks.exe \
@@ -391,15 +387,13 @@ let
           "out"
           "archive"
           "generate_keypair"
-          "mainnet"
-          "testnet"
           "genesis"
           "sample"
           "batch_txn_tool"
         ];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           # TODO uncomment when genesis is generated above
           # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
@@ -409,10 +403,6 @@ let
           cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $out/bin/runtime_genesis_ledger
-          cp src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
-          cp src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
-          cp src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
-          cp src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
           cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           cp src/app/archive/archive.exe $archive/bin/mina-archive
           cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
@@ -421,7 +411,7 @@ let
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
           popd
-          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =
           "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
