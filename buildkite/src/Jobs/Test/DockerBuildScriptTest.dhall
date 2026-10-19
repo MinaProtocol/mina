@@ -4,6 +4,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -28,6 +30,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "DockerBuildScriptTest"
+        , scope = PipelineScope.InfraOnly
         , tags =
           [ PipelineTag.Type.Fast
           , PipelineTag.Type.Test
