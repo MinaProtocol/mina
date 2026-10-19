@@ -36,6 +36,6 @@
   tuple_lib
   genesis_constants)
  (preprocess
-  (pps h_list.ppx ppx_bench ppx_compare ppx_jane ppx_version))
+  (pps h_list.ppx ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx)))

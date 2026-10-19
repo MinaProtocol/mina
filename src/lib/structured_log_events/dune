@@ -12,12 +12,7 @@
   ;; local libraries
   interpolator_lib)
  (preprocess
-  (pps
-   ppx_version
-   ppx_jane
-   ppx_deriving.std
-   ppx_deriving_yojson
-   ppx_inline_test))
+  (pps ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Events, logging and parsing"))

@@ -40,6 +40,10 @@
 open Core
 open Async
 
+(* The exit status of a failed --assert-no-growth. It differs from the status of
+   every other failure, so a leak can be told apart from a broken run. *)
+let memory_gate_exit_status = 42
+
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
 let exec_oneshot sql =
@@ -101,6 +105,11 @@ end
 type result =
   { name : string
   ; prepared_final : int
+  ; prepared_growth : int
+        (* rise in the count over the second half of the calls: a request that
+           is built once, or [~oneshot], adds no statement after its first call,
+           so anything above zero is the leak *)
+  ; calls_per_s : float
   ; per_call : float
   ; plan_cache_kib_final : int option
         (* [None] on servers without [pg_backend_memory_contexts] (<PG14) *)
@@ -464,14 +473,28 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
     (prepared, bytes)
   in
   let%bind prepared0, bytes0 = sample_and_print 0 in
+  let midpoint = iterations / 2 in
+  let prepared_mid = ref prepared0 in
+  let elapsed = ref Time_ns.Span.zero in
   let%bind final_prepared, final_bytes =
     Deferred.List.fold
       (List.range 1 (iterations + 1))
       ~init:(prepared0, bytes0)
       ~f:(fun acc i ->
+        let started = Time_ns.now () in
         let%bind () = s.step ~table conn i in
-        if i % sample_every = 0 || i = iterations then sample_and_print i
+        (elapsed :=
+           Time_ns.Span.(!elapsed + Time_ns.diff (Time_ns.now ()) started) ) ;
+        if i % sample_every = 0 || i = iterations || i = midpoint then (
+          let%map ((prepared, _) as sample) = sample_and_print i in
+          if i = midpoint then prepared_mid := prepared ;
+          sample )
         else return acc )
+  in
+  let prepared_growth = final_prepared - !prepared_mid in
+  (* sampling is outside the timed region, so this is the helper alone *)
+  let calls_per_s =
+    Float.of_int iterations /. Float.max 1e-9 (Time_ns.Span.to_sec !elapsed)
   in
   let%bind () =
     C.exec (exec_oneshot (s.teardown ~table)) ()
@@ -507,6 +530,8 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   let%map () = C.disconnect () in
   { name = s.name
   ; prepared_final = final_prepared
+  ; prepared_growth
+  ; calls_per_s
   ; per_call
   ; plan_cache_kib_final
   ; plan_cache_growth_kib
@@ -516,40 +541,31 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
 
 (* --- InfluxDB line protocol (matches scripts/tests/rosetta-load.sh) --------- *)
 
-(* line-protocol tag/measurement values must not contain unescaped spaces or
-   commas; keep it simple and sanitise to underscores *)
-let sanitize s =
-  String.map s ~f:(fun c -> match c with ' ' | ',' | '=' -> '_' | c -> c)
-
-let influx_lines ~measurement ~tags (results : result list) =
-  let ts_ns = Time_ns.now () |> Time_ns.to_int_ns_since_epoch in
-  let tag_str =
-    List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-    |> String.concat ~sep:","
-  in
-  (* the plan-cache fields are omitted rather than sent as 0 where the server
-     has no [pg_backend_memory_contexts]: a constant-zero series charts as a
-     real measurement, whereas a missing one is visibly missing. *)
+(* the plan-cache fields are omitted rather than sent as 0 where the server has
+   no [pg_backend_memory_contexts]: a constant-zero series charts as a real
+   measurement, whereas a missing one is visibly missing. *)
+let influx_points ~measurement ~tags (results : result list) =
   List.map results ~f:(fun r ->
-      let fields =
-        [ sprintf "prepared_final=%di" r.prepared_final
-        ; sprintf "prepared_per_call=%.6f" r.per_call
-        ; sprintf "iterations=%di" r.iterations
-        ]
-        @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
-              [ sprintf "plan_cache_kib_final=%di" kib ] )
-        @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
-              [ sprintf "plan_cache_growth_kib=%di" kib ] )
-        @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
-            ~f:(fun bytes -> [ sprintf "plan_cache_bytes_per_call=%.6f" bytes ])
-      in
-      sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
-        (sanitize r.name)
-        (String.concat ~sep:"," fields)
-        ts_ns )
+      Influxdb_line_protocol.(
+        create
+          ~tags:(tags @ [ ("scenario", r.name) ])
+          ~measurement
+          ( [ ("prepared_final", Field.Int r.prepared_final)
+            ; ("prepared_per_call", Float r.per_call)
+            ; ("prepared_growth", Int r.prepared_growth)
+            ; ("calls_per_s", Float r.calls_per_s)
+            ; ("iterations", Int r.iterations)
+            ]
+          @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
+                [ ("plan_cache_kib_final", Field.Int kib) ] )
+          @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
+                [ ("plan_cache_growth_kib", Field.Int kib) ] )
+          @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
+              ~f:(fun bytes ->
+                [ ("plan_cache_bytes_per_call", Field.Float bytes) ] ) )) )
 
 let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
-    ~influxdb_file ~measurement ~tags () =
+    ~assert_no_growth ~influxdb_file ~measurement ~tags () =
   printf "mina_caqti postgres memory-usage benchmark\n" ;
   printf "uri=%s iterations=%d sample_every=%d shapes=%d\n" (Uri.to_string uri)
     iterations sample_every shapes ;
@@ -559,18 +575,21 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
   in
   printf "\n== summary ==\n" ;
   List.iter results ~f:(fun r ->
-      printf "   %-36s prepared_final=%-8d per_call=%-8.3f bytes_per_call=%s\n"
-        r.name r.prepared_final r.per_call
+      printf
+        "   %-36s prepared_final=%-8d per_call=%-8.3f growth=%-6d \
+         calls/s=%-8.1f bytes_per_call=%s\n"
+        r.name r.prepared_final r.per_call r.prepared_growth r.calls_per_s
         (Option.value_map r.plan_cache_bytes_per_call ~default:"n/a"
            ~f:(sprintf "%.1f") ) ) ;
-  let lines = influx_lines ~measurement ~tags results in
+  let points = influx_points ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
       ()
   | Some path ->
-      Out_channel.write_lines path lines ;
+      Influxdb_line_protocol.write_file path points ;
       printf "\n== influxdb line protocol -> %s ==\n" path ;
-      List.iter lines ~f:(fun l -> printf "   %s\n" l) ) ;
+      List.iter points ~f:(fun p ->
+          printf "   %s\n" (Influxdb_line_protocol.to_line p) ) ) ;
   ( match assert_max_prepared with
   | None ->
       ()
@@ -586,8 +605,20 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
           (List.length offenders) limit ;
         List.iter offenders ~f:(fun r ->
             eprintf "   %s: prepared_final=%d\n" r.name r.prepared_final ) ;
-        Core.exit 1 )
+        Shutdown.shutdown 1 )
       else printf "\nOK: all scenarios <= --assert-max-prepared=%d\n" limit ) ;
+  ( if assert_no_growth then
+    let offenders = List.filter results ~f:(fun r -> r.prepared_growth > 0) in
+    if not (List.is_empty offenders) then (
+      eprintf
+        "\n\
+         FAIL: %d scenario(s) kept preparing statements over the second half \
+         of their calls (memory leak):\n"
+        (List.length offenders) ;
+      List.iter offenders ~f:(fun r ->
+          eprintf "   %s: +%d prepared\n" r.name r.prepared_growth ) ;
+      Shutdown.shutdown memory_gate_exit_status )
+    else printf "\nOK: no scenario grew its prepared-statement count\n" ) ;
   return ()
 
 let () =
@@ -612,6 +643,11 @@ let () =
      and assert_max_prepared =
        flag "--assert-max-prepared" (optional int)
          ~doc:"K fail if any scenario's final prepared count exceeds K"
+     and assert_no_growth =
+       flag "--assert-no-growth" no_arg
+         ~doc:
+           " fail if any scenario's prepared count rises over the second half \
+            of its calls"
      and influxdb_file =
        flag "--influxdb-file" (optional string)
          ~doc:"PATH write InfluxDB line protocol (one point per scenario) here"
@@ -673,5 +709,6 @@ let () =
              @ opt_tag "network" network
            in
            main ~uri:(Uri.of_string u) ~iterations ~sample_every ~shapes
-             ~assert_max_prepared ~influxdb_file ~measurement ~tags () )
+             ~assert_max_prepared ~assert_no_growth ~influxdb_file ~measurement
+             ~tags () )
   |> Command_unix.run

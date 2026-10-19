@@ -36,7 +36,6 @@
   (pps
    ppx_mina
    ppx_version
-   ppx_bin_prot
    ppx_compare
    ppx_hash
    ppx_fields_conv
@@ -45,7 +44,6 @@
    ppx_sexp_conv
    ppx_let
    ppx_custom_printf
-   ppx_deriving_yojson
    h_list.ppx
    ppx_inline_test))
  (synopsis "Coda genesis constants"))

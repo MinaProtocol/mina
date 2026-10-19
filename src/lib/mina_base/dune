@@ -82,20 +82,16 @@
    ppx_assert
    ppx_base
    ppx_bench
-   ppx_bin_prot
-   ppx_compare
    ppx_custom_printf
    ppx_deriving.enum
    ppx_deriving.make
    ppx_deriving.ord
-   ppx_deriving_yojson
    ppx_fields_conv
    ppx_here
    ppx_inline_test
    ppx_let
    ppx_mina
    ppx_pipebang
-   ppx_sexp_conv
    ppx_snarky
    ppx_variants_conv
    ppx_version))

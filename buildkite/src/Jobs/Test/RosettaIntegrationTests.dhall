@@ -22,6 +22,8 @@ let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let MemoryGate = ../../Constants/MemoryGate.dhall
+
 let network = Network.Type.Devnet
 
 let dirtyWhen =
@@ -41,6 +43,7 @@ let bareBinaries =
       ++  ",signer.exe:mina-ocaml-signer"
       ++  ",zkapp_test_transaction.exe:mina-zkapp-test-transaction"
       ++  ",indexer_test.exe:mina-rosetta-indexer-test"
+      ++  ",rosetta_search_test.exe:mina-rosetta-search-test"
       ++  ",rosetta_healthcheck.exe:rosetta-healthcheck"
       ++  ",libp2p_helper:libp2p_helper"
 
@@ -82,6 +85,7 @@ in  Pipeline.build
             , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
+            , soft_fail = Some MemoryGate.softFail
             , depends_on =
                 DebianVersions.appDependsOn
                   DebianVersions.DepsSpec::{

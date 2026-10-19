@@ -76,15 +76,11 @@
   with_hash
   zkapp_command_builder)
  (inline_tests
+  (deps
+   (env_var MINA_TEST_POSTGRES))
   (flags -verbose -show-counts))
  (modes native)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess
-  (pps
-   h_list.ppx
-   ppx_custom_printf
-   ppx_deriving_yojson
-   ppx_jane
-   ppx_mina
-   ppx_version)))
+  (pps h_list.ppx ppx_jane ppx_mina ppx_version)))

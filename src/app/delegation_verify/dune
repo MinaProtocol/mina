@@ -47,4 +47,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+  (pps ppx_mina ppx_version ppx_jane h_list.ppx)))

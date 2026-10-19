@@ -132,13 +132,11 @@
   ../../../../graphql-ppx-config.inc)
  (preprocess
   (pps
-   ppx_deriving_yojson
    ppx_mina
    ppx_version
    ppx_base
    ppx_assert
    ppx_bench
-   ppx_bin_prot
    ppx_custom_printf
    ppx_fields_conv
    ppx_fixed_literal

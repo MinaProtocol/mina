@@ -38,6 +38,5 @@
    ppx_compare
    ppx_deriving.std
    ppx_custom_printf
-   ppx_deriving_yojson
    ppx_inline_test))
  (synopsis "Rosetta-related support code"))
