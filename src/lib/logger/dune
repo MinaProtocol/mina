@@ -10,6 +10,6 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std))
+  (pps mina_ppx))
  (virtual_modules logger)
  (default_implementation logger.native))

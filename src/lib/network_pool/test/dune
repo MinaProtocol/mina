@@ -41,6 +41,6 @@
   mina_transaction
   with_hash)
  (preprocess
-  (pps ppx_base ppx_let ppx_custom_printf ppx_assert))
+  (pps mina_ppx.no_pipebang))
  (instrumentation
   (backend bisect_ppx)))

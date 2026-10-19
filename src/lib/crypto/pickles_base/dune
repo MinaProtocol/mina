@@ -9,7 +9,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps h_list.ppx ppx_version ppx_mina ppx_jane ppx_deriving.std h_list.ppx))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   base.base_internalhash_types

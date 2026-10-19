@@ -3,6 +3,6 @@
  (public_name mina_signature_kind)
  (libraries core_kernel mina_node_config)
  (preprocess
-  (pps ppx_deriving_yojson ppx_jane ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

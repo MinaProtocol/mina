@@ -7,19 +7,10 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_custom_printf
-   ppx_mina
-   ppx_version
-   ppx_snarky
-   ppx_compare
-   ppx_sexp_conv
-   ppx_hash
-   ppx_fields_conv
-   ppx_let
-   ppx_inline_test
-   ppx_assert
-   ppx_deriving.std
-   h_list.ppx))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (libraries
   ;; opam libraries
   core

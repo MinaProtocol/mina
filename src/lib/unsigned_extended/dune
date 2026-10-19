@@ -23,13 +23,10 @@
   ppx_version.runtime)
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
-   ppx_sexp_conv
-   ppx_compare
-   ppx_hash
-   ppx_inline_test
-   ppx_deriving.std))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Unsigned integer functions"))

@@ -29,16 +29,7 @@
   snarky.intf
   kimchi_backend)
  (preprocess
-  (pps
-   ppx_version
-   ppx_assert
-   ppx_base
-   ppx_bench
-   ppx_let
-   ppx_deriving.std
-   ppx_deriving_yojson
-   ppx_custom_printf
-   ppx_snarky))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snark parameters"))

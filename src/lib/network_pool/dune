@@ -71,17 +71,6 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_assert
-   ppx_base
-   ppx_custom_printf
-   ppx_deriving.std
-   ppx_fields_conv
-   ppx_inline_test
-   ppx_let
-   ppx_mina
-   ppx_pipebang
-   ppx_snarky
-   ppx_version))
+  (pps mina_ppx))
  (synopsis
   "Network pool is an interface that processes incoming diffs and then broadcasts them"))

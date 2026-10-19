@@ -20,8 +20,7 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_let
-   ppx_inline_test
-   ppx_assert
-   ppx_deriving_yojson)))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

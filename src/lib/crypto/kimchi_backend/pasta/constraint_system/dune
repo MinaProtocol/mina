@@ -7,7 +7,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   ppx_inline_test.config
