@@ -23,13 +23,14 @@
 # OPTIONS:
 #   -f, --from-branch BRANCH   Branch whose databases must upgrade to the working
 #                              tree's schema (default: compatible)
+#   -b, --release-branch BRANCH  Branch releases are merged into (default: master)
 #   -r, --release-tag TAG      Release with the schema downgrade.sql goes back to
-#                              (default: newest X.Y.Z tag on the from-branch)
+#                              (default: newest X.Y.Z tag on the release branch)
 #   -h, --help                 Show this help message
 #
 # REQUIRES:
 #   - Docker daemon running
-#   - Git repository with access to the from-branch and its tags
+#   - Git repository with access to the from-branch, the release branch and tags
 #
 # EXIT CODES:
 #   0: All schema comparisons pass
@@ -46,6 +47,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 WORK_DIR="/tmp/schema-test-$$"
 
 FROM_BRANCH="compatible"
+RELEASE_BRANCH="master"
 RELEASE_TAG=""
 
 # --- Argument Parsing ---
@@ -54,6 +56,10 @@ parse_args() {
         case $1 in
             -f|--from-branch)
                 FROM_BRANCH="$2"
+                shift 2
+                ;;
+            -b|--release-branch)
+                RELEASE_BRANCH="$2"
                 shift 2
                 ;;
             -r|--release-tag)
@@ -174,18 +180,18 @@ compare() {
 main() {
     parse_args "$@"
 
-    git fetch --tags origin "$FROM_BRANCH"
+    git fetch --tags origin "$FROM_BRANCH" "$RELEASE_BRANCH"
 
     if [[ -z "$RELEASE_TAG" ]]; then
         RELEASE_TAG="$(git describe --tags --abbrev=0 \
             --match '[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' \
-            "origin/${FROM_BRANCH}")"
+            "origin/${RELEASE_BRANCH}")"
     fi
 
     echo "=== Archive Schema Upgrade Verification ==="
     echo "create/upgrade/downgrade: working tree"
     echo "From branch:              origin/${FROM_BRANCH}"
-    echo "Release tag:              ${RELEASE_TAG}"
+    echo "Release tag:              ${RELEASE_TAG} (newest on origin/${RELEASE_BRANCH})"
     echo ""
 
     mkdir -p "$WORK_DIR"
