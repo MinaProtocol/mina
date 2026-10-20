@@ -60,6 +60,32 @@ val of_block :
   -> (Block.t, Mina_base.State_hash.State_hashes.t) With_hash.t
   -> t
 
+(** A precomputed block of version 3, written between the Berkeley and Mesa
+    hard forks. Its protocol state has the same type as version 4's: the
+    Mesa version bump renamed it without changing it, so its state hash is
+    computed the same way. Its transactions and accounts are Berkeley's. *)
+module V3 : sig
+  type t =
+    { scheduled_time : Block_time.Stable.V1.t
+    ; protocol_state : Protocol_state.Value.Stable.V3.t
+    ; protocol_state_proof : Proof.t
+    ; staged_ledger_diff : Berkeley_types.Diff.t
+    ; delta_transition_chain_proof :
+        Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+    ; protocol_version : Protocol_version.Stable.V2.t
+    ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+    ; accounts_accessed : (int * Berkeley_types.Account.Stable.V2.t) list
+    ; accounts_created :
+        (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+    ; tokens_used : (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+    }
+
+  (** The data of the versioned JSON, without its version tag. *)
+  val to_yojson : t -> Yojson.Safe.t
+
+  val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+end
+
 (** A precomputed block in the version it was written in.
 
     Converting an older block to the latest version changes what hashing it
@@ -68,7 +94,7 @@ val of_block :
     should work from this type and derive that identity by the rules of the
     block's own version. *)
 module Versioned : sig
-  type t = V4 of Stable.V4.t
+  type t = V3 of V3.t | V4 of Stable.V4.t
 
   val version : t -> int
 
