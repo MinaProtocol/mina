@@ -1662,8 +1662,9 @@ let generate_libp2p_keypair_do privkey_path =
             in
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
-            [%log fatal] "failed to generate libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            (* the logger is null, so the error only reaches the user here *)
+            eprintf "Failed to generate libp2p keypair: %s\n"
+              (Error.to_string_hum e) ;
             exit 20 ))
 
 let generate_libp2p_keypair =
@@ -1692,8 +1693,9 @@ let dump_libp2p_keypair_do privkey_path =
             let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
-            [%log fatal] "failed to dump libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            (* the logger is null, so the error only reaches the user here *)
+            eprintf "Failed to dump libp2p keypair: %s\n"
+              (Error.to_string_hum e) ;
             exit 20 ))
 
 let dump_libp2p_keypair =
