@@ -21,16 +21,33 @@ let maybe_from_config ~logger (rev_daemon_configs : t) (type a)
   | Some v ->
       Some v
   | None ->
-      (* Load value from the latest config file that both
-         * has the key we are looking for, and
-         * has the key in a format that [f] can parse.
+      (* Load value from the latest config file that has the key we are
+         looking for with a non-null value. A value that [f] cannot decode is
+         a configuration error.
       *)
       let%map config_file, data =
         List.find_map rev_daemon_configs ~f:(fun (config_file, daemon_config) ->
             let%bind json_val =
               to_option Fn.id (member keyname daemon_config)
             in
-            let%map data = f json_val in
+            let%map data =
+              try f json_val with
+              | Mina_stdlib.Mina_user_error.Mina_user_error _ as exn ->
+                  raise exn
+              | exn ->
+                  let reason =
+                    match exn with
+                    | Type_error (reason, _) ->
+                        reason
+                    | exn ->
+                        Exn.to_string exn
+                  in
+                  Mina_stdlib.Mina_user_error.raisef
+                    ~where:"reading a daemon setting"
+                    "The value %s for the key \"%s\" in the \"daemon\" section \
+                     of the configuration file %s is not valid: %s"
+                    (YJ.to_string json_val) keyname config_file reason
+            in
             (config_file, data) )
       in
       [%log debug] "Key $key being used from config file $config_file"
