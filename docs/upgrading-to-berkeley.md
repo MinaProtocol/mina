@@ -1,5 +1,9 @@
 # Internal details on Berkeley migration
 
+> **Historical.** This document describes the Berkeley hard fork (mainnet 1.5 → 2.0, June 2024).
+> It is kept for reference only. The fork config file and the bucket that hosted it
+> (`tmp-hardfork-testing`) are no longer available, so the package verification below cannot be repeated.
+
 To perform the upgrade from 1.5 to 2.0, first connect a node to the 1.5 network.
 When it has synchronized, the `fork_config` GraphQL endpoint produces the protocol
 state needed to start the new chain:
@@ -75,6 +79,10 @@ Many of the script inputs are environment variables that default to the location
 Here are some general instructions that should help you get most of the way there.
 
 ### Package Verification
+
+> **Historical.** The fork config URLs below (`tmp-hardfork-testing/…`, `fork-config-dryrun.json.gz`)
+> no longer exist, and the dry-run blocks (`mainnet-pre-hf-dry-run-2`) are being removed from
+> `mina_network_block_data`. The commands are kept as a record of the June 2024 procedure.
 
 #### Environment Setup
 1. **Use a Debian Environment:** 
