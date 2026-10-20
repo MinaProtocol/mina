@@ -4,5 +4,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std))
+  (pps mina_ppx))
  (libraries kimchi_backend kimchi_pasta kimchi_pasta.basic))

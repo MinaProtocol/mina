@@ -13,6 +13,6 @@
   random_oracle_input
   snark_params)
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

@@ -21,7 +21,7 @@
   bitstring_lib
   ppx_version.runtime)
  (preprocess
-  (pps h_list.ppx ppx_jane ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "VRF instantiation"))

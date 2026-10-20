@@ -12,7 +12,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane)))
+  (pps mina_ppx)))
 
 ; Generate the circuit statistics JSON for every profile, selecting each with
 ; MINA_PROFILE: node_config reads the profile at runtime, so one build of the
