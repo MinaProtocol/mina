@@ -14,6 +14,7 @@
 #                  one and runs upgrade.sql, or rolls back with downgrade.sql.
 #                    release's create + upgrade         == create
 #                    create + upgrade + downgrade       == release's create
+#                    create + downgrade                 == release's create
 #   from-branch    Develop: before the hardfork, upgrade.sql runs on a database
 #                  of the from-branch, then the software is upgraded.
 #                    <from-branch>'s create + upgrade   == create
@@ -229,11 +230,14 @@ check_from_release() {
     build_db "released" release_create_schema
     build_db "release_upgraded" release_create_schema upgrade
     build_db "downgraded" create_schema upgrade downgrade
+    build_db "fresh_downgraded" create_schema downgrade
 
     compare "${RELEASE_TAG}'s create + upgrade == create" \
         "created" "release_upgraded"
     compare "create + upgrade + downgrade == ${RELEASE_TAG}'s create" \
         "released" "downgraded"
+    compare "create + downgrade == ${RELEASE_TAG}'s create" \
+        "released" "fresh_downgraded"
 }
 
 check_from_branch() {

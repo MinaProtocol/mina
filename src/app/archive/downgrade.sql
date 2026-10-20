@@ -17,13 +17,13 @@ SET statement_timeout = '10min';
 
 -- See "src/lib/node_config/version/node_config_version.ml" for protocol version
 SET archive.current_protocol_version = '5.0.0';
--- Protocol version that create_schema.sql describes, i.e. the latest released
--- one. Used to place a database that has no migration_history row yet.
-SET archive.create_schema_protocol_version = '4.0.0';
+-- Protocol version that create_schema.sql describes. Used to place a database
+-- that has no migration_history row yet.
+SET archive.create_schema_protocol_version = '5.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.3';
+SET archive.migration_version = '0.0.4';
 
 -- TODO: put below in a common script
 
@@ -76,6 +76,7 @@ DECLARE
     latest_protocol_version    text;
     latest_migration_version   text;
     latest_migration_status    migration_status;
+    has_history                boolean;
 BEGIN
     -- Try to fetch the existing migration row
     SELECT
@@ -86,13 +87,18 @@ BEGIN
     FROM migration_history
     ORDER BY commit_start_at DESC
     LIMIT 1;
+    has_history := FOUND;
 
     -- A database built straight from create_schema.sql carries no migration
-    -- history. It is at the version create_schema.sql describes.
+    -- history. It is at the version create_schema.sql describes. When that is
+    -- already the target, record the run and apply the steps anyway: they are
+    -- idempotent, and an older create_schema.sql also has no history.
     latest_protocol_version :=
         COALESCE(latest_protocol_version, create_schema_protocol_version);
 
-    IF latest_protocol_version = current_protocol_version THEN
+    IF latest_protocol_version = current_protocol_version OR
+       (NOT has_history AND latest_protocol_version = target_protocol_version)
+    THEN
         INSERT INTO migration_history(
             protocol_version, migration_version, description, status
         ) VALUES (
