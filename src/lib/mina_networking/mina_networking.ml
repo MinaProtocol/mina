@@ -439,105 +439,121 @@ let glue_sync_ledger :
       | Failed_to_connect _ | Connected { data = Error _; _ } ->
           `Some []
     in
-    let%bind first_target =
+    match%bind
       Deferred.create (fun first_target ->
           don't_wait_for
-            (Broadcast_pipe.Reader.iter_until target ~f:(function
-              | None ->
-                  return false
-              | Some h ->
-                  Ivar.fill_if_empty first_target h ;
-                  return true ) ) )
-    in
-    let root_hash_r, root_hash_w = Broadcast_pipe.create first_target in
-    Sl_downloader.create ~preferred ~max_batch_size:100
-      ~peers:(fun () -> peers t)
-      ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
-      ~logger:t.logger ~trust_system:t.trust_system
-      ~get:(fun (peer : Peer.t) qs ->
-        let%map rs =
-          query_peer' ~how:`Parallel ~heartbeat_timeout
-            ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
-            t peer.peer_id Rpcs.Answer_sync_ledger_query qs
-        in
-        match rs with
-        | Failed_to_connect e ->
-            Error e
-        | Connected res -> (
-            match res.data with
-            | Error e ->
+            (let%map () =
+               Broadcast_pipe.Reader.iter_until target ~f:(function
+                 | None ->
+                     return false
+                 | Some h ->
+                     Ivar.fill_if_empty first_target (Some h) ;
+                     return true )
+             in
+             Ivar.fill_if_empty first_target None ) )
+    with
+    | None ->
+        (* The sync ledger was destroyed before it was given a target, so
+           there is nothing to download. *)
+        return None
+    | Some first_target ->
+        let root_hash_r, root_hash_w = Broadcast_pipe.create first_target in
+        Sl_downloader.create ~preferred ~max_batch_size:100
+          ~peers:(fun () -> peers t)
+          ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
+          ~logger:t.logger ~trust_system:t.trust_system
+          ~get:(fun (peer : Peer.t) qs ->
+            let%map rs =
+              query_peer' ~how:`Parallel ~heartbeat_timeout
+                ~timeout:
+                  (Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
+                t peer.peer_id Rpcs.Answer_sync_ledger_query qs
+            in
+            match rs with
+            | Failed_to_connect e ->
                 Error e
-            | Ok rs -> (
-                match List.zip qs rs with
-                | Unequal_lengths ->
-                    Or_error.error_string "mismatched lengths"
-                | Ok ps ->
-                    Ok
-                      (List.filter_map ps ~f:(fun (q, r) ->
-                           match r with Ok r -> Some (q, r) | Error _ -> None )
-                      ) ) ) )
-      ()
-    >>| fun downloader -> (downloader, root_hash_r, root_hash_w)
+            | Connected res -> (
+                match res.data with
+                | Error e ->
+                    Error e
+                | Ok rs -> (
+                    match List.zip qs rs with
+                    | Unequal_lengths ->
+                        Or_error.error_string "mismatched lengths"
+                    | Ok ps ->
+                        Ok
+                          (List.filter_map ps ~f:(fun (q, r) ->
+                               match r with
+                               | Ok r ->
+                                   Some (q, r)
+                               | Error _ ->
+                                   None ) ) ) ) )
+          ()
+        >>| fun downloader -> Some (downloader, root_hash_r, root_hash_w)
   in
   don't_wait_for
-    (let%bind downloader, root_hash_r, root_hash_w = downloader in
-     let is_current (h, _) =
-       Option.value_map (current_target ()) ~default:false
-         ~f:(Ledger_hash.equal h)
-     in
-     let in_flight = Sl_downloader.Key.Hash_set.create () in
-     (* Once the sync ledger moves to a new target, queries for the old one
-        are never answered by peers that have moved on with it, and the sync
-        ledger ignores their answers anyway. So on a change of target, cancel
-        them and point the downloader's knowledge at the new target; otherwise
-        they would hold every in-flight slot and the new target's queries would
-        never be sent. The downloader also forgets what it learnt about peers
-        from the old target, lest it pass over the peers that failed its
-        queries because they have moved on to the new one. *)
-     let retarget new_root =
-       if Ledger_hash.equal new_root (Broadcast_pipe.Reader.peek root_hash_r)
-       then Deferred.unit
-       else (
-         Hash_set.to_list in_flight
-         |> List.filter ~f:(fun (h, _) -> not (Ledger_hash.equal h new_root))
-         |> List.iter ~f:(Sl_downloader.cancel downloader) ;
-         Sl_downloader.forget_peer_state downloader ;
-         Broadcast_pipe.Writer.write root_hash_w new_root )
-     in
-     don't_wait_for
-       (Broadcast_pipe.Reader.iter target ~f:(function
-         | None ->
-             Deferred.unit
-         | Some new_root ->
-             retarget new_root ) ) ;
-     let throttle =
-       Throttle.create ~continue_on_error:true ~max_concurrent_jobs:400
-     in
-     let download q =
-       (* A downloader torn down with the sync never resolves new jobs. *)
-       if
-         Deferred.is_determined (Linear_pipe.closed query_reader)
-         || not (is_current q)
-       then Deferred.unit
-       else (
-         (* The sync ledger publishes a new target before writing its first
-            query, but the subscriber above may not have run by the time that
-            query is read. Switch here too, so that no job for the new target
-            reaches a downloader still knowing peers by the old one. *)
-         don't_wait_for (retarget (fst q)) ;
-         Hash_set.add in_flight q ;
-         let%bind result =
-           Sl_downloader.Job.result
-             (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
-         in
-         Hash_set.remove in_flight q ;
-         match result with
-         | Error _ ->
-             Deferred.unit
-         | Ok (a, _) ->
-             Linear_pipe.write_if_open response_writer
-               (fst q, snd q, { a with data = snd a.data }) )
-     in
-     Linear_pipe.iter query_reader ~f:(fun q ->
-         don't_wait_for (Throttle.enqueue throttle (fun () -> download q)) ;
-         Deferred.unit ) )
+    ( match%bind downloader with
+    | None ->
+        Deferred.unit
+    | Some (downloader, root_hash_r, root_hash_w) ->
+        let is_current (h, _) =
+          Option.value_map (current_target ()) ~default:false
+            ~f:(Ledger_hash.equal h)
+        in
+        let in_flight = Sl_downloader.Key.Hash_set.create () in
+        (* Once the sync ledger moves to a new target, queries for the old one
+           are never answered by peers that have moved on with it, and the sync
+           ledger ignores their answers anyway. So on a change of target, cancel
+           them and point the downloader's knowledge at the new target; otherwise
+           they would hold every in-flight slot and the new target's queries would
+           never be sent. The downloader also forgets what it learnt about peers
+           from the old target, lest it pass over the peers that failed its
+           queries because they have moved on to the new one. *)
+        let retarget new_root =
+          if Ledger_hash.equal new_root (Broadcast_pipe.Reader.peek root_hash_r)
+          then Deferred.unit
+          else (
+            Hash_set.to_list in_flight
+            |> List.filter ~f:(fun (h, _) -> not (Ledger_hash.equal h new_root))
+            |> List.iter ~f:(Sl_downloader.cancel downloader) ;
+            Sl_downloader.forget_peer_state downloader ;
+            Broadcast_pipe.Writer.write root_hash_w new_root )
+        in
+        don't_wait_for
+          (Broadcast_pipe.Reader.iter target ~f:(function
+            | None ->
+                Deferred.unit
+            | Some new_root ->
+                retarget new_root ) ) ;
+        let throttle =
+          Throttle.create ~continue_on_error:true ~max_concurrent_jobs:400
+        in
+        let download q =
+          (* A downloader torn down with the sync never resolves new jobs. *)
+          if
+            Deferred.is_determined (Linear_pipe.closed query_reader)
+            || not (is_current q)
+          then Deferred.unit
+          else (
+            (* The sync ledger publishes a new target before writing its first
+               query, but the subscriber above may not have run by the time that
+               query is read. Switch here too, so that no job for the new target
+               reaches a downloader still knowing peers by the old one. *)
+            don't_wait_for (retarget (fst q)) ;
+            Hash_set.add in_flight q ;
+            let%bind result =
+              Sl_downloader.Job.result
+                (Sl_downloader.download downloader ~key:q
+                   ~attempts:Peer.Map.empty )
+            in
+            Hash_set.remove in_flight q ;
+            match result with
+            | Error _ ->
+                Deferred.unit
+            | Ok (a, _) ->
+                Linear_pipe.write_if_open response_writer
+                  (fst q, snd q, { a with data = snd a.data }) )
+        in
+        Linear_pipe.iter query_reader ~f:(fun q ->
+            don't_wait_for (Throttle.enqueue throttle (fun () -> download q)) ;
+            Deferred.unit ) )
