@@ -187,6 +187,26 @@ scenario_config_peers_not_list() {
   ARGS=(--seed); ENVS=()
 }
 
+scenario_config_null_values() {
+  mkdir -p "$CONF"
+  write_json "$CONF/daemon.json" '{"daemon": {
+    "min-connections": null, "log-block-creation": null,
+    "node-status-url": null, "run-snark-worker": null, "pubsub-v0": null}}'
+  ARGS=(--seed); ENVS=()
+}
+
+scenario_config_peers_null() {
+  mkdir -p "$CONF"
+  write_json "$CONF/daemon.json" '{"daemon": {"peers": null}}'
+  ARGS=(--seed); ENVS=()
+}
+
+scenario_config_work_selection_null() {
+  mkdir -p "$CONF"
+  write_json "$CONF/daemon.json" '{"daemon": {"work-selection": null}}'
+  ARGS=(--seed); ENVS=()
+}
+
 scenario_config_pubsub_v0_bogus() {
   mkdir -p "$CONF"
   write_json "$CONF/daemon.json" '{"daemon": {"pubsub-v0": "bogus"}}'
