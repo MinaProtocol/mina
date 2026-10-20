@@ -23,7 +23,8 @@
 # OPTIONS:
 #   -f, --from-branch BRANCH   Branch whose databases must upgrade to the working
 #                              tree's schema (default: compatible)
-#   -b, --release-branch BRANCH  Branch releases are merged into (default: master)
+#   -b, --release-branch BRANCH  Branch the release is tagged on
+#                              (default: highest release/X.Y.Z branch on origin)
 #   -r, --release-tag TAG      Release with the schema downgrade.sql goes back to
 #                              (default: newest X.Y.Z tag on the release branch)
 #   -h, --help                 Show this help message
@@ -47,7 +48,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 WORK_DIR="/tmp/schema-test-$$"
 
 FROM_BRANCH="compatible"
-RELEASE_BRANCH="master"
+RELEASE_BRANCH=""
 RELEASE_TAG=""
 
 # --- Argument Parsing ---
@@ -179,6 +180,13 @@ compare() {
 # --- Main ---
 main() {
     parse_args "$@"
+
+    if [[ -z "$RELEASE_BRANCH" ]]; then
+        RELEASE_BRANCH="$(git ls-remote --heads origin 'release/*' \
+            | sed -n 's|.*refs/heads/||p' \
+            | grep -E '^release/[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V | tail -n 1)"
+    fi
 
     git fetch --tags origin "$FROM_BRANCH" "$RELEASE_BRANCH"
 
