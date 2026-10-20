@@ -16,10 +16,15 @@
   async_unix
   async.async_command
   ;; local libraries
+  archive_health_queries
   logger
   mina_stdlib
   mina_caqti)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_let)))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

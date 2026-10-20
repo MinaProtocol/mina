@@ -40,7 +40,7 @@ The Mina codebase has several categories of tests that range from fast in-proces
 | Rosetta tests | Rosetta API + daemon | ⚠️ (CI recommended) | custom scripts |
 | Replayer test | Archive replayer | ⚠️ (needs PostgreSQL) | `mina-replayer` |
 | Fuzzy ZkApp tests | ZkApp logic | ✅ | `dune exec` |
-| Coverage tests | Unit tests with coverage | ✅ | `make test-coverage` |
+| Coverage tests | Unit tests with coverage | ✅ | `make test-coverage MINA_PROFILE=dev` |
 
 ---
 
@@ -65,7 +65,7 @@ dune runtest src/lib/<library-name> --profile=dev
 **Run a single inline test case** (using the helper script):
 
 ```bash
-./scripts/testone.sh src/lib/<library-name>/<file>.ml [<test-name>]
+MINA_PROFILE=dev ./scripts/testone.sh src/lib/<library-name>/<file>.ml [<test-name>]
 ```
 
 **Tips:**
@@ -203,7 +203,7 @@ export TEST_NAME=<test>
 export MINA_IMAGE=<url-to-mina-daemon-image>
 export ARCHIVE_IMAGE=<url-to-mina-archive-image>
 
-test_executive local "$TEST_NAME" \
+test_executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   --debug \
@@ -222,7 +222,7 @@ apt-get update && apt-get install -y mina-test-executive
 Then invoke the installed binary directly:
 
 ```bash
-mina-test-executive local "$TEST_NAME" \
+mina-test-executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   --debug \
@@ -246,7 +246,66 @@ mina-test-executive local "$TEST_NAME" \
 | `zkapps-timing` | `develop` |
 | `snarkyjs` | `develop` |
 
-In CI the integration tests are driven by `buildkite/scripts/run-test-executive-local.sh`. The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
+In CI the integration tests are driven by `buildkite/scripts/run-test-executive-docker.sh`. CI runs `block-prod-prio` only when `RUN_OPT_TESTS` is set in the environment that generates the pipeline (see `buildkite/src/Jobs/Test/TestnetIntegrationTests.dhall`). The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
+
+#### Native engine (no Docker)
+
+The `native` engine runs the same tests against bare `mina` / `mina-archive`
+binaries on the host instead of Docker containers. It is for local runs only:
+a full test network does not fit in one CI pod, so CI does not run it.
+
+The simplest way to run it is the Makefile target, which builds `mina`,
+`mina-archive`, the replayer and the test executive from the checkout and then
+runs one test:
+
+```bash
+make intgtest-native TEST=payments
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TEST` | (required) | Test name, for example `payments` or `chain-reliability` |
+| `INTGTEST_PROFILE` | `devnet` | `MINA_PROFILE` for the test executive and the daemons |
+| `INTGTEST_POSTGRES_URI` | `postgres://$PG_USER:$PG_PW@$PG_HOST:$PG_PORT` | PostgreSQL server for archive tests |
+| `DUNE_PROFILE` | `dev` | Dune build profile |
+
+The test log goes to `<test>.native.test.log`, and each node's logs go to
+`<test>-<node>*.native.test.log` in the current directory.
+
+To run binaries that are already installed, call the test executive directly.
+Here `--mina-image` / `--archive-image` are paths to the binaries rather than
+image identifiers:
+
+```bash
+mina-test-executive native "$TEST_NAME" \
+  --mina-image /usr/local/bin/mina \
+  --archive-image /usr/local/bin/mina-archive
+```
+
+Tests that run archive nodes need a PostgreSQL **server**. The engine does not
+start one; it connects to the server given by `--postgres-uri` (env
+`MINA_TEST_POSTGRES_URI`, default `postgres://postgres:password@127.0.0.1:5432`)
+and, for each archive node, **creates a per-test `test_archive_<pid>_<id>`
+database** on that server, loads the archive schema into it, and **drops it**
+when the node stops. The role must be allowed to create databases. Tests
+without archive nodes never touch PostgreSQL. Archive tests also need `psql`,
+`pg_dump`, `jq` and `mina-replayer` on `PATH` (the Makefile target provides
+`mina-replayer`).
+
+The test's proof level comes from the build profile that **the test
+executive** resolves at runtime (`MINA_PROFILE`, else
+`/etc/coda/build_config/PROFILE`): dev = `check`, devnet/mainnet = `full`,
+lightnet = `none`. It does not come from the `--mina-image` binary. The spawned
+daemons inherit the test executive's environment, so they normally resolve the
+same profile. At startup the engine runs `mina advanced compile-time-constants`
+and compares the consensus constants of the binary with its own. If they are
+different, the test fails at once with a "Profile mismatch" error. To fix it,
+set `MINA_PROFILE` so that both resolve the same profile.
+
+Concurrent runs on one host are not supported. Two runs of the same test share
+a working directory, and node ports are allocated from 11000 in sequence (the
+engine skips a port that is already in use, but two runs can still race for a
+port).
 
 ---
 
@@ -316,7 +375,7 @@ To measure code coverage of the unit test suite, use the bisect_ppx-instrumented
 **Run all unit tests with coverage instrumentation:**
 
 ```bash
-make test-coverage
+make test-coverage MINA_PROFILE=dev
 ```
 
 This calls `scripts/create_coverage_profiles.sh`, which runs:
@@ -328,7 +387,7 @@ dune runtest --instrument-with bisect_ppx --force src/lib --profile=dev
 **Run coverage for a specific library only:**
 
 ```bash
-scripts/create_coverage_profiles.sh <library-name>
+MINA_PROFILE=dev scripts/create_coverage_profiles.sh <library-name>
 ```
 
 **Generate reports after running tests with coverage:**

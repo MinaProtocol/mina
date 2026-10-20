@@ -1,0 +1,25 @@
+{
+  "name": "mina-rosetta-examples-ts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable TypeScript examples for integrating with Mina's Rosetta API via @o1-labs/mina-rosetta-sdk",
+  "license": "Apache-2.0",
+  "scripts": {
+    "account-balance": "ts-node account-balance.ts",
+    "scan-blocks": "ts-node scan-blocks.ts",
+    "track-deposits": "ts-node track-deposits.ts",
+    "send-transaction": "ts-node send-transaction.ts",
+    "offline-sign": "ts-node offline-sign.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@o1-labs/mina-rosetta-sdk": "^0.0.1",
+    "dotenv": "^16.4.0",
+    "mina-signer": "^3.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  }
+}

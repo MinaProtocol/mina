@@ -19,9 +19,7 @@
   ../../graphql-ppx-config.inc)
  (preprocess
   (pps
-   ppx_base
-   ppx_version
-   graphql_ppx
+   mina_ppx.graphql.no_pipebang
    --
    %{read-lines:../../graphql-ppx-config.inc})))
 
@@ -30,4 +28,7 @@
  (deps
   (:< gen/gen.exe))
  (action
-  (run %{<} %{targets})))
+  (setenv
+   MINA_PROFILE
+   dev
+   (run %{<} %{targets}))))

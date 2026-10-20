@@ -478,8 +478,12 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
   let signer_pk = Public_key.compress fee_payer_keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
+  (* [f] bumps [nonce_ref], so it must run in index order. [List.init] calls
+     [f] from the last index down, which hands the lowest nonces to the last
+     commands and the last block. *)
+  let init_in_order n ~f = Sequence.init n ~f |> Sequence.to_list in
   let generate_payments () =
-    List.init (n_payments + n_zkapp_txs) ~f:(fun i ->
+    init_in_order (n_payments + n_zkapp_txs) ~f:(fun i ->
         let command =
           if i < n_payments then (
             (* Creates a simple payment that initializes a new account *)
@@ -553,7 +557,7 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
         in
         valid_command )
   in
-  List.init n_blocks ~f:(fun _ -> generate_payments ())
+  init_in_order n_blocks ~f:(fun _ -> generate_payments ())
 
 let assert_max_cost_zkapp ~logger ~genesis_constants
     (zkapp_cmd : Zkapp_command.t) =
@@ -602,9 +606,11 @@ let load_and_initialize_config ~genesis_dir ~logger ~config_file =
     |> Result.map_error ~f:Error.of_string
     |> Or_error.ok_exn
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
+
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  let proof_level = G.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
     ~genesis_dir runtime_config

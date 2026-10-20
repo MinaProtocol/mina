@@ -19,13 +19,13 @@ fi
 sum="$(cksum opam.export | grep -oE '^\S*')"
 switch_dir=opam_switches/"$sum"
 # The version must be the same as the version used in:
-# - dockerfiles/1-build-deps
+# - dockerfiles/toolchain/1-build-deps
 # - opam.export
 # - scripts/update_opam_switch.sh
 ocaml_version=4.14.2
 
 # The version must be the same as the version used in:
-# - dockerfiles/1-build-deps
+# - dockerfiles/toolchain/1-build-deps
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh

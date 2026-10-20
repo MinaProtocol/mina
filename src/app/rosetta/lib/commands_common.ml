@@ -6,6 +6,39 @@ let account_id = User_command_info.account_id
 
 module Op = User_command_info.Op
 
+let logger = Logger.create ()
+
+(* Build the metadata `Assoc returned by /block for user and zkapp commands.
+   Always includes [nonce]; appends [memo] iff the optional base58-check
+   encoded memo decodes to a non-empty plaintext. A decode failure is
+   logged at warn level and treated as an absent memo. *)
+let nonce_and_memo_metadata ~hash ~nonce ~memo : Yojson.Safe.t =
+  let nonce_field = ("nonce", `Int (Unsigned.UInt32.to_int nonce)) in
+  let memo_field =
+    Option.bind memo ~f:(fun base58_check ->
+        try
+          let memo =
+            let open Mina_base.Signed_command_memo in
+            base58_check |> of_base58_check_exn |> to_string_hum
+          in
+          if String.is_empty memo then None else Some ("memo", `String memo)
+        with exn ->
+          [%log warn]
+            ~metadata:
+              [ ("memo", `String base58_check)
+              ; ("hash", `String hash)
+              ; ("error", `String (Exn.to_string exn))
+              ]
+            "Failed to base58-check decode memo $memo for transaction $hash; \
+             omitting memo from metadata: $error" ;
+          None )
+  in
+  match memo_field with
+  | Some m ->
+      `Assoc [ nonce_field; m ]
+  | None ->
+      `Assoc [ nonce_field ]
+
 module Internal_command_info = struct
   module Kind = struct
     type t = [ `Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase ]
@@ -202,24 +235,144 @@ module User_command_info = struct
         { Transaction_identifier.hash = info.hash }
     ; operations = User_command_info.to_operations' info
     ; metadata =
-        Option.bind info.memo ~f:(fun base58_check ->
-            try
-              let memo =
-                let open Mina_base.Signed_command_memo in
-                base58_check |> of_base58_check_exn |> to_string_hum
-              in
-              let nonce = ("nonce", `Int (Unsigned.UInt32.to_int info.nonce)) in
-              Some
-                (`Assoc
-                  ( if String.is_empty memo then [ nonce ]
-                  else [ nonce; ("memo", `String memo) ] ) )
-            with _ -> None )
+        Some
+          (nonce_and_memo_metadata ~hash:info.hash ~nonce:info.nonce
+             ~memo:info.memo )
     ; related_transactions = []
     }
 
   module T (M : Monad_fail.S) = struct
     let to_transaction info = M.return @@ to_transaction info
   end
+
+  let%test_module "User_command_info.to_transaction metadata" =
+    ( module struct
+      let metadata_fields info =
+        match (to_transaction info).metadata with
+        | Some (`Assoc fields) ->
+            fields
+        | Some j ->
+            failwith
+              (sprintf "expected metadata to be Some (`Assoc _) but got: %s"
+                 (Yojson.Safe.to_string j) )
+        | None ->
+            failwith "expected metadata to be Some (`Assoc _) but got None"
+
+      let find_field fields key = List.Assoc.find fields ~equal:String.equal key
+
+      let assert_nonce_matches fields ~expected =
+        match find_field fields "nonce" with
+        | Some (`Int n) ->
+            [%test_eq: int] n (Unsigned.UInt32.to_int expected)
+        | other ->
+            failwith
+              (sprintf "expected nonce field to be Some (`Int _), got: %s"
+                 ( match other with
+                 | None ->
+                     "None"
+                 | Some j ->
+                     Yojson.Safe.to_string j ) )
+
+      let%test_unit "nonce is always present (memo = None)" =
+        let info = { (List.hd_exn dummies) with memo = None } in
+        let fields = metadata_fields info in
+        assert_nonce_matches fields ~expected:info.nonce ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "nonce is present even when memo is unparseable" =
+        (* dummies set memo to a non-base58-check string, so decoding
+           raises and the memo field is dropped while nonce remains. *)
+        let info = List.hd_exn dummies in
+        let fields = metadata_fields info in
+        assert_nonce_matches fields ~expected:info.nonce ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "memo included when valid base58 check string" =
+        let memo_text = "rosetta-memo-test" in
+        let memo_base58 =
+          Mina_base.Signed_command_memo.(
+            create_from_string_exn memo_text |> to_base58_check)
+        in
+        let info = { (List.hd_exn dummies) with memo = Some memo_base58 } in
+        let fields = metadata_fields info in
+        assert_nonce_matches fields ~expected:info.nonce ;
+        match find_field fields "memo" with
+        | Some (`String m) ->
+            [%test_eq: string] m memo_text
+        | _ ->
+            failwith "expected memo field to be Some (`String _)"
+
+      let%test_unit "memo omitted when valid base58 decodes to empty string" =
+        let empty_base58 =
+          Mina_base.Signed_command_memo.(to_base58_check empty)
+        in
+        let info = { (List.hd_exn dummies) with memo = Some empty_base58 } in
+        let fields = metadata_fields info in
+        assert_nonce_matches fields ~expected:info.nonce ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      (* Same regression pin as the zkapp side: metadata must never be None,
+         since nonce is mandatory. *)
+      let%test_unit "metadata is never None across all dummies" =
+        List.iter dummies ~f:(fun info ->
+            match (to_transaction info).metadata with
+            | Some _ ->
+                ()
+            | None ->
+                failwith
+                  (sprintf "metadata is None for user command with hash %s"
+                     info.hash ) )
+
+      (* Property-based test mirroring the zkapp side: for any random
+         valid memo (Signed_command_memo.gen) and for arbitrary fuzzed
+         strings (potentially invalid base58-check), to_transaction must
+         always emit Some (`Assoc _) metadata with the nonce intact, and
+         a memo iff the input decodes to a non-empty plaintext. *)
+      let%test_unit "PBT: metadata invariants over random memos" =
+        let base = List.hd_exn dummies in
+        let memo_input_gen =
+          let open Quickcheck.Generator.Let_syntax in
+          let valid_memo =
+            let%map m = Mina_base.Signed_command_memo.gen in
+            `Valid (Mina_base.Signed_command_memo.to_base58_check m)
+          in
+          let arbitrary_string =
+            let%map s = String.quickcheck_generator in
+            `Arbitrary s
+          in
+          let none = Quickcheck.Generator.return `None in
+          Quickcheck.Generator.union [ valid_memo; arbitrary_string; none ]
+        in
+        Quickcheck.test ~trials:200 memo_input_gen ~f:(fun input ->
+            let memo =
+              match input with
+              | `Valid s | `Arbitrary s ->
+                  Some s
+              | `None ->
+                  None
+            in
+            let info = { base with memo } in
+            let fields = metadata_fields info in
+            assert_nonce_matches fields ~expected:info.nonce ;
+            let memo_decoded =
+              Option.bind memo ~f:(fun s ->
+                  try
+                    Some
+                      Mina_base.Signed_command_memo.(
+                        s |> of_base58_check_exn |> to_string_hum)
+                  with _ -> None )
+            in
+            let expect_memo_field =
+              match memo_decoded with
+              | Some m when not (String.is_empty m) ->
+                  true
+              | _ ->
+                  false
+            in
+            [%test_eq: bool]
+              (Option.is_some (find_field fields "memo"))
+              expect_memo_field )
+    end )
 end
 
 module Zkapp_account_update_info = struct
@@ -373,7 +526,10 @@ module Zkapp_command_info = struct
       { Transaction.transaction_identifier =
           { Transaction_identifier.hash = cmd.hash }
       ; operations
-      ; metadata = None
+      ; metadata =
+          Some
+            (nonce_and_memo_metadata ~hash:cmd.hash ~nonce:cmd.nonce
+               ~memo:cmd.memo )
       ; related_transactions = []
       }
   end
@@ -400,4 +556,160 @@ module Zkapp_command_info = struct
       ; account_updates = Zkapp_account_update_info.dummies
       }
     ]
+
+  let%test_module "Zkapp_command_info.to_transaction metadata" =
+    ( module struct
+      module T_result = T (Result)
+
+      let metadata_fields cmd =
+        match T_result.to_transaction cmd with
+        | Ok { metadata = Some (`Assoc fields); _ } ->
+            fields
+        | Ok { metadata = Some j; _ } ->
+            failwith
+              (sprintf "expected metadata to be Some (`Assoc _) but got: %s"
+                 (Yojson.Safe.to_string j) )
+        | Ok { metadata = None; _ } ->
+            failwith "expected metadata to be Some (`Assoc _) but got None"
+        | Error e ->
+            failwith
+              (sprintf "to_transaction returned Error for a valid command: %s"
+                 (Errors.show e) )
+
+      let find_field fields key = List.Assoc.find fields ~equal:String.equal key
+
+      let assert_nonce_matches fields ~expected =
+        match find_field fields "nonce" with
+        | Some (`Int n) ->
+            [%test_eq: int] n (Unsigned.UInt32.to_int expected)
+        | other ->
+            failwith
+              (sprintf "expected nonce field to be Some (`Int _), got: %s"
+                 ( match other with
+                 | None ->
+                     "None"
+                 | Some j ->
+                     Yojson.Safe.to_string j ) )
+
+      let%test_unit "nonce is always present (memo = None)" =
+        let cmd = List.nth_exn dummies 1 in
+        let fields = metadata_fields cmd in
+        assert_nonce_matches fields ~expected:cmd.nonce ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "nonce is present even when memo is unparseable" =
+        let cmd = List.nth_exn dummies 0 in
+        let fields = metadata_fields cmd in
+        assert_nonce_matches fields ~expected:cmd.nonce ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "memo included when valid base58 check string" =
+        let memo_text = "rosetta-memo-test" in
+        let memo_base58 =
+          Mina_base.Signed_command_memo.(
+            create_from_string_exn memo_text |> to_base58_check)
+        in
+        let cmd = { (List.nth_exn dummies 0) with memo = Some memo_base58 } in
+        let fields = metadata_fields cmd in
+        assert_nonce_matches fields ~expected:cmd.nonce ;
+        match find_field fields "memo" with
+        | Some (`String m) ->
+            [%test_eq: string] m memo_text
+        | _ ->
+            failwith "expected memo field to be Some (`String _)"
+
+      let%test_unit "memo omitted when valid base58 decodes to empty string" =
+        let empty_base58 =
+          Mina_base.Signed_command_memo.(to_base58_check empty)
+        in
+        let cmd = { (List.nth_exn dummies 0) with memo = Some empty_base58 } in
+        let fields = metadata_fields cmd in
+        assert_nonce_matches fields ~expected:cmd.nonce ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      (* Regression pin: metadata must never be None, since that was the
+         original symptom (zk-tx responses lacked the nonce entirely). *)
+      let%test_unit "metadata is never None across all dummies" =
+        List.iter dummies ~f:(fun cmd ->
+            match T_result.to_transaction cmd with
+            | Ok { metadata = Some _; _ } ->
+                ()
+            | Ok { metadata = None; _ } ->
+                failwith
+                  (sprintf "metadata is None for zkapp command with hash %s"
+                     cmd.hash )
+            | Error e ->
+                failwith
+                  (sprintf
+                     "to_transaction returned Error for dummy with hash %s: %s"
+                     cmd.hash (Errors.show e) ) )
+
+      (* Property-based test: for any random valid memo (generated by
+         Signed_command_memo.gen) over any randomly chosen base dummy,
+         to_transaction must:
+           - always return Ok
+           - always emit Some (`Assoc _) metadata
+           - always include a nonce equal to the input nonce
+           - include a memo equal to the decoded plaintext when non-empty,
+             or omit the memo field when the decoded plaintext is empty *)
+      let%test_unit "PBT: metadata invariants over random valid memos" =
+        let open Quickcheck.Generator.Let_syntax in
+        let gen =
+          let%map base = Quickcheck.Generator.of_list dummies
+          and m = Mina_base.Signed_command_memo.gen in
+          (base, m)
+        in
+        Quickcheck.test ~trials:200 gen ~f:(fun (base, m) ->
+            let memo_text = Mina_base.Signed_command_memo.to_string_hum m in
+            let memo_base58 = Mina_base.Signed_command_memo.to_base58_check m in
+            let cmd = { base with memo = Some memo_base58 } in
+            let fields = metadata_fields cmd in
+            assert_nonce_matches fields ~expected:cmd.nonce ;
+            match find_field fields "memo" with
+            | Some (`String found) ->
+                [%test_eq: bool] (String.is_empty memo_text) false ;
+                [%test_eq: string] found memo_text
+            | Some j ->
+                failwith
+                  (sprintf "expected memo field to be Some (`String _), got: %s"
+                     (Yojson.Safe.to_string j) )
+            | None ->
+                [%test_eq: bool] (String.is_empty memo_text) true )
+
+      (* Property-based test: for arbitrary fuzzed memo strings (potentially
+         invalid base58-check) over any randomly chosen base dummy,
+         to_transaction must:
+           - always return Ok
+           - always emit Some (`Assoc _) metadata
+           - always include a nonce equal to the input nonce
+           - include a memo iff the input decodes to a non-empty plaintext *)
+      let%test_unit "PBT: metadata invariants over arbitrary memo strings" =
+        let open Quickcheck.Generator.Let_syntax in
+        let gen =
+          let%map base = Quickcheck.Generator.of_list dummies
+          and s = String.quickcheck_generator in
+          (base, s)
+        in
+        Quickcheck.test ~trials:200 gen ~f:(fun (base, s) ->
+            let cmd = { base with memo = Some s } in
+            let fields = metadata_fields cmd in
+            assert_nonce_matches fields ~expected:cmd.nonce ;
+            let memo_decoded =
+              try
+                Some
+                  Mina_base.Signed_command_memo.(
+                    s |> of_base58_check_exn |> to_string_hum)
+              with _ -> None
+            in
+            let expect_memo_field =
+              match memo_decoded with
+              | Some m when not (String.is_empty m) ->
+                  true
+              | _ ->
+                  false
+            in
+            [%test_eq: bool]
+              (Option.is_some (find_field fields "memo"))
+              expect_memo_field )
+    end )
 end

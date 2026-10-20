@@ -35,7 +35,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           @@ Network_peer.Envelope.Incoming.data h
     in
     Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
-      ~logger
+      ~logger ;
+    match head with
+    | `Block b ->
+        let (_ : Mina_block.initial_valid_block Network_peer.Envelope.Incoming.t)
+            =
+          Cache_lib.Cached.invalidate_with_failure b
+        in
+        ()
+    | `Header _ ->
+        ()
   in
   let valid_transition_reader, valid_transition_writer =
     let name = "valid transitions" in

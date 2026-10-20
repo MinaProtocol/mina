@@ -801,94 +801,55 @@ module Offset_limit = struct
       ] )
 end
 
+(* The two zkApp regressions below build the exact archive they need with
+   Synthetic_archive, each in a database of its own on the
+   indexer's server. *)
+module B = Synthetic_archive
+
+let with_built_archive ~(pool : pool) ~name scenario f =
+  B.Db.with_fresh ~server_uri:pool.uri ~name (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize scenario db in
+      let%map.Deferred result =
+        B.Db.with_connection db (fun conn -> f conn built)
+      in
+      Ok result )
+  >>| Or_error.ok_exn
+
+let zkapp_commands_of_block (module Conn : Mina_caqti.CONNECTION) block_id =
+  Lib.Block.Sql.Zkapp_commands.run (module Conn) block_id
+  >>| ok_or_failwith Caqti_error.show
+  >>| Lib.Block.Sql.Zkapp_commands.to_command_infos
+
 module Zkapp_account_update_multiplicity = struct
   (* Regression test for the zkApp [= ANY (zkapp_account_updates_ids)] bug: when a
      zkApp command's account-updates array repeats an id (identical account
      updates share one zkapp_account_update row), the /block query must still
-     produce one account update — and hence one balance-change operation — per
-     array element; the buggy [= ANY] join collapses the repeat to one.
-
-     The fixture is inserted at runtime into the indexer's throwaway database
-     (reusing whatever account-update / block / fee-payer rows exist), rather
-     than added to sample_db/archive_db.sql, which is a regenerated fixture
-     shared with several other tests. *)
-  let dup_command_hash = "5JuDUPzkAppAccountUpdateMultiplicityRegressionTest01"
-
-  let default_token = Rosetta_lib.Amount_of.Token_id.default
-
-  (* One zkApp command whose account-updates array repeats an existing
-     default-token account-update id (so it must yield two account updates). *)
-  let insert_command_sql =
-    [%string
-      {sql|
-        INSERT INTO zkapp_commands
-          (id, zkapp_fee_payer_body_id, zkapp_account_updates_ids, memo, hash)
-        VALUES
-          ( (SELECT COALESCE(MAX(id), 0) + 1 FROM zkapp_commands)
-          , (SELECT MIN(id) FROM zkapp_fee_payer_body)
-          , (SELECT ARRAY[a.id, a.id]
-             FROM zkapp_account_update a
-             INNER JOIN zkapp_account_update_body b ON b.id = a.body_id
-             INNER JOIN account_identifiers ai ON ai.id = b.account_identifier_id
-             INNER JOIN tokens t ON t.id = ai.token_id
-             WHERE t.value = '%{default_token}'
-             ORDER BY a.id LIMIT 1)
-          , 'E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH'
-          , '%{dup_command_hash}' )
-      |sql}]
-
-  let insert_block_link_sql =
-    [%string
-      {sql|
-        INSERT INTO blocks_zkapp_commands
-          (block_id, zkapp_command_id, sequence_no, status, failure_reasons_ids)
-        SELECT b.block_id,
-               (SELECT id FROM zkapp_commands WHERE hash = '%{dup_command_hash}'),
-               COALESCE(MAX(bzc.sequence_no), -1) + 1,
-               'applied', NULL
-        FROM (SELECT block_id FROM blocks_zkapp_commands ORDER BY block_id LIMIT 1) b
-        INNER JOIN blocks_zkapp_commands bzc ON bzc.block_id = b.block_id
-        GROUP BY b.block_id
-      |sql}]
-
-  let block_id_sql =
-    [%string
-      {sql|
-        SELECT bzc.block_id FROM blocks_zkapp_commands bzc
-        INNER JOIN zkapp_commands zc ON zc.id = bzc.zkapp_command_id
-        WHERE zc.hash = '%{dup_command_hash}'
-      |sql}]
-
-  let test { pool; _ } =
+     produce one account update -- and hence one balance-change operation -- per
+     array element; the buggy [= ANY] join collapses the repeat to one. *)
+  let test pool =
     let open Deferred.Let_syntax in
+    let s = B.create () in
+    let payer = B.account s "payer" in
+    let block = B.block s ~name:"block" ~height:1 Canonical in
+    let update = B.account_update ~balance_change:1 (B.account s "zkapp") in
+    let command =
+      B.zkapp_command s ~name:"repeated-update" ~fee_payer:payer
+        ~account_updates:[ update; update ]
+        ~in_:[ (block, Applied) ]
+    in
     let%map account_updates =
-      with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
-          let open Deferred.Result.Let_syntax in
-          let%bind () =
-            Conn.exec
-              (Mina_caqti.exec_req Caqti_type.unit insert_command_sql)
-              ()
+      with_built_archive ~pool ~name:"test_indexer_zkapp_update_multiplicity" s
+        (fun conn built ->
+          let%map commands =
+            zkapp_commands_of_block conn (B.block_id built block)
           in
-          let%bind () =
-            Conn.exec
-              (Mina_caqti.exec_req Caqti_type.unit insert_block_link_sql)
-              ()
-          in
-          let%bind block_id =
-            Conn.find
-              (Mina_caqti.find_req Caqti_type.unit Caqti_type.int block_id_sql)
-              ()
-          in
-          let%map rows =
-            Lib.Block.Sql.Zkapp_commands.run (module Conn) block_id
-          in
-          let command =
-            List.find_exn (Lib.Block.Sql.Zkapp_commands.to_command_infos rows)
-              ~f:(fun info ->
+          let info =
+            List.find_exn commands ~f:(fun info ->
                 String.equal info.Lib.Commands_common.Zkapp_command_info.hash
-                  dup_command_hash )
+                  (B.zkapp_command_hash command) )
           in
-          command.Lib.Commands_common.Zkapp_command_info.account_updates )
+          info.Lib.Commands_common.Zkapp_command_info.account_updates )
     in
     Alcotest.(check int)
       "one account update per zkapp_account_updates_ids element" 2
@@ -906,7 +867,6 @@ module Zkapp_account_creation_fee = struct
   (* Regression test for the two ways a zkApp command can pay the account-creation
      fee for an account it creates. The discriminator is the created account's own
      [implicit_account_creation_fee] flag:
-
      - flag SET: the ledger charged the fee to that account update by shrinking its
        own [balance_change], so the final balance is [balance_change - fee]. Rosetta
        must emit an [account_creation_fee_via_zkapp] op, else it over-reports by the
@@ -914,146 +874,31 @@ module Zkapp_account_creation_fee = struct
      - flag UNSET: the fee is funded by *other* account updates' negative balance
        changes (already emitted as [zkapp_balance_update] ops) and the created
        account's final balance is exactly its [balance_change]. Rosetta must emit NO
-       fee op — emitting one double-counts the fee and, whenever the created account's
+       fee op -- emitting one double-counts the fee and, whenever the created account's
        [balance_change] is 0, drives its Rosetta balance negative and aborts check:data.
-
-     Both scenarios are inserted at runtime into the indexer's throwaway database and
-     land in the same block, so one /block query exercises both. Each fixture picks a
-     default-token account update that is never a user/internal receiver and has no
-     accounts_created row yet — so the second fixture automatically picks a different
-     account than the first. *)
-  let implicit_cmd_hash = "5JuACFzkAppCreatedAccountImplicitFeeFixture000000000"
-
-  let funded_cmd_hash = "5JuACFzkAppCreatedAccountFundedFeeFixture00000000000"
-
-  let default_token = Rosetta_lib.Amount_of.Token_id.default
-
-  let insert_command_sql ~cmd_hash =
-    [%string
-      {sql|
-        INSERT INTO zkapp_commands
-          (id, zkapp_fee_payer_body_id, zkapp_account_updates_ids, memo, hash)
-        VALUES
-          ( (SELECT COALESCE(MAX(id), 0) + 1 FROM zkapp_commands)
-          , (SELECT MIN(id) FROM zkapp_fee_payer_body)
-          , (SELECT ARRAY[a.id]
-             FROM zkapp_account_update a
-             INNER JOIN zkapp_account_update_body b ON b.id = a.body_id
-             INNER JOIN account_identifiers ai ON ai.id = b.account_identifier_id
-             INNER JOIN tokens t ON t.id = ai.token_id
-             WHERE t.value = '%{default_token}'
-               AND NOT EXISTS
-                 (SELECT 1 FROM user_commands uc
-                  INNER JOIN account_identifiers ai2 ON ai2.public_key_id = uc.receiver_id
-                  WHERE ai2.id = ai.id)
-               AND NOT EXISTS
-                 (SELECT 1 FROM internal_commands ic
-                  INNER JOIN account_identifiers ai3 ON ai3.public_key_id = ic.receiver_id
-                  WHERE ai3.id = ai.id)
-               AND NOT EXISTS
-                 (SELECT 1 FROM accounts_created ac WHERE ac.account_identifier_id = ai.id)
-             ORDER BY a.id LIMIT 1)
-          , 'E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH'
-          , '%{cmd_hash}' )
-      |sql}]
-
-  let insert_block_link_sql ~cmd_hash =
-    [%string
-      {sql|
-        INSERT INTO blocks_zkapp_commands
-          (block_id, zkapp_command_id, sequence_no, status, failure_reasons_ids)
-        SELECT b.block_id,
-               (SELECT id FROM zkapp_commands WHERE hash = '%{cmd_hash}'),
-               COALESCE(MAX(bzc.sequence_no), -1) + 1, 'applied', NULL
-        FROM (SELECT block_id FROM blocks_zkapp_commands ORDER BY block_id LIMIT 1) b
-        INNER JOIN blocks_zkapp_commands bzc ON bzc.block_id = b.block_id
-        GROUP BY b.block_id
-      |sql}]
-
-  let insert_accounts_created_sql ~cmd_hash =
-    [%string
-      {sql|
-        INSERT INTO accounts_created (block_id, account_identifier_id, creation_fee)
-        SELECT bzc.block_id, aub.account_identifier_id, '1000000000'
-        FROM blocks_zkapp_commands bzc
-        INNER JOIN zkapp_commands zc ON zc.id = bzc.zkapp_command_id
-        INNER JOIN zkapp_account_update au ON au.id = ANY (zc.zkapp_account_updates_ids)
-        INNER JOIN zkapp_account_update_body aub ON aub.id = au.body_id
-        WHERE zc.hash = '%{cmd_hash}'
-        LIMIT 1
-      |sql}]
-
-  let set_implicit_fee_sql ~cmd_hash ~implicit =
-    let implicit = Bool.to_string implicit in
-    [%string
-      {sql|
-        UPDATE zkapp_account_update_body
-        SET implicit_account_creation_fee = %{implicit}
-        WHERE id IN
-          (SELECT au.body_id
-           FROM zkapp_commands zc
-           INNER JOIN zkapp_account_update au
-             ON au.id = ANY (zc.zkapp_account_updates_ids)
-           WHERE zc.hash = '%{cmd_hash}')
-      |sql}]
-
-  let block_id_sql ~cmd_hash =
-    [%string
-      {sql|
-        SELECT bzc.block_id FROM blocks_zkapp_commands bzc
-        INNER JOIN zkapp_commands zc ON zc.id = bzc.zkapp_command_id
-        WHERE zc.hash = '%{cmd_hash}'
-      |sql}]
-
-  let account_pk_sql ~cmd_hash =
-    [%string
-      {sql|
-        SELECT pk.value FROM zkapp_commands zc
-        INNER JOIN zkapp_account_update au ON au.id = ANY (zc.zkapp_account_updates_ids)
-        INNER JOIN zkapp_account_update_body aub ON aub.id = au.body_id
-        INNER JOIN account_identifiers ai ON ai.id = aub.account_identifier_id
-        INNER JOIN public_keys pk ON pk.id = ai.public_key_id
-        WHERE zc.hash = '%{cmd_hash}' LIMIT 1
-      |sql}]
-
-  let test { pool; _ } =
+     Both commands land in the same block, so one /block query exercises both. *)
+  let test pool =
     let open Deferred.Let_syntax in
-    let%bind commands, implicit_pk, funded_pk =
-      with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
-          let open Deferred.Result.Let_syntax in
-          let exec sql =
-            Conn.exec (Mina_caqti.exec_req Caqti_type.unit sql) ()
-          in
-          let account_pk ~cmd_hash =
-            Conn.find
-              (Mina_caqti.find_req Caqti_type.unit Caqti_type.string
-                 (account_pk_sql ~cmd_hash) )
-              ()
-          in
-          (* Insert each fixture's accounts_created row before building the next
-             command, so the next one selects a different account. *)
-          let setup ~cmd_hash ~implicit =
-            let%bind () = exec (insert_command_sql ~cmd_hash) in
-            let%bind () = exec (insert_block_link_sql ~cmd_hash) in
-            let%bind () = exec (insert_accounts_created_sql ~cmd_hash) in
-            exec (set_implicit_fee_sql ~cmd_hash ~implicit)
-          in
-          let%bind () = setup ~cmd_hash:implicit_cmd_hash ~implicit:true in
-          let%bind () = setup ~cmd_hash:funded_cmd_hash ~implicit:false in
-          let%bind block_id =
-            Conn.find
-              (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
-                 (block_id_sql ~cmd_hash:implicit_cmd_hash) )
-              ()
-          in
-          let%bind implicit_pk = account_pk ~cmd_hash:implicit_cmd_hash in
-          let%bind funded_pk = account_pk ~cmd_hash:funded_cmd_hash in
-          let%map rows =
-            Lib.Block.Sql.Zkapp_commands.run (module Conn) block_id
-          in
-          ( Lib.Block.Sql.Zkapp_commands.to_command_infos rows
-          , implicit_pk
-          , funded_pk ) )
+    let s = B.create () in
+    let payer = B.account s "payer" in
+    let implicit = B.account s "created-implicit-fee" in
+    let funded = B.account s "created-funded-fee" in
+    let block = B.block s ~name:"block" ~height:1 Canonical in
+    let created account ~implicit_account_creation_fee name =
+      let (_ : B.zkapp_command) =
+        B.zkapp_command s ~name ~fee_payer:payer
+          ~account_updates:
+            [ B.account_update ~implicit_account_creation_fee account ]
+          ~in_:[ (block, Applied) ]
+      in
+      B.account_created s block account
+    in
+    created implicit ~implicit_account_creation_fee:true "implicit-fee" ;
+    created funded ~implicit_account_creation_fee:false "funded-fee" ;
+    let%bind commands =
+      with_built_archive ~pool ~name:"test_indexer_zkapp_account_creation_fee" s
+        (fun conn built ->
+          zkapp_commands_of_block conn (B.block_id built block) )
     in
     let module Zkapp_ops =
       Lib.Commands_common.Zkapp_command_info.T (Deferred.Result) in
@@ -1062,25 +907,25 @@ module Zkapp_account_creation_fee = struct
           Zkapp_ops.to_operations command
           >>| ok_or_failwith Rosetta_lib.Errors.show )
     in
-    let creation_fee_ops_for pk =
+    let creation_fee_ops_for account =
       List.count ops ~f:(fun op ->
           String.equal op.Rosetta_models.Operation._type
             "account_creation_fee_via_zkapp"
           && Option.value_map op.Rosetta_models.Operation.account ~default:false
-               ~f:(fun account ->
-                 String.equal account.Rosetta_models.Account_identifier.address
-                   pk ) )
+               ~f:(fun a ->
+                 String.equal a.Rosetta_models.Account_identifier.address
+                   (B.public_key account) ) )
     in
     Alcotest.(check int)
       "one account_creation_fee_via_zkapp op when the created account pays the \
        fee implicitly"
       1
-      (creation_fee_ops_for implicit_pk) ;
+      (creation_fee_ops_for implicit) ;
     Alcotest.(check int)
       "no account_creation_fee_via_zkapp op when the fee is funded by another \
        account update"
       0
-      (creation_fee_ops_for funded_pk)
+      (creation_fee_ops_for funded)
 
   let test_suite =
     let open Alcotest_async in

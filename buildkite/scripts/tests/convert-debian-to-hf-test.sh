@@ -21,7 +21,10 @@ buildkite/scripts/debian/update.sh --verbose
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${NETWORK_NAME}" 1
+# The daemon binary (and mina-create-genesis, needed by the conversion below)
+# now lives in the split-out mina-generic package, not the old
+# monolithic mina-${NETWORK} metapackage.
+source buildkite/scripts/debian/install.sh "mina-generic" 1
 
 
 # Step 1: Get test debian package from cache
@@ -46,13 +49,13 @@ echo "Package size: $(du -h "$INPUT_DEB" | cut -f1)"
 echo ""
 echo "=== Step 2: Running local conversion script ==="
 
-if [[ ! -f scripts/hardfork/release/tests/convert-debian-to-hf-local.sh ]]; then
-    echo "ERROR: Local conversion script not found at scripts/hardfork/release/tests/convert-debian-to-hf-local.sh" >&2
+if [[ ! -f scripts/tests/hardfork/convert-debian-to-hf-local.sh ]]; then
+    echo "ERROR: Local conversion script not found at scripts/tests/hardfork/convert-debian-to-hf-local.sh" >&2
     exit 1
 fi
 
 # Run the local script
-./scripts/hardfork/release/tests/convert-debian-to-hf-local.sh \
+./scripts/tests/hardfork/convert-debian-to-hf-local.sh \
     --deb-file "$INPUT_DEB" \
     --network "$NETWORK_NAME" \
     --output-dir "." \

@@ -45,6 +45,11 @@ let test_case (test_data : t) =
   Archive.Process.start_logging test_data.archive ~log_file ;
 
   let%bind () =
+    Archive_healthcheck.wait_db_and_server_ready ~postgres_uri:archive_uri
+      ~server_port:test_data.archive.config.server_port ()
+    >>| Or_error.ok_exn
+  in
+  let%bind () =
     Daemon.archive_blocks_from_files daemon.executor
       ~archive_address:test_data.archive.config.server_port ~format:`Precomputed
       ~sleep:5 precomputed_blocks

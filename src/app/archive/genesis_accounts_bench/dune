@@ -1,0 +1,32 @@
+(executable
+ (name genesis_accounts_bench)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  async
+  async_kernel
+  async_unix
+  core_unix.command_unix
+  uri
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  yojson
+  ;; local libraries
+  archive_lib
+  genesis_constants
+  genesis_ledger_helper
+  influxdb_line_protocol
+  logger
+  mina_automation
+  mina_automation.synthetic_archive
+  mina_base
+  mina_caqti
+  mina_ledger
+  precomputed_values
+  runtime_config)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx)))

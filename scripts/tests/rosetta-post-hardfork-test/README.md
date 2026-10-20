@@ -2,7 +2,7 @@
 
 Validates Mina's [Rosetta API](https://docs.cdp.coinbase.com/mesh/docs/welcome/) implementation after a hardfork using the `rosetta-cli` tool. Runs three checks in sequence: **spec**, **data integrity**, and **construction** (payments, delegations, account creation).
 
-> **Note:** The repository already contains Rosetta validation tests (see `src/app/rosetta/test-agent`). This test suite is specifically tailored for **post-hardfork validation** -- it uses a different `rosetta-cli` Docker image (`gcr.io/o1labs-192920/rosetta-cli:mesa-hardfork-testing`) built to handle hardfork-specific scenarios and is meant to be run against a freshly upgraded network before it is declared ready.
+> **Note:** The repository already contains Rosetta validation tests (see `src/app/rosetta/test-agent`). This test suite is specifically tailored for **post-hardfork validation** -- it uses a different `rosetta-cli` Docker image (`docker.io/minaprotocol/rosetta-cli:mesa-hardfork-testing`) built to handle hardfork-specific scenarios and is meant to be run against a freshly upgraded network before it is declared ready.
 
 ## Prerequisites
 
@@ -75,7 +75,7 @@ The Rosetta API is exposed on port **3087** of the Rosetta container. Use the pu
 | `-f, --offline-url` | Rosetta offline API URL (defaults to online URL) | No |
 | `-k, --privkey` | Hex-encoded private key (output of `convert-pvk-to-hex.js`) | Yes |
 | `-a, --address` | Mina public key address (B62q...) | Yes |
-| `-i, --image` | Docker image for rosetta-cli | No (default: `gcr.io/o1labs-192920/rosetta-cli:mesa-hardfork-testing`) |
+| `-i, --image` | Docker image for rosetta-cli | No (default: `docker.io/minaprotocol/rosetta-cli:mesa-hardfork-testing`) |
 
 ### Example
 

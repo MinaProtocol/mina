@@ -178,10 +178,9 @@ let command =
            (String.concat !incompatible_flags ~sep:", ") ;
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
-     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-     let constraint_constants =
-       Genesis_constants.Compiled.constraint_constants
-     in
+     let (module G) = Genesis_constants.profiled () in
+     let genesis_constants = G.genesis_constants in
+     let constraint_constants = G.constraint_constants in
      let proof_level = Genesis_constants.Proof_level.Full in
      let proof_cache_db = Proof_cache_tag.create_identity_db () in
      let signature_kind = Mina_signature_kind.Testnet in

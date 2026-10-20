@@ -43,12 +43,15 @@ let DockerLogin = ./DockerLogin/Type.dhall
 
 let Summon = ./Summon/Type.dhall
 
+let SubmoduleCredentials = ./SubmoduleCredentials/Type.dhall
+
 let Size = ./Size.dhall
 
 let Plugins =
       < Docker : Docker.Type
       | DockerLogin : DockerLogin.Type
       | Summon : Summon.Type
+      | SubmoduleCredentials : SubmoduleCredentials.Type
       >
 
 let B/Command = B.definitions/commandStep/Type Text Text Plugins Plugins
@@ -122,12 +125,16 @@ let Config =
       }
 
 let targetToAgent =
+    -- Integration agents also advertise generic=true, so generic=true jobs
+    -- can land on them. Generic pins to the dedicated generic pool for jobs
+    -- that cannot tolerate a burstable agent.
           \(target : Size)
       ->  merge
             { XLarge = toMap { generic = "true" }
             , Large = toMap { generic = "true" }
             , Medium = toMap { generic = "true" }
             , Small = toMap { generic = "true" }
+            , Generic = toMap { size = "generic" }
             , Integration = toMap { integration = "true" }
             , QA = toMap { qa = "true" }
             , Perf = toMap { performance = "true" }
@@ -289,10 +296,22 @@ let build
                           c.summon
                       )
 
+              let submoduleCredentialsPart =
+                    [ toMap
+                        { `MinaProtocol/submodule-credentials#v1.1.0` =
+                            Plugins.SubmoduleCredentials
+                              SubmoduleCredentials::{=}
+                        }
+                    ]
+
               let allPlugins =
                     List/concat
                       (Map.Entry Text Plugins)
-                      (dockerPart # summonPart # dockerLoginPart)
+                      (   submoduleCredentialsPart
+                        # dockerPart
+                        # summonPart
+                        # dockerLoginPart
+                      )
 
               in        if Prelude.List.null (Map.Entry Text Plugins) allPlugins
 

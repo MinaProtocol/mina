@@ -54,6 +54,26 @@ end
 let contain_log_output output =
   String.is_substring ~substring:"{\"timestamp\":" output
 
+let log_contains_structured_async_exception logs =
+  String.split_lines logs
+  |> List.exists ~f:(fun line ->
+         match Yojson.Safe.from_string line with
+         | exception _ ->
+             false
+         | json -> (
+             match Yojson.Safe.Util.member "message" json with
+             | `String "Unhandled Async exception: $exn" -> (
+                 match
+                   Yojson.Safe.Util.member "metadata" json
+                   |> Yojson.Safe.Util.member "exn"
+                 with
+                 | `Null ->
+                     false
+                 | _ ->
+                     true )
+             | _ ->
+                 false ) )
+
 module LedgerHash = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
@@ -535,6 +555,65 @@ module HardforkStateDirMismatch = struct
                 (Core.Signal.to_string signal) ) )
 end
 
+module MisconfiguredWalletCrashLog = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    (* Use a config directory private to this test: the shared default config
+       dir is reused by every test in this binary, and a daemon booted by an
+       earlier test leaves [wallets/store] behind as a directory, which would
+       make the [write_all] below fail with [Is a directory]. *)
+    let dirs = Daemon.Config.ConfigDirs.create ~root_path:test.temp_dir () in
+    let config = Daemon.Config.create ~dirs ~config:test.config.config () in
+    let daemon = Daemon.of_config config in
+    let%bind () = Daemon.Config.generate_keys config in
+    let ledger_file = dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let wallets_dir = dirs.conf ^/ "wallets" in
+    Core.Unix.mkdir_p wallets_dir ;
+    Out_channel.write_all (wallets_dir ^/ "store") ~data:"not a directory" ;
+    let%bind process = Daemon.start daemon in
+    match%bind
+      Async.Clock.with_timeout
+        (Core.Time.Span.of_sec 15.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        let%map _ = Daemon.Process.force_kill process in
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "Daemon did not exit within 15 seconds")
+    | `Result (Ok ()) ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.of_string "Daemon exited with code 0, expected non-zero") )
+    | `Result (Error (`Signal signal)) ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.createf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+    | `Result (Error (`Exit_non_zero _)) -> (
+        let log_file = Daemon.Config.ConfigDirs.mina_log dirs in
+        match%map
+          Monitor.try_with (fun () -> Reader.file_contents log_file)
+        with
+        | Error exn ->
+            Mina_automation_fixture.Intf.Failed
+              (Error.createf "Could not read daemon log %s: %s" log_file
+                 (Exn.to_string exn) )
+        | Ok logs ->
+            if log_contains_structured_async_exception logs then
+              Mina_automation_fixture.Intf.Passed
+            else
+              Failed
+                (Error.createf
+                   "Daemon log did not contain structured unhandled async \
+                    exception metadata. Logs:\n\
+                    %s"
+                   logs ) )
+end
+
 module ConfigFileOverride = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
@@ -993,6 +1072,123 @@ module NodeStatusReport = struct
             Node_status_mock_server.stop mock )
 end
 
+(** Healthcheck integration test: starts a daemon, performs an initial
+    readiness check (which may or may not show not-ready depending on
+    bootstrap speed), then uses healthcheck_lib to wait for the daemon
+    to become ready and verifies all checks pass. *)
+module HealthcheckBootstrapLifecycle = struct
+  module HC = Mina_healthcheck_lib
+  module GC = Mina_graphql_client.Client
+
+  let hc_logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let start_daemon (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%map _process = Daemon.start daemon in
+    Uri.make ~scheme:"http" ~host:"localhost" ~port:test.config.rest_port
+      ~path:"/graphql" ()
+
+  (** Check readiness before bootstrap.  In demo-mode with a small ledger the
+      node may already be SYNCED by the time GraphQL becomes reachable, so we
+      treat "already ready" as acceptable rather than a hard failure. *)
+  let check_pre_bootstrap_readiness node_uri =
+    let%map pre = GC.get_readiness ~logger:hc_logger node_uri ~min_peers:0 in
+    match pre with
+    | Error e ->
+        Or_error.errorf "pre-bootstrap readiness check errored: %s"
+          (Error.to_string_hum e)
+    | Ok r when r.ready ->
+        [%log' info hc_logger]
+          "Pre-bootstrap: node already ready (fast bootstrap in demo mode)" ;
+        Ok ()
+    | Ok _ ->
+        [%log' info hc_logger] "Pre-bootstrap not_ready=true" ;
+        Ok ()
+
+  let assert_synced node_uri =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind ds = GC.get_daemon_status ~logger:hc_logger node_uri in
+    [%log' info hc_logger] "Post-bootstrap sync=%s peers=%d"
+      (Sync_status.to_string ds.sync_status)
+      ds.peer_count ;
+    if not (Sync_status.equal ds.sync_status `Synced) then
+      Deferred.Or_error.errorf "expected SYNCED, got %s"
+        (Sync_status.to_string ds.sync_status)
+    else Deferred.Or_error.return ()
+
+  let test_case (test : t) =
+    let open Mina_automation_fixture.Intf in
+    let run () =
+      let open Deferred.Or_error.Let_syntax in
+      let%bind node_uri = Deferred.map (start_daemon test) ~f:Or_error.return in
+      let%bind _initial =
+        HC.wait_for_graphql ~logger:hc_logger node_uri ~timeout:120 ~interval:5
+      in
+      let%bind () = check_pre_bootstrap_readiness node_uri in
+      let%bind _ready =
+        HC.wait_for_ready ~logger:hc_logger node_uri ~min_peers:0 ~timeout:300
+          ~interval:5
+      in
+      assert_synced node_uri
+    in
+    match%map run () with Ok () -> Passed | Error e -> Failed e
+end
+
+(** Healthcheck negative test: verifies failure for an unreachable
+    daemon AND that the [?deadline] parameter actually bounds the call.
+    Without the deadline plumbing through to [exec_graphql_request],
+    each call retries 10 times with 30s sleeps and takes ~5 minutes —
+    the bug Luis flagged on PR #18746 where [wait --timeout 30] took
+    300s instead of 30s. *)
+module HealthcheckUnreachable = struct
+  module GC = Mina_graphql_client.Client
+
+  let hc_logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  (* 5s deadline on the inner call, 15s wall-clock ceiling on the test
+     itself.  CI hosts can be slow but if this assertion fails it
+     means the deadline parameter no longer reaches the retry loop —
+     a regression we want to catch loudly, not paper over with a
+     bigger margin. *)
+  let inner_deadline_secs = 5.0
+
+  let max_wall_clock_secs = 15.0
+
+  let test_case (_test : t) =
+    let unreachable_uri = Uri.of_string "http://127.0.0.1:1/graphql" in
+    let deadline =
+      Time.add (Time.now ()) (Time.Span.of_sec inner_deadline_secs)
+    in
+    let start = Time.now () in
+    let%map result =
+      GC.get_sync_status ~deadline ~logger:hc_logger unreachable_uri
+    in
+    let elapsed = Time.Span.to_sec (Time.diff (Time.now ()) start) in
+    match result with
+    | Ok _ ->
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "expected failure for unreachable daemon")
+    | Error _ when Float.( > ) elapsed max_wall_clock_secs ->
+        Mina_automation_fixture.Intf.Failed
+          (Error.createf
+             "deadline parameter not honored: get_sync_status against an \
+              unreachable URI took %.2fs (deadline was %.0fs, wall-clock \
+              ceiling %.0fs).  Likely cause: ?deadline is not threaded through \
+              to exec_graphql_request's retry loop."
+             elapsed inner_deadline_secs max_wall_clock_secs )
+    | Error _ ->
+        Mina_automation_fixture.Intf.Passed
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1079,6 +1275,16 @@ let () =
                         .Make_FixtureWithoutBootstrap
                           (HardforkStateDirMismatch) ) )
         ] )
+    ; ( "misconfigured-wallet-crash-log"
+      , [ test_case
+            "The mina daemon logs structured metadata for a misconfigured \
+             wallet"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (MisconfiguredWalletCrashLog) ) )
+        ] )
     ; ( "config-file-override"
       , [ test_case "Multiple --config-file flags merge/override configs" `Slow
             (Mina_automation_runner.Runner.run_blocking
@@ -1131,5 +1337,20 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (NodeStatusReport) ) )
+        ] )
+    ; ( "healthcheck"
+      , [ test_case "Healthcheck lifecycle: readiness check then wait for ready"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HealthcheckBootstrapLifecycle) ) )
+        ] )
+    ; ( "healthcheck-unreachable"
+      , [ test_case "Healthcheck reports failure for unreachable daemon" `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HealthcheckUnreachable) ) )
         ] )
     ]

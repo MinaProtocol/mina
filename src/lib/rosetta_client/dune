@@ -1,0 +1,26 @@
+(library
+ (name rosetta_client)
+ (public_name rosetta_client)
+ (libraries
+  ;; opam libraries
+  core
+  core_unix
+  async
+  async.async_command
+  cohttp
+  cohttp-async
+  ppx_deriving_yojson.runtime
+  uri
+  yojson
+  ;; local libraries
+  rosetta_models)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

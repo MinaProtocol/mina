@@ -8,18 +8,13 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ArchiveNodeTest = ../../Command/ArchiveNodeTest.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.DepsSpec::{
-        , buildFlags = BuildFlags.Type.Instrumented
-        , artifact = Artifacts.Type.FunctionalTestSuite
-        }
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -33,7 +28,6 @@ in  Pipeline.build
           , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
           , S.exactly "buildkite/scripts/bench/install" "sh"
           , S.exactly "buildkite/scripts/bench/run" "sh"
-          , S.contains "scripts/benchmark"
           , S.exactly "buildkite/src/Jobs/Bench/ArchiveStable" "dhall"
           , S.exactly "buildkite/src/Jobs/Bench/ArchiveUnstable" "dhall"
           ]

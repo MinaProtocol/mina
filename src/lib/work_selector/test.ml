@@ -75,11 +75,7 @@ struct
       let%bind sl = gen_staged_ledger in
       let%map pool =
         gen_snark_pool
-          ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
-                Ok
-                  (Lazy.force precomputed_values).protocol_state_with_hashes
-                    .data )
-          |> Or_error.ok_exn )
+          (T.Staged_ledger.all_work_jobs sl)
           (Currency.Fee.of_nanomina_int_exn 2)
       in
       (sl, pool)

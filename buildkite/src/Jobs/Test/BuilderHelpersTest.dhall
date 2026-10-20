@@ -4,6 +4,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -19,12 +21,14 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.exactly "scripts/debian/builder-helpers" "sh"
-          , S.strictlyStart (S.contains "scripts/debian/tests")
+          , S.strictlyStart (S.contains "scripts/tests/debian")
           , S.exactly "scripts/export-git-env-vars" "sh"
+          , S.exactly "buildkite/scripts/debian/select_release_packages" "sh"
           , S.exactly "buildkite/src/Jobs/Test/BuilderHelpersTest" "dhall"
           ]
         , path = "Test"
         , name = "BuilderHelpersTest"
+        , scope = PipelineScope.InfraOnly
         , tags =
           [ PipelineTag.Type.Fast
           , PipelineTag.Type.Test
@@ -36,9 +40,28 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./scripts/debian/tests/test_builder_helpers.sh" ]
+              [ Cmd.run "./scripts/tests/debian/test_builder_helpers.sh" ]
             , label = "Debian builder-helpers tests"
             , key = "builder-helpers-tests"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "./scripts/tests/debian/test_build_parallel.sh" ]
+            , label = "Debian parallel-build tests"
+            , key = "build-parallel-tests"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "./scripts/tests/debian/test_select_release_packages.sh"
+              ]
+            , label = "Release package selection tests"
+            , key = "select-release-packages-tests"
             , target = Size.Small
             , docker = None Docker.Type
             }

@@ -34,7 +34,7 @@
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
-  # - dockerfiles/1-build-deps
+  # - dockerfiles/toolchain/1-build-deps
   # - flake.nix (and flake.lock after running
   #   `nix flake update opam-repository`).
   # - scripts/update-opam-switch.sh
@@ -224,7 +224,7 @@
             { with-archive ? false }: {
               command =
                 runInEnv self.devShells.x86_64-linux.integration-tests ''
-                  test_executive local ${test} \
+                  test_executive docker ${test} \
                   --mina-image=${
                     dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
                   } \
@@ -395,7 +395,7 @@
         packages = (rec {
           inherit (ocamlPackages)
             mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
-            test_executive with-instrumentation;
+            test_executive with-instrumentation mina-graphql-client;
           # Granular nix
           inherit (ocamlPackages)
             src exes all all-tested all-exes files tested info dune-description
@@ -405,11 +405,11 @@
           granular = ocamlPackages.default;
           default = ocamlPackages.mina;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool minimina
+            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
             zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full
-            mina-image-instr-full;
+            mina-image-devnet-generic mina-archive-image-devnet;
           mina-deb = debianPackages.mina;
           impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
         }) // {

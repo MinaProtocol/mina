@@ -105,6 +105,8 @@ in      \ ( args
                         , environment =
                           [ "BUILDKITE_AGENT_ACCESS_TOKEN"
                           , "BUILDKITE_INCREMENTAL"
+                          , "GITHUB_TOKEN"
+                          , "GIT_CONFIG_PARAMETERS"
                           ]
                         }
                       }

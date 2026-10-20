@@ -282,3 +282,26 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+let%test_module "to_time range" =
+  ( module struct
+    (* [of_int64] builds a [t] from a raw millisecond count (the epoch is 0), so
+       these exercise the same uint64 range an untrusted block timestamp can
+       take. A value with the high bit set reads as a negative int64 and is the
+       range that made [to_time_exn] raise (the gossip-path DoS). *)
+    let%test "ordinary timestamp is in range" =
+      Option.is_some (to_time_opt (of_int64 1_700_000_000_000L))
+
+    let%test "high-bit-set timestamp is rejected" =
+      Option.is_none (to_time_opt (of_int64 (-1L)))
+
+    let%test "to_time_exn raises exactly when to_time_opt is None" =
+      List.for_all
+        [ 0L; 1L; 1_700_000_000_000L; Int64.max_value; Int64.min_value; -1L ]
+        ~f:(fun v ->
+          let t = of_int64 v in
+          let raised =
+            match to_time_exn t with _ -> false | exception _ -> true
+          in
+          Bool.equal raised (Option.is_none (to_time_opt t)) )
+  end )

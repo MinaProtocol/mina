@@ -42,7 +42,10 @@ let add_new_subscription (t : t) ~pk =
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
     ~transition_frontier ~is_storing_all ~time_controller
-    ~upload_blocks_to_gcloud ~precomputed_block_writer =
+    ~upload_blocks_to_gcloud ~network_name ~precomputed_block_writer =
+  (* Blocks are written by this job rather than by the handler below, so that a
+     multi-megabyte write never stops the Async scheduler mid-block. *)
+  let block_sink_writer = Precomputed_block_sink.start_writer ~logger in
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -118,7 +121,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
           let new_block = Mina_block.Validated.forget new_block_validated in
           let new_block_no_hash = With_hash.data new_block in
           let hash = State_hash.With_state_hashes.state_hash new_block in
-          (let path, _ = !precomputed_block_writer in
+          (let sinks = !precomputed_block_writer in
            match Broadcast_pipe.Reader.peek transition_frontier with
            | None ->
                [%log warn]
@@ -250,13 +253,16 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                  .upload_to_gcloud_blocks) )
                      | _ ->
                          () ) ;
-                   Option.iter path ~f:(fun (`Path path) ->
-                       Out_channel.with_file ~append:true path
-                         ~f:(fun out_channel ->
-                           Out_channel.output_lines out_channel
-                             [ Yojson.Safe.to_string
-                                 (Lazy.force precomputed_block)
-                             ] ) ) ;
+                   Precomputed_block_sink.write sinks block_sink_writer
+                     ~network:network_name
+                     ~height:
+                       ( Mina_block.blockchain_length new_block_no_hash
+                       |> Mina_numbers.Length.to_string )
+                     ~state_hash:(State_hash.to_base58_check hash)
+                     ~json:
+                       ( lazy
+                         (Yojson.Safe.to_string (Lazy.force precomputed_block))
+                         ) ;
                    [%log info] "Saw block with state hash $state_hash"
                      ~metadata:
                        [ ( "state_hash"

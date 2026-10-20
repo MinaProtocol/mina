@@ -27,7 +27,7 @@
   o1trace
   mina_stdlib)
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))
 

@@ -26,8 +26,8 @@ in  Pipeline.build
         , dirtyWhen =
           [ SelectFiles.exactly "src/app/archive/create_schema" "sql"
           , SelectFiles.exactly "src/app/archive/drop_tables" "sql"
-          , SelectFiles.exactly "src/app/archive/upgrade_to_mesa" "sql"
-          , SelectFiles.exactly "src/app/archive/downgrade_to_berkeley" "sql"
+          , SelectFiles.exactly "src/app/archive/upgrade" "sql"
+          , SelectFiles.exactly "src/app/archive/downgrade" "sql"
           , SelectFiles.exactly "buildkite/src/Jobs/Lint/ArchiveUpgrade" "dhall"
           , SelectFiles.exactly
               "buildkite/scripts/archive/upgrade-script-check"

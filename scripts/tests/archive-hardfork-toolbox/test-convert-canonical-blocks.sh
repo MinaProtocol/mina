@@ -12,4 +12,4 @@ CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${PG_PORT}
 eval "$(opam config env)"
 
 echo "Running convert canonical blocks test"
-POSTGRES_URI="${CONN}" dune runtest src/app/archive_hardfork_toolbox/tests
+MINA_PROFILE=dev POSTGRES_URI="${CONN}" dune runtest src/app/archive_hardfork_toolbox/tests

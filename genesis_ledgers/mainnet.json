@@ -1,36 +1,33 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2024-06-05T00:00:00Z"
+    "genesis_state_timestamp": "2026-09-03T18:00:00Z"
   },
   "proof": {
     "fork": {
-      "state_hash": "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15",
-      "blockchain_length": 359604,
-      "global_slot_since_genesis": 564480
+      "state_hash": "3NKHyxzgM9z4C1wUz5ZhJBmNhtDzDQGr1PGvWRwiCUcFvsdTco2T",
+      "blockchain_length": 548146,
+      "global_slot_since_genesis": 958440
     }
   },
   "ledger": {
-    "add_genesis_winner": false,
-    "hash": "jwNw4qb6tnNhpQNxiMLem9WumxZTwmbSx3fYXW4FP3hZRkoQJSE",
-    "s3_data_hash": "1b3c34283e6880a9dfdb7d5dc351e1c063f5865a13012d81acc8d55601d2c8f3"
+    "hash": "jwo3EM3zXkK5gpQYZHQP9KJVgH4ZCfv5bMgvyy3Gh2dAWU6AgyN",
+    "s3_data_hash": "68f5a0c1f32ccc36e8c13f9d6b38a2de5d82155887752b795bf2d60cbed441a1",
+    "add_genesis_winner": false
   },
   "epoch_data": {
     "staking": {
-      "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
-      "hash": "jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL",
-      "s3_data_hash": "ab6bec51c8523c0d041fab66cb9ca12b03842d3d77b1b06254d7a9c8dc33cbfc"
+      "seed": "2vaPBM2CkpnPhnPsrDEBwhX8d5XBP6UaedLCpVu3Y9bARWPCrQCC",
+      "s3_data_hash": "d32def351368bd72331a85822f06c42e888c58790c7481748fe38e4ffa509d7b",
+      "hash": "jwydedrpUSNZr49ZgNsmZjMVX5BEZp5cwGN68Z7hhU9kp3eAtBa"
     },
     "next": {
-      "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
-      "hash": "jwgzfxD5rEnSP3k4UiZu2569FfhJ1SRUvabfTz21e4btwBHg3jq",
-      "s3_data_hash": "61323d7565130cfa4768c0333f32b2a8ea7fdfbf17065adfa48b4e9956619b44"
+      "seed": "2vbu8qY9toPbkrgPEW2Wtd8oqHrbCvDnrvMQq1zvY6V4n3U6VasS",
+      "s3_data_hash": "39ffe8728842e772de3c7d647f430bab52170ff86919f84ef4e8dbe3b358e493",
+      "hash": "jwCRaGZjgN6fe1ZQWGvti47ERfzdPMbffeL6BJPNj8sk6SLNX8Z"
     }
   },
   "daemon": {
     "network_id": "mainnet",
-    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/mainnet.txt",
-    "slot_tx_end": 393800,
-    "slot_chain_end": 393900,
-    "hard_fork_genesis_slot_delta": 60
+    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
   }
 }

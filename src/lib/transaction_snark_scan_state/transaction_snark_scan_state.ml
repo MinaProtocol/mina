@@ -163,6 +163,7 @@ module Available_job = struct
 end
 
 module Space_partition = Parallel_scan.Space_partition
+module Tree_metrics = Parallel_scan.Tree_metrics
 
 module Job_view = struct
   type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
@@ -730,6 +731,14 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         (Ledger_proof.Cached.statement p1)
         (Ledger_proof.Cached.statement p2)
       |> Result.ok
+
+(* The transaction of a base job, for log summaries — read from the job's
+   [transaction_with_status]. [None] for merge jobs, which have no transaction. *)
+let job_transaction : job -> Mina_transaction.Transaction.t option = function
+  | Base { transaction_with_status; _ } ->
+      Some (With_status.data transaction_with_status)
+  | Merge _ ->
+      None
 
 let create ~work_delay ~transaction_capacity_log_2 : t =
   let k = Int.pow 2 transaction_capacity_log_2 in
@@ -1367,6 +1376,14 @@ let single_spec_one_or_twos_rev_of_job_list ~get_state jobs =
       in
       spec :: acc' )
 
+(* The pending work as raw jobs, grouped into proof bundles. Work selection (and
+   the snark pool) deal only in each job's statement (via [statement_of_job]);
+   the proving spec — which carries the transaction witness — is a separate,
+   prove-time concern built per job with [single_spec_of_job]. Same
+   grouping/order as [all_work_pairs], so the two line up by statement. *)
+let all_work_jobs t : Available_job.t One_or_two.t list =
+  List.concat_map (all_jobs t) ~f:One_or_two.group_list
+
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
     Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t =
@@ -1383,7 +1400,25 @@ let all_work_pairs t
       | Error e ->
           Stop (Error e) )
 
-let update_metrics t = Parallel_scan.update_metrics t.scan_state
+let tree_metrics t = Parallel_scan.metrics t.scan_state
+
+let update_metrics t =
+  Or_error.try_with (fun () ->
+      List.iteri (tree_metrics t)
+        ~f:(fun
+             i
+             { Tree_metrics.available_space; base_jobs_todo; merge_jobs_todo }
+           ->
+          let name = sprintf "tree%d" i in
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_available_space ~name))
+            (Int.to_float available_space) ;
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name))
+            (Int.to_float base_jobs_todo) ;
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
+            (Int.to_float merge_jobs_todo) ) )
 
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in

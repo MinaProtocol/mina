@@ -167,7 +167,12 @@ else
   closest_ancestor=$(find_closest_ancestor)
 fi
 
-find "$JOBS" -type f -name "*.yml" | while read -r file; do
+# Phase 1: triage. Collect every job that passes tags, scope, dirty-when and
+# include/exclude filters into the SELECTED_FILES set. Nothing is uploaded yet:
+# their dependencies must be pulled in first (Phase 2).
+declare -A SELECTED_FILES=()
+
+while IFS= read -r file; do
   tags=$(yq .spec.tags "$file")
   scope=$(yq .spec.scope "$file")
   job_name=$(yq -r .spec.name "$file")
@@ -213,14 +218,59 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
   fi
 
   echo "✅ Including job $job_name in build "
+  SELECTED_FILES["$file"]=1
+done < <(find "$JOBS" -type f -name "*.yml")
+
+# Phase 2: dependency resolution. A selected job may depend on a build job whose
+# own dirty-when did not match, so triage would not upload it. Pull only such
+# "would not be selected" prerequisites into the run set.
+#
+# A dependency is pulled ONLY when select_job would reject it on its own. If it
+# would be selected, its own triage step already uploads it -- and re-uploading
+# it here would duplicate the step key. That matters for full/multi-phase runs
+# (e.g. nightly): every job is selected in full mode, so nothing is ever pulled,
+# and cross-phase duplicates (a build selected in one phase, depended on from
+# another) are avoided. select_job is phase-independent (it only looks at the
+# selection mode and the job's own dirty-when), so the decision is consistent
+# regardless of which phase's tag/scope filter is running.
+build_step_index "$JOBS"
+
+declare -A TO_UPLOAD=()
+for file in "${!SELECTED_FILES[@]}"; do
+  TO_UPLOAD["$file"]=1
+done
+
+for file in "${!SELECTED_FILES[@]}"; do
+  while IFS= read -r dep_file; do
+    [[ -z "$dep_file" ]] && continue
+    [[ -n "${TO_UPLOAD[$dep_file]-}" ]] && continue
+
+    dep_name=$(yq -r .spec.name "$dep_file")
+
+    # Skip dependencies that triage would select on their own; their dedicated
+    # step already uploads them (pulling would duplicate the step key).
+    dep_selected=$(select_job "$SELECTION_FULL" "$SELECTION_TRIAGED" "$dep_file" "$dep_name" "$GIT_DIFF_FILE")
+    if [[ "$dep_selected" -eq 1 ]]; then
+      echo "↩️  Skipping dependency $dep_name: already selected by its own triage step" >&2
+      continue
+    fi
+
+    TO_UPLOAD["$dep_file"]=1
+    sel_name=$(yq -r .spec.name "$file")
+    echo "➕ Including dependency job $dep_name (required by $sel_name)"
+  done < <(resolve_transitive_deps "$file")
+done
+
+# Phase 3: upload every job in the run set exactly once.
+for file in "${!TO_UPLOAD[@]}"; do
+  job_name=$(yq -r .spec.name "$file")
 
   if [[ "$DRY_RUN" == true ]]; then
-      printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
-  else
-    job_path=$(yq -r .spec.path "$file")
-
-    ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
-    printf " -> ✅ Uploaded job: %s\n" "$job_name"
+    printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
+    continue
   fi
 
+  job_path=$(yq -r .spec.path "$file")
+  ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
+  printf " -> ✅ Uploaded job: %s\n" "$job_name"
 done

@@ -1,5 +1,8 @@
 (test
- (name test_convert_canonical)
+ (name main)
+ (deps
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql)
  (libraries
   ;; opam libraries
   alcotest
@@ -32,6 +35,7 @@
   mina_base.import
   mina_block
   mina_caqti
+  mina_automation.synthetic_archive
   mina_numbers
   mina_state
   mina_transaction
@@ -42,13 +46,14 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules test_convert_canonical)
+ (modules
+  main
+  test_env
+  convert_canonical_tests
+  populate_genesis_accounts_tests)
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_let
-   ppx_hash
-   ppx_compare
-   ppx_sexp_conv
-   h_list.ppx)))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

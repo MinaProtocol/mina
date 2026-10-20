@@ -22,19 +22,19 @@ type ForkConfigData struct {
 // ExtractForkConfig extracts the fork configuration from the network
 func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
-		forkConfig, err := t.Client.ForkConfig(port)
+		forkConfigBytes, err := t.Client.ForkConfig(port)
 		if err != nil {
 			t.Logger.Error("Failed to get fork config: %v", err)
-			continue
-		}
-		forkConfigBytes := []byte(forkConfig.Raw)
-
-		if !bytes.Equal(forkConfigBytes, []byte("null")) {
+		} else if !bytes.Equal(forkConfigBytes, []byte("null")) {
 			t.Logger.Info("Successfully queried fork config on node port %d", port)
 			return forkConfigBytes, nil
+		} else {
+			t.Logger.Info("Failed to fetch valid fork config (attempt %d/%d), retrying...", attempt, t.Config.ForkConfigMaxRetries)
 		}
 
-		t.Logger.Info("Failed to fetch valid fork config (attempt %d/%d), retrying...", attempt, t.Config.ForkConfigMaxRetries)
+		// The delay must also cover the error path: a GraphQL error comes back
+		// from the SDK immediately, so skipping the sleep here would burn every
+		// attempt in a tight loop.
 		if attempt < t.Config.ForkConfigMaxRetries {
 			time.Sleep(time.Duration(t.Config.ForkConfigRetryDelaySeconds) * time.Second)
 		}

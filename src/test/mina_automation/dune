@@ -18,6 +18,7 @@
   cohttp-async
   ;; mina libraries
   init
+  mina_healthcheck_lib
   logger
   currency
   integration_test_lib
@@ -32,4 +33,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_compare)))
+  (pps mina_ppx)))

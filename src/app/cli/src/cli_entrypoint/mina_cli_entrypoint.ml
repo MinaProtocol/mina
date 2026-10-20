@@ -13,15 +13,6 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-let plugin_flag =
-  if Node_config.plugins then
-    let open Command.Param in
-    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-      ~doc:
-        "PATH The path to load a .cmxs plugin from. May be passed multiple \
-         times"
-  else Command.Param.return []
-
 let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
     =
   let current_genesis_global_slot =
@@ -501,12 +492,22 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "full|check|none Internal, for testing. Start or connect to a network \
          with full proving (full), snark-testing with dummy proofs (check), or \
          dummy proofs (none)"
-  and plugins = plugin_flag
   and precomputed_blocks_path =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
       (optional string)
-      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
+      ~doc:
+        "PATH Deprecated, use --precomputed-blocks-dir. Append every \
+         precomputed block as one JSON line to this file. The file grows \
+         without limit and nothing rotates it"
+  and precomputed_blocks_dir =
+    flag "--precomputed-blocks-dir"
+      ~aliases:[ "precomputed-blocks-dir" ]
+      (optional string)
+      ~doc:
+        "DIR Write each precomputed block to its own file in this directory, \
+         named <network>-<height>-<state-hash>.json, the same name the \
+         precomputed block bucket uses. The directory must exist"
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
@@ -826,13 +827,20 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             @ List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
           in
-          let genesis_constants =
-            Genesis_constants.Compiled.genesis_constants
+
+          let (module G) = Genesis_constants.profiled () in
+          let genesis_constants = G.genesis_constants in
+          let constraint_constants = G.constraint_constants in
+          [%log info] "Daemon running with node profile $profile"
+            ~metadata:
+              [ ("profile", `String Node_config.profile)
+              ; ( "constraint_constants"
+                , Genesis_constants.Constraint_constants.to_yojson
+                    constraint_constants )
+              ] ;
+          let compile_config =
+            Mina_compile_config.of_node_config (module Node_config)
           in
-          let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
-          in
-          let compile_config = Mina_compile_config.Compiled.t in
           let%bind ( precomputed_values
                    , config_jsons
                    , config
@@ -840,9 +848,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    , ledger_backing
                    , chain_id ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
-              ~proof_level:Genesis_constants.Compiled.proof_level config_files
-              ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~hardfork_handling
+              ~proof_level:G.proof_level config_files ~genesis_constants
+              ~constraint_constants ~cli_proof_level ~hardfork_handling
           in
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
@@ -1469,11 +1476,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~is_archive_rocksdb ~work_reassignment_wait
                  ~archive_process_location ~log_block_creation
                  ~precomputed_values ~start_time ?precomputed_blocks_path
-                 ~log_precomputed_blocks ~start_filtered_logs
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~stop_time_interval ~node_status_url
-                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 ~precomputed_blocks_dir ~log_precomputed_blocks
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~stop_time_interval
+                 ~node_status_url ~graphql_control_port:itn_graphql_port
+                 ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  ~itn_features ~compile_config ~hardfork_handling
                  ~ledger_backing () )
@@ -1535,22 +1543,34 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
-        let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
 let daemon logger ~itn_features =
-  let compile_config = Mina_compile_config.Compiled.t in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   Command.async ~summary:"Mina daemon"
     (Command.Param.map
        (setup_daemon logger ~itn_features
           ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun setup_daemon () ->
-         (* Immediately disable updating the time offset. *)
-         Block_time.Controller.disable_setting_offset () ;
-         let%bind mina = setup_daemon () in
-         let%bind () = Mina_lib.start mina in
-         [%log info] "Daemon ready. Clients can now connect" ;
-         Async.never () ) )
+         match%bind
+           Monitor.try_with (fun () ->
+               (* Immediately disable updating the time offset. *)
+               Block_time.Controller.disable_setting_offset () ;
+               let%bind mina = setup_daemon () in
+               let%map () = Mina_lib.start mina in
+               [%log info] "Daemon ready. Clients can now connect" )
+         with
+         | Ok _ ->
+             Async.never ()
+         | Error exn ->
+             let exn_json =
+               Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get exn)
+             in
+             [%log fatal] "Unhandled Async exception: $exn"
+               ~metadata:[ ("exn", exn_json) ] ;
+             exit 1 ) )
 
 let replay_blocks logger ~itn_features =
   let replay_flag =
@@ -1563,7 +1583,9 @@ let replay_blocks logger ~itn_features =
     flag "--format" ~aliases:[ "-format" ] (optional string)
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
     (Command.Param.map3 replay_flag read_kind
        (setup_daemon logger ~itn_features
@@ -1760,10 +1782,10 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
+  let (module G) = Genesis_constants.profiled () in
   [ ( Snark_worker.Entry.command_name
-    , Snark_worker.Entry.command_from_rpcs
-        ~proof_level:Genesis_constants.Compiled.proof_level
-        ~constraint_constants:Genesis_constants.Compiled.constraint_constants
+    , Snark_worker.Entry.command_from_rpcs ~proof_level:G.proof_level
+        ~constraint_constants:G.constraint_constants
         ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
@@ -1772,10 +1794,8 @@ let internal_commands logger ~itn_features =
         (let%map_open.Command signature_kind = Cli_lib.Flag.signature_kind in
          fun () ->
            let logger = Logger.create () in
-           let constraint_constants =
-             Genesis_constants.Compiled.constraint_constants
-           in
-           let proof_level = Genesis_constants.Compiled.proof_level in
+           let constraint_constants = G.constraint_constants in
+           let proof_level = G.proof_level in
            Parallel.init_master () ;
            match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
            | `Ok sexp ->
@@ -1800,10 +1820,8 @@ let internal_commands logger ~itn_features =
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
-          let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
-          in
-          let proof_level = Genesis_constants.Compiled.proof_level in
+          let constraint_constants = G.constraint_constants in
+          let proof_level = G.proof_level in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1854,10 +1872,8 @@ let internal_commands logger ~itn_features =
         fun () ->
           let open Async in
           let logger = Logger.create () in
-          let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
-          in
-          let proof_level = Genesis_constants.Compiled.proof_level in
+          let constraint_constants = G.constraint_constants in
+          let proof_level = G.proof_level in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
@@ -2016,12 +2032,8 @@ let internal_commands logger ~itn_features =
           Parallel.init_master () ;
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
-          let genesis_constants =
-            Genesis_constants.Compiled.genesis_constants
-          in
-          let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
-          in
+          let genesis_constants = G.genesis_constants in
+          let constraint_constants = G.constraint_constants in
           let proof_level = Genesis_constants.Proof_level.Full in
           let config_files =
             List.map config_files ~f:(fun config_file ->
@@ -2088,12 +2100,11 @@ let internal_commands logger ~itn_features =
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
           let logger = Logger.create () in
-          let genesis_constants =
-            Genesis_constants.Compiled.genesis_constants
-          in
-          let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
-          in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
+
+          let (module G) = Genesis_constants.profiled () in
+          let genesis_constants = G.genesis_constants in
+          let constraint_constants = G.constraint_constants in
           let proof_level = Genesis_constants.Proof_level.Full in
           if from_config_hashes_only then (
             let%bind config =
@@ -2127,7 +2138,6 @@ let internal_commands logger ~itn_features =
                    config contains ledger.hash and epoch_data hashes.\n" ;
                 exit 1 )
           else
-            let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
             let config_files =
               List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
@@ -2177,13 +2187,10 @@ let internal_commands logger ~itn_features =
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.null () in
-          let genesis_constants =
-            Genesis_constants.Compiled.genesis_constants
-          in
-          let constraint_constants =
-            Genesis_constants.Compiled.constraint_constants
-          in
-          let proof_level = Genesis_constants.Compiled.proof_level in
+          let (module G) = Genesis_constants.profiled () in
+          let genesis_constants = G.genesis_constants in
+          let constraint_constants = G.constraint_constants in
+          let proof_level = G.proof_level in
           let config =
             let config_jsons =
               List.map config_files ~f:(fun config_file ->
@@ -2267,25 +2274,33 @@ let print_version_help coda_exe version =
 let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
-  Random.self_init () ;
-  let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
-  let logger = Logger.create ~itn_features () in
-  don't_wait_for (ensure_testnet_id_still_good logger) ;
-  (* Turn on snark debugging in prod for now *)
-  Snarky_backendless.Snark.set_eval_constraints true ;
-  (* intercept command-line processing for "version", because we don't
-     use the Jane Street scripts that generate their version information
-  *)
-  (let is_version_cmd s =
-     List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
-   in
-   match Sys.get_argv () with
-   | [| _mina_exe; version |] when is_version_cmd version ->
-       Mina_version.print_version ()
-   | _ ->
-       Command.run
-         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~itn_features) ) ) ;
-  Core.exit 0
+  try
+    Random.self_init () ;
+    let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
+    let logger = Logger.create ~itn_features () in
+    don't_wait_for (ensure_testnet_id_still_good logger) ;
+    (* Turn on snark debugging in prod for now *)
+    Snarky_backendless.Snark.set_eval_constraints true ;
+    (* intercept command-line processing for "version", because we don't
+       use the Jane Street scripts that generate their version information
+    *)
+    (let is_version_cmd s =
+       List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
+     in
+     match Sys.get_argv () with
+     | [| _mina_exe; version |] when is_version_cmd version ->
+         Mina_version.print_version ()
+     | _ ->
+         Command.run
+           (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
+              (mina_commands logger ~itn_features) ) ) ;
+    Core.exit 0
+  with exn ->
+    let logger = Logger.create () in
+    let exn_json =
+      Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get exn)
+    in
+    [%log fatal] "Unhandled top level exception: $exn"
+      ~metadata:[ ("exn", exn_json) ]
 
 let linkme = ()

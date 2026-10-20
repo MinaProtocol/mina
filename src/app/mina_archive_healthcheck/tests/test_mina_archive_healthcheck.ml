@@ -1,0 +1,714 @@
+(* Alcotest smoke tests for mina-archive-healthcheck.
+
+   These always exercise the subcommands that don't require a running
+   archive PostgreSQL: --help at the top level and per-subcommand, plus
+   the single-JSON-record contract for each subcommand against a
+   non-routable [postgres://...:1/...] URI.  The success-path envelope and
+   query-regression tests create temporary DBs on the server named by
+   [MINA_TEST_POSTGRES], and fail when it is not set.
+
+   The dead-PG URI deliberately points at a port that no local service
+   listens on (127.0.0.1:1), so the connect attempt fails fast with
+   ECONNREFUSED, the [with_pool] error path runs, and we get one
+   well-formed JSON record on stdout in [--json] mode.  This is the
+   same contract regression the original defect — [Caqti_error]
+   propagating unwrapped — could violate. *)
+
+open Core
+
+let bin =
+  let here = Filename.dirname (Array.get (Sys.get_argv ()) 0) in
+  Filename.concat here "../mina_archive_healthcheck.exe"
+
+(* Non-routable URI: caqti will try to TCP-connect to 127.0.0.1:1,
+   get ECONNREFUSED, surface a Caqti_error which the CLI must format
+   into a single JSON record (or single text line) without leaking. *)
+let dead_pg = "postgres://test:test@127.0.0.1:1/test"
+
+(* The envelope is the contract, so each shape is stated as a type and
+   checked by its derived [of_yojson]: an extra, missing or wrongly
+   typed field fails the parse and names itself.  [error] is typed as
+   raw JSON because it is the structured [Error_json] encoding, whose
+   inner shape is not part of the contract. *)
+module Envelope = struct
+  type probe = { healthy : bool; error : Yojson.Safe.t } [@@deriving of_yojson]
+
+  type readiness = { ready : bool; error : Yojson.Safe.t }
+  [@@deriving of_yojson]
+
+  type wait =
+    { ready : bool; timed_out : bool; db_only : bool; error : Yojson.Safe.t }
+  [@@deriving of_yojson]
+
+  type db_ready_success = { healthy : bool } [@@deriving of_yojson]
+
+  type block_height_success = { healthy : bool; block_height : int }
+  [@@deriving of_yojson]
+
+  type recency_success =
+    { healthy : bool; delay_seconds : int64; max_delay : int }
+  [@@deriving of_yojson]
+
+  type missing_blocks_success =
+    { healthy : bool; missing_blocks : int; max_missing : int; window : int }
+  [@@deriving of_yojson]
+
+  type missing_blocks_failure =
+    { healthy : bool
+    ; missing_blocks : int
+    ; max_missing : int
+    ; window : int
+    ; error : Yojson.Safe.t
+    }
+  [@@deriving of_yojson]
+
+  type unparented_blocks_success =
+    { healthy : bool; unparented_blocks : int; max_unparented : int }
+  [@@deriving of_yojson]
+
+  type readiness_success =
+    { ready : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    }
+  [@@deriving of_yojson]
+
+  (* --skip-block-recency: the delay is still measured, and the envelope
+     says it was not judged. *)
+  type readiness_recency_skipped_success =
+    { ready : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; block_recency_skipped : bool
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    }
+  [@@deriving of_yojson]
+
+  type readiness_failure =
+    { ready : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    ; problems : string list
+    ; error : Yojson.Safe.t
+    }
+  [@@deriving of_yojson]
+
+  type wait_recency_skipped_success =
+    { ready : bool
+    ; timed_out : bool
+    ; db_only : bool
+    ; block_height : int
+    ; delay_seconds : int64
+    ; block_recency_skipped : bool
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    }
+  [@@deriving of_yojson]
+
+  type readiness_recency_skipped_no_delay_failure =
+    { ready : bool
+    ; block_height : int
+    ; block_recency_skipped : bool
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    ; problems : string list
+    ; error : Yojson.Safe.t
+    }
+  [@@deriving of_yojson]
+
+  type readiness_no_delay_failure =
+    { ready : bool
+    ; block_height : int
+    ; missing_blocks : int
+    ; unparented_blocks : int
+    ; problems : string list
+    ; error : Yojson.Safe.t
+    }
+  [@@deriving of_yojson]
+end
+
+let read_all_fd fd =
+  let ic = Core_unix.in_channel_of_descr fd in
+  let s = In_channel.input_all ic in
+  In_channel.close ic ; s
+
+(* Spawn a process with [args], capture stdout/stderr, return
+   [(exit_code, stdout, stderr)]. *)
+let run_program ~prog args =
+  let pi = Core_unix.create_process ~prog ~args in
+  Core_unix.close pi.stdin ;
+  let out = read_all_fd pi.stdout in
+  let err = read_all_fd pi.stderr in
+  let status = Core_unix.waitpid pi.pid in
+  let code =
+    match status with
+    | Ok () ->
+        0
+    | Error (`Exit_non_zero n) ->
+        n
+    | Error (`Signal s) ->
+        128 + Signal.to_system_int s
+  in
+  (code, out, err)
+
+let run_cli args = run_program ~prog:bin args
+
+(* Regression guard: user-visible output must not leak raw OCaml
+   exception syntax.  The original defect was [Caqti_error] /
+   [Unix_error] propagating unwrapped through stderr on
+   ECONNREFUSED. *)
+let assert_no_ocaml_exn_leak label s =
+  let needles = [ "Unix_error"; "(Unix."; "Core.Unix"; "Caqti_error" ] in
+  List.iter needles ~f:(fun needle ->
+      if String.is_substring s ~substring:needle then
+        Alcotest.failf "%s: output leaked OCaml exception syntax (%s):\n%s"
+          label needle s )
+
+let check_contains ~label s ~sub =
+  if not (String.is_substring s ~substring:sub) then
+    Alcotest.failf "%s: expected to contain %S, got:\n%s" label sub s
+
+(* Parse stdout as exactly one JSON object.  A second object tacked on
+   is the double-print regression every subcommand must avoid. *)
+let parse_single_json_record ~label out err =
+  let trimmed = String.strip out in
+  if String.is_empty trimmed then
+    Alcotest.failf "%s: stdout empty, stderr:\n%s" label err ;
+  List.iter [ "}\n{"; "} {" ] ~f:(fun separator ->
+      if String.is_substring trimmed ~substring:separator then
+        Alcotest.failf "%s: stdout contains multiple JSON objects:\n%s" label
+          out ) ;
+  try Yojson.Safe.from_string trimmed
+  with exn ->
+    Alcotest.failf "%s: stdout did not parse as JSON: %s\nstdout=%s" label
+      (Exn.to_string exn) out
+
+let of_yojson_exn ~label of_yojson json =
+  match of_yojson json with
+  | Ok envelope ->
+      envelope
+  | Error where ->
+      Alcotest.failf "%s: unexpected envelope (at %s): %s" label where
+        (Yojson.Safe.to_string json)
+
+let check_error_reported ~label error =
+  match error with
+  | `Null ->
+      Alcotest.failf "%s: error field is null" label
+  | _ ->
+      ()
+
+let rec json_contains_string (json : Yojson.Safe.t) expected =
+  match json with
+  | `String s ->
+      String.equal s expected
+  | `List xs ->
+      List.exists xs ~f:(fun json -> json_contains_string json expected)
+  | `Tuple xs ->
+      List.exists xs ~f:(fun json -> json_contains_string json expected)
+  | `Assoc fields ->
+      List.exists fields ~f:(fun (_key, json) ->
+          json_contains_string json expected )
+  | `Variant (tag, payload) ->
+      String.equal tag expected
+      || Option.exists payload ~f:(fun json ->
+             json_contains_string json expected )
+  | `Bool _ | `Float _ | `Int _ | `Intlit _ | `Null ->
+      false
+
+let check_error_constructor ~label error expected =
+  check_error_reported ~label error ;
+  if not (json_contains_string error expected) then
+    Alcotest.failf "%s: expected error constructor %S in %s" label expected
+      (Yojson.Safe.to_string error)
+
+let check_absent_field ~label (json : Yojson.Safe.t) field =
+  match json with
+  | `Assoc fields ->
+      if List.Assoc.mem fields field ~equal:String.equal then
+        Alcotest.failf "%s: expected field %S to be absent in %s" label field
+          (Yojson.Safe.to_string json)
+  | _ ->
+      Alcotest.failf "%s: expected JSON object, got %s" label
+        (Yojson.Safe.to_string json)
+
+(* Run [sub] against a dead PG in JSON mode and return its one record. *)
+let run_dead_pg_json ~sub ?(extra_args = []) () =
+  let label = sprintf "%s --json (dead PG)" sub in
+  let code, out, err =
+    run_cli ([ sub; "--postgres-uri"; dead_pg; "--json" ] @ extra_args)
+  in
+  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  (label, parse_single_json_record ~label out err)
+
+let all_subcommands =
+  [ "db-ready"
+  ; "server-ready"
+  ; "block-height"
+  ; "block-recency"
+  ; "missing-blocks"
+  ; "unparented-blocks"
+  ; "ready"
+  ; "wait"
+  ]
+
+let current_epoch_ms () =
+  Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
+
+module B = Synthetic_archive
+
+(* [scenario] adds blocks to the builder, which writes them into a fresh
+   archive on the real schema; that is all the probes read. *)
+let with_test_db ?(scenario = fun (_ : B.t) -> ()) f =
+  let server_uri = B.Db.test_server_uri () in
+  let s = B.create () in
+  scenario s ;
+  let run f = Async.Thread_safe.block_on_async_exn f |> Or_error.ok_exn in
+  let db =
+    run (fun () ->
+        B.Db.create ~server_uri
+          ~name:
+            (Mina_automation.Psql.random_db_name
+               ~prefix:"test_mina_archive_healthcheck" )
+          () )
+  in
+  (* a failed materialize must not leave the database behind either *)
+  Exn.protect
+    ~f:(fun () ->
+      let (_ : B.built) = run (fun () -> B.materialize s db) in
+      f (Uri.to_string db.uri) )
+    ~finally:(fun () -> run (fun () -> B.Db.drop db))
+
+(* a root at height 10 with an orphaned fork sibling, and a block at 12 whose
+   parent at 11 is missing: two rows at height 10 but one height *)
+let gap_at_height_11 s =
+  let timestamp = current_epoch_ms () in
+  let root = B.block s ~name:"root" ~height:10 ~timestamp Canonical in
+  let (_ : B.block) =
+    B.block s ~name:"fork_sibling" ~height:10 ~timestamp Orphaned
+  in
+  let (_ : B.block) =
+    B.block s ~name:"tip" ~height:12 ~parent:root ~timestamp Canonical
+  in
+  ()
+
+let run_success_json ~postgres_uri ~sub ?(extra_args = []) () =
+  let label = sprintf "%s --json (test DB)" sub in
+  let code, out, err =
+    run_cli ([ sub; "--postgres-uri"; postgres_uri; "--json" ] @ extra_args)
+  in
+  if code <> 0 then
+    Alcotest.failf "%s: expected exit 0\nstdout=%s\nstderr=%s" label out err ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  (label, parse_single_json_record ~label out err)
+
+let run_failure_json ~postgres_uri ~sub ?(extra_args = []) () =
+  let label = sprintf "%s --json (test DB)" sub in
+  let code, out, err =
+    run_cli ([ sub; "--postgres-uri"; postgres_uri; "--json" ] @ extra_args)
+  in
+  if code = 0 then
+    Alcotest.failf "%s: expected non-zero exit\nstdout=%s\nstderr=%s" label out
+      err ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  (label, parse_single_json_record ~label out err)
+
+(* ---------- Tests ---------- *)
+
+let test_help_root () =
+  let code, out, err = run_cli [ "--help" ] in
+  Alcotest.(check int) "--help exit" 0 code ;
+  List.iter all_subcommands ~f:(fun sub ->
+      check_contains ~label:(sprintf "--help lists %s" sub) out ~sub ) ;
+  assert_no_ocaml_exn_leak "--help stderr" err
+
+(* Each subcommand must respond to its own --help with exit 0.  This
+   catches typos / orphaned [Command.Param.flag] definitions that only
+   blow up at CLI construction time. *)
+let test_help_subs () =
+  List.iter all_subcommands ~f:(fun sub ->
+      let code, _out, err = run_cli [ sub; "--help" ] in
+      Alcotest.(check int) (sprintf "%s --help exit" sub) 0 code ;
+      assert_no_ocaml_exn_leak (sprintf "%s --help stderr" sub) err )
+
+(* Every subcommand reaches text output through the same [emit], so one
+   text-mode case is enough; the rest is covered in JSON mode below. *)
+let test_db_ready_dead_pg_text () =
+  let code, out, err = run_cli [ "db-ready"; "--postgres-uri"; dead_pg ] in
+  if code = 0 then Alcotest.failf "db-ready (dead PG): expected non-zero exit" ;
+  assert_no_ocaml_exn_leak "db-ready text stdout" out ;
+  assert_no_ocaml_exn_leak "db-ready text stderr" err
+
+(* A connection that never opened measured nothing, so the envelope
+   carries the verdict and the error and no metric field. *)
+let test_dead_pg_healthy_false ~sub () =
+  let label, json = run_dead_pg_json ~sub () in
+  let envelope = of_yojson_exn ~label Envelope.probe_of_yojson json in
+  Alcotest.(check bool) (label ^ ": healthy") false envelope.healthy ;
+  check_error_constructor ~label envelope.error "Db_unreachable"
+
+(* [server-ready] probes the archive's TCP port, not PostgreSQL; port 1
+   on localhost is never listening, so the connect fails fast and must
+   surface as [Server_unreachable] without leaking exception syntax. *)
+let test_server_ready_dead_port_json () =
+  let label = "server-ready --json (dead port)" in
+  let code, out, err =
+    run_cli [ "server-ready"; "--server-port"; "1"; "--json" ]
+  in
+  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  let json = parse_single_json_record ~label out err in
+  let envelope = of_yojson_exn ~label Envelope.probe_of_yojson json in
+  Alcotest.(check bool) (label ^ ": healthy") false envelope.healthy ;
+  check_error_constructor ~label envelope.error "Server_unreachable"
+
+(* [wait --server-port] must gate on the server socket even when the
+   DB side would pass; a dead port is checked first, so the timeout's
+   last failure is the server one. *)
+let test_wait_dead_server_port_json () =
+  let label, json =
+    run_dead_pg_json ~sub:"wait"
+      ~extra_args:
+        [ "--db-only"
+        ; "--server-port"
+        ; "1"
+        ; "--timeout"
+        ; "1"
+        ; "--interval"
+        ; "1"
+        ]
+      ()
+  in
+  let envelope = of_yojson_exn ~label Envelope.wait_of_yojson json in
+  Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+  check_error_constructor ~label envelope.error "Server_unreachable"
+
+let test_ready_dead_pg_json () =
+  let label, json = run_dead_pg_json ~sub:"ready" () in
+  let envelope = of_yojson_exn ~label Envelope.readiness_of_yojson json in
+  Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+  check_error_constructor ~label envelope.error "Db_unreachable"
+
+(* [wait] enters a polling loop; bound it tightly (--timeout/--interval
+   1) so the test exits quickly.  Its envelope always carries
+   [timed_out] and [db_only], so a consumer can tell a db-only wait from
+   a full readiness wait, and a timeout from an outright connection
+   failure. *)
+let test_wait_dead_pg_json ~db_only () =
+  let label, json =
+    run_dead_pg_json ~sub:"wait"
+      ~extra_args:
+        ( (if db_only then [ "--db-only" ] else [])
+        @ [ "--timeout"; "1"; "--interval"; "1" ] )
+      ()
+  in
+  let envelope = of_yojson_exn ~label Envelope.wait_of_yojson json in
+  Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+  Alcotest.(check bool) (label ^ ": db_only") db_only envelope.db_only ;
+  if envelope.timed_out then
+    check_error_constructor ~label envelope.error "Timed_out" ;
+  check_error_constructor ~label envelope.error "Db_unreachable"
+
+let test_success_envelopes_against_db () =
+  with_test_db ~scenario:gap_at_height_11 (fun postgres_uri ->
+      let label, json = run_success_json ~postgres_uri ~sub:"db-ready" () in
+      let envelope =
+        of_yojson_exn ~label Envelope.db_ready_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": healthy") true envelope.healthy ;
+      let label, json = run_success_json ~postgres_uri ~sub:"block-height" () in
+      let envelope =
+        of_yojson_exn ~label Envelope.block_height_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": healthy") true envelope.healthy ;
+      Alcotest.(check int) (label ^ ": block_height") 12 envelope.block_height ;
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"block-recency"
+          ~extra_args:[ "--max-delay"; "3600" ] ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.recency_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": healthy") true envelope.healthy ;
+      Alcotest.(check int) (label ^ ": max_delay") 3600 envelope.max_delay ;
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"missing-blocks"
+          ~extra_args:[ "--window"; "3"; "--max-missing"; "1" ]
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.missing_blocks_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": healthy") true envelope.healthy ;
+      Alcotest.(check int)
+        (label ^ ": missing_blocks")
+        1 envelope.missing_blocks ;
+      Alcotest.(check int) (label ^ ": max_missing") 1 envelope.max_missing ;
+      Alcotest.(check int) (label ^ ": window") 3 envelope.window ;
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"unparented-blocks" ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.unparented_blocks_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": healthy") true envelope.healthy ;
+      Alcotest.(check int)
+        (label ^ ": unparented_blocks")
+        0 envelope.unparented_blocks ;
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"ready"
+          ~extra_args:
+            [ "--window"
+            ; "3"
+            ; "--max-delay"
+            ; "3600"
+            ; "--max-missing"
+            ; "1"
+            ; "--max-unparented"
+            ; "0"
+            ]
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.readiness_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": ready") true envelope.ready ;
+      Alcotest.(check int) (label ^ ": block_height") 12 envelope.block_height ;
+      Alcotest.(check int)
+        (label ^ ": missing_blocks")
+        1 envelope.missing_blocks ;
+      Alcotest.(check int)
+        (label ^ ": unparented_blocks")
+        0 envelope.unparented_blocks )
+
+let test_missing_blocks_counts_distinct_heights () =
+  with_test_db ~scenario:gap_at_height_11 (fun postgres_uri ->
+      let label, json =
+        run_failure_json ~postgres_uri ~sub:"missing-blocks"
+          ~extra_args:[ "--window"; "3"; "--max-missing"; "0" ]
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.missing_blocks_failure_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": healthy") false envelope.healthy ;
+      Alcotest.(check int)
+        (label ^ ": missing_blocks")
+        1 envelope.missing_blocks ;
+      check_error_constructor ~label envelope.error "Thresholds_exceeded" )
+
+let test_ready_empty_db_omits_delay () =
+  with_test_db (fun postgres_uri ->
+      let label, json =
+        run_failure_json ~postgres_uri ~sub:"ready"
+          ~extra_args:
+            [ "--window"
+            ; "3"
+            ; "--max-delay"
+            ; "3600"
+            ; "--max-missing"
+            ; "0"
+            ; "--max-unparented"
+            ; "0"
+            ]
+          ()
+      in
+      check_absent_field ~label json "delay_seconds" ;
+      let envelope =
+        of_yojson_exn ~label Envelope.readiness_no_delay_failure_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+      Alcotest.(check int) (label ^ ": block_height") 0 envelope.block_height ;
+      Alcotest.(check int)
+        (label ^ ": missing_blocks")
+        0 envelope.missing_blocks ;
+      Alcotest.(check int)
+        (label ^ ": unparented_blocks")
+        0 envelope.unparented_blocks ;
+      if
+        not
+          (List.mem envelope.problems "no blocks in archive database"
+             ~equal:String.equal )
+      then
+        Alcotest.failf "%s: expected no-blocks problem, got %s" label
+          (String.concat envelope.problems ~sep:", ") ;
+      check_error_constructor ~label envelope.error "Thresholds_exceeded" )
+
+(* [--skip-block-recency] is a flag of the combined checks only. *)
+let test_help_skip_block_recency () =
+  List.iter [ "ready"; "wait" ] ~f:(fun sub ->
+      let code, out, err = run_cli [ sub; "--help" ] in
+      Alcotest.(check int) (sprintf "%s --help exit" sub) 0 code ;
+      check_contains
+        ~label:(sprintf "%s --help lists --skip-block-recency" sub)
+        (out ^ err) ~sub:"--skip-block-recency" )
+
+let one_hour_ms = 3_600_000L
+
+(* A tip an hour old: what a database restored from a dump, or a slow
+   block period, looks like to the probe. *)
+(* a two-block chain whose tip is an hour old *)
+let stale_chain s =
+  let timestamp = Int64.( - ) (current_epoch_ms ()) one_hour_ms in
+  let root = B.block s ~name:"root" ~height:10 ~timestamp Canonical in
+  let (_ : B.block) =
+    B.block s ~name:"tip" ~height:11 ~parent:root ~timestamp Canonical
+  in
+  ()
+
+let readiness_args =
+  [ "--window"
+  ; "3"
+  ; "--max-delay"
+  ; "60"
+  ; "--max-missing"
+  ; "1"
+  ; "--max-unparented"
+  ; "0"
+  ]
+
+let test_ready_skip_block_recency_stale_tip () =
+  with_test_db ~scenario:stale_chain (fun postgres_uri ->
+      (* Without the flag the stale tip alone makes it NOT READY ... *)
+      let label, json =
+        run_failure_json ~postgres_uri ~sub:"ready" ~extra_args:readiness_args
+          ()
+      in
+      check_absent_field ~label json "block_recency_skipped" ;
+      let envelope =
+        of_yojson_exn ~label Envelope.readiness_failure_of_yojson json
+      in
+      if
+        not
+          (List.exists envelope.problems ~f:(fun problem ->
+               String.is_prefix problem ~prefix:"block delay " ) )
+      then
+        Alcotest.failf "%s: expected a block-delay problem, got %s" label
+          (String.concat envelope.problems ~sep:", ") ;
+      (* ... and with it the same archive is READY, the delay still
+         reported. *)
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"ready"
+          ~extra_args:("--skip-block-recency" :: readiness_args)
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label
+          Envelope.readiness_recency_skipped_success_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": ready") true envelope.ready ;
+      Alcotest.(check bool)
+        (label ^ ": block_recency_skipped")
+        true envelope.block_recency_skipped ;
+      Alcotest.(check int) (label ^ ": block_height") 11 envelope.block_height ;
+      if Int64.( < ) envelope.delay_seconds 3500L then
+        Alcotest.failf "%s: expected delay_seconds of about an hour, got %Ld"
+          label envelope.delay_seconds )
+
+let test_wait_skip_block_recency_stale_tip () =
+  with_test_db ~scenario:stale_chain (fun postgres_uri ->
+      let label, json =
+        run_success_json ~postgres_uri ~sub:"wait"
+          ~extra_args:
+            ( [ "--skip-block-recency"; "--timeout"; "5"; "--interval"; "1" ]
+            @ readiness_args )
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label Envelope.wait_recency_skipped_success_of_yojson
+          json
+      in
+      Alcotest.(check bool) (label ^ ": ready") true envelope.ready ;
+      Alcotest.(check bool) (label ^ ": timed_out") false envelope.timed_out ;
+      Alcotest.(check bool)
+        (label ^ ": block_recency_skipped")
+        true envelope.block_recency_skipped )
+
+(* Skipping the age check does not make an empty archive ready. *)
+let test_ready_skip_block_recency_empty_db () =
+  with_test_db (fun postgres_uri ->
+      let label, json =
+        run_failure_json ~postgres_uri ~sub:"ready"
+          ~extra_args:("--skip-block-recency" :: readiness_args)
+          ()
+      in
+      let envelope =
+        of_yojson_exn ~label
+          Envelope.readiness_recency_skipped_no_delay_failure_of_yojson json
+      in
+      Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+      if
+        not
+          (List.mem envelope.problems "no blocks in archive database"
+             ~equal:String.equal )
+      then
+        Alcotest.failf "%s: expected no-blocks problem, got %s" label
+          (String.concat envelope.problems ~sep:", ") )
+
+(* ---------- Runner ---------- *)
+
+let () =
+  Alcotest.run "mina-archive-healthcheck CLI smoke tests"
+    [ ( "help"
+      , [ ("root", `Quick, test_help_root)
+        ; ("each subcommand", `Quick, test_help_subs)
+        ; ( "ready and wait list --skip-block-recency"
+          , `Quick
+          , test_help_skip_block_recency )
+        ] )
+    ; ( "db-ready against dead PG"
+      , [ ("text format", `Quick, test_db_ready_dead_pg_text)
+        ; ( "json is single well-formed record"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"db-ready" )
+        ] )
+    ; ( "json single-record contract against dead PG"
+      , [ ( "block-height"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"block-height" )
+        ; ( "block-recency"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"block-recency" )
+        ; ( "missing-blocks"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"missing-blocks" )
+        ; ( "unparented-blocks"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"unparented-blocks" )
+        ; ("ready", `Quick, test_ready_dead_pg_json)
+        ; ("wait", `Quick, test_wait_dead_pg_json ~db_only:false)
+        ; ("wait --db-only", `Quick, test_wait_dead_pg_json ~db_only:true)
+        ; ("server-ready", `Quick, test_server_ready_dead_port_json)
+        ; ( "wait --server-port gates on the server socket"
+          , `Quick
+          , test_wait_dead_server_port_json )
+        ] )
+    ; ( "json envelope against test DB"
+      , [ ("success paths", `Quick, test_success_envelopes_against_db)
+        ; ( "missing-blocks counts distinct heights"
+          , `Quick
+          , test_missing_blocks_counts_distinct_heights )
+        ; ( "ready omits unavailable delay"
+          , `Quick
+          , test_ready_empty_db_omits_delay )
+        ; ( "ready --skip-block-recency passes a stale tip"
+          , `Quick
+          , test_ready_skip_block_recency_stale_tip )
+        ; ( "wait --skip-block-recency passes a stale tip"
+          , `Quick
+          , test_wait_skip_block_recency_stale_tip )
+        ; ( "ready --skip-block-recency still needs a block"
+          , `Quick
+          , test_ready_skip_block_recency_empty_db )
+        ] )
+    ]

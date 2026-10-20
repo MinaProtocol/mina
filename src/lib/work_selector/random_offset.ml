@@ -49,8 +49,7 @@ module Make (Lib : Intf.Lib_intf) = struct
     | expensive_work ->
         Offset.update ~new_length:(List.length expensive_work) ;
         let x = Offset.get_nth expensive_work in
-        Lib.State.mark_scheduled ~logger state x ;
-        Some x
+        Lib.State.schedule_and_build_spec ~logger state x
 end
 
 let%test_module "test" =

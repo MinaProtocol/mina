@@ -8,25 +8,25 @@ let Optional/toList = Prelude.Optional.toList
 
 let DebianRepo
     : Type
-    = < Local | Unstable | Nightly | Stable >
+    = < Unstable | Nightly | Stable | O1Test >
 
 let address =
           \(repo : DebianRepo)
       ->  merge
-            { Local = "http://localhost:8080"
-            , Unstable = "https://unstable.apt.packages.minaprotocol.com"
+            { Unstable = "https://unstable.apt.packages.minaprotocol.com"
             , Nightly = "https://nightly.apt.packages.minaprotocol.com"
             , Stable = "https://stable.apt.packages.minaprotocol.com"
+            , O1Test = "https://packages.o1test.net"
             }
             repo
 
 let bucket =
           \(repo : DebianRepo)
       ->  merge
-            { Local = None Text
-            , Unstable = Some "unstable.apt.packages.minaprotocol.com"
+            { Unstable = Some "unstable.apt.packages.minaprotocol.com"
             , Nightly = Some "nightly.apt.packages.minaprotocol.com"
             , Stable = Some "stable.apt.packages.minaprotocol.com"
+            , O1Test = Some "packages.o1test.net"
             }
             repo
 
@@ -55,17 +55,17 @@ let bucketArg =
 let keyId =
           \(repo : DebianRepo)
       ->  merge
-            { Local = None Text
-            , Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+            { Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Nightly = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Stable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+            , O1Test = None Text
             }
             repo
 
 let isSigned =
           \(repo : DebianRepo)
       ->  merge
-            { Local = False, Unstable = True, Nightly = True, Stable = True }
+            { Unstable = True, Nightly = True, Stable = True, O1Test = False }
             repo
 
 let keyAddress =
@@ -73,10 +73,10 @@ let keyAddress =
       ->  let keyPath = "/key.asc"
 
           in  merge
-                { Local = None Text
-                , Unstable = Some (address repo ++ keyPath)
+                { Unstable = Some (address repo ++ keyPath)
                 , Nightly = Some (address repo ++ keyPath)
                 , Stable = Some (address repo ++ keyPath)
+                , O1Test = None Text
                 }
                 repo
 

@@ -77,12 +77,18 @@ let is_transition_for_bootstrap
       false
   | `Take ->
       let slack = 5 in
+      (* How far behind the frontier has to be for none of it to be worth
+         keeping: [k] blocks, because that is how much of the chain the
+         frontier holds. This used to be the literal 290 -- mainnet's k -- so
+         on any network configured with a different k the check was measuring
+         against the wrong chain. *)
+      let k = Unsigned.UInt32.to_int Context.consensus_constants.k in
       if
         Length.to_int
           ( Transition_frontier.best_tip frontier
           |> Transition_frontier.Breadcrumb.consensus_state
           |> Consensus.Data.Consensus_state.blockchain_length )
-        + 290 + slack
+        + k + slack
         < Length.to_int
             (Consensus.Data.Consensus_state.blockchain_length
                new_consensus_state.data )

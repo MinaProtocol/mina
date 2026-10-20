@@ -363,6 +363,28 @@ taken from nixpkgs with some overlays applied. All the dependencies are then
 provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix) for more
 details.
 
+### Crate downloads go through `static.crates.io`
+
+crates.io answers 403 to any `User-Agent` starting with `curl/`, which is what
+nixpkgs' `fetchurl` sends, so every crate fetched through
+`https://crates.io/api/v1/crates/...` fails on a binary-cache miss.
+[./rust.nix](./rust.nix) points the cargo fetches at `static.crates.io`
+instead, which has no such gate — the same change upstream nixpkgs made in
+`f830e6112` (nixos-25.11).
+
+The redirect is confined to the Rust build path: `importCargoLock` gets a
+`fetchurl` that rewrites crate URLs, `buildRustPackage` gets that
+`importCargoLock`, and `fetchCrate` is passed `registryDl` directly. It is
+deliberately not a package-set-wide `fetchurl` wrapper, because newer nixpkgs
+call fetchers with function-form arguments that such a wrapper cannot merge
+into, which breaks every unrelated fetcher with an error pointing nowhere near
+the cause.
+
+A crate is a fixed-output derivation, so its output path depends only on the
+derivation name and the checksum, never on the URL: existing cache entries for
+crate tarballs stay valid. All of it can be dropped once the nixpkgs pin moves
+past the upstream fix.
+
 ### Why are Rust, Go and OCaml bits built separately?
 
 In order to enforce reproducibility, Nix doesn't generally allow networking from

@@ -39,11 +39,21 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
+  (** Per-tree counts of free space and outstanding work. *)
+  module Tree_metrics : sig
+    type t =
+      { available_space : int; base_jobs_todo : int; merge_jobs_todo : int }
+    [@@deriving equal, sexp]
+  end
+
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   (** Statements of the required snark work *)
   val snark_job_list_json : t -> string
+
+  (** Per-tree counts of free space and outstanding work, oldest tree first *)
+  val tree_metrics : t -> Tree_metrics.t list
 
   (** Statements of all the pending work. Fails if there are any invalid
       statements in the scan state [t] *)
@@ -282,6 +292,35 @@ val all_work_pairs :
      One_or_two.t
      list
      Or_error.t
+
+(** A single unit of pending SNARK work. Work selection deals in these and their
+    statements; a job's proving spec is built separately. Re-exported from the
+    scan state. *)
+module Available_job : sig
+  type t
+end
+
+(** All the pending work as raw jobs; work selection reads only their statements.
+    Same grouping/order as [all_work_pairs]. *)
+val all_work_jobs : t -> Available_job.t One_or_two.t list
+
+(** Build the full proving spec (statement and transaction witness) for one job —
+    called when a job is dispatched to a worker, the only point the witness is
+    needed. *)
+val single_spec_of_job :
+     get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> Available_job.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
+     Or_error.t
+
+(** The statement of a job (for selection/dedup); [None] only if a merge job's
+    sub-statements fail to merge. *)
+val statement_of_job : Available_job.t -> Transaction_snark.Statement.t option
+
+(** The transaction of a base job (for log summaries); [None] for merge jobs. *)
+val job_transaction : Available_job.t -> Mina_transaction.Transaction.t option
 
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list

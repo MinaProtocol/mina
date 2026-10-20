@@ -16,9 +16,7 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_bin_prot
-   ppx_sexp_conv
-   ppx_hash
-   ppx_compare
-   ppx_version
-   ppx_deriving_yojson)))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

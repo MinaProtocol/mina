@@ -10,7 +10,11 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let Docker = ../Command/Docker/Type.dhall
 
+let Expr = ../Pipeline/Expr.dhall
+
 let JobSpec = ../Pipeline/JobSpec.dhall
+
+let MainlineBranch = ../Pipeline/MainlineBranch.dhall
 
 let Pipeline = ../Pipeline/Dsl.dhall
 
@@ -49,6 +53,13 @@ in  { pipeline =
                   , PipelineTag.Type.Test
                   , PipelineTag.Type.Stable
                   , PipelineTag.Type.Hardfork
+                  ]
+                , includeIf =
+                  [ Expr.Type.DescendantOf
+                      { ancestor = MainlineBranch.Type.Develop
+                      , reason =
+                          "build-and-test.sh builds the postfork daemon from the commit under test, and only develop carries the next protocol_version_transaction; elsewhere this is a same-version fork, which the advanced and auto fork methods cannot complete"
+                      }
                   ]
                 }
               , steps =

@@ -26,10 +26,14 @@ let%test_module "Archive node unit tests" =
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let archive_uri =
-      Uri.of_string
-        (Option.value
-           (Sys.getenv "MINA_TEST_POSTGRES")
-           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
+      match Sys.getenv "MINA_TEST_POSTGRES" with
+      | Some uri ->
+          Uri.of_string uri
+      | None ->
+          failwith
+            "MINA_TEST_POSTGRES is not set: the archive tests need a \
+             PostgreSQL database with the archive schema (CI sets it up with \
+             buildkite/scripts/setup-database-for-archive-node.sh)"
 
     let conn_lazy =
       lazy
@@ -143,7 +147,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
               Processor.User_command.add_if_doesn't_exist conn ~logger
-                ~v1_transaction_hash:false user_command
+                ~transaction_hash ~v1_transaction_hash:false user_command
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
@@ -204,7 +208,7 @@ let%test_module "Archive node unit tests" =
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
                   Processor.User_command.add_if_doesn't_exist conn ~logger
-                    ~v1_transaction_hash:false user_command
+                    ~transaction_hash ~v1_transaction_hash:false user_command
                 in
                 let%map result =
                   Processor.User_command.find conn ~transaction_hash
@@ -217,6 +221,67 @@ let%test_module "Archive node unit tests" =
                 in
                 [%test_result: int] ~expect:user_command_id
                   (Option.value_exn result)
+              with
+              | Ok () ->
+                  ()
+              | Error e ->
+                  failwith @@ Caqti_error.show e ) )
+
+    let%test_unit "Zkapp_command: duplicate insertion returns same id" =
+      (* Regression test for issue 19041: calls add_inner twice on the same
+         connection to simulate the concurrent race where two transactions both
+         pass find_opt (hash not yet present) and reach the inner upsert.  The
+         first call inserts; the second call hits ON CONFLICT (hash) and returns
+         the same id instead of UNIQUE-violating. *)
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
+        user_command_zkapp_gen ~f:(fun user_command ->
+          match user_command with
+          | Signed_command _ ->
+              failwith "zkapp_gen failed"
+          | Zkapp_command p -> (
+              let rec add_token_owners
+                  (forest :
+                    ( Account_update.t
+                    , Zkapp_command.Digest.Account_update.t
+                    , Zkapp_command.Digest.Forest.t )
+                    Zkapp_command.Call_forest.t ) =
+                List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
+                    if List.is_empty tree.calls then ()
+                    else
+                      let acct_id =
+                        Account_update.account_id tree.account_update
+                      in
+                      let token_id =
+                        Account_id.derive_token_id ~owner:acct_id
+                      in
+                      Processor.Token_owners.add_to_owner_tbl token_id acct_id ;
+                      add_token_owners tree.calls )
+              in
+              let%bind _ =
+                Processor.Protocol_versions.add_if_doesn't_exist conn
+                  ~transaction:Protocol_version.(transaction current)
+                  ~network:Protocol_version.(network current)
+                  ~patch:Protocol_version.(patch current)
+              in
+              add_token_owners p.account_updates ;
+              match%map
+                let open Deferred.Result.Let_syntax in
+                let%bind id1 =
+                  Processor.For_test.add_zkapp_command_without_find_opt ~logger
+                    conn p
+                    ~transaction_hash:
+                      (Transaction_hash.hash_zkapp_command_with_hashes p)
+                in
+                let%map id2 =
+                  Processor.For_test.add_zkapp_command_without_find_opt ~logger
+                    conn p
+                    ~transaction_hash:
+                      (Transaction_hash.hash_zkapp_command_with_hashes p)
+                in
+                [%test_result: int] ~expect:id1 id2
               with
               | Ok () ->
                   ()
@@ -244,6 +309,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
+                ~transaction_hash
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
@@ -269,6 +335,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind coinbase_id =
               Processor.Coinbase.add_if_doesn't_exist conn coinbase
+                ~transaction_hash
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
@@ -465,12 +532,12 @@ let%test_module "Archive node unit tests" =
       (* Derive the precomputed values (and hence the exact fork genesis block)
          the same way [add_genesis_accounts] does internally, so the block we
          insert below is the very block it will later look up and backfill. *)
+      let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:Genesis_constants.Compiled.proof_level
-            ~genesis_constants ~constraint_constants ~cli_proof_level:None
-            runtime_config
+            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+            ~cli_proof_level:None runtime_config
         with
         | Ok precomputed_values ->
             precomputed_values

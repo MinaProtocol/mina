@@ -15,7 +15,8 @@ let () =
         let signature_kind = Mina_signature_kind.t_DEPRECATED
 
         let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
+          let (module G) = Genesis_constants.profiled () in
+          G.constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
       end) in
