@@ -371,9 +371,10 @@ printf '%s\n' "${SCENARIOS[@]}" |
 # rejected run may change its message, and may move from the crash path to
 # the user-error path, but must never move the other way.
 #
-# With ALLOW_LOG_REORDER=1, an accepted run whose output differs only in the
-# order of its lines is reported as REORDERED and passes: this is for changes
-# that deliberately move work (and its logging) earlier or later.
+# With ALLOW_LOG_REORDER=1, a run with an unchanged outcome whose output
+# differs only in the order of its lines is reported as REORDERED and passes:
+# this is for changes that deliberately move work (and its logging) earlier
+# or later.
 status=0
 printf '%-48s %-16s %-16s %s\n' SCENARIO OLD NEW RESULT >"$OUT/summary"
 for s in "${SCENARIOS[@]}"; do
@@ -384,22 +385,19 @@ for s in "${SCENARIOS[@]}"; do
   else
     diff -u "$OUT/old/$s/normalised" "$OUT/new/$s/normalised" \
       >"$OUT/$s.diff" || true
-    case "$b>$n" in
+    if [[ ${ALLOW_LOG_REORDER:-} == 1 && $b == "$n" ]] && cmp -s \
+      <(sort "$OUT/old/$s/normalised") <(sort "$OUT/new/$s/normalised")
+    then
+      r=REORDERED
+    else
+      case "$b>$n" in
       "crash>user-error") r=UPGRADED ;;
       "user-error>user-error" | "crash>crash") r=MESSAGE-CHANGED ;;
-      "reached-create>reached-create")
-        if [[ ${ALLOW_LOG_REORDER:-} == 1 ]] && cmp -s \
-          <(sort "$OUT/old/$s/normalised") <(sort "$OUT/new/$s/normalised")
-        then
-          r=REORDERED
-        else
-          r=CHANGED
-          status=1
-        fi
-        ;;
+      "reached-create>reached-create") r=CHANGED; status=1 ;;
       "user-error>crash") r=DOWNGRADED; status=1 ;;
       *) r=OUTCOME-CHANGED; status=1 ;;
-    esac
+      esac
+    fi
   fi
   printf '%-48s %-16s %-16s %s\n' "$s" "$b" "$n" "$r" >>"$OUT/summary"
 done
