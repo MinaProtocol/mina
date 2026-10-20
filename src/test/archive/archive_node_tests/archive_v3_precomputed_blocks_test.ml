@@ -45,8 +45,7 @@ let assert_archived_command_hashes ~archive_uri ~state_hash ~expected =
   let expected = String.concat ~sep:"," expected in
   let rec check ~attempts_left =
     let%bind actual =
-      archived_command_hashes ~archive_uri state_hash
-      >>| Or_error.ok_exn
+      archived_command_hashes ~archive_uri state_hash >>| Or_error.ok_exn
     in
     if String.equal actual expected then Deferred.unit
     else if attempts_left <= 1 then
