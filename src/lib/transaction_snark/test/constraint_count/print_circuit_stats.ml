@@ -16,10 +16,7 @@
     The output is compared against the checked-in [<profile>_circuit_stats.json]
     by the [runtest] alias, so a change in circuit shape appears as a diff and
     is accepted with [dune promote]. Values vary by profile because constraint
-    counts depend on configuration parameters such as the ledger depth.
-
-    If these values change, update the table in [transaction_snark_intf.ml] to
-    keep the documentation in sync. *)
+    counts depend on configuration parameters such as the ledger depth. *)
 
 open Core
 
