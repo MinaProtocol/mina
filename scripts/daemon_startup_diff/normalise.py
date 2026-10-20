@@ -50,6 +50,14 @@ def mask(text, run_dir, commit_ids):
         "$TIME",
         text,
     )
+    # Backtrace frames are masked above; also collapse each run of them, since
+    # moving code between functions changes the number of frames.
+    text = re.sub(
+        r'(^[ \t]*"?\$BACKTRACE.*\n)+',
+        lambda m: re.match(r"[ \t]*", m.group(0)).group(0) + "$BACKTRACES\n",
+        text,
+        flags=re.MULTILINE,
+    )
     return text
 
 
