@@ -3,6 +3,7 @@ open Async
 open Cli_lib
 open Signature_lib
 open Init
+module Key = Daemon_file.Key
 module YJ = Yojson.Safe
 
 type mina_initialization =
@@ -493,6 +494,13 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Daemon_file.or_from_config ~logger daemon_file map keyname
               actual_value ~default
           in
+          let find key actual_value =
+            Daemon_file.find ~logger daemon_file key actual_value
+          in
+          let find_or_default key actual_value ~default =
+            Daemon_file.find_or_default ~logger daemon_file key actual_value
+              ~default
+          in
           let get_port { Flag.Types.value; default; name } =
             or_from_config YJ.Util.to_int_option name ~default value
           in
@@ -513,10 +521,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             or_from_config json_to_currency_fee_option "snark-worker-fee"
               ~default:compile_config.default_snark_worker_fee snark_work_fee
           in
-          let node_status_url =
-            maybe_from_config YJ.Util.to_string_option "node-status-url"
-              node_status_url
-          in
+          let node_status_url = find Key.node_status_url node_status_url in
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
             (*if
@@ -535,21 +540,21 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               work_selection_method_flag
           in
           let work_reassignment_wait =
-            or_from_config YJ.Util.to_int_option "work-reassignment-wait"
+            find_or_default Key.work_reassignment_wait
               ~default:Cli_lib.Default.work_reassignment_wait
               work_reassignment_wait
           in
           let log_received_snark_pool_diff =
-            or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
-              ~default:false log_received_snark_pool_diff
+            find_or_default Key.log_snark_work_gossip ~default:false
+              log_received_snark_pool_diff
           in
           let log_transaction_pool_diff =
-            or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
-              ~default:false log_transaction_pool_diff
+            find_or_default Key.log_txn_pool_gossip ~default:false
+              log_transaction_pool_diff
           in
           let log_block_creation =
-            or_from_config YJ.Util.to_bool_option "log-block-creation"
-              ~default:true log_block_creation
+            find_or_default Key.log_block_creation ~default:true
+              log_block_creation
           in
           let log_gossip_heard =
             { Mina_networking.Config.snark_pool_diff =
@@ -588,8 +593,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               "run-snark-coordinator" run_snark_coordinator_flag
           in
           let snark_worker_parallelism_flag =
-            maybe_from_config YJ.Util.to_int_option "snark-worker-parallelism"
-              snark_worker_parallelism_flag
+            find Key.snark_worker_parallelism snark_worker_parallelism_flag
           in
           let coinbase_receiver_flag =
             maybe_from_config
@@ -611,8 +615,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             { external_ip; bind_ip; peer = None; client_port; libp2p_port }
           in
           let block_production_key =
-            maybe_from_config YJ.Util.to_string_option "block-producer-key"
-              block_production_key
+            find Key.block_producer_key block_production_key
           in
           let block_production_pubkey =
             maybe_from_config
@@ -620,8 +623,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               "block-producer-pubkey" block_production_pubkey
           in
           let block_production_password =
-            maybe_from_config YJ.Util.to_string_option "block-producer-password"
-              block_production_password
+            find Key.block_producer_password block_production_password
           in
           Option.iter
             ~f:(fun password ->
@@ -859,11 +861,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
           in
           let min_connections =
-            or_from_config YJ.Util.to_int_option "min-connections"
+            find_or_default Key.min_connections
               ~default:Cli_lib.Default.min_connections min_connections
           in
           let max_connections =
-            or_from_config YJ.Util.to_int_option "max-connections"
+            find_or_default Key.max_connections
               ~default:Cli_lib.Default.max_connections max_connections
           in
           let pubsub_v1 = Gossip_net.Libp2p.N in
@@ -877,16 +879,16 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~default:Cli_lib.Default.pubsub_v0 None
           in
           let validation_queue_size =
-            or_from_config YJ.Util.to_int_option "validation-queue-size"
+            find_or_default Key.validation_queue_size
               ~default:Cli_lib.Default.validation_queue_size
               validation_queue_size
           in
           let stop_time =
-            or_from_config YJ.Util.to_int_option "stop-time"
-              ~default:Cli_lib.Default.stop_time stop_time
+            find_or_default Key.stop_time ~default:Cli_lib.Default.stop_time
+              stop_time
           in
           let stop_time_interval =
-            or_from_config YJ.Util.to_int_option "stop-time-interval"
+            find_or_default Key.stop_time_interval
               ~default:Cli_lib.Default.stop_time_interval stop_time_interval
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;

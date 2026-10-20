@@ -48,3 +48,47 @@ let or_from_config ~logger rev_daemon_configs map keyname actual_value ~default
       [%log trace] "Key '$key' not found in the config file, using default"
         ~metadata:[ ("key", `String keyname) ] ;
       default
+
+(** A key of the configuration files' [daemon] sections, with the decoder for
+    its value. *)
+type 'a key = { name : string; decode : YJ.t -> 'a option }
+
+let find ~logger t key actual_value =
+  maybe_from_config ~logger t key.decode key.name actual_value
+
+let find_or_default ~logger t key actual_value ~default =
+  or_from_config ~logger t key.decode key.name actual_value ~default
+
+module Key = struct
+  let int name = { name; decode = YJ.Util.to_int_option }
+
+  let bool name = { name; decode = YJ.Util.to_bool_option }
+
+  let string name = { name; decode = YJ.Util.to_string_option }
+
+  let node_status_url = string "node-status-url"
+
+  let work_reassignment_wait = int "work-reassignment-wait"
+
+  let log_snark_work_gossip = bool "log-snark-work-gossip"
+
+  let log_txn_pool_gossip = bool "log-txn-pool-gossip"
+
+  let log_block_creation = bool "log-block-creation"
+
+  let snark_worker_parallelism = int "snark-worker-parallelism"
+
+  let block_producer_key = string "block-producer-key"
+
+  let block_producer_password = string "block-producer-password"
+
+  let min_connections = int "min-connections"
+
+  let max_connections = int "max-connections"
+
+  let validation_queue_size = int "validation-queue-size"
+
+  let stop_time = int "stop-time"
+
+  let stop_time_interval = int "stop-time-interval"
+end
