@@ -520,6 +520,11 @@ let glue_sync_ledger :
          || not (is_current q)
        then Deferred.unit
        else (
+         (* The sync ledger publishes a new target before writing its first
+            query, but the subscriber above may not have run by the time that
+            query is read. Switch here too, so that no job for the new target
+            reaches a downloader still knowing peers by the old one. *)
+         don't_wait_for (retarget (fst q)) ;
          Hash_set.add in_flight q ;
          let%bind result =
            Sl_downloader.Job.result

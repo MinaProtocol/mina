@@ -729,7 +729,7 @@ let%test_module "Epoch ledger sync tests" =
         (target_root, Syncable_ledger.Query.Num_accounts) ;
       write_stale_queries 10 ;
       let%map answer =
-        Clock.with_timeout (Time.Span.of_sec 30.)
+        Clock.with_timeout (Time.Span.of_sec 15.)
           (Linear_pipe.read answer_reader)
       in
       Linear_pipe.close query_writer ;
