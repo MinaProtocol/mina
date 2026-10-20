@@ -275,8 +275,11 @@ run_one() {
     sed -n 's/^Commit //p' "$dir/commit_id_raw" >"$dir/commit_id"
     printf '%q ' "${ENVS[@]}" daemon --config-directory "$CONF" "${ARGS[@]}" \
       >"$dir/command"
-    env -i PATH="$PATH" HOME="$dir/home" MINA_PROFILE="$MINA_PROFILE" \
-      "${ENVS[@]}" \
+    # TMPDIR is per run: the daemon creates its temporary ledger databases
+    # under $TMPDIR/coda_cache_dir and does not remove them.
+    mkdir -p "$dir/tmp"
+    env -i PATH="$PATH" HOME="$dir/home" TMPDIR="$dir/tmp" \
+      MINA_PROFILE="$MINA_PROFILE" "${ENVS[@]}" \
       setsid "$exe" daemon --config-directory "$CONF" "${ARGS[@]}" \
       >"$dir/stdout" 2>"$dir/stderr" &
     local pid=$!
@@ -300,6 +303,10 @@ run_one() {
     kill -9 -- "-$pid" 2>/dev/null || true
   )
   python3 -I "$HERE/normalise.py" "$dir"
+  # Keep the logs, drop ledgers, crash-report tarballs and other bulk.
+  rm -rf "$dir/tmp" "$dir/home"
+  find "$dir/conf" -mindepth 1 -maxdepth 1 ! -name mina.log \
+    -exec rm -rf {} + 2>/dev/null || true
 }
 
 SCENARIOS=("$@")
