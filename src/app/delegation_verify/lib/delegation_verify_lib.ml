@@ -50,7 +50,7 @@ module Verification_status = struct
     | Verified ->
         [ ("verified", "true"); ("validation_error", "NULL") ]
     | Failed e ->
-        [ ("verified", "false"); ("validation_error", sprintf "'%s'" e) ]
+        [ ("verified", "false"); ("validation_error", Cql.string_literal e) ]
 
   let%test_module "verified and validation_error cannot disagree" =
     ( module struct
@@ -101,6 +101,12 @@ module Verification_status = struct
             true
         | _ ->
             false
+
+      let%test "cassandra: quotes in the reason are escaped" =
+        let fields = to_cassandra_updates (Failed "can't read 'block.dat'") in
+        String.equal
+          (field fields "validation_error")
+          "'can''t read ''block.dat'''"
 
       let%test "of_or_error carries the error text through" =
         match of_or_error (Error (Error.of_string "boom")) with
