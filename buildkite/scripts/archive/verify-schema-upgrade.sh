@@ -5,17 +5,15 @@
 # Verifies the working tree's create_schema.sql, upgrade.sql and downgrade.sql
 # against each other:
 #
-#   1. idempotent:   create + upgrade                       == create
-#   2. round trip:   create + upgrade + downgrade + upgrade == create
-#   3. downgrade:    create + upgrade + downgrade           == release tag's create
-#   4. from branch:  <from-branch>'s create + upgrade       == create
+#   1. idempotent:   create + upgrade                  == create
+#   2. upgrade:      release tag's create + upgrade    == create
+#   3. downgrade:    create + upgrade + downgrade      == release tag's create
+#   4. from branch:  <from-branch>'s create + upgrade  == create
 #
-# The release tag is the schema downgrade.sql goes back to. Check 3 catches a
-# downgrade that leaves an object behind, which check 2 cannot see because
-# upgrade.sql creates objects only when they are missing. Check 4 covers
-# databases created from the from-branch, e.g. a develop archive upgraded from
-# compatible. On the from-branch itself it repeats check 1 against the
-# merged schema.
+# The release tag is the schema of production archives: upgrade.sql starts
+# from it and downgrade.sql goes back to it. Check 4 covers databases created
+# from the from-branch, e.g. a develop archive upgraded from compatible. On the
+# from-branch itself it repeats check 1 against the merged schema.
 #
 # USAGE:
 #   verify-schema-upgrade.sh [OPTIONS]
@@ -216,7 +214,7 @@ main() {
 
     build_db "created" create_schema
     build_db "upgraded" create_schema upgrade
-    build_db "round_trip" create_schema upgrade downgrade upgrade
+    build_db "release_upgraded" release_create_schema upgrade
     build_db "downgraded" create_schema upgrade downgrade
     build_db "released" release_create_schema
     build_db "from_upgraded" from_create_schema upgrade
@@ -225,8 +223,8 @@ main() {
     echo "=== Comparing schemas ==="
     compare "create + upgrade == create" \
         "created" "upgraded"
-    compare "create + upgrade + downgrade + upgrade == create" \
-        "created" "round_trip"
+    compare "${RELEASE_TAG}'s create + upgrade == create" \
+        "created" "release_upgraded"
     compare "create + upgrade + downgrade == ${RELEASE_TAG}'s create" \
         "released" "downgraded"
     compare "${FROM_BRANCH}'s create + upgrade == create" \
