@@ -2,9 +2,9 @@
    -------
 
    Component: Pickles
-   Subject: Test side-loading proofs with a smaller wrap domain
+   Subject: Test side-loading proofs
    Invocation: \
-    dune exec src/lib/crypto/pickles/test/test_domain_too_small.exe
+    dune exec src/lib/crypto/pickles/test/test_side_loaded.exe
 *)
 
 open Pickles_types
@@ -179,7 +179,10 @@ end
 
 [@@@warning "-60"]
 
-module Simple_chain = struct
+module Simple_chain (Flags : sig
+  val feature_flags : Opt.Flag.t Plonk_types.Features.t
+end) =
+struct
   type _ Snarky_backendless.Request.t +=
     | Prev_input : Field.Constant.t Snarky_backendless.Request.t
     | Proof : Side_loaded.Proof.t Snarky_backendless.Request.t
@@ -202,9 +205,9 @@ module Simple_chain = struct
   let side_loaded_tag =
     Side_loaded.create ~name:"foo"
       ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-      ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
+      ~feature_flags:Flags.feature_flags ~typ:Field.typ
 
-  let _tag, _, p, Provers.[ step ] =
+  let tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Input Field.typ)
           ~auxiliary_typ:Typ.unit
@@ -250,6 +253,14 @@ module Simple_chain = struct
                       } )
               }
             ] ) )
+
+  (* Finish the setup that compile_promise leaves pending, so that it cannot
+     interleave with that of another instance of this functor. *)
+  let () =
+    ignore
+      ( Promise.block_on_async_exn (fun () ->
+            Side_loaded.Verification_key.of_compiled_promise tag )
+        : Side_loaded.Verification_key.t )
 
   module Proof = (val p)
 
@@ -311,20 +322,37 @@ module Simple_chain = struct
            Proof.verify_promise [ (Field.Constant.one, b3) ] ) )
 end
 
+module Simple_chain_no_features = Simple_chain (struct
+  let feature_flags = Plonk_types.Features.none
+end)
+
+module Simple_chain_maybe_features = Simple_chain (struct
+  let feature_flags =
+    Plonk_types.Features.(map none ~f:(fun _ -> Opt.Flag.Maybe))
+end)
+
 let () =
   let open Alcotest in
-  run "Pickles domain too small"
+  run "Pickles side-loaded"
     [ ("No recursion", [ test_case "verify" `Quick No_recursion.test_verify ])
     ; ( "Fake 1 recursion"
       , [ test_case "verify" `Quick Fake_1_recursion.test_verify ] )
     ; ( "Fake 2 recursion"
       , [ test_case "verify" `Quick Fake_2_recursion.test_verify ] )
-    ; ( "Simple chain"
+    ; ( "Simple chain, no features"
       , [ test_case "side-load no recursion" `Quick
-            Simple_chain.test_side_load_no_recursion
+            Simple_chain_no_features.test_side_load_no_recursion
         ; test_case "side-load fake 1 recursion" `Quick
-            Simple_chain.test_side_load_fake_1_recursion
+            Simple_chain_no_features.test_side_load_fake_1_recursion
         ; test_case "side-load fake 2 recursion" `Quick
-            Simple_chain.test_side_load_fake_2_recursion
+            Simple_chain_no_features.test_side_load_fake_2_recursion
+        ] )
+    ; ( "Simple chain, maybe features"
+      , [ test_case "side-load no recursion" `Quick
+            Simple_chain_maybe_features.test_side_load_no_recursion
+        ; test_case "side-load fake 1 recursion" `Quick
+            Simple_chain_maybe_features.test_side_load_fake_1_recursion
+        ; test_case "side-load fake 2 recursion" `Quick
+            Simple_chain_maybe_features.test_side_load_fake_2_recursion
         ] )
     ]
