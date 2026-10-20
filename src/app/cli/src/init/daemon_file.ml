@@ -1,4 +1,5 @@
 open Core_kernel
+open Signature_lib
 module YJ = Yojson.Safe
 
 (** The [daemon] sections of the configuration files, latest file first, each
@@ -91,4 +92,70 @@ module Key = struct
   let stop_time = int "stop-time"
 
   let stop_time_interval = int "stop-time-interval"
+
+  let snark_worker_fee =
+    let json_to_currency_fee_option json =
+      YJ.Util.to_int_option json
+      |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
+    in
+    { name = "snark-worker-fee"; decode = json_to_currency_fee_option }
+
+  let work_selection =
+    { name = "work-selection"
+    ; decode =
+        Fn.compose Option.return
+          (Fn.compose Cli_lib.Arg_type.work_selection_method_val
+             YJ.Util.to_string )
+    }
+
+  let json_to_publickey_compressed_option which json =
+    YJ.Util.to_string_option json
+    |> Option.bind ~f:(fun pk_str ->
+           match Public_key.Compressed.of_base58_check pk_str with
+           | Ok key -> (
+               match Public_key.decompress key with
+               | None ->
+                   Mina_stdlib.Mina_user_error.raisef
+                     ~where:"decompressing a public key"
+                     "The %s public key %s could not be decompressed." which
+                     pk_str
+               | Some _ ->
+                   Some key )
+           | Error _e ->
+               Mina_stdlib.Mina_user_error.raisef ~where:"decoding a public key"
+                 "The %s public key %s could not be decoded." which pk_str )
+
+  let public_key which name =
+    { name; decode = json_to_publickey_compressed_option which }
+
+  let run_snark_worker = public_key "snark worker" "run-snark-worker"
+
+  let run_snark_coordinator =
+    public_key "snark coordinator" "run-snark-coordinator"
+
+  let coinbase_receiver = public_key "coinbase receiver" "coinbase-receiver"
+
+  let block_producer_pubkey =
+    public_key "block producer" "block-producer-pubkey"
+
+  let peers =
+    { name = "peers"
+    ; decode = Fn.compose Option.some (YJ.Util.convert_each YJ.Util.to_string)
+    }
+
+  let to_pubsub_topic_mode_option =
+    let open Gossip_net.Libp2p in
+    function
+    | `String "ro" ->
+        Some RO
+    | `String "rw" ->
+        Some RW
+    | `String "none" ->
+        Some N
+    | `Null ->
+        None
+    | _ ->
+        raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
+
+  let pubsub_v0 = { name = "pubsub-v0"; decode = to_pubsub_topic_mode_option }
 end

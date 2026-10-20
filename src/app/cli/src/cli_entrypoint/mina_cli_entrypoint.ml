@@ -215,7 +215,6 @@ let daemon_config_files ~conf_dir config_files =
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
-  let open Cli_lib.Arg_type in
   let%map { Daemon_flags.conf_dir
           ; block_production_key
           ; block_production_pubkey
@@ -293,20 +292,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           ; hardfork_handling
           } =
     Daemon_flags.param ~itn_features ~default_snark_worker_fee
-  in
-  let to_pubsub_topic_mode_option =
-    let open Gossip_net.Libp2p in
-    function
-    | `String "ro" ->
-        Some RO
-    | `String "rw" ->
-        Some RW
-    | `String "none" ->
-        Some N
-    | `Null ->
-        None
-    | _ ->
-        raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
   fun () ->
     let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
@@ -514,11 +499,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let client_port = get_port client_port in
           let snark_work_fee_flag =
-            let json_to_currency_fee_option json =
-              YJ.Util.to_int_option json
-              |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
-            in
-            or_from_config json_to_currency_fee_option "snark-worker-fee"
+            find_or_default Key.snark_worker_fee
               ~default:compile_config.default_snark_worker_fee snark_work_fee
           in
           let node_status_url = find Key.node_status_url node_status_url in
@@ -532,10 +513,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             None
           in
           let work_selection_method =
-            or_from_config
-              (Fn.compose Option.return
-                 (Fn.compose work_selection_method_val YJ.Util.to_string) )
-              "work-selection"
+            find_or_default Key.work_selection
               ~default:Cli_lib.Arg_type.Work_selection_method.Random
               work_selection_method_flag
           in
@@ -563,42 +541,17 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             ; new_state = true
             }
           in
-          let json_to_publickey_compressed_option which json =
-            YJ.Util.to_string_option json
-            |> Option.bind ~f:(fun pk_str ->
-                   match Public_key.Compressed.of_base58_check pk_str with
-                   | Ok key -> (
-                       match Public_key.decompress key with
-                       | None ->
-                           Mina_stdlib.Mina_user_error.raisef
-                             ~where:"decompressing a public key"
-                             "The %s public key %s could not be decompressed."
-                             which pk_str
-                       | Some _ ->
-                           Some key )
-                   | Error _e ->
-                       Mina_stdlib.Mina_user_error.raisef
-                         ~where:"decoding a public key"
-                         "The %s public key %s could not be decoded." which
-                         pk_str )
-          in
           let run_snark_worker_flag =
-            maybe_from_config
-              (json_to_publickey_compressed_option "snark worker")
-              "run-snark-worker" run_snark_worker_flag
+            find Key.run_snark_worker run_snark_worker_flag
           in
           let run_snark_coordinator_flag =
-            maybe_from_config
-              (json_to_publickey_compressed_option "snark coordinator")
-              "run-snark-coordinator" run_snark_coordinator_flag
+            find Key.run_snark_coordinator run_snark_coordinator_flag
           in
           let snark_worker_parallelism_flag =
             find Key.snark_worker_parallelism snark_worker_parallelism_flag
           in
           let coinbase_receiver_flag =
-            maybe_from_config
-              (json_to_publickey_compressed_option "coinbase receiver")
-              "coinbase-receiver" coinbase_receiver_flag
+            find Key.coinbase_receiver coinbase_receiver_flag
           in
           let%bind external_ip =
             match external_ip_opt with
@@ -618,9 +571,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             find Key.block_producer_key block_production_key
           in
           let block_production_pubkey =
-            maybe_from_config
-              (json_to_publickey_compressed_option "block producer")
-              "block-producer-pubkey" block_production_pubkey
+            find Key.block_producer_pubkey block_production_pubkey
           in
           let block_production_password =
             find Key.block_producer_password block_production_password
@@ -851,10 +802,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
               ; peer_list_file_contents_or_empty
               ; List.map ~f:Mina_net2.Multiaddr.of_string
-                @@ or_from_config
-                     (Fn.compose Option.some
-                        (YJ.Util.convert_each YJ.Util.to_string) )
-                     "peers" None ~default:[]
+                @@ find_or_default Key.peers None ~default:[]
               ]
           in
           let direct_peers =
@@ -875,8 +823,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                  ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
              in *)
           let pubsub_v0 =
-            or_from_config to_pubsub_topic_mode_option "pubsub-v0"
-              ~default:Cli_lib.Default.pubsub_v0 None
+            find_or_default Key.pubsub_v0 ~default:Cli_lib.Default.pubsub_v0
+              None
           in
           let validation_queue_size =
             find_or_default Key.validation_queue_size
