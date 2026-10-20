@@ -42,9 +42,9 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "buildkite/scripts/archive/verify-schema-upgrade.sh --from-branch compatible"
+                  "buildkite/scripts/archive/verify-schema-upgrade.sh round-trip"
               ]
-            , label = "Archive: Schema upgrade verification"
+            , label = "Archive: Schema upgrade round trip"
             , key = "archive-schema-upgrade-test"
             , target = Size.Multi
             , docker = None Docker.Type

@@ -2,34 +2,34 @@
 
 # Archive Schema Upgrade Verification Test
 #
-# Verifies the working tree's create_schema.sql, upgrade.sql and downgrade.sql
-# against each other:
-#
-#   1. idempotent:   create + upgrade                  == create
-#   2. upgrade:      release tag's create + upgrade    == create
-#   3. downgrade:    create + upgrade + downgrade      == release tag's create
-#   4. from branch:  <from-branch>'s create + upgrade  == create
-#
-# The release tag is the schema of production archives: upgrade.sql starts
-# from it and downgrade.sql goes back to it. Check 4 covers databases created
-# from the from-branch, e.g. a develop archive upgraded from compatible. On the
-# from-branch itself it repeats check 1 against the merged schema.
+# Verifies the working tree's create_schema.sql, upgrade.sql and downgrade.sql.
 #
 # USAGE:
-#   verify-schema-upgrade.sh [OPTIONS]
+#   verify-schema-upgrade.sh CHECK [OPTIONS]
+#
+# CHECKS:
+#   round-trip     Every branch.
+#                    create + upgrade + downgrade + upgrade == create
+#   from-release   Compatible: an operator on the last release installs the next
+#                  one and runs upgrade.sql, or rolls back with downgrade.sql.
+#                    release's create + upgrade         == create
+#                    create + upgrade + downgrade       == release's create
+#   from-branch    Develop: before the hardfork, upgrade.sql runs on a database
+#                  of the from-branch, then the software is upgraded.
+#                    <from-branch>'s create + upgrade   == create
 #
 # OPTIONS:
-#   -f, --from-branch BRANCH   Branch whose databases must upgrade to the working
-#                              tree's schema (default: compatible)
+#   -f, --from-branch BRANCH     Branch of the pre-hardfork database
+#                                (default: compatible)
 #   -b, --release-branch BRANCH  Branch the release is tagged on
-#                              (default: highest release/X.Y.Z branch on origin)
-#   -r, --release-tag TAG      Release with the schema downgrade.sql goes back to
-#                              (default: newest X.Y.Z tag on the release branch)
-#   -h, --help                 Show this help message
+#                                (default: highest release/X.Y.Z branch on origin)
+#   -r, --release-tag TAG        Release of the pre-upgrade database
+#                                (default: newest X.Y.Z tag on the release branch)
+#   -h, --help                   Show this help message
 #
 # REQUIRES:
 #   - Docker daemon running
-#   - Git repository with access to the from-branch, the release branch and tags
+#   - Git repository with access to origin
 #
 # EXIT CODES:
 #   0: All schema comparisons pass
@@ -45,14 +45,23 @@ PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 WORK_DIR="/tmp/schema-test-$$"
 
+CHECK=""
 FROM_BRANCH="compatible"
 RELEASE_BRANCH=""
 RELEASE_TAG=""
+
+usage() {
+    grep '^#' "$0" | sed 's/^# //' | sed 's/^#//'
+}
 
 # --- Argument Parsing ---
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
+            round-trip|from-release|from-branch)
+                CHECK="$1"
+                shift
+                ;;
             -f|--from-branch)
                 FROM_BRANCH="$2"
                 shift 2
@@ -66,7 +75,7 @@ parse_args() {
                 shift 2
                 ;;
             -h|--help)
-                grep '^#' "$0" | sed 's/^# //' | sed 's/^#//'
+                usage
                 exit 0
                 ;;
             *)
@@ -76,6 +85,12 @@ parse_args() {
                 ;;
         esac
     done
+
+    if [[ -z "$CHECK" ]]; then
+        echo "Error: CHECK is required" >&2
+        echo "Use --help for usage information" >&2
+        exit 1
+    fi
 }
 
 # --- Cleanup trap ---
@@ -175,60 +190,85 @@ compare() {
     fi
 }
 
-# --- Main ---
-main() {
-    parse_args "$@"
+# --- Copy a create_schema.sql from a git ref into the container ---
+copy_schema_from_ref() {
+    local ref="$1"
+    local name="$2"
 
+    git show "${ref}:src/app/archive/create_schema.sql" > "${WORK_DIR}/${name}.sql"
+    docker cp "${WORK_DIR}/${name}.sql" "${POSTGRES_CONTAINER}:/workdir/${name}.sql"
+}
+
+# --- Checks ---
+check_round_trip() {
+    build_db "created" create_schema
+    build_db "round_trip" create_schema upgrade downgrade upgrade
+
+    compare "create + upgrade + downgrade + upgrade == create" \
+        "created" "round_trip"
+}
+
+check_from_release() {
     if [[ -z "$RELEASE_BRANCH" ]]; then
         RELEASE_BRANCH="$(git ls-remote --heads origin 'release/*' \
             | sed -n 's|.*refs/heads/||p' \
             | grep -E '^release/[0-9]+\.[0-9]+\.[0-9]+$' \
             | sort -V | tail -n 1)"
     fi
-
-    git fetch --tags origin "$FROM_BRANCH" "$RELEASE_BRANCH"
-
+    git fetch --tags origin "$RELEASE_BRANCH"
     if [[ -z "$RELEASE_TAG" ]]; then
         RELEASE_TAG="$(git describe --tags --abbrev=0 \
             --match '[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' \
             "origin/${RELEASE_BRANCH}")"
     fi
+    echo "Release: ${RELEASE_TAG} (newest on origin/${RELEASE_BRANCH})"
 
-    echo "=== Archive Schema Upgrade Verification ==="
+    copy_schema_from_ref "refs/tags/${RELEASE_TAG}" release_create_schema
+
+    build_db "created" create_schema
+    build_db "released" release_create_schema
+    build_db "release_upgraded" release_create_schema upgrade
+    build_db "downgraded" create_schema upgrade downgrade
+
+    compare "${RELEASE_TAG}'s create + upgrade == create" \
+        "created" "release_upgraded"
+    compare "create + upgrade + downgrade == ${RELEASE_TAG}'s create" \
+        "released" "downgraded"
+}
+
+check_from_branch() {
+    git fetch origin "$FROM_BRANCH"
+    echo "From branch: origin/${FROM_BRANCH}"
+
+    copy_schema_from_ref "origin/${FROM_BRANCH}" from_create_schema
+
+    build_db "created" create_schema
+    build_db "from_upgraded" from_create_schema upgrade
+
+    compare "${FROM_BRANCH}'s create + upgrade == create" \
+        "created" "from_upgraded"
+}
+
+# --- Main ---
+main() {
+    parse_args "$@"
+
+    echo "=== Archive Schema Upgrade Verification: ${CHECK} ==="
     echo "create/upgrade/downgrade: working tree"
-    echo "From branch:              origin/${FROM_BRANCH}"
-    echo "Release tag:              ${RELEASE_TAG} (newest on origin/${RELEASE_BRANCH})"
-    echo ""
 
     mkdir -p "$WORK_DIR"
     for sql in create_schema upgrade downgrade; do
         cp "${REPO_ROOT}/src/app/archive/${sql}.sql" "${WORK_DIR}/${sql}.sql"
     done
-    git show "origin/${FROM_BRANCH}:src/app/archive/create_schema.sql" \
-        > "${WORK_DIR}/from_create_schema.sql"
-    git show "refs/tags/${RELEASE_TAG}:src/app/archive/create_schema.sql" \
-        > "${WORK_DIR}/release_create_schema.sql"
 
     start_postgres
     docker cp "${WORK_DIR}/." "${POSTGRES_CONTAINER}:/workdir"
 
-    build_db "created" create_schema
-    build_db "upgraded" create_schema upgrade
-    build_db "release_upgraded" release_create_schema upgrade
-    build_db "downgraded" create_schema upgrade downgrade
-    build_db "released" release_create_schema
-    build_db "from_upgraded" from_create_schema upgrade
-
-    echo ""
-    echo "=== Comparing schemas ==="
-    compare "create + upgrade == create" \
-        "created" "upgraded"
-    compare "${RELEASE_TAG}'s create + upgrade == create" \
-        "created" "release_upgraded"
-    compare "create + upgrade + downgrade == ${RELEASE_TAG}'s create" \
-        "released" "downgraded"
-    compare "${FROM_BRANCH}'s create + upgrade == create" \
-        "created" "from_upgraded"
+    case "$CHECK" in
+        round-trip) check_round_trip ;;
+        from-release) check_from_release ;;
+        from-branch) check_from_branch ;;
+    esac
 
     echo ""
     if [[ "$FAILED" -ne 0 ]]; then
