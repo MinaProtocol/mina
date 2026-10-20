@@ -218,7 +218,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V3 = struct
+        module V4 = struct
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -227,7 +227,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V3.t
+                Delegator_stake.Stable.V1.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }
@@ -244,7 +244,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
         ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
         ; delegatee_table :
-            Mina_base.Account.t Mina_base.Account.Index.Table.t
+            Delegator_stake.t Mina_base.Account.Index.Table.t
             Public_key.Compressed.Table.t
         }
       [@@deriving sexp]
@@ -866,7 +866,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~producer_private_key ~producer_public_key ~total_stake
           ~(get_delegators :
                 Public_key.Compressed.t
-             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+             -> Delegator_stake.t Mina_base.Account.Index.Table.t option ) =
         let open Context in
         let open Message in
         let open Interruptible.Let_syntax in
@@ -877,7 +877,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let rec go acc = function
           | [] ->
               Interruptible.return acc
-          | (delegator, (account : Mina_base.Account.t)) :: delegators ->
+          | (delegator, (account : Delegator_stake.t)) :: delegators ->
               let%bind () = Interruptible.return () in
               let vrf_result =
                 T.eval ~constraint_constants ~private_key:producer_private_key
@@ -3017,7 +3017,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Consensus_state.global_slot_since_genesis state)
           slot_diff
       in
-      let delegatee_table = epoch_snapshot.delegatee_table in
+      let delegatee_table =
+        Public_key.Compressed.Table.map epoch_snapshot.delegatee_table
+          ~f:(Mina_base.Account.Index.Table.map ~f:Delegator_stake.of_account)
+      in
       ( Epoch_data_for_vrf.
           { epoch_ledger = epoch_data.ledger
           ; epoch_seed = epoch_data.seed
@@ -3723,8 +3726,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                  ~context:(module Context)
                  ~global_slot ~seed ~producer_private_key:private_key
                  ~producer_public_key:public_key_compressed ~total_stake
-                 ~get_delegators:
-                   (Local_state.Snapshot.delegators epoch_snapshot) )
+                 ~get_delegators:(fun pk ->
+                   Local_state.Snapshot.delegators epoch_snapshot pk
+                   |> Option.map
+                        ~f:
+                          (Mina_base.Account.Index.Table.map
+                             ~f:Delegator_stake.of_account ) ) )
           in
           match Result.ok_exn result with Some _ -> 1 | None -> 0
         in
