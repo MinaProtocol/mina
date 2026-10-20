@@ -2,31 +2,34 @@
 
 # Archive Schema Upgrade Verification Test
 #
-# This script verifies that applying upgrade.sql to the released schema
-# produces the same schema as the target (develop) branch's create_schema.sql,
-# and that downgrade.sql reverses the upgrade correctly.
+# Verifies the working tree's create_schema.sql, upgrade.sql and downgrade.sql
+# against each other:
 #
-# The released schema is create_schema.sql at the newest release tag (X.Y.Z)
-# reachable from the source branch. The source branch's own create_schema.sql
-# is not used: it may already carry objects that upgrade.sql adds, so the
-# downgrade would never match it.
+#   1. idempotent:   create + upgrade                       == create
+#   2. round trip:   create + upgrade + downgrade + upgrade == create
+#   3. downgrade:    create + upgrade + downgrade           == release tag's create
+#   4. from branch:  <from-branch>'s create + upgrade       == create
 #
-# The upgrade/downgrade scripts are always taken from the current working tree,
-# while the target schema is fetched from the remote target branch.
+# The release tag is the schema downgrade.sql goes back to. Check 3 catches a
+# downgrade that leaves an object behind, which check 2 cannot see because
+# upgrade.sql creates objects only when they are missing. Check 4 covers
+# databases created from the from-branch, e.g. a develop archive upgraded from
+# compatible. On the from-branch itself it repeats check 1 against the
+# merged schema.
 #
 # USAGE:
 #   verify-schema-upgrade.sh [OPTIONS]
 #
 # OPTIONS:
-#   -s, --source-branch BRANCH   Branch the release tags are cut from (default: compatible)
-#   -r, --source-tag TAG         Release tag with the pre-upgrade schema
-#                                (default: newest X.Y.Z tag reachable from the source branch)
-#   -t, --target-branch BRANCH   Target (post-upgrade) branch (default: develop)
-#   -h, --help                   Show this help message
+#   -f, --from-branch BRANCH   Branch whose databases must upgrade to the working
+#                              tree's schema (default: compatible)
+#   -r, --release-tag TAG      Release with the schema downgrade.sql goes back to
+#                              (default: newest X.Y.Z tag on the from-branch)
+#   -h, --help                 Show this help message
 #
 # REQUIRES:
 #   - Docker daemon running
-#   - Git repository with access to source and target branches
+#   - Git repository with access to the from-branch and its tags
 #
 # EXIT CODES:
 #   0: All schema comparisons pass
@@ -40,25 +43,21 @@ POSTGRES_IMAGE="postgres:17-alpine"
 PG_USER="postgres"
 PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORK_DIR="/tmp/schema-test-$$"
 
-SOURCE_BRANCH="compatible"
-SOURCE_TAG=""
-TARGET_BRANCH="develop"
+FROM_BRANCH="compatible"
+RELEASE_TAG=""
 
 # --- Argument Parsing ---
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -s|--source-branch)
-                SOURCE_BRANCH="$2"
+            -f|--from-branch)
+                FROM_BRANCH="$2"
                 shift 2
                 ;;
-            -r|--source-tag)
-                SOURCE_TAG="$2"
-                shift 2
-                ;;
-            -t|--target-branch)
-                TARGET_BRANCH="$2"
+            -r|--release-tag)
+                RELEASE_TAG="$2"
                 shift 2
                 ;;
             -h|--help)
@@ -79,7 +78,7 @@ cleanup() {
     echo "Cleaning up..."
     docker stop "$POSTGRES_CONTAINER" 2>/dev/null || true
     docker rm "$POSTGRES_CONTAINER" 2>/dev/null || true
-    rm -f /tmp/source_schema_$$.sql /tmp/target_schema_$$.sql /tmp/schema_*_$$.sql 2>/dev/null || true
+    rm -rf "$WORK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -89,8 +88,6 @@ start_postgres() {
     docker rm "$POSTGRES_CONTAINER" 2>/dev/null || true
 
     docker run \
-        --volume "${REPO_ROOT}:/workdir" \
-        --workdir /workdir \
         --name "$POSTGRES_CONTAINER" \
         -d \
         -e POSTGRES_USER="$PG_USER" \
@@ -116,10 +113,16 @@ run_psql() {
     docker exec "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$db" "$@"
 }
 
-create_db() {
+# --- Build a database by applying SQL files from WORK_DIR in order ---
+build_db() {
     local db="$1"
+    shift
     run_psql "postgres" -c "DROP DATABASE IF EXISTS ${db};"
     run_psql "postgres" -c "CREATE DATABASE ${db};"
+    for sql in "$@"; do
+        echo "[${db}] applying ${sql}.sql"
+        run_psql "$db" -v ON_ERROR_STOP=1 -f "/workdir/${sql}.sql"
+    done
 }
 
 # --- Dump and normalize schema ---
@@ -147,175 +150,80 @@ dump_and_normalize() {
     > "$output_file"
 }
 
-# --- Normalize documented Berkeley/Mesa schema deltas ---
-# A btree key over the unbounded zkapp_{events,field_array}.element_ids int[]
-# overflows Postgres' 2704-byte limit for max-cost zkApps, so Mesa drops those
-# UNIQUE constraints/indexes and makes events_id/actions_id nullable. On the
-# compatible branch this delta shows up in two places and is intentionally
-# tolerated here rather than by retroactively editing the released migration
-# scripts:
-#   * upgrade:   compatible's create_schema + upgrade still carries Berkeley's
-#                element_ids UNIQUE/index + NOT NULL that develop's create_schema
-#                has dropped.
-#   * downgrade: the downgrade does not restore them (lossy) — post-Mesa data may
-#                hold duplicates, oversized arrays, or NULLs Berkeley rejected.
-# Strip that documented delta from both sides before comparing.
-#
-# TODO: the upgrade arm of this tolerance is only needed because compatible's
-# released upgrade.sql never dropped the element_ids UNIQUE/index and the
-# events_id/actions_id NOT NULL, while develop's does. Once compatible's migration
-# carries those DROPs, stop normalizing the upgrade comparison (Test 1) and let it
-# assert the constraints are gone; the downgrade arm (Test 2) stays either way,
-# since the downgrade is deliberately lossy.
-normalize_known_schema_deltas() {
-    local schema_file="$1"
-    local tmp_file="${schema_file}.known_downgrade_deltas"
+# --- Compare two databases' schemas ---
+FAILED=0
+compare() {
+    local name="$1"
+    local expected_db="$2"
+    local actual_db="$3"
 
-    awk '
-        /^ALTER TABLE ONLY public\.zkapp_(events|field_array)$/ {
-            alter_line = $0
-            if ((getline constraint_line) <= 0) {
-                print alter_line
-                next
-            }
-            if (constraint_line ~ /^    ADD CONSTRAINT zkapp_(events|field_array)_element_ids_key UNIQUE \(element_ids\);$/) {
-                next
-            }
-            print alter_line
-            print constraint_line
-            next
-        }
-        /^CREATE INDEX idx_zkapp_(events|field_array)_element_ids ON public\.zkapp_(events|field_array) USING btree \(element_ids\);$/ {
-            next
-        }
-        {
-            sub(/^    events_id integer NOT NULL,/, "    events_id integer,")
-            sub(/^    actions_id integer NOT NULL,/, "    actions_id integer,")
-            print
-        }
-    ' "$schema_file" > "$tmp_file"
+    dump_and_normalize "$expected_db" "${WORK_DIR}/${expected_db}.schema"
+    dump_and_normalize "$actual_db" "${WORK_DIR}/${actual_db}.schema"
 
-    mv "$tmp_file" "$schema_file"
+    if diff -u "${WORK_DIR}/${expected_db}.schema" "${WORK_DIR}/${actual_db}.schema"; then
+        echo "PASS: ${name}"
+    else
+        echo "FAIL: ${name}"
+        echo "  Left:  ${expected_db}"
+        echo "  Right: ${actual_db}"
+        FAILED=1
+    fi
 }
 
 # --- Main ---
 main() {
     parse_args "$@"
 
-    # Fetch both branches and the release tags
-    git fetch --tags origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
+    git fetch --tags origin "$FROM_BRANCH"
 
-    if [[ -z "$SOURCE_TAG" ]]; then
-        SOURCE_TAG="$(git describe --tags --abbrev=0 \
+    if [[ -z "$RELEASE_TAG" ]]; then
+        RELEASE_TAG="$(git describe --tags --abbrev=0 \
             --match '[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' \
-            "origin/${SOURCE_BRANCH}")"
+            "origin/${FROM_BRANCH}")"
     fi
 
     echo "=== Archive Schema Upgrade Verification ==="
-    echo "Source (pre-upgrade):         ${SOURCE_TAG} (release tag on ${SOURCE_BRANCH})"
-    echo "Target branch (post-upgrade): $TARGET_BRANCH"
-    echo "Upgrade/downgrade scripts:    current working tree"
+    echo "create/upgrade/downgrade: working tree"
+    echo "From branch:              origin/${FROM_BRANCH}"
+    echo "Release tag:              ${RELEASE_TAG}"
     echo ""
+
+    mkdir -p "$WORK_DIR"
+    for sql in create_schema upgrade downgrade; do
+        cp "${REPO_ROOT}/src/app/archive/${sql}.sql" "${WORK_DIR}/${sql}.sql"
+    done
+    git show "origin/${FROM_BRANCH}:src/app/archive/create_schema.sql" \
+        > "${WORK_DIR}/from_create_schema.sql"
+    git show "refs/tags/${RELEASE_TAG}:src/app/archive/create_schema.sql" \
+        > "${WORK_DIR}/release_create_schema.sql"
 
     start_postgres
+    docker cp "${WORK_DIR}/." "${POSTGRES_CONTAINER}:/workdir"
 
-    # Extract schemas from the release tag and the remote target branch
-    local source_schema_file="/tmp/source_schema_$$.sql"
-    local target_schema_file="/tmp/target_schema_$$.sql"
-    git show "refs/tags/${SOURCE_TAG}:src/app/archive/create_schema.sql" > "$source_schema_file"
-    git show "origin/${TARGET_BRANCH}:src/app/archive/create_schema.sql" > "$target_schema_file"
+    build_db "created" create_schema
+    build_db "upgraded" create_schema upgrade
+    build_db "round_trip" create_schema upgrade downgrade upgrade
+    build_db "downgraded" create_schema upgrade downgrade
+    build_db "released" release_create_schema
+    build_db "from_upgraded" from_create_schema upgrade
 
-    local upgrade_script="${REPO_ROOT}/src/app/archive/upgrade.sql"
-    local downgrade_script="${REPO_ROOT}/src/app/archive/downgrade.sql"
-
-    # Verify upgrade/downgrade scripts exist in working tree
-    for f in "$upgrade_script" "$downgrade_script"; do
-        if [[ ! -f "$f" ]]; then
-            echo "ERROR: Required file not found: $f"
-            exit 1
-        fi
-    done
-
-    # Copy schemas into the container
-    docker cp "$source_schema_file" "${POSTGRES_CONTAINER}:/tmp/source_schema.sql"
-    docker cp "$target_schema_file" "${POSTGRES_CONTAINER}:/tmp/target_schema.sql"
-
-    # --- Test 1: Upgrade path produces correct schema ---
     echo ""
-    echo "=== Test 1: Upgrade path verification ==="
-    echo "  Expected: ${SOURCE_TAG} schema + upgrade.sql == ${TARGET_BRANCH} schema"
-    echo "            except documented Berkeley/Mesa element_ids constraint deltas"
+    echo "=== Comparing schemas ==="
+    compare "create + upgrade == create" \
+        "created" "upgraded"
+    compare "create + upgrade + downgrade + upgrade == create" \
+        "created" "round_trip"
+    compare "create + upgrade + downgrade == ${RELEASE_TAG}'s create" \
+        "released" "downgraded"
+    compare "${FROM_BRANCH}'s create + upgrade == create" \
+        "created" "from_upgraded"
 
-    create_db "archive_fresh"
-    create_db "archive_upgraded"
-
-    echo "Applying ${TARGET_BRANCH}'s create_schema.sql to fresh database..."
-    run_psql "archive_fresh" -f "/tmp/target_schema.sql"
-
-    echo "Applying ${SOURCE_TAG}'s create_schema.sql to upgrade database..."
-    run_psql "archive_upgraded" -f "/tmp/source_schema.sql"
-
-    echo "Applying upgrade.sql..."
-    run_psql "archive_upgraded" -f "/workdir/src/app/archive/upgrade.sql"
-
-    local schema_fresh="/tmp/schema_fresh_$$.sql"
-    local schema_upgraded="/tmp/schema_upgraded_$$.sql"
-
-    dump_and_normalize "archive_fresh" "$schema_fresh"
-    dump_and_normalize "archive_upgraded" "$schema_upgraded"
-    normalize_known_schema_deltas "$schema_fresh"
-    normalize_known_schema_deltas "$schema_upgraded"
-
-    echo "Comparing schemas..."
-    if diff -u "$schema_fresh" "$schema_upgraded"; then
-        echo "PASS: Upgraded schema matches ${TARGET_BRANCH}'s fresh schema"
-    else
-        echo ""
-        echo "FAIL: Schema mismatch between upgrade path and fresh create"
-        echo "  Left:  ${TARGET_BRANCH}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_TAG}'s create_schema.sql + upgrade.sql"
+    echo ""
+    if [[ "$FAILED" -ne 0 ]]; then
+        echo "=== Schema verification FAILED ==="
         exit 1
     fi
-
-    # --- Test 2: Downgrade path restores source schema ---
-    echo ""
-    echo "=== Test 2: Downgrade path verification ==="
-    echo "  Expected: ${SOURCE_TAG} schema + upgrade + downgrade == ${SOURCE_TAG} schema"
-    echo "            except documented lossy Berkeley constraint restorations"
-
-    create_db "archive_downgraded"
-    create_db "archive_source_ref"
-
-    echo "Applying ${SOURCE_TAG}'s create_schema.sql to reference database..."
-    run_psql "archive_source_ref" -f "/tmp/source_schema.sql"
-
-    echo "Applying ${SOURCE_TAG}'s create_schema.sql + upgrade + downgrade..."
-    run_psql "archive_downgraded" -f "/tmp/source_schema.sql"
-    run_psql "archive_downgraded" -f "/workdir/src/app/archive/upgrade.sql"
-    run_psql "archive_downgraded" -f "/workdir/src/app/archive/downgrade.sql"
-
-    local schema_source_ref="/tmp/schema_source_ref_$$.sql"
-    local schema_downgraded="/tmp/schema_downgraded_$$.sql"
-
-    dump_and_normalize "archive_source_ref" "$schema_source_ref"
-    dump_and_normalize "archive_downgraded" "$schema_downgraded"
-    normalize_known_schema_deltas "$schema_source_ref"
-    normalize_known_schema_deltas "$schema_downgraded"
-
-    echo "Comparing schemas..."
-    if diff -u "$schema_source_ref" "$schema_downgraded"; then
-        echo "PASS: Downgraded schema matches ${SOURCE_TAG}'s fresh schema"
-    else
-        echo ""
-        echo "FAIL: Schema mismatch between downgrade path and fresh source schema"
-        echo "  Left:  ${SOURCE_TAG}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_TAG}'s create_schema.sql + upgrade + downgrade"
-        exit 1
-    fi
-
-    echo ""
     echo "=== All schema verification tests passed ==="
-    exit 0
 }
 
 main "$@"
