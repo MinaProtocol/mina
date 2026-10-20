@@ -443,19 +443,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let compile_config =
             Mina_compile_config.of_node_config (module Node_config)
           in
-          let%bind ( precomputed_values
-                   , config_jsons
-                   , config
-                   , chain_state_locations
-                   , ledger_backing
-                   , chain_id ) =
-            load_config_files ~logger ~conf_dir ~genesis_dir
-              ~proof_level:G.proof_level config_files ~genesis_constants
-              ~constraint_constants ~cli_proof_level ~hardfork_handling
+          let%bind ((config_jsons, _) as config_jsons_and_config) =
+            read_config_files ~logger config_files
           in
-          constraint_constants.block_window_duration_ms |> Float.of_int
-          |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
-
           let daemon_file = Daemon_file.of_config_jsons config_jsons in
           let find key actual_value =
             Daemon_file.find ~logger daemon_file key actual_value
@@ -483,6 +473,19 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Daemon_settings.Ports_and_work.resolve ~logger ~compile_config
               daemon_file flags
           in
+          let%bind ( precomputed_values
+                   , _
+                   , config
+                   , chain_state_locations
+                   , ledger_backing
+                   , chain_id ) =
+            init_from_runtime_config ~logger ~conf_dir ~genesis_dir
+              ~proof_level:G.proof_level ~genesis_constants
+              ~constraint_constants ~cli_proof_level ~hardfork_handling
+              config_jsons_and_config
+          in
+          constraint_constants.block_window_duration_ms |> Float.of_int
+          |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
             (*if
