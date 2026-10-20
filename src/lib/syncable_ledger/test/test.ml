@@ -418,6 +418,50 @@ module Make_test_num_accounts_dos (Input : Input_intf) = struct
         false
 end
 
+module Make_test_target (Input : Input_intf) = struct
+  open Input
+
+  let trust_system = Trust_system.null ()
+
+  let%test_unit "target changes before the new target's first query" =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        let l1, _k1 = Ledger.load_ledger 1 1 in
+        let l2, _k2 = Ledger.load_ledger 2 2 in
+        let l3, _k3 = Ledger.load_ledger 3 3 in
+        let lsync =
+          Sync_ledger.create l1 ~context:(module Context) ~trust_system
+        in
+        let target = Sync_ledger.target lsync in
+        let qr = Sync_ledger.query_reader lsync in
+        [%test_eq: Root_hash.t option] (Broadcast_pipe.Reader.peek target) None ;
+        let expect_retarget_to h =
+          ignore
+            ( Sync_ledger.new_goal lsync h ~data:() ~equal:(fun () () -> true)
+              : [ `New | `Repeat | `Update_data ] ) ;
+          match%map Linear_pipe.read qr with
+          | `Ok (root_hash, Syncable_ledger.Query.Num_accounts) ->
+              [%test_eq: Root_hash.t] root_hash h ;
+              [%test_eq: Root_hash.t option]
+                (Broadcast_pipe.Reader.peek target)
+                (Some h)
+          | `Ok _ ->
+              failwith "expected the new target's Num_accounts query"
+          | `Eof ->
+              failwith "query pipe closed"
+        in
+        let%bind () = expect_retarget_to (Ledger.merkle_root l2) in
+        let%bind () = expect_retarget_to (Ledger.merkle_root l3) in
+        let observed =
+          Broadcast_pipe.Reader.iter target ~f:(fun _ -> Deferred.unit)
+        in
+        Sync_ledger.destroy lsync ;
+        match%map Async.with_timeout (Time.Span.of_sec 5.) observed with
+        | `Result () ->
+            ()
+        | `Timeout ->
+            failwith "target was not closed by destroy" )
+end
+
 module Root_hash = struct
   include Merkle_ledger_tests.Test_stubs.Hash
 
@@ -579,6 +623,7 @@ module Db = struct
 
   module TestDB16_Num_accounts_dos =
     Make_test_num_accounts_dos (DB16_subtree_depths86)
+  module TestDB16_Target = Make_test_target (DB16_subtree_depths86)
 
   module TestDB16_1024 =
     Make_test

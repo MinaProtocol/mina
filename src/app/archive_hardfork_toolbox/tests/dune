@@ -1,5 +1,5 @@
 (test
- (name test_convert_canonical)
+ (name main)
  (deps
   %{project_root}/app/archive/create_schema.sql
   %{project_root}/app/archive/upgrade.sql)
@@ -46,13 +46,14 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules test_convert_canonical)
+ (modules
+  main
+  test_env
+  convert_canonical_tests
+  populate_genesis_accounts_tests)
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_let
-   ppx_hash
-   ppx_compare
-   ppx_sexp_conv
-   h_list.ppx)))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

@@ -44,18 +44,7 @@
   ppx_version.runtime
   o1trace)
  (preprocess
-  (pps
-   ppx_mina
-   ppx_version
-   ppx_assert
-   ppx_base
-   ppx_let
-   ppx_deriving.std
-   ppx_deriving_yojson
-   ppx_sexp_conv
-   ppx_bin_prot
-   ppx_custom_printf
-   ppx_inline_test))
+  (pps mina_ppx.no_pipebang))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Selects work from the work pool"))

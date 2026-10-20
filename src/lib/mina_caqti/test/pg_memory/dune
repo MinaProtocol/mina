@@ -12,8 +12,9 @@
   core.uuid
   core_kernel.uuid
   ;; local libraries
+  influxdb_line_protocol
   mina_caqti)
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

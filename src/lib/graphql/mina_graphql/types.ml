@@ -375,6 +375,47 @@ module Itn = struct
             ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
               let bp_keys = Mina_lib.block_production_pubkeys mina in
               not (Public_key.Compressed.Set.is_empty bp_keys) )
+        ; field "commitId"
+            ~args:Arg.[]
+            ~doc:
+              "Git commit of the daemon build, so that a client can check that \
+               it was built for this daemon"
+            ~typ:(non_null string)
+            ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
+              Mina_lib.commit_id mina )
+        ] )
+
+  let created_account : (bool * Mina_lib.t, Keypair.t option) typ =
+    obj "ItnCreatedAccount" ~fields:(fun _ ->
+        [ field "publicKey"
+            ~args:Arg.[]
+            ~doc:"Public key of the new account"
+            ~typ:(non_null (Scalars.PublicKey.typ ()))
+            ~resolve:(fun _ (kp : Keypair.t) ->
+              Public_key.compress kp.public_key )
+        ; field "privateKey"
+            ~args:Arg.[]
+            ~doc:"Private key of the new account, in base58"
+            ~typ:(non_null string)
+            ~resolve:(fun _ (kp : Keypair.t) ->
+              Private_key.to_base58_check kp.private_key )
+        ] )
+
+  let created_accounts :
+      (bool * Mina_lib.t, (string * Keypair.t list) option) typ =
+    obj "ItnCreatedAccounts" ~fields:(fun _ ->
+        [ field "handle"
+            ~args:Arg.[]
+            ~doc:
+              "Handle of the background job that funds the accounts; it is \
+               listed by scheduledTransactions until the job ends"
+            ~typ:(non_null string)
+            ~resolve:(fun _ (handle, _) -> handle)
+        ; field "accounts"
+            ~args:Arg.[]
+            ~doc:"The new accounts, funded by the background job"
+            ~typ:(non_null (list (non_null created_account)))
+            ~resolve:(fun _ (_, accounts) -> accounts)
         ] )
 
   let metadatum =
@@ -704,6 +745,46 @@ let pending_work_spec =
           ~typ:(non_null Snark_work_bundle.spec)
           ~resolve:(fun _ w -> w)
       ] )
+
+module Scan_state = struct
+  module Tree_metrics = Staged_ledger.Scan_state.Tree_metrics
+
+  type t = { state_hash : State_hash.t; trees : Tree_metrics.t list }
+
+  let tree : (Mina_lib.t, Tree_metrics.t option) typ =
+    obj "ScanStateTree"
+      ~doc:"Free space and outstanding snark work in one tree of the scan state"
+      ~fields:(fun _ ->
+        [ field "availableSpace" ~typ:(non_null int)
+            ~doc:"Number of transaction slots still free in this tree"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.available_space; _ } ->
+              available_space )
+        ; field "baseJobsTodo" ~typ:(non_null int)
+            ~doc:"Number of base jobs in this tree that are yet to be done"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.base_jobs_todo; _ } -> base_jobs_todo)
+        ; field "mergeJobsTodo" ~typ:(non_null int)
+            ~doc:"Number of merge jobs in this tree that are yet to be done"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.merge_jobs_todo; _ } ->
+              merge_jobs_todo )
+        ] )
+
+  let obj : (Mina_lib.t, t option) typ =
+    obj "ScanState" ~doc:"Status of the scan state as of a block"
+      ~fields:(fun _ ->
+        [ field "stateHash" ~typ:(non_null state_hash)
+            ~doc:"State hash of the block whose scan state this is"
+            ~args:Arg.[]
+            ~resolve:(fun _ { state_hash; _ } -> state_hash)
+        ; field "trees"
+            ~typ:(non_null @@ list @@ non_null tree)
+            ~doc:"Status of each tree in the scan state, oldest first"
+            ~args:Arg.[]
+            ~resolve:(fun _ { trees; _ } -> trees)
+        ] )
+end
 
 let state_stack =
   let module M = Pending_coinbase.State_stack in
@@ -3443,6 +3524,38 @@ module Input = struct
                      will have (2*maxAccountUpdates+2) account updates \
                      (including balancing and fee payer)"
                   ~typ:int
+              ]
+    end
+
+    module CreateAccountsDetails = struct
+      type input =
+        { fee_payer : Signature_lib.Private_key.t
+        ; num_accounts : int
+        ; fee : Currency.Fee.t
+        ; amount : Currency.Amount.t
+        }
+
+      let arg_typ : ((input, string) result option, input option) arg_typ =
+        obj "CreateAccountsDetails"
+          ~doc:"Fee payer and amounts for creating and funding new accounts"
+          ~coerce:(fun fee_payer num_accounts fee amount ->
+            Result.return { fee_payer; num_accounts; fee; amount } )
+          ~split:(fun f (t : input) ->
+            f t.fee_payer t.num_accounts t.fee t.amount )
+          ~fields:
+            Arg.
+              [ arg "feePayer"
+                  ~typ:(non_null PrivateKey.arg_typ)
+                  ~doc:"Private key of the account that funds the new accounts"
+              ; arg "numAccounts" ~typ:(non_null int)
+                  ~doc:"Number of new accounts"
+              ; arg "fee" ~typ:(non_null Fee.arg_typ)
+                  ~doc:"Fee of each zkApp command that creates accounts"
+              ; arg "amount"
+                  ~typ:(non_null CurrencyAmount.arg_typ)
+                  ~doc:
+                    "Amount divided among the new accounts (each account also \
+                     pays the account creation fee out of its share)"
               ]
     end
 

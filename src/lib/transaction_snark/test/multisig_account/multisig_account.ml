@@ -311,9 +311,9 @@ let%test_module "multisig_account" =
                          verification_key = Some vk
                        }
                  } ) ;
-              let update_empty_permissions =
+              let update_default_permissions =
                 let permissions =
-                  Zkapp_basic.Set_or_keep.Set Permissions.empty
+                  Zkapp_basic.Set_or_keep.Set Permissions.user_default
                 in
                 { Account_update.Update.noop with permissions }
               in
@@ -362,7 +362,7 @@ let%test_module "multisig_account" =
                   ~body:
                     { Account_update.Body.Simple.public_key =
                         multisig_account_pk
-                    ; update = update_empty_permissions
+                    ; update = update_default_permissions
                     ; token_id = Token_id.default
                     ; balance_change =
                         Currency.Amount.Signed.(of_unsigned amount)

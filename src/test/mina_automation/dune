@@ -33,4 +33,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_compare)))
+  (pps mina_ppx)))

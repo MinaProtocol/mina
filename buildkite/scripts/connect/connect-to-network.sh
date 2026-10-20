@@ -12,7 +12,8 @@ MINA_DEBIAN_NETWORK=""
 MINA_PROFILE_ARG=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
-SYNC_TIMEOUT=""
+STALL_TIMEOUT=""
+HARD_TIMEOUT=""
 
 usage() {
     cat << EOF
@@ -22,13 +23,14 @@ All arguments are mandatory unless noted:
   --mina-debian-network <val>        Mina debian network name
   --mina-profile <val>               Node profile (dev, devnet, lightnet, mainnet)
   --network-name <val>               Testnet name (used for seeds URL and validation)
-  --wait-between-polling <val>       Duration to wait between GraphQL polling
-  --sync-timeout <val>               Duration to wait before considering the sync is failed
+  --wait-between-polling <val>       Duration to wait between status polls
+  --stall-timeout <val>              Fail when the daemon reports no sync progress for this long
+  --hard-timeout <val>               Fail when the daemon is not Synced after this long, progress or not
   --peer-list-url <val>              Peer list URL
   --help                             Display this help message
 
 Example:
-  $0 --mina-debian-network devnet --mina-profile devnet --network-name devnet --wait-between-polling 10s --sync-timeout 20min
+  $0 --mina-debian-network devnet --mina-profile devnet --network-name devnet --wait-between-polling 10s --stall-timeout 8min --hard-timeout 60min
 EOF
     exit 1
 }
@@ -41,14 +43,15 @@ while [[ $# -gt 0 ]]; do
         --network-name) NETWORK_NAME="$2"; shift 2 ;;
         --peer-list-url) PEER_LIST_URL="$2"; shift 2 ;;
         --wait-between-polling) WAIT_BETWEEN_POLLING_GRAPHQL="$2"; shift 2 ;;
-        --sync-timeout) SYNC_TIMEOUT="$2"; shift 2 ;;
+        --stall-timeout) STALL_TIMEOUT="$2"; shift 2 ;;
+        --hard-timeout) HARD_TIMEOUT="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Error: Unknown argument '$1'"; usage ;;
     esac
 done
 
 # --- Validation ---
-if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$MINA_PROFILE_ARG" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" || -z "$PEER_LIST_URL" ]]; then
+if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$MINA_PROFILE_ARG" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$STALL_TIMEOUT" || -z "$HARD_TIMEOUT" || -z "$PEER_LIST_URL" ]]; then
     echo "Error: All required arguments must be provided."
     usage
 fi
@@ -88,6 +91,20 @@ export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2u
 mina libp2p generate-keypair --privkey-path /home/opam/libp2p-keys/key
 chmod -R 0700 /home/opam/libp2p-keys/
 
+# Sync status plus the two block heights the daemon tracks, as one line.
+# Any change in the line counts as progress: Connecting -> Bootstrap -> Catchup
+# -> Synced, or the frontier growing while catching up. CONNECT_ERROR before the
+# RPC port is up.
+sync_progress() {
+    timeout 10 mina client status --json 2>/dev/null \
+      | jq -r '[.sync_status, .blockchain_length, .highest_block_length_received] | @tsv' \
+      || echo "CONNECT_ERROR"
+}
+
+# Bootstrap and catchup on mainnet take anywhere from 6 to over 20 minutes
+# depending on the agent, so a fixed deadline is either too tight on a slow
+# agent or too loose to catch a wedged daemon. Fail on a stall (no change in
+# sync_progress for STALL_TIMEOUT) and keep HARD_TIMEOUT only as a backstop.
 start_daemon_and_wait_for_sync() {
     mina daemon \
       --peer-list-url "$PEER_LIST_URL" \
@@ -95,24 +112,34 @@ start_daemon_and_wait_for_sync() {
     &
     DAEMON_PID="$!"
 
-    local deadline
-    deadline=$(date -d "+$SYNC_TIMEOUT" +%s)
+    local hard_deadline stall_seconds now last_change
+    hard_deadline=$(date -d "+$HARD_TIMEOUT" +%s)
+    stall_seconds=$(( $(date -d "+$STALL_TIMEOUT" +%s) - $(date +%s) ))
+    last_change=$(date +%s)
 
-    local sync_status=""
-    while [ "$(date +%s)" -lt $deadline ]; do
-        sync_status=$(timeout 5 mina-graphql-client sync-status \
-            --graphql-uri http://localhost:3085/graphql --raw \
-            2>/dev/null || echo "CONNECT_ERROR")
+    local progress last_progress="" sync_status=""
+    while :; do
+        progress=$(sync_progress)
+        sync_status="${progress%%$'\t'*}"
         if [[ "$sync_status" == "Synced" ]]; then
             break
         fi
+        now=$(date +%s)
+        if [[ "$progress" != "$last_progress" ]]; then
+            echo "Sync progress: $progress"
+            last_progress="$progress"
+            last_change="$now"
+        fi
+        if (( now - last_change > stall_seconds )); then
+            echo "Error: Daemon made no sync progress for $STALL_TIMEOUT, current status: $progress"
+            exit 1
+        fi
+        if (( now > hard_deadline )); then
+            echo "Error: Daemon not synced after $HARD_TIMEOUT, current status: $progress"
+            exit 1
+        fi
         sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
     done
-
-    if [[ "$sync_status" != "Synced" ]]; then
-        echo "Error: Daemon failed to sync into network within timeout of $SYNC_TIMEOUT, current status: $sync_status"
-        exit 1
-    fi
 
     NETWORK_ID=$(timeout 10 mina-graphql-client network-id \
         --graphql-uri http://localhost:3085/graphql --raw)

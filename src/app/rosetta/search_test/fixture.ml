@@ -148,7 +148,6 @@ module Search = struct
     Rosetta_models.Search_transactions_request.of_yojson body
     |> Result.ok_or_failwith
 
-  (* every transaction as "<transaction> @ <block>", in the response's order *)
   (* every transaction as "<transaction> @ <block>", in the response's order;
      an internal command's identifier is <kind>:<sequence no>:<secondary
      sequence no>:<hash> *)
@@ -185,6 +184,30 @@ module Search = struct
         failwith (Rosetta_lib.Errors.show e)
 
   let rows t request = (run t request).rows
+
+  (** [block t query] reads one block through the /block database query, on
+      the same connection as the searches. *)
+  let block t (query : Lib.Block.Block_query.t) =
+    let (module Conn : Mina_caqti.CONNECTION) = t.conn in
+    match block_on (fun () -> Lib.Block.Sql.run (module Conn) query) with
+    | Ok (_ : Lib.Block.Block_info.t) ->
+        ()
+    | Error e ->
+        failwith (Rosetta_lib.Errors.show e)
+
+  let prepared_statements_req =
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
+      "SELECT count(*)::int FROM pg_prepared_statements"
+
+  (** The number of prepared statements that the connection of [t] holds.
+      [pg_prepared_statements] lists those of its own session only. *)
+  let prepared_statements t =
+    let (module Conn : Mina_caqti.CONNECTION) = t.conn in
+    match block_on (fun () -> Conn.find prepared_statements_req ()) with
+    | Ok count ->
+        count
+    | Error e ->
+        failwith (Caqti_error.show e)
 
   (** The pages of [size] a client reads by following [next_offset] from the
       first page until the response has none. *)

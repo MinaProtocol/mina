@@ -8,6 +8,10 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
+let MemoryGate = ../../Constants/MemoryGate.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
@@ -24,6 +28,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/MinaCaqtiPgMemoryBench")
           , S.exactly "buildkite/scripts/tests/mina-caqti-pg-memory-bench" "sh"
+          , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
           ]
         , path = "Test"
         , name = "MinaCaqtiPgMemoryBench"
@@ -40,13 +45,15 @@ in  Pipeline.build
             , key = "mina-caqti-pg-memory-bench"
             , label = "Mina caqti postgres memory-usage bench"
             , runCommands =
-              [ FixPermissions.command Arch.Type.Amd64
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  [ "BUILDKITE_BRANCH", "BUILDKITE_COMMIT" ]
-                  (None RunWithPostgres.ScriptOrArchive)
-                  ContainerImages.minaToolchain
-                  "./buildkite/scripts/tests/mina-caqti-pg-memory-bench.sh"
-              ]
+                  RunInToolchain.submodulesInit True
+                # [ FixPermissions.command Arch.Type.Amd64
+                  , RunWithPostgres.runInDockerWithPostgresConn
+                      [ "BUILDKITE_BRANCH", "BUILDKITE_COMMIT" ]
+                      (None RunWithPostgres.ScriptOrArchive)
+                      ContainerImages.minaToolchain
+                      "./buildkite/scripts/tests/mina-caqti-pg-memory-bench.sh"
+                  ]
+            , softFail = Some MemoryGate.softFail
             }
         ]
       }

@@ -45,6 +45,6 @@
   (flags -verbose -show-counts)
   (deps proof_cache.json))
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

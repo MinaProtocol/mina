@@ -17,6 +17,7 @@
   allocation_functor
   verifier
   staged_ledger_diff
+  berkeley_types
   protocol_version
   consensus
   precomputed_values
@@ -51,4 +52,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))
+  (pps mina_ppx)))

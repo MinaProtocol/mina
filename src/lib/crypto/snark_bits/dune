@@ -16,7 +16,11 @@
   bitstring_lib
   snarky.intf)
  (preprocess
-  (pps ppx_version ppx_snarky ppx_let ppx_inline_test ppx_compare))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snark parameters"))
