@@ -160,7 +160,89 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   , ledger_backing
   , chain_id )
 
-let setup_daemon logger ~itn_features ~default_snark_worker_fee =
+module Daemon_flags = struct
+  (** The daemon's command-line flags, as given. *)
+  type t =
+    { conf_dir : string option
+    ; block_production_key : string option
+    ; block_production_pubkey : Public_key.Compressed.t option
+    ; block_production_password : string option
+    ; itn_keys : string option
+    ; itn_max_logs : int option
+    ; demo_mode : bool
+    ; coinbase_receiver_flag : Public_key.Compressed.t option
+    ; genesis_dir : string option
+    ; run_snark_worker_flag : Public_key.Compressed.t option
+    ; run_snark_coordinator_flag : Public_key.Compressed.t option
+    ; snark_worker_parallelism_flag : int option
+    ; work_selection_method_flag :
+        Cli_lib.Arg_type.Work_selection_method.t option
+    ; libp2p_port : int Flag.Types.with_name_and_displayed_default
+    ; client_port : int Flag.Types.with_name_and_displayed_default
+    ; rest_server_port : int Flag.Types.with_name_and_displayed_default
+    ; limited_graphql_port : int option Flag.Types.with_name
+    ; itn_graphql_port : int option
+    ; open_limited_graphql_port : bool
+    ; archive_process_location : Host_and_port.t Flag.Types.with_name option
+    ; metrics_server_port : int option
+    ; gc_stat_interval : float option
+    ; libp2p_metrics_port : int option
+    ; external_ip_opt : string option
+    ; bind_ip_opt : string option
+    ; working_dir : string option
+    ; is_background : bool
+    ; is_archive_rocksdb : bool
+    ; log_json : bool
+    ; log_level : Logger.Level.t
+    ; file_log_level : Logger.Level.t
+    ; file_log_rotations : int
+    ; snark_work_fee : Currency.Fee.t option
+    ; work_reassignment_wait : int option
+    ; enable_tracing : bool
+    ; enable_internal_tracing : bool
+    ; insecure_rest_server : bool
+    ; log_received_snark_pool_diff : bool option
+    ; log_transaction_pool_diff : bool option
+    ; log_block_creation : bool option
+    ; libp2p_keypair : string option
+    ; is_seed : bool
+    ; enable_flooding : bool option
+    ; peer_exchange : bool option
+    ; peer_protection_ratio : float
+    ; min_connections : int option
+    ; max_connections : int option
+    ; validation_queue_size : int option
+    ; direct_peers_raw : string list
+    ; isolate : bool option
+    ; libp2p_peers_raw : string list
+    ; libp2p_peer_list_file : string option
+    ; seed_peer_list_url : string option
+    ; proposed_protocol_version : string option
+    ; config_files : string list
+    ; disable_node_status : bool
+    ; cli_proof_level : Genesis_constants.Proof_level.t option
+    ; precomputed_blocks_path : string option
+    ; precomputed_blocks_dir : string option
+    ; log_precomputed_blocks : bool
+    ; start_filtered_logs : string list
+    ; block_reward_threshold : Currency.Amount.t option
+    ; stop_time : int option
+    ; stop_time_interval : int option
+    ; upload_blocks_to_gcloud : bool
+    ; all_peers_seen_metric : bool
+    ; node_status_url : string option
+    ; node_error_url : string option
+    ; simplified_node_stats : bool
+    ; contact_info : string option
+    ; uptime_url_string : string option
+    ; uptime_submitter_key : string option
+    ; uptime_submitter_pubkey : string option
+    ; uptime_send_node_commit : bool
+    ; hardfork_handling : Cli_lib.Arg_type.Hardfork_handling.t
+    }
+end
+
+let daemon_flags ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
@@ -624,6 +706,164 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          (default: keep-running). "
       (optional_with_default Hardfork_handling.Keep_running
          Hardfork_handling.arg )
+  in
+  { Daemon_flags.conf_dir
+  ; block_production_key
+  ; block_production_pubkey
+  ; block_production_password
+  ; itn_keys
+  ; itn_max_logs
+  ; demo_mode
+  ; coinbase_receiver_flag
+  ; genesis_dir
+  ; run_snark_worker_flag
+  ; run_snark_coordinator_flag
+  ; snark_worker_parallelism_flag
+  ; work_selection_method_flag
+  ; libp2p_port
+  ; client_port
+  ; rest_server_port
+  ; limited_graphql_port
+  ; itn_graphql_port
+  ; open_limited_graphql_port
+  ; archive_process_location
+  ; metrics_server_port
+  ; gc_stat_interval
+  ; libp2p_metrics_port
+  ; external_ip_opt
+  ; bind_ip_opt
+  ; working_dir
+  ; is_background
+  ; is_archive_rocksdb
+  ; log_json
+  ; log_level
+  ; file_log_level
+  ; file_log_rotations
+  ; snark_work_fee
+  ; work_reassignment_wait
+  ; enable_tracing
+  ; enable_internal_tracing
+  ; insecure_rest_server
+  ; log_received_snark_pool_diff
+  ; log_transaction_pool_diff
+  ; log_block_creation
+  ; libp2p_keypair
+  ; is_seed
+  ; enable_flooding
+  ; peer_exchange
+  ; peer_protection_ratio
+  ; min_connections
+  ; max_connections
+  ; validation_queue_size
+  ; direct_peers_raw
+  ; isolate
+  ; libp2p_peers_raw
+  ; libp2p_peer_list_file
+  ; seed_peer_list_url
+  ; proposed_protocol_version
+  ; config_files
+  ; disable_node_status
+  ; cli_proof_level
+  ; precomputed_blocks_path
+  ; precomputed_blocks_dir
+  ; log_precomputed_blocks
+  ; start_filtered_logs
+  ; block_reward_threshold
+  ; stop_time
+  ; stop_time_interval
+  ; upload_blocks_to_gcloud
+  ; all_peers_seen_metric
+  ; node_status_url
+  ; node_error_url
+  ; simplified_node_stats
+  ; contact_info
+  ; uptime_url_string
+  ; uptime_submitter_key
+  ; uptime_submitter_pubkey
+  ; uptime_send_node_commit
+  ; hardfork_handling
+  }
+
+let setup_daemon logger ~itn_features ~default_snark_worker_fee =
+  let open Command.Let_syntax in
+  let open Cli_lib.Arg_type in
+  let%map { Daemon_flags.conf_dir
+          ; block_production_key
+          ; block_production_pubkey
+          ; block_production_password
+          ; itn_keys
+          ; itn_max_logs
+          ; demo_mode
+          ; coinbase_receiver_flag
+          ; genesis_dir
+          ; run_snark_worker_flag
+          ; run_snark_coordinator_flag
+          ; snark_worker_parallelism_flag
+          ; work_selection_method_flag
+          ; libp2p_port
+          ; client_port
+          ; rest_server_port
+          ; limited_graphql_port
+          ; itn_graphql_port
+          ; open_limited_graphql_port
+          ; archive_process_location
+          ; metrics_server_port
+          ; gc_stat_interval
+          ; libp2p_metrics_port
+          ; external_ip_opt
+          ; bind_ip_opt
+          ; working_dir
+          ; is_background
+          ; is_archive_rocksdb
+          ; log_json
+          ; log_level
+          ; file_log_level
+          ; file_log_rotations
+          ; snark_work_fee
+          ; work_reassignment_wait
+          ; enable_tracing
+          ; enable_internal_tracing
+          ; insecure_rest_server
+          ; log_received_snark_pool_diff
+          ; log_transaction_pool_diff
+          ; log_block_creation
+          ; libp2p_keypair
+          ; is_seed
+          ; enable_flooding
+          ; peer_exchange
+          ; peer_protection_ratio
+          ; min_connections
+          ; max_connections
+          ; validation_queue_size
+          ; direct_peers_raw
+          ; isolate
+          ; libp2p_peers_raw
+          ; libp2p_peer_list_file
+          ; seed_peer_list_url
+          ; proposed_protocol_version
+          ; config_files
+          ; disable_node_status
+          ; cli_proof_level
+          ; precomputed_blocks_path
+          ; precomputed_blocks_dir
+          ; log_precomputed_blocks
+          ; start_filtered_logs
+          ; block_reward_threshold
+          ; stop_time
+          ; stop_time_interval
+          ; upload_blocks_to_gcloud
+          ; all_peers_seen_metric
+          ; node_status_url
+          ; node_error_url
+          ; simplified_node_stats
+          ; contact_info
+          ; uptime_url_string
+          ; uptime_submitter_key
+          ; uptime_submitter_pubkey
+          ; uptime_send_node_commit
+          ; hardfork_handling
+          } =
+    daemon_flags ~itn_features ~default_snark_worker_fee
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
