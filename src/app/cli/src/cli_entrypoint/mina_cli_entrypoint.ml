@@ -215,82 +215,68 @@ let daemon_config_files ~conf_dir config_files =
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
-  let%map { Daemon_flags.conf_dir
-          ; block_production_key
-          ; block_production_pubkey
-          ; block_production_password
-          ; itn_keys
-          ; itn_max_logs
-          ; demo_mode
-          ; coinbase_receiver_flag
-          ; genesis_dir
-          ; run_snark_worker_flag
-          ; run_snark_coordinator_flag
-          ; snark_worker_parallelism_flag
-          ; work_selection_method_flag
-          ; libp2p_port
-          ; client_port
-          ; rest_server_port
-          ; limited_graphql_port
-          ; itn_graphql_port
-          ; open_limited_graphql_port
-          ; archive_process_location
-          ; metrics_server_port
-          ; gc_stat_interval
-          ; libp2p_metrics_port
-          ; external_ip_opt
-          ; bind_ip_opt
-          ; working_dir
-          ; is_background
-          ; is_archive_rocksdb
-          ; log_json
-          ; log_level
-          ; file_log_level
-          ; file_log_rotations
-          ; snark_work_fee
-          ; work_reassignment_wait
-          ; enable_tracing
-          ; enable_internal_tracing
-          ; insecure_rest_server
-          ; log_received_snark_pool_diff
-          ; log_transaction_pool_diff
-          ; log_block_creation
-          ; libp2p_keypair
-          ; is_seed
-          ; enable_flooding
-          ; peer_exchange
-          ; peer_protection_ratio
-          ; min_connections
-          ; max_connections
-          ; validation_queue_size
-          ; direct_peers_raw
-          ; isolate
-          ; libp2p_peers_raw
-          ; libp2p_peer_list_file
-          ; seed_peer_list_url
-          ; proposed_protocol_version
-          ; config_files
-          ; disable_node_status
-          ; cli_proof_level
-          ; precomputed_blocks_path
-          ; precomputed_blocks_dir
-          ; log_precomputed_blocks
-          ; start_filtered_logs
-          ; block_reward_threshold
-          ; stop_time
-          ; stop_time_interval
-          ; upload_blocks_to_gcloud
-          ; all_peers_seen_metric
-          ; node_status_url
-          ; node_error_url
-          ; simplified_node_stats
-          ; contact_info
-          ; uptime_url_string
-          ; uptime_submitter_key
-          ; uptime_submitter_pubkey
-          ; uptime_send_node_commit
-          ; hardfork_handling
-          } =
+  let%map ( { Daemon_flags.conf_dir
+            ; block_production_key
+            ; block_production_pubkey
+            ; block_production_password
+            ; itn_keys
+            ; itn_max_logs
+            ; demo_mode
+            ; genesis_dir
+            ; itn_graphql_port
+            ; open_limited_graphql_port
+            ; archive_process_location
+            ; metrics_server_port
+            ; gc_stat_interval
+            ; libp2p_metrics_port
+            ; external_ip_opt
+            ; bind_ip_opt
+            ; working_dir
+            ; is_background
+            ; is_archive_rocksdb
+            ; log_json
+            ; log_level
+            ; file_log_level
+            ; file_log_rotations
+            ; enable_tracing
+            ; enable_internal_tracing
+            ; insecure_rest_server
+            ; libp2p_keypair
+            ; is_seed
+            ; enable_flooding
+            ; peer_exchange
+            ; peer_protection_ratio
+            ; min_connections
+            ; max_connections
+            ; validation_queue_size
+            ; direct_peers_raw
+            ; isolate
+            ; libp2p_peers_raw
+            ; libp2p_peer_list_file
+            ; seed_peer_list_url
+            ; proposed_protocol_version
+            ; config_files
+            ; disable_node_status
+            ; cli_proof_level
+            ; precomputed_blocks_path
+            ; precomputed_blocks_dir
+            ; log_precomputed_blocks
+            ; start_filtered_logs
+            ; block_reward_threshold
+            ; stop_time
+            ; stop_time_interval
+            ; upload_blocks_to_gcloud
+            ; all_peers_seen_metric
+            ; node_error_url
+            ; simplified_node_stats
+            ; contact_info
+            ; uptime_url_string
+            ; uptime_submitter_key
+            ; uptime_submitter_pubkey
+            ; uptime_send_node_commit
+            ; hardfork_handling
+            ; _
+            } as flags ) =
     Daemon_flags.param ~itn_features ~default_snark_worker_fee
   in
   fun () ->
@@ -471,14 +457,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
           let daemon_file = Daemon_file.of_config_jsons config_jsons in
-          let maybe_from_config f keyname actual_value =
-            Daemon_file.maybe_from_config ~logger daemon_file f keyname
-              actual_value
-          in
-          let or_from_config map keyname actual_value ~default =
-            Daemon_file.or_from_config ~logger daemon_file map keyname
-              actual_value ~default
-          in
           let find key actual_value =
             Daemon_file.find ~logger daemon_file key actual_value
           in
@@ -486,23 +464,25 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Daemon_file.find_or_default ~logger daemon_file key actual_value
               ~default
           in
-          let get_port { Flag.Types.value; default; name } =
-            or_from_config YJ.Util.to_int_option name ~default value
+          let { Daemon_settings.Ports_and_work.libp2p_port
+              ; rest_server_port
+              ; limited_graphql_port
+              ; client_port
+              ; snark_work_fee_flag
+              ; node_status_url
+              ; work_selection_method
+              ; work_reassignment_wait
+              ; log_block_creation
+              ; log_gossip_heard
+              ; run_snark_worker_flag
+              ; run_snark_coordinator_flag
+              ; snark_worker_parallelism_flag
+              ; coinbase_receiver_flag
+              ; _
+              } =
+            Daemon_settings.Ports_and_work.resolve ~logger ~compile_config
+              daemon_file flags
           in
-          let libp2p_port = get_port libp2p_port in
-          let rest_server_port = get_port rest_server_port in
-          let limited_graphql_port =
-            let ({ value; name } : int option Flag.Types.with_name) =
-              limited_graphql_port
-            in
-            maybe_from_config YJ.Util.to_int_option name value
-          in
-          let client_port = get_port client_port in
-          let snark_work_fee_flag =
-            find_or_default Key.snark_worker_fee
-              ~default:compile_config.default_snark_worker_fee snark_work_fee
-          in
-          let node_status_url = find Key.node_status_url node_status_url in
           (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
           let _max_concurrent_connections =
             (*if
@@ -511,47 +491,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                then Some 40
                else *)
             None
-          in
-          let work_selection_method =
-            find_or_default Key.work_selection
-              ~default:Cli_lib.Arg_type.Work_selection_method.Random
-              work_selection_method_flag
-          in
-          let work_reassignment_wait =
-            find_or_default Key.work_reassignment_wait
-              ~default:Cli_lib.Default.work_reassignment_wait
-              work_reassignment_wait
-          in
-          let log_received_snark_pool_diff =
-            find_or_default Key.log_snark_work_gossip ~default:false
-              log_received_snark_pool_diff
-          in
-          let log_transaction_pool_diff =
-            find_or_default Key.log_txn_pool_gossip ~default:false
-              log_transaction_pool_diff
-          in
-          let log_block_creation =
-            find_or_default Key.log_block_creation ~default:true
-              log_block_creation
-          in
-          let log_gossip_heard =
-            { Mina_networking.Config.snark_pool_diff =
-                log_received_snark_pool_diff
-            ; transaction_pool_diff = log_transaction_pool_diff
-            ; new_state = true
-            }
-          in
-          let run_snark_worker_flag =
-            find Key.run_snark_worker run_snark_worker_flag
-          in
-          let run_snark_coordinator_flag =
-            find Key.run_snark_coordinator run_snark_coordinator_flag
-          in
-          let snark_worker_parallelism_flag =
-            find Key.snark_worker_parallelism snark_worker_parallelism_flag
-          in
-          let coinbase_receiver_flag =
-            find Key.coinbase_receiver coinbase_receiver_flag
           in
           let%bind external_ip =
             match external_ip_opt with
