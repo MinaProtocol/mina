@@ -8,7 +8,12 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version js_of_ocaml-ppx)))
+  (pps
+   mina_ppx
+   js_of_ocaml-ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (rule
  (targets

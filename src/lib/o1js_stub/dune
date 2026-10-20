@@ -75,4 +75,9 @@
   (backend bisect_ppx))
  (forbidden_libraries async core re2 ctypes)
  (preprocess
-  (pps ppx_custom_printf ppx_version js_of_ocaml-ppx)))
+  (pps
+   mina_ppx
+   js_of_ocaml-ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

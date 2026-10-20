@@ -14,7 +14,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.std))
+  (pps mina_ppx))
  (inline_tests
   (flags -verbose -show-counts)))
 
