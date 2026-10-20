@@ -103,6 +103,22 @@ scenario_missing_config_file() {
   ARGS=(--seed --config-file "$PWD/does-not-exist.json"); ENVS=()
 }
 
+scenario_config_file_invalid_json() {
+  printf '{ "daemon": \n' >"$PWD/bad.json"
+  ARGS=(--seed --config-file "$PWD/bad.json"); ENVS=()
+}
+
+scenario_daemon_json_invalid_json() {
+  mkdir -p "$CONF"
+  printf '{ "daemon": \n' >"$CONF/daemon.json"
+  ARGS=(--seed); ENVS=()
+}
+
+scenario_config_runtime_unparseable() {
+  write_json "$PWD/bad.json" '{"ledger": 5}'
+  ARGS=(--seed --config-file "$PWD/bad.json"); ENVS=()
+}
+
 scenario_daemon_json_operator_keys() {
   mkdir -p "$CONF"
   write_json "$CONF/daemon.json" '{"daemon": {
