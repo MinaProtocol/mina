@@ -405,6 +405,23 @@ module type S = sig
       end
     end
 
+    module Delegator_stake : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t =
+            { public_key : Signature_lib.Public_key.Compressed.Stable.V1.t
+            ; balance : Currency.Balance.Stable.V1.t
+            }
+          [@@deriving sexp]
+
+          val to_latest : t -> t
+        end
+      end]
+
+      val of_account : Mina_base.Account.t -> t
+    end
+
     module Vrf : sig
       val check :
            context:(module CONTEXT)

@@ -189,6 +189,30 @@ module Make_str (A : Wire_types.Concrete) = struct
         stake_proof.coinbase_receiver_pk
     end
 
+    module Delegator_stake = struct
+      [%%versioned
+      module Stable = struct
+        [@@@no_toplevel_latest_type]
+
+        module V1 = struct
+          type t =
+            { public_key : Public_key.Compressed.Stable.V1.t
+            ; balance : Balance.Stable.V1.t
+            }
+          [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t =
+        { public_key : Public_key.Compressed.t; balance : Balance.t }
+      [@@deriving sexp]
+
+      let of_account (account : Mina_base.Account.t) =
+        { public_key = account.public_key; balance = account.balance }
+    end
+
     module Epoch_data_for_vrf = struct
       [%%versioned
       module Stable = struct
