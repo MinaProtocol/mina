@@ -367,18 +367,26 @@ export -f write_json
 printf '%s\n' "${SCENARIOS[@]}" |
   xargs -P "$JOBS" -I{} bash -c 'run_scenario_pair "$@"' _ {}
 
+# Outcome transitions: an accepted run (reached-create) must stay identical; a
+# rejected run may change its message, and may move from the crash path to
+# the user-error path, but must never move the other way.
 status=0
-printf '%-48s %-16s %-16s %s\n' SCENARIO BASE NEW RESULT >"$OUT/summary"
+printf '%-48s %-16s %-16s %s\n' SCENARIO OLD NEW RESULT >"$OUT/summary"
 for s in "${SCENARIOS[@]}"; do
   b=$(cat "$OUT/old/$s/outcome")
   n=$(cat "$OUT/new/$s/outcome")
   if diff -q "$OUT/old/$s/normalised" "$OUT/new/$s/normalised" >/dev/null; then
     r=identical
   else
-    r=DIFFERENT
-    status=1
     diff -u "$OUT/old/$s/normalised" "$OUT/new/$s/normalised" \
       >"$OUT/$s.diff" || true
+    case "$b>$n" in
+      "crash>user-error") r=UPGRADED ;;
+      "user-error>user-error" | "crash>crash") r=MESSAGE-CHANGED ;;
+      "reached-create>reached-create") r=CHANGED; status=1 ;;
+      "user-error>crash") r=DOWNGRADED; status=1 ;;
+      *) r=OUTCOME-CHANGED; status=1 ;;
+    esac
   fi
   printf '%-48s %-16s %-16s %s\n' "$s" "$b" "$n" "$r" >>"$OUT/summary"
 done
