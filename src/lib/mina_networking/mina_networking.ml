@@ -494,22 +494,22 @@ let glue_sync_ledger :
         never be sent. The downloader also forgets what it learnt about peers
         from the old target, lest it pass over the peers that failed its
         queries because they have moved on to the new one. *)
+     let retarget new_root =
+       if Ledger_hash.equal new_root (Broadcast_pipe.Reader.peek root_hash_r)
+       then Deferred.unit
+       else (
+         Hash_set.to_list in_flight
+         |> List.filter ~f:(fun (h, _) -> not (Ledger_hash.equal h new_root))
+         |> List.iter ~f:(Sl_downloader.cancel downloader) ;
+         Sl_downloader.forget_peer_state downloader ;
+         Broadcast_pipe.Writer.write root_hash_w new_root )
+     in
      don't_wait_for
        (Broadcast_pipe.Reader.iter target ~f:(function
          | None ->
              Deferred.unit
          | Some new_root ->
-             if
-               Ledger_hash.equal new_root
-                 (Broadcast_pipe.Reader.peek root_hash_r)
-             then Deferred.unit
-             else (
-               Hash_set.to_list in_flight
-               |> List.filter ~f:(fun (h, _) ->
-                      not (Ledger_hash.equal h new_root) )
-               |> List.iter ~f:(Sl_downloader.cancel downloader) ;
-               Sl_downloader.forget_peer_state downloader ;
-               Broadcast_pipe.Writer.write root_hash_w new_root ) ) ) ;
+             retarget new_root ) ) ;
      let throttle =
        Throttle.create ~continue_on_error:true ~max_concurrent_jobs:400
      in
