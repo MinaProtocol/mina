@@ -160,6 +160,44 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   , ledger_backing
   , chain_id )
 
+(** The configuration files to read, in increasing order of precedence, each
+    marked with whether it is an error for it to be missing. *)
+let daemon_config_files ~conf_dir config_files =
+  let config_file_installed =
+    (* Search for config files installed as part of a deb/brew package.
+       These files are commit-dependent, to ensure that we don't clobber
+       configuration for dev builds or use incompatible configs.
+    *)
+    let config_file_installed =
+      let json = "config_" ^ Mina_version.commit_id_short ^ ".json" in
+      List.fold_until ~init:None
+        (Cache_dir.possible_paths json)
+        ~f:(fun _acc f ->
+          match Core.Sys.file_exists f with
+          | `Yes ->
+              Stop (Some f)
+          | _ ->
+              Continue None )
+        ~finish:Fn.id
+    in
+    match config_file_installed with
+    | Some config_file ->
+        Some (config_file, `Must_exist)
+    | None ->
+        None
+  in
+  let config_file_configdir = (conf_dir ^/ "daemon.json", `May_be_missing) in
+  let config_file_envvar =
+    match Sys.getenv "MINA_CONFIG_FILE" with
+    | Some config_file ->
+        Some (config_file, `Must_exist)
+    | None ->
+        None
+  in
+  Option.to_list config_file_installed
+  @ (config_file_configdir :: Option.to_list config_file_envvar)
+  @ List.map config_files ~f:(fun config_file -> (config_file, `Must_exist))
+
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -404,45 +442,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         let time_controller = Block_time.Controller.basic ~logger in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
-          let config_file_installed =
-            (* Search for config files installed as part of a deb/brew package.
-               These files are commit-dependent, to ensure that we don't clobber
-               configuration for dev builds or use incompatible configs.
-            *)
-            let config_file_installed =
-              let json = "config_" ^ Mina_version.commit_id_short ^ ".json" in
-              List.fold_until ~init:None
-                (Cache_dir.possible_paths json)
-                ~f:(fun _acc f ->
-                  match Core.Sys.file_exists f with
-                  | `Yes ->
-                      Stop (Some f)
-                  | _ ->
-                      Continue None )
-                ~finish:Fn.id
-            in
-            match config_file_installed with
-            | Some config_file ->
-                Some (config_file, `Must_exist)
-            | None ->
-                None
-          in
-          let config_file_configdir =
-            (conf_dir ^/ "daemon.json", `May_be_missing)
-          in
-          let config_file_envvar =
-            match Sys.getenv "MINA_CONFIG_FILE" with
-            | Some config_file ->
-                Some (config_file, `Must_exist)
-            | None ->
-                None
-          in
-          let config_files =
-            Option.to_list config_file_installed
-            @ (config_file_configdir :: Option.to_list config_file_envvar)
-            @ List.map config_files ~f:(fun config_file ->
-                  (config_file, `Must_exist) )
-          in
+          let config_files = daemon_config_files ~conf_dir config_files in
 
           let (module G) = Genesis_constants.profiled () in
           let genesis_constants = G.genesis_constants in
