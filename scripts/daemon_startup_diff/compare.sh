@@ -12,6 +12,9 @@
 # The comparison is of outcome class (user-error / crash / reached-create),
 # exit code, stdout, stderr and the mina.log stream, after normalise.py has
 # masked timestamps, source locations, backtraces, run paths and commit ids.
+# The two binaries' runs live in old/ and new/: the names have equal length
+# because the stdout logger only interpolates values below a length limit, so
+# run paths of different lengths can render the same log line differently.
 
 set -euo pipefail
 
@@ -316,7 +319,7 @@ fi
 
 JOBS=${JOBS:-4}
 run_scenario_pair() {
-  run_one "$BASE_EXE" base "$1"
+  run_one "$BASE_EXE" old "$1"
   run_one "$NEW_EXE" new "$1"
 }
 export -f run_one run_scenario_pair
@@ -331,14 +334,14 @@ printf '%s\n' "${SCENARIOS[@]}" |
 status=0
 printf '%-48s %-16s %-16s %s\n' SCENARIO BASE NEW RESULT >"$OUT/summary"
 for s in "${SCENARIOS[@]}"; do
-  b=$(cat "$OUT/base/$s/outcome")
+  b=$(cat "$OUT/old/$s/outcome")
   n=$(cat "$OUT/new/$s/outcome")
-  if diff -q "$OUT/base/$s/normalised" "$OUT/new/$s/normalised" >/dev/null; then
+  if diff -q "$OUT/old/$s/normalised" "$OUT/new/$s/normalised" >/dev/null; then
     r=identical
   else
     r=DIFFERENT
     status=1
-    diff -u "$OUT/base/$s/normalised" "$OUT/new/$s/normalised" \
+    diff -u "$OUT/old/$s/normalised" "$OUT/new/$s/normalised" \
       >"$OUT/$s.diff" || true
   fi
   printf '%-48s %-16s %-16s %s\n' "$s" "$b" "$n" "$r" >>"$OUT/summary"
