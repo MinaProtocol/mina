@@ -9,9 +9,6 @@
   ;; local libraries
   parallel_scan)
  (preprocess
-  (pps
-   ppx_version
-   ppx_jane
-   ppx_compare))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

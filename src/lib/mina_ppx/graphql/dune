@@ -1,0 +1,38 @@
+; As `mina_ppx`, for code that uses `graphql_ppx`. That is a whole-file
+; preprocessor, as is `ppx_optcomp` in `ppx_jane`, and ppxlib accepts only
+; one, so this lists the parts of `ppx_jane` used alongside `graphql_ppx`
+; instead.
+
+(library
+ (name mina_ppx_graphql)
+ (public_name mina_ppx.graphql)
+ (kind ppx_rewriter)
+ (modules)
+ (libraries
+  graphql_ppx
+  h_list.ppx
+  ppx_annot
+  ppx_assert
+  ppx_base
+  ppx_bench
+  ppx_compare
+  ppx_custom_printf
+  ppx_deriving.std
+  ppx_fields_conv
+  ppx_fixed_literal
+  ppx_hash
+  ppx_here
+  ppx_inline_test
+  ppx_let
+  ppx_mina
+  ppx_module_timer
+  ppx_optional
+  ppx_pipebang
+  ppx_sexp_conv
+  ppx_sexp_message
+  ppx_sexp_value
+  ppx_snarky
+  ppx_string
+  ppx_typerep_conv
+  ppx_variants_conv
+  ppx_version))

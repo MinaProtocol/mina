@@ -11,7 +11,7 @@
   async.async_rpc
   core_kernel)
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Template code to run programs that rely Rpc_parallel.Expert"))

@@ -10,7 +10,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let RunInToolchain = ./RunInToolchain.dhall
 
-let testScript = "./buildkite/scripts/cache/tests/cache-parity-test.sh"
+let testScript = "./scripts/tests/buildkite-cache/cache-parity-test.sh"
 
 in  { bashStep =
         Command.build

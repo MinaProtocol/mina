@@ -7,7 +7,7 @@
   async_kernel
   core_kernel)
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps mina_ppx))
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

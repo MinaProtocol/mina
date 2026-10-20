@@ -8,7 +8,10 @@ The benchmark itself is expressed as `runCommands` — arbitrary command(s) that
 produce one or more `*.perf` files (InfluxDB line protocol) under `/workdir`.
 This command appends the standard upload teardown (`uploadScript`, run in the
 default toolchain with the InfluxDB credentials from `Benchmarks`), so every
-perf job uploads the same way instead of open-coding the teardown.
+perf job uploads the same way instead of open-coding the teardown. After the
+upload it runs `buildkite/scripts/bench/memory-gate.sh verdict`, which exits
+with `MemoryGate.exitStatus` if a benchmark recorded a failed memory gate. A job
+can soft-fail on that status alone with `softFail = Some MemoryGate.softFail`.
 
 `runCommands` is intentionally open: a job can run its benchmark however it needs
 (plain toolchain, `RunWithPostgres`, a Docker container, several steps, …) and
@@ -77,6 +80,7 @@ let command
                 # RunInToolchain.runInDefaultToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
                     spec.uploadScript
+                # [ Cmd.run "./buildkite/scripts/bench/memory-gate.sh verdict" ]
             , label = spec.label
             , key = spec.key
             , target = spec.size
