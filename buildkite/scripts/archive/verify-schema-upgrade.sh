@@ -2,19 +2,25 @@
 
 # Archive Schema Upgrade Verification Test
 #
-# This script verifies that applying upgrade.sql to the source
-# (Berkeley/compatible) schema produces the same schema as the target
-# (Mesa/develop) branch's create_schema.sql, and that downgrade.sql
-# reverses the upgrade correctly.
+# This script verifies that applying upgrade.sql to the released schema
+# produces the same schema as the target (develop) branch's create_schema.sql,
+# and that downgrade.sql reverses the upgrade correctly.
+#
+# The released schema is create_schema.sql at the newest release tag (X.Y.Z)
+# reachable from the source branch. The source branch's own create_schema.sql
+# is not used: it may already carry objects that upgrade.sql adds, so the
+# downgrade would never match it.
 #
 # The upgrade/downgrade scripts are always taken from the current working tree,
-# while source and target schemas are fetched from their respective remote branches.
+# while the target schema is fetched from the remote target branch.
 #
 # USAGE:
 #   verify-schema-upgrade.sh [OPTIONS]
 #
 # OPTIONS:
-#   -s, --source-branch BRANCH   Source (pre-upgrade) branch (default: compatible)
+#   -s, --source-branch BRANCH   Branch the release tags are cut from (default: compatible)
+#   -r, --source-tag TAG         Release tag with the pre-upgrade schema
+#                                (default: newest X.Y.Z tag reachable from the source branch)
 #   -t, --target-branch BRANCH   Target (post-upgrade) branch (default: develop)
 #   -h, --help                   Show this help message
 #
@@ -36,6 +42,7 @@ PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 SOURCE_BRANCH="compatible"
+SOURCE_TAG=""
 TARGET_BRANCH="develop"
 
 # --- Argument Parsing ---
@@ -44,6 +51,10 @@ parse_args() {
         case $1 in
             -s|--source-branch)
                 SOURCE_BRANCH="$2"
+                shift 2
+                ;;
+            -r|--source-tag)
+                SOURCE_TAG="$2"
                 shift 2
                 ;;
             -t|--target-branch)
@@ -191,21 +202,27 @@ normalize_known_schema_deltas() {
 main() {
     parse_args "$@"
 
+    # Fetch both branches and the release tags
+    git fetch --tags origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
+
+    if [[ -z "$SOURCE_TAG" ]]; then
+        SOURCE_TAG="$(git describe --tags --abbrev=0 \
+            --match '[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' \
+            "origin/${SOURCE_BRANCH}")"
+    fi
+
     echo "=== Archive Schema Upgrade Verification ==="
-    echo "Source branch (pre-upgrade):  $SOURCE_BRANCH"
+    echo "Source (pre-upgrade):         ${SOURCE_TAG} (release tag on ${SOURCE_BRANCH})"
     echo "Target branch (post-upgrade): $TARGET_BRANCH"
     echo "Upgrade/downgrade scripts:    current working tree"
     echo ""
 
-    # Fetch both branches
-    git fetch origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
-
     start_postgres
 
-    # Extract schemas from remote branches
+    # Extract schemas from the release tag and the remote target branch
     local source_schema_file="/tmp/source_schema_$$.sql"
     local target_schema_file="/tmp/target_schema_$$.sql"
-    git show "origin/${SOURCE_BRANCH}:src/app/archive/create_schema.sql" > "$source_schema_file"
+    git show "refs/tags/${SOURCE_TAG}:src/app/archive/create_schema.sql" > "$source_schema_file"
     git show "origin/${TARGET_BRANCH}:src/app/archive/create_schema.sql" > "$target_schema_file"
 
     local upgrade_script="${REPO_ROOT}/src/app/archive/upgrade.sql"
@@ -226,7 +243,7 @@ main() {
     # --- Test 1: Upgrade path produces correct schema ---
     echo ""
     echo "=== Test 1: Upgrade path verification ==="
-    echo "  Expected: ${SOURCE_BRANCH} schema + upgrade.sql == ${TARGET_BRANCH} schema"
+    echo "  Expected: ${SOURCE_TAG} schema + upgrade.sql == ${TARGET_BRANCH} schema"
     echo "            except documented Berkeley/Mesa element_ids constraint deltas"
 
     create_db "archive_fresh"
@@ -235,7 +252,7 @@ main() {
     echo "Applying ${TARGET_BRANCH}'s create_schema.sql to fresh database..."
     run_psql "archive_fresh" -f "/tmp/target_schema.sql"
 
-    echo "Applying ${SOURCE_BRANCH}'s create_schema.sql to upgrade database..."
+    echo "Applying ${SOURCE_TAG}'s create_schema.sql to upgrade database..."
     run_psql "archive_upgraded" -f "/tmp/source_schema.sql"
 
     echo "Applying upgrade.sql..."
@@ -256,23 +273,23 @@ main() {
         echo ""
         echo "FAIL: Schema mismatch between upgrade path and fresh create"
         echo "  Left:  ${TARGET_BRANCH}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_BRANCH}'s create_schema.sql + upgrade.sql"
+        echo "  Right: ${SOURCE_TAG}'s create_schema.sql + upgrade.sql"
         exit 1
     fi
 
     # --- Test 2: Downgrade path restores source schema ---
     echo ""
     echo "=== Test 2: Downgrade path verification ==="
-    echo "  Expected: ${SOURCE_BRANCH} schema + upgrade + downgrade == ${SOURCE_BRANCH} schema"
+    echo "  Expected: ${SOURCE_TAG} schema + upgrade + downgrade == ${SOURCE_TAG} schema"
     echo "            except documented lossy Berkeley constraint restorations"
 
     create_db "archive_downgraded"
     create_db "archive_source_ref"
 
-    echo "Applying ${SOURCE_BRANCH}'s create_schema.sql to reference database..."
+    echo "Applying ${SOURCE_TAG}'s create_schema.sql to reference database..."
     run_psql "archive_source_ref" -f "/tmp/source_schema.sql"
 
-    echo "Applying ${SOURCE_BRANCH}'s create_schema.sql + upgrade + downgrade..."
+    echo "Applying ${SOURCE_TAG}'s create_schema.sql + upgrade + downgrade..."
     run_psql "archive_downgraded" -f "/tmp/source_schema.sql"
     run_psql "archive_downgraded" -f "/workdir/src/app/archive/upgrade.sql"
     run_psql "archive_downgraded" -f "/workdir/src/app/archive/downgrade.sql"
@@ -287,12 +304,12 @@ main() {
 
     echo "Comparing schemas..."
     if diff -u "$schema_source_ref" "$schema_downgraded"; then
-        echo "PASS: Downgraded schema matches ${SOURCE_BRANCH}'s fresh schema"
+        echo "PASS: Downgraded schema matches ${SOURCE_TAG}'s fresh schema"
     else
         echo ""
         echo "FAIL: Schema mismatch between downgrade path and fresh source schema"
-        echo "  Left:  ${SOURCE_BRANCH}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_BRANCH}'s create_schema.sql + upgrade + downgrade"
+        echo "  Left:  ${SOURCE_TAG}'s create_schema.sql applied directly"
+        echo "  Right: ${SOURCE_TAG}'s create_schema.sql + upgrade + downgrade"
         exit 1
     fi
 
