@@ -13,7 +13,11 @@
   test_step_verifier
   test_wrap
   test_wrap_hack
-  test_encoding_regression)
+  test_encoding_regression
+  test_domain_too_small
+  test_side_loaded_feature_flags
+  test_adversarial
+  test_uncorrelated_bulletproof_challenges)
  (flags
   (:standard -warn-error +a)
   -open
@@ -30,7 +34,9 @@
   fmt
   integers
   sexplib0
+  yojson
   ; Mina libraries
+  error_json
   kimchi_backend
   kimchi_backend_common
   kimchi_pasta
