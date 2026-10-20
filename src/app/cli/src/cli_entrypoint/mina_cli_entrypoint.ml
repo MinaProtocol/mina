@@ -42,9 +42,10 @@ let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
   | Keep_running, _ ->
       Stable_db
 
-let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level ~hardfork_handling config_files =
-  let%bind config_jsons =
+(** Read the configuration files, returning each file's JSON alongside the
+    runtime configuration they combine to. *)
+let read_config_files ~logger config_files =
+  let%map config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
     in
@@ -90,6 +91,13 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
+  (config_jsons, config)
+
+(** Initialise the genesis state and chain-state locations from the combined
+    runtime configuration. *)
+let init_from_runtime_config ~logger ~genesis_constants ~constraint_constants
+    ~conf_dir ~genesis_dir ~cli_proof_level ~proof_level ~hardfork_handling
+    (config_jsons, config) =
   let chain_state_locations, chain_id_opt =
     Init.Chain_state_locations.of_config ~logger
       ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
@@ -159,6 +167,12 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   , chain_state_locations
   , ledger_backing
   , chain_id )
+
+let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
+    ~genesis_dir ~cli_proof_level ~proof_level ~hardfork_handling config_files =
+  read_config_files ~logger config_files
+  >>= init_from_runtime_config ~logger ~genesis_constants ~constraint_constants
+        ~conf_dir ~genesis_dir ~cli_proof_level ~proof_level ~hardfork_handling
 
 (** The configuration files to read, in increasing order of precedence, each
     marked with whether it is an error for it to be missing. *)
