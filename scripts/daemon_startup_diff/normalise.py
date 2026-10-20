@@ -101,6 +101,15 @@ def main():
     stderr = read("stderr")
     exit_code = read("exit_code").strip()
 
+    # Runs are killed once they reach this message, but a few more lines can
+    # be written before the kill lands: cut both streams at the marker.
+    marker = "Creating daemon with commit id"
+    stdout_lines = stdout.splitlines()
+    for i, line in enumerate(stdout_lines):
+        if marker in line:
+            stdout = "\n".join(stdout_lines[: i + 1])
+            break
+
     log_lines = []
     log_messages = []
     for line in read("conf/mina.log").splitlines():
@@ -122,6 +131,8 @@ def main():
                 json.dumps(metadata, sort_keys=True),
             )
         )
+        if message.startswith(marker):
+            break
 
     outcome = classify(stdout, log_messages)
     # A run killed at the [Mina_lib.create] marker has no meaningful exit code.
