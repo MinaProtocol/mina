@@ -15,9 +15,13 @@
 # base images (which it may have pulled but not yet started a container from) are
 # left intact. (We deliberately avoid --all, which would evict those.)
 #
-# Acts only when / usage >= DISK_PRUNE_THRESHOLD (default 80) so healthy agents
-# pay nothing; set DISK_PRUNE_THRESHOLD=0 to always prune (used by the build
-# job). Honours SKIP_DOCKER_PRUNE; never fatal.
+# Acts only when the docker graph's usage >= DISK_PRUNE_THRESHOLD (default 80)
+# so healthy agents pay nothing; set DISK_PRUNE_THRESHOLD=0 to always prune
+# (used by the build job). The graph is the daemon's /var/lib/docker, which on
+# the CI agents is the DinD sidecar's own volume, not the agent's / (see
+# graph-lib.sh). If its usage cannot be read -- no usable local image, or the
+# graph is too full to start a container -- the dangling prune runs anyway.
+# Honours SKIP_DOCKER_PRUNE; never fatal.
 
 set +e
 
@@ -26,23 +30,28 @@ if [[ -n "${SKIP_DOCKER_PRUNE:-}" ]]; then
   exit 0
 fi
 
+# shellcheck source=buildkite/scripts/docker/graph-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/graph-lib.sh"
+
 THRESHOLD="${DISK_PRUNE_THRESHOLD:-80}"
 
-USE=$(df --output=pcent / 2>/dev/null | tail -1 | tr -dc '0-9')
+HELPER=$(graph_find_helper)
+USE=""
+[[ -n "$HELPER" ]] && USE=$(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')
 if [[ -z "$USE" ]]; then
-  echo "disk-cleanup: could not read / usage, skipping"
+  echo "disk-cleanup: could not read the docker graph's usage, pruning dangling docker data (concurrency-safe, no --all)"
+  docker system prune --force
   exit 0
 fi
 
 if [[ "$USE" -lt "$THRESHOLD" ]]; then
-  echo "disk-cleanup: / at ${USE}% (< ${THRESHOLD}%), no cleanup needed"
+  echo "disk-cleanup: docker graph at ${USE}% (< ${THRESHOLD}%), no cleanup needed"
   exit 0
 fi
 
-echo "disk-cleanup: / at ${USE}% (>= ${THRESHOLD}%), pruning dangling docker data (concurrency-safe, no --all)"
+echo "disk-cleanup: docker graph at ${USE}% (>= ${THRESHOLD}%), pruning dangling docker data (concurrency-safe, no --all)"
 docker system prune --force
 
-echo "disk-cleanup: / usage after cleanup:"
-df -h / 2>/dev/null
+echo "disk-cleanup: docker graph at $(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')% after cleanup"
 
 exit 0
