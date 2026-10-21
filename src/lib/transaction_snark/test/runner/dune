@@ -4,6 +4,7 @@
   ;; opam libraries
   alcotest
   ;; local libraries
+  account_timing_tests
   account_update_network_id
   account_update_precondition_tests
   app_state_tests

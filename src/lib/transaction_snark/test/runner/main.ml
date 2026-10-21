@@ -3,6 +3,7 @@ let () =
     [ Transaction_snark_tests_access_permission
       .Transaction_snark_test_access_permission
       .suite ()
+    ; Account_timing_tests.Account_timing.suite ()
     ; Account_update_network_id.suite ()
     ; App_state_tests.App_state.suite ()
     ; Delegate_tests.Delegate.suite ()
