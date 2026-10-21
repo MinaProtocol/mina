@@ -18,15 +18,22 @@
 
 GRAPH_HELPER_MOUNT=/graph
 
-# Prints the first local image whose `sh` has the tools the helpers use.
+# Prints the first local image whose `sh` has the tools the helpers use. If
+# there is none -- e.g. the janitor's `system prune --all` emptied a graph that
+# is full of orphaned layers -- pulls DOCKER_GRAPH_HELPER_PULL (default
+# busybox, ~4MB, so it fits where a toolchain load does not).
 # DOCKER_GRAPH_HELPER_IMAGE overrides the search. Fails if there is none.
 graph_find_helper() {
   if [[ -n "${DOCKER_GRAPH_HELPER_IMAGE:-}" ]]; then
     echo "$DOCKER_GRAPH_HELPER_IMAGE"
     return 0
   fi
-  local img
-  for img in $(docker image ls --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>'); do
+  local img pull="${DOCKER_GRAPH_HELPER_PULL:-busybox:1.36.1}"
+  for img in $(docker image ls --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>') PULL; do
+    if [[ "$img" == "PULL" ]]; then
+      img="$pull"
+      docker pull -q "$img" >/dev/null 2>&1 || return 1
+    fi
     if docker run --rm --pull never --network none --user 0:0 --entrypoint sh "$img" \
          -c 'for t in df du find stat grep sed sort cat date awk; do command -v $t >/dev/null || exit 1; done' \
          >/dev/null 2>&1; then
