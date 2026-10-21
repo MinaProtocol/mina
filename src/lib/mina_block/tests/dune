@@ -34,17 +34,22 @@
  (libraries
   alcotest
   async
+  berkeley_types
   core_kernel
   disk_cache.lmdb
   mina_base
   mina_block
   mina_state
+  mina_transaction
+  staged_ledger_diff
   yojson)
  (deps
   hetzner-itn-1-1795.json
   mainnet-2-3NKaTb2EEadeFbv9MyCbHZckWvroG9SdtMBdoMB4asExPEy4Vhw3.json
+  mainnet-520000-3NKuyY4iqW7mXThknMwwNiKst67uo6txzhWFJj3S9fk1jot8M7Qn.json
+  mainnet-545000-3NKc1wHM45SweeqiCZyNwmNJQnT4vjzJmeCYkG83YqXNgDPY57ZD.json
   regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version)))
+  (pps mina_ppx)))

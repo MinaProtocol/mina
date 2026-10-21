@@ -156,8 +156,17 @@ let without_table server_uri () =
       (alice, bob) )
     (fun db (alice, bob) ->
       let open Deferred.Or_error.Let_syntax in
-      let%bind () = B.Db.run_script db `Upgrade in
-      let%bind () = B.Db.run_script db `Rollback in
+      let%bind () =
+        B.Db.with_connection db (fun (module Conn : Mina_caqti.CONNECTION) ->
+            Conn.exec
+              (Caqti_request.Infix.( ->. ) Caqti_type.unit Caqti_type.unit
+                 "DROP TABLE genesis_accounts" )
+              () )
+        |> Deferred.map
+             ~f:
+               (Result.map_error ~f:(fun e ->
+                    Error.of_string (Caqti_error.show e) ) )
+      in
       let%bind a = balance_of db alice ~height:2 in
       check "only in no block" (0L, 0L, 0) a ;
       let%map b = balance_of db bob ~height:2 in

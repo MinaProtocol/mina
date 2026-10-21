@@ -32,6 +32,6 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

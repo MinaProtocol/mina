@@ -269,8 +269,4 @@ module Make (Inputs : Inputs_intf) = struct
   let set_batch_accounts t addresses_and_accounts =
     Base.set_batch_accounts t addresses_and_accounts ;
     batch_notify_mask_children t (List.map addresses_and_accounts ~f:snd)
-
-  let set_all_accounts_rooted_at_exn t address accounts =
-    Base.set_all_accounts_rooted_at_exn t address accounts ;
-    batch_notify_mask_children t accounts
 end

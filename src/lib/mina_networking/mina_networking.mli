@@ -253,9 +253,12 @@ val broadcast_snark_pool_diff :
 val broadcast_transaction_pool_diff :
   ?nonce:int -> t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
 
+(** Fetch the answers to a sync ledger's queries from peers. [target] is the
+    sync ledger's target, which decides which queries are worth asking. *)
 val glue_sync_ledger :
      t
   -> preferred:Peer.t list
+  -> target:Ledger_hash.t option Broadcast_pipe.Reader.t
   -> (Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
      * Mina_ledger.Sync_ledger.Query.t

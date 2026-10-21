@@ -5,13 +5,7 @@
  (deps
   (source_tree examples))
  (preprocess
-  (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
-   ppx_compare
-   ppx_deriving_yojson
-   h_list.ppx))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   alcotest

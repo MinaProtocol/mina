@@ -201,6 +201,7 @@ module Available_job = struct
 end
 
 module Space_partition = Parallel_scan.Space_partition
+module Tree_metrics = Parallel_scan.Tree_metrics
 
 module Job_view = struct
   type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
@@ -1437,15 +1438,14 @@ let all_work_pairs t
       | Error e ->
           Stop (Error e) )
 
+let tree_metrics t = Parallel_scan.metrics t.scan_state
+
 let update_metrics t =
   Or_error.try_with (fun () ->
-      List.iteri (Parallel_scan.metrics t.scan_state)
+      List.iteri (tree_metrics t)
         ~f:(fun
              i
-             { Parallel_scan.Tree_metrics.available_space
-             ; base_jobs_todo
-             ; merge_jobs_todo
-             }
+             { Tree_metrics.available_space; base_jobs_todo; merge_jobs_todo }
            ->
           let name = sprintf "tree%d" i in
           Mina_metrics.(

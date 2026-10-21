@@ -21,7 +21,7 @@
   snarky.backendless
   tuple_lib)
  (preprocess
-  (pps h_list.ppx ppx_jane ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Cryptographic parameters"))

@@ -48,17 +48,10 @@ type t =
             derive. *)
   }
 
-let transaction_of_latest : Transaction.t -> transaction = function
-  | Command (Signed_command signed_command as command) ->
-      Command
-        { command
-        ; hash = Transaction_hash.hash_command (Signed_command signed_command)
-        }
-  | Command (Zkapp_command zkapp_command as command) ->
-      Command
-        { command
-        ; hash = Transaction_hash.hash_zkapp_command_with_hashes zkapp_command
-        }
+let transaction_of_latest ~command_hash : Transaction.t -> transaction =
+  function
+  | Command command ->
+      Command { command; hash = command_hash command }
   | Fee_transfer fee_transfer ->
       Fee_transfer
         { fee_transfer
@@ -81,9 +74,10 @@ let transaction_of_latest : Transaction.t -> transaction = function
 
 (** The parts of a block, from its protocol state, of whatever version, and
     [get_transactions], which gives its transactions from its coinbase
-    receiver and whether its coinbase is supercharged. *)
-let of_protocol_state ~state_hash ~protocol_state ~get_transactions
-    ~protocol_version ~proposed_protocol_version =
+    receiver and whether its coinbase is supercharged, with the hashes of its
+    commands given by [command_hash]. *)
+let of_protocol_state ~command_hash ~state_hash ~protocol_state
+    ~get_transactions ~protocol_version ~proposed_protocol_version =
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let transactions =
@@ -96,7 +90,8 @@ let of_protocol_state ~state_hash ~protocol_state ~get_transactions
        in
        match get_transactions ~coinbase_receiver ~supercharge_coinbase with
        | Ok transactions ->
-           List.map transactions ~f:(With_status.map ~f:transaction_of_latest)
+           List.map transactions
+             ~f:(With_status.map ~f:(transaction_of_latest ~command_hash))
        | Error e ->
            Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e) )
   in
@@ -137,7 +132,8 @@ let of_latest ~constraint_constants ~state_hash
     ~(protocol_state : Protocol_state.Value.t)
     ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
     ~proposed_protocol_version =
-  of_protocol_state ~state_hash ~protocol_state
+  of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
+    ~state_hash ~protocol_state
     ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
       Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
         ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff )
@@ -163,7 +159,7 @@ let of_precomputed_v5 ~constraint_constants ~proof_cache_db
 let of_precomputed_v4 ~constraint_constants ~proof_cache_db
     (t : Mina_block.Precomputed.Stable.V4.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  of_protocol_state
+  of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
     ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
@@ -182,9 +178,67 @@ let of_precomputed_v4 ~constraint_constants ~proof_cache_db
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
+(* The coinbase of the Berkeley era on mainnet, which the Mesa hard fork
+   halved along with the slot time. A block doesn't record its coinbase, so a
+   V3 block's transactions need it in place of the current one. *)
+let berkeley_coinbase_amount = Currency.Amount.of_mina_int_exn 720
+
+(* A V3 block's transactions are derived as a V4 block's are, from its diff
+   converted to the version a V4 block carries, which only extends zkApp
+   states. Each command takes the Berkeley hash of the command it was
+   converted from, found by the latest hash of the converted command. *)
+let of_precomputed_v3 ~constraint_constants ~proof_cache_db
+    (t : Mina_block.Precomputed.V3.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let berkeley_hashes =
+    lazy
+      (let two, one =
+         Berkeley_types.Diff.commands_with_hashes t.staged_ledger_diff
+       in
+       let { Staged_ledger_diff.Pre_diff_two.commands; _ } = two in
+       let one_commands =
+         Option.value_map one ~default:[]
+           ~f:(fun { Staged_ledger_diff.Pre_diff_one.commands; _ } -> commands)
+       in
+       List.map (commands @ one_commands)
+         ~f:(fun { With_status.data = command, hash; _ } ->
+           ( Transaction_hash.hash_command
+               (Berkeley_types.User_command.to_mesa command)
+           , hash ) )
+       |> Transaction_hash.Map.of_alist_exn )
+  in
+  of_protocol_state
+    ~command_hash:(fun command ->
+      Map.find_exn
+        (Lazy.force berkeley_hashes)
+        (Transaction_hash.hash_command_with_hashes command) )
+    ~state_hash:
+      (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
+    ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
+    ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
+      Staged_ledger.Pre_diff_info.get_transactions_stable_v3
+        ~constraint_constants:
+          { constraint_constants with
+            coinbase_amount = berkeley_coinbase_amount
+          }
+        ~coinbase_receiver ~supercharge_coinbase
+        (Berkeley_types.Diff.to_mesa t.staged_ledger_diff)
+      |> Result.map
+           ~f:
+             (List.map
+                ~f:
+                  (With_status.map
+                     ~f:
+                       (Transaction.write_all_proofs_to_disk ~signature_kind
+                          ~proof_cache_db ) ) ) )
+    ~protocol_version:t.protocol_version
+    ~proposed_protocol_version:t.proposed_protocol_version
+
 let of_precomputed ~constraint_constants ~proof_cache_db :
     Mina_block.Precomputed.Versioned.t -> t = function
   | V5 t ->
       of_precomputed_v5 ~constraint_constants ~proof_cache_db t
   | V4 t ->
       of_precomputed_v4 ~constraint_constants ~proof_cache_db t
+  | V3 t ->
+      of_precomputed_v3 ~constraint_constants ~proof_cache_db t
