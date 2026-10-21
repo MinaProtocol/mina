@@ -26,3 +26,7 @@ val make :
   -> ?proof_cache_json:string
   -> (test:(string -> (unit -> unit) -> unit) -> unit)
   -> string * unit Alcotest.test_case list
+
+(** [assert_true f] runs [f], failing if it returns [false], like a
+    [let%test]. *)
+val assert_true : (unit -> bool) -> unit -> unit

@@ -70,3 +70,5 @@ let make ~name ?proof_cache_json setup =
     ~base:(Base.Random.State.copy initial_base_random_state) (fun () ->
       in_suite (fun () -> setup ~test) ) ;
   (name, Queue.to_list tests)
+
+let assert_true f () = assert (f ())
