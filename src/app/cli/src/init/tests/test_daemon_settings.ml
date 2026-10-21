@@ -1,7 +1,6 @@
 (* Tests of daemon-setting resolution. These pin its existing behaviour,
-   including the quirks (port keys keeping their flag's dashes, wrong-typed
-   values raising rather than falling through, overridden values not being
-   decoded). *)
+   including the quirks (port keys keeping their flag's dashes, overridden
+   values not being decoded). *)
 
 open Core
 open Init
@@ -32,13 +31,6 @@ let resolve ?(files = []) args =
 
 let public_key () =
   Signature_lib.(Public_key.compress (Keypair.create ()).public_key)
-
-let raises_type_error f =
-  match f () with
-  | (_ : Daemon_settings.Ports_and_work.t) ->
-      Alcotest.fail "expected Yojson.Safe.Util.Type_error"
-  | exception Yojson.Safe.Util.Type_error _ ->
-      ()
 
 let raises_user_error f =
   match f () with
@@ -104,17 +96,20 @@ let test_null_falls_through () =
   in
   Alcotest.(check int) "reassignment wait" 1 r.work_reassignment_wait
 
-(* A value of the wrong type does not fall through: the decoder raises. *)
-let test_wrong_type_raises () =
-  raises_type_error (fun () ->
+(* A value of the wrong type does not fall through: it is a configuration
+   error. *)
+let test_wrong_type_is_user_error () =
+  raises_user_error (fun () ->
       resolve
         ~files:
           [ ("a", {|{"work-reassignment-wait": 1}|})
           ; ("b", {|{"work-reassignment-wait": "2"}|})
           ]
         [] ) ;
-  raises_type_error (fun () ->
-      resolve ~files:[ ("a", {|{"work-selection": 5}|}) ] [] )
+  raises_user_error (fun () ->
+      resolve ~files:[ ("a", {|{"work-selection": 5}|}) ] [] ) ;
+  raises_user_error (fun () ->
+      resolve ~files:[ ("a", {|{"snark-worker-fee": -1}|}) ] [] )
 
 let test_work_selection () =
   let r = resolve ~files:[ ("a", {|{"work-selection": "seq"}|}) ] [] in
@@ -150,7 +145,8 @@ let () =
             test_port_keys_are_dashed_flag_names
         ; Alcotest.test_case "latest file wins" `Quick test_latest_file_wins
         ; Alcotest.test_case "null falls through" `Quick test_null_falls_through
-        ; Alcotest.test_case "wrong type raises" `Quick test_wrong_type_raises
+        ; Alcotest.test_case "wrong type is a user error" `Quick
+            test_wrong_type_is_user_error
         ; Alcotest.test_case "work selection" `Quick test_work_selection
         ; Alcotest.test_case "bad public key is a user error" `Quick
             test_bad_public_key_is_user_error
