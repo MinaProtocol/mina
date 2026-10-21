@@ -14,5 +14,6 @@ let () =
     ; Verification_key_permission_tests.Verification_key_permission.suite ()
     ; Voting_for_tests.Voting_for.suite ()
     ; Zkapp_deploy_tests.Zkapp_deploy.suite ()
+    ; Zkapp_payments_tests.Zkapp_payments.suite ()
     ; Zkapp_uri_tests.Zkapp_uri.suite ()
     ]
