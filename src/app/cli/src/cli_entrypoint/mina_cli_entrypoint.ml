@@ -216,9 +216,6 @@ let daemon_config_files ~conf_dir config_files =
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
   let%map ( { Daemon_flags.conf_dir
-            ; block_production_key
-            ; block_production_pubkey
-            ; block_production_password
             ; itn_keys
             ; itn_max_logs
             ; demo_mode
@@ -447,9 +444,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             read_config_files ~logger config_files
           in
           let daemon_file = Daemon_file.of_config_jsons config_jsons in
-          let find key actual_value =
-            Daemon_file.find ~logger daemon_file key actual_value
-          in
           let find_or_default key actual_value ~default =
             Daemon_file.find_or_default ~logger daemon_file key actual_value
               ~default
@@ -509,14 +503,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let addrs_and_ports : Node_addrs_and_ports.t =
             { external_ip; bind_ip; peer = None; client_port; libp2p_port }
           in
-          let block_production_key =
-            find Key.block_producer_key block_production_key
-          in
-          let block_production_pubkey =
-            find Key.block_producer_pubkey block_production_pubkey
-          in
-          let block_production_password =
-            find Key.block_producer_password block_production_password
+          let { Daemon_settings.Block_producer.block_production_key
+              ; block_production_pubkey
+              ; block_production_password
+              } =
+            Daemon_settings.Block_producer.resolve ~logger daemon_file flags
           in
           Option.iter
             ~f:(fun password ->

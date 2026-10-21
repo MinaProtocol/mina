@@ -131,3 +131,34 @@ module Ports_and_work = struct
     ; coinbase_receiver_flag
     }
 end
+
+(** The block producer's key file, public key and key-file password, resolved
+    from the flags and the configuration files' [daemon] sections. *)
+module Block_producer = struct
+  type t =
+    { block_production_key : string option
+    ; block_production_pubkey : Public_key.Compressed.t option
+    ; block_production_password : string option
+    }
+
+  let resolve ~logger daemon_file
+      ({ block_production_key
+       ; block_production_pubkey
+       ; block_production_password
+       ; _
+       } :
+        Daemon_flags.t ) =
+    let find key actual_value =
+      Daemon_file.find ~logger daemon_file key actual_value
+    in
+    let block_production_key =
+      find Key.block_producer_key block_production_key
+    in
+    let block_production_pubkey =
+      find Key.block_producer_pubkey block_production_pubkey
+    in
+    let block_production_password =
+      find Key.block_producer_password block_production_password
+    in
+    { block_production_key; block_production_pubkey; block_production_password }
+end
