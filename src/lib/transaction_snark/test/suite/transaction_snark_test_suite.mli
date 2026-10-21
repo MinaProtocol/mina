@@ -11,8 +11,9 @@
     suite compiles itself must be compiled with this cache. *)
 val proof_cache : Pickles.Proof_cache.t
 
-(** [make ~name ?proof_cache_json tests] builds an Alcotest suite. [tests] is
-    called once, to set up the suite and return its test cases.
+(** [make ~name ?proof_cache_json setup] builds an Alcotest suite. [setup] is
+    called once, to set up the suite and register its tests, in order, with
+    [test].
 
     [proof_cache_json] is the contents of the suite's [proof_cache.json]. A
     suite without one generates its proofs, even when [ERROR_ON_PROOF] is set.
@@ -23,5 +24,5 @@ val proof_cache : Pickles.Proof_cache.t
 val make :
      name:string
   -> ?proof_cache_json:string
-  -> (unit -> unit Alcotest.test_case list)
+  -> (test:(string -> (unit -> unit) -> unit) -> unit)
   -> string * unit Alcotest.test_case list

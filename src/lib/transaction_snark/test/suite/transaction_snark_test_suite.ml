@@ -33,7 +33,7 @@ let without_error_on_proof f =
       Exn.protect ~f ~finally:(fun () ->
           Core.Unix.putenv ~key:error_on_proof_var ~data )
 
-let make ~name ?proof_cache_json tests =
+let make ~name ?proof_cache_json setup =
   Transaction_snark.For_tests.set_proof_cache proof_cache ;
   let suite_proofs =
     match proof_cache_json with
@@ -58,14 +58,15 @@ let make ~name ?proof_cache_json tests =
     in
     if Option.is_some proof_cache_json then f () else without_error_on_proof f
   in
+  let tests = Queue.create () in
+  let test test_name f =
+    Queue.enqueue tests
+      (Alcotest.test_case test_name `Quick (fun () ->
+           in_suite (fun () -> with_inline_test_random_state f) ) )
+  in
   (* A suite's setup sees the random state that it would at the start of its
      own process. *)
-  let tests =
-    with_random_state ~caml:(Caml.Random.State.copy initial_caml_random_state)
-      ~base:(Base.Random.State.copy initial_base_random_state) (fun () ->
-        in_suite tests )
-  in
-  ( name
-  , List.map tests ~f:(fun (test_name, speed, f) ->
-        Alcotest.test_case test_name speed (fun () ->
-            in_suite (fun () -> with_inline_test_random_state f) ) ) )
+  with_random_state ~caml:(Caml.Random.State.copy initial_caml_random_state)
+    ~base:(Base.Random.State.copy initial_base_random_state) (fun () ->
+      in_suite (fun () -> setup ~test) ) ;
+  (name, Queue.to_list tests)
