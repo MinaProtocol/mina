@@ -4,6 +4,7 @@
   ;; opam libraries
   alcotest
   ;; local libraries
+  account_update_network_id
   app_state_tests
   delegate_tests
   fee_payer_tests
