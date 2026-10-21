@@ -16,6 +16,7 @@ let () =
     ; Voting_for_tests.Voting_for.suite ()
     ; Zkapp_deploy_tests.Zkapp_deploy.suite ()
     ; Zkapp_payments_tests.Zkapp_payments.suite ()
+    ; Account_update_precondition_tests.Zkapp_preconditions.suite ()
     ; Zkapp_tokens_tests.Zkapp_tokens.suite ()
     ; Zkapp_uri_tests.Zkapp_uri.suite ()
     ]

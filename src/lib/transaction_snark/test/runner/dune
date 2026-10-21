@@ -5,6 +5,7 @@
   alcotest
   ;; local libraries
   account_update_network_id
+  account_update_precondition_tests
   app_state_tests
   delegate_tests
   fee_payer_tests
