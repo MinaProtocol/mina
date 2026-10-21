@@ -7,6 +7,7 @@ let () =
     ; App_state_tests.App_state.suite ()
     ; Delegate_tests.Delegate.suite ()
     ; Fee_payer_tests.Fee_payer.suite ()
+    ; Multisig_tests.Multisig_account.suite ()
     ; Permissions_tests.Permissions.suite ()
     ; Token_symbol_tests.Token_symbol.suite ()
     ; Verification_key_tests.Verification_key.suite ()
