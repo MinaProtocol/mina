@@ -183,3 +183,82 @@ let of_block ~logger
   ; accounts_created
   ; tokens_used
   }
+
+module V3 = struct
+  type t =
+    { scheduled_time : Block_time.Stable.V1.t
+    ; protocol_state : Protocol_state.Value.Stable.V3.t
+    ; protocol_state_proof : Proof.t
+    ; staged_ledger_diff : Berkeley_types.Diff.t
+    ; delta_transition_chain_proof :
+        Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+    ; protocol_version : Protocol_version.Stable.V2.t
+    ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+          [@default None]
+    ; accounts_accessed : (int * Berkeley_types.Account.Stable.V2.t) list
+    ; accounts_created :
+        (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+    ; tokens_used : (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+    }
+  [@@deriving yojson]
+end
+
+module Versioned = struct
+  type t = V3 of V3.t | V4 of Stable.V4.t
+
+  let version = function V3 _ -> 3 | V4 _ -> 4
+
+  let of_latest (t : Stable.Latest.t) = V4 t
+
+  let to_yojson = function
+    | V3 t ->
+        `Assoc [ ("version", `Int 3); ("data", V3.to_yojson t) ]
+    | V4 t ->
+        Stable.V4.to_yojson t
+
+  let of_yojson json =
+    let open Result.Let_syntax in
+    let%bind fields =
+      match json with
+      | `Assoc fields ->
+          Ok fields
+      | _ ->
+          Error "Precomputed.Versioned.of_yojson: expected an object"
+    in
+    let%bind version =
+      match List.Assoc.find fields ~equal:String.equal "version" with
+      | Some (`Int version) ->
+          Ok version
+      | _ ->
+          Error "Precomputed.Versioned.of_yojson: missing version tag"
+    in
+    match version with
+    | 3 -> (
+        match List.Assoc.find fields ~equal:String.equal "data" with
+        | Some data ->
+            V3.of_yojson data >>| fun t -> V3 t
+        | None ->
+            Error "Precomputed.Versioned.of_yojson: missing data" )
+    | 4 ->
+        Stable.V4.of_yojson json >>| fun t -> V4 t
+    | _ ->
+        Error
+          (sprintf "Precomputed.Versioned.of_yojson: unsupported version %d"
+             version )
+
+  module V3 = struct
+    (* The protocol state of a V3 block has the type of a V4 block's, and its
+       hash is computed in the same way. *)
+    let state_hashes (t : V3.t) = Protocol_state.hashes t.protocol_state
+  end
+
+  module V4 = struct
+    let state_hashes (t : Stable.V4.t) = Protocol_state.hashes t.protocol_state
+  end
+
+  let state_hashes = function
+    | V3 t ->
+        V3.state_hashes t
+    | V4 t ->
+        V4.state_hashes t
+end

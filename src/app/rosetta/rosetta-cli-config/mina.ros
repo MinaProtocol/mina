@@ -77,6 +77,7 @@ payment(10){
 
     max_fee = "4000000000"; // no less than 1 MINA + 1 MINA (account creation fee)
     max_recipient_value = "100000000000"; // 100 MINA
+    min_recipient_value = "1000000001"; // a new recipient pays the 1 MINA account creation fee out of the amount
     min_required_value = {{max_recipient_value}} + {{max_fee}};
     
     sender = find_balance({
@@ -86,7 +87,7 @@ payment(10){
       }
     });
 
-    recipient_amount = random_number({"minimum": "1", "maximum": {{max_recipient_value}}});
+    recipient_amount = random_number({"minimum": {{min_recipient_value}}, "maximum": {{max_recipient_value}}});
     print_message({"recipient_amount":{{recipient_amount}}});
 
     recipient = find_balance({

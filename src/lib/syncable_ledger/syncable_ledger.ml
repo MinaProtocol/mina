@@ -166,6 +166,11 @@ module type S = sig
 
   val query_reader : 'a t -> (root_hash * query) Linear_pipe.Reader.t
 
+  (** The root hash being synced to, or [None] before the first [new_goal]. It
+      changes to a new target before any query for that target is written to
+      [query_reader], and is closed by [destroy]. *)
+  val target : 'a t -> root_hash option Broadcast_pipe.Reader.t
+
   val destroy : 'a t -> unit
 
   val new_goal :
@@ -441,6 +446,8 @@ end = struct
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
     ; queries : (Root_hash.t * query) Linear_pipe.Writer.t
     ; query_reader : (Root_hash.t * query) Linear_pipe.Reader.t
+    ; target : Root_hash.t option Broadcast_pipe.Reader.t
+    ; target_writer : Root_hash.t option Broadcast_pipe.Writer.t
     ; waiting_parents : Hash.t Addr.Table.t
           (** Addresses we are waiting for the children of, and the expected
               hash of the node with the address. *)
@@ -458,11 +465,15 @@ end = struct
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
-    Linear_pipe.close_read t.query_reader
+    Linear_pipe.close_read t.query_reader ;
+    try Broadcast_pipe.Writer.close t.target_writer
+    with Broadcast_pipe.Already_closed _ -> ()
 
   let answer_writer t = t.answer_writer
 
   let query_reader t = t.query_reader
+
+  let target t = t.target
 
   let expect_children : 'a t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
@@ -711,7 +722,11 @@ end = struct
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
-          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
+          (* The target may have changed while the answer was being handled,
+             and a query for a root we no longer want must not be reissued. *)
+          if Root_hash.equal root_hash (desired_root_exn t) then
+            Linear_pipe.write_without_pushback_if_open t.queries
+              (root_hash, query)
         in
         let credit_fulfilled_request () =
           record_envelope_sender t.trust_system logger sender
@@ -863,6 +878,8 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
+      ( try don't_wait_for (Broadcast_pipe.Writer.write t.target_writer (Some h))
+        with Broadcast_pipe.Already_closed _ -> () ) ;
       t.auxiliary_data <- Some data ;
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
@@ -907,6 +924,7 @@ end = struct
   let create mt ~context ~trust_system =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
+    let target, target_writer = Broadcast_pipe.create None in
     let t =
       { desired_root = None
       ; auxiliary_data = None
@@ -916,6 +934,8 @@ end = struct
       ; answer_writer = aw
       ; queries = qw
       ; query_reader = qr
+      ; target
+      ; target_writer
       ; waiting_parents = Addr.Table.create ()
       ; waiting_content = Addr.Table.create ()
       ; validity_listener = Ivar.create ()

@@ -13,7 +13,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps mina_ppx))
  ;; Ignoring -22 because we use Binable.of_binable_without_uuid
  (flags
   (:standard -w +a -w -22)))
@@ -30,7 +30,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps mina_ppx))
  (flags
   (:standard -w +a)))
 
@@ -46,6 +46,6 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps mina_ppx))
  (flags
   (:standard -w +a)))

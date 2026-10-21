@@ -4,7 +4,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_compare))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   integers

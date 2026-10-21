@@ -51,15 +51,8 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
             return (add_to_failure_file file)
       in
       let add_precomputed_block =
-        (* allow use of older-versioned blocks *)
-        let of_yojson json =
-          match Mina_block.Precomputed.Stable.of_yojson_to_latest json with
-          | Ok block ->
-              Ok block
-          | Error err ->
-              Error (Error.to_string_hum err)
-        in
-        make_add_block of_yojson
+        (* allow use of older-versioned blocks, kept at their own version *)
+        make_add_block Mina_block.Precomputed.Versioned.of_yojson
           (Processor.add_block_aux_precomputed ~proof_cache_db
              ~genesis_constants ~constraint_constants ~pool
              ~delete_older_than:None ~logger )
