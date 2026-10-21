@@ -110,9 +110,10 @@ kill_mid_load() {
     docker rmi leak:1 >/dev/null 2>&1 || true
 }
 
+# shellcheck source=buildkite/scripts/docker/graph-lib.sh
+source "$SCRIPTS/graph-lib.sh"
+
 graph_mb() {
-    # shellcheck source=buildkite/scripts/docker/graph-lib.sh
-    source "$SCRIPTS/graph-lib.sh"
     graph_sh "$BASE_IMAGE" ro 'du -sm "$GRAPH" | cut -f1' 2>/dev/null
 }
 
@@ -216,6 +217,35 @@ test_load_from_cache_records_use() {
     if [[ "$after" > "$before" ]]; then pass; else fail "LastTagTime ${before} -> ${after}"; fi
 }
 
+test_orphans_on_a_graph_with_no_images() {
+    start_test "a graph with no images but full of orphaned layers is reclaimed (pulls a helper)"
+    local s usage out
+    for s in 3 4 5 6 3.5 4.5 5.5; do
+        kill_mid_load "$s"
+        docker system prune --all --volumes -f >/dev/null
+        docker builder prune --all -f >/dev/null
+        # measure with a helper pulled for the purpose, then leave no image
+        docker pull -q busybox:1.36.1 >/dev/null
+        usage=$(graph_usage busybox:1.36.1 2>/dev/null)
+        docker rmi busybox:1.36.1 >/dev/null
+        [[ "${usage:-0}" -ge 8 ]] && break
+    done
+    if [[ "${usage:-0}" -lt 8 || -n "$(docker image ls -q)" ]]; then
+        fail "could not make an image-less leaked graph (usage ${usage:-?}%)"
+        return
+    fi
+    # busybox's `find -mmin +0` only matches what is at least a whole minute old
+    sleep 61
+    out=$(DISK_PRUNE_THRESHOLD=0 DISK_PRUNE_TARGET=0 ORPHAN_GC_MIN_AGE_MIN=0 "$SCRIPTS/disk-cleanup.sh" 2>&1)
+    usage=$(graph_usage busybox:1.36.1 2>/dev/null)
+    if [[ "${usage:-100}" -le 3 ]]; then
+        echo "    image-less graph reclaimed to ${usage}%"
+        pass
+    else
+        fail "graph at ${usage:-?}% after cleanup: $out"
+    fi
+}
+
 ################################################################################
 # Main
 ################################################################################
@@ -233,6 +263,7 @@ test_unreadable_usage_falls_back_to_prune
 test_orphaned_layers_are_reclaimed
 test_lru_eviction
 test_load_from_cache_records_use
+test_orphans_on_a_graph_with_no_images
 
 echo
 echo "${TESTS_PASSED}/${TESTS_RUN} passed"
