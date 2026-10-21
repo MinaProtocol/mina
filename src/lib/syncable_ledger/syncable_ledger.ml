@@ -546,6 +546,32 @@ end = struct
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
+  (* Merges each 2 contigous nodes, halving the size of the array *)
+  let merge_siblings : Hash.t array -> index -> Hash.t array =
+   fun nodes height ->
+    let len = Array.length nodes in
+    if len mod 2 <> 0 then failwith "length must be even" ;
+    let half_len = len / 2 in
+    let f i = Hash.merge ~height nodes.(2 * i) nodes.((2 * i) + 1) in
+    Array.init half_len ~f
+
+  (* Assumes nodes to be a power of 2 and merges them into their common root *)
+  let rec merge_many : Hash.t array -> index -> Hash.t =
+   fun nodes height ->
+    let len = Array.length nodes in
+    match len with
+    | 1 ->
+        nodes.(0)
+    | _ ->
+        let half = merge_siblings nodes height in
+        merge_many half (height + 1)
+
+  let merge_many : Hash.t array -> index -> index -> Hash.t =
+   fun nodes height subtree_depth ->
+    let bottom_height = height - subtree_depth in
+    let hash = merge_many nodes bottom_height in
+    hash
+
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
   let add_content :
@@ -579,32 +605,6 @@ end = struct
       let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
       if Hash.equal actual expected then `Success
       else `Hash_mismatch (expected, actual) )
-
-  (* Merges each 2 contigous nodes, halving the size of the array *)
-  let merge_siblings : Hash.t array -> index -> Hash.t array =
-   fun nodes height ->
-    let len = Array.length nodes in
-    if len mod 2 <> 0 then failwith "length must be even" ;
-    let half_len = len / 2 in
-    let f i = Hash.merge ~height nodes.(2 * i) nodes.((2 * i) + 1) in
-    Array.init half_len ~f
-
-  (* Assumes nodes to be a power of 2 and merges them into their common root *)
-  let rec merge_many : Hash.t array -> index -> Hash.t =
-   fun nodes height ->
-    let len = Array.length nodes in
-    match len with
-    | 1 ->
-        nodes.(0)
-    | _ ->
-        let half = merge_siblings nodes height in
-        merge_many half (height + 1)
-
-  let merge_many : Hash.t array -> index -> index -> Hash.t =
-   fun nodes height subtree_depth ->
-    let bottom_height = height - subtree_depth in
-    let hash = merge_many nodes bottom_height in
-    hash
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)
