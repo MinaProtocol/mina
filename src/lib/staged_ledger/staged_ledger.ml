@@ -3240,7 +3240,7 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 Option.is_none
-                  (Ledger.location_of_account test_mask
+                  (Ledger.location_of_account (Sl.ledger !sl)
                      (Account_id.create snark_worker_pk Token_id.default) ) ) )
           )
 
