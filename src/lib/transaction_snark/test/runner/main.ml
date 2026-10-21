@@ -1,6 +1,9 @@
 let () =
   Alcotest.run "Transaction snark"
-    [ App_state_tests.App_state.suite ()
+    [ Transaction_snark_tests_access_permission
+      .Transaction_snark_test_access_permission
+      .suite ()
+    ; App_state_tests.App_state.suite ()
     ; Delegate_tests.Delegate.suite ()
     ; Fee_payer_tests.Fee_payer.suite ()
     ; Permissions_tests.Permissions.suite ()
