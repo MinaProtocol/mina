@@ -366,8 +366,8 @@ details.
 ### Crate downloads go through `static.crates.io`
 
 crates.io answers 403 to any `User-Agent` starting with `curl/`, which is what
-nixpkgs' `fetchurl` sends, so every crate fetched through
-`https://crates.io/api/v1/crates/...` fails on a binary-cache miss.
+nixpkgs' `fetchurl` sends, so every crate fetched through crates.io's
+download API (`/api/v1/crates/...`) fails on a binary-cache miss.
 [./rust.nix](./rust.nix) points the cargo fetches at `static.crates.io`
 instead, which has no such gate — the same change upstream nixpkgs made in
 `f830e6112` (nixos-25.11).
