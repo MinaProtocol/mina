@@ -503,10 +503,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let addrs_and_ports : Node_addrs_and_ports.t =
             { external_ip; bind_ip; peer = None; client_port; libp2p_port }
           in
-          let { Daemon_settings.Block_producer.block_production_key
-              ; block_production_pubkey
-              ; block_production_password
-              } =
+          let ( { Daemon_settings.Block_producer.block_production_password; _ }
+              as block_producer ) =
             Daemon_settings.Block_producer.resolve ~logger daemon_file flags
           in
           Option.iter
@@ -522,28 +520,19 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             block_production_password ;
           let%bind block_production_keypair =
             match
-              ( block_production_key
-              , block_production_pubkey
-              , Sys.getenv "MINA_BP_PRIVKEY" )
+              Daemon_settings.Block_producer.keypair_source
+                ~env_private_key:(Sys.getenv "MINA_BP_PRIVKEY")
+                block_producer
             with
-            | Some _, Some _, _ ->
-                Mina_stdlib.Mina_user_error.raise
-                  "You cannot provide both `block-producer-key` and \
-                   `block_production_pubkey`"
-            | None, Some _, Some _ ->
-                Mina_stdlib.Mina_user_error.raise
-                  "You cannot provide both `MINA_BP_PRIVKEY` and \
-                   `block_production_pubkey`"
-            | None, None, None ->
+            | No_block_producer ->
                 Deferred.return None
-            | None, None, Some base58_privkey ->
+            | Env_private_key base58_privkey ->
                 let kp =
                   Private_key.of_base58_check_exn base58_privkey
                   |> Keypair.of_private_key_exn
                 in
                 Deferred.return (Some kp)
-            (* CLI argument takes precedence over env variable *)
-            | Some sk_file, None, (Some _ | None) ->
+            | Key_file sk_file ->
                 [%log warn]
                   "`block-producer-key` is deprecated. Please set \
                    `MINA_BP_PRIVKEY` environment variable instead." ;
@@ -553,7 +542,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                     sk_file
                 in
                 Some kp
-            | None, Some tracked_pubkey, None ->
+            | Tracked_pubkey tracked_pubkey ->
                 let%map kp =
                   Secrets.Wallets.get_tracked_keypair ~logger
                     ~which:"block producer keypair"

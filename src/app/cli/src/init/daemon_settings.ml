@@ -161,4 +161,35 @@ module Block_producer = struct
       find Key.block_producer_password block_production_password
     in
     { block_production_key; block_production_pubkey; block_production_password }
+
+  (** Where the block producer's keypair comes from. *)
+  type keypair_source =
+    | No_block_producer
+    | Env_private_key of string
+        (** A base58-encoded private key, from [MINA_BP_PRIVKEY]. *)
+    | Key_file of string
+    | Tracked_pubkey of Public_key.Compressed.t
+        (** The public key of a keypair in the daemon's wallets. *)
+
+  (** [env_private_key] is the value of [MINA_BP_PRIVKEY]. *)
+  let keypair_source ~env_private_key
+      { block_production_key; block_production_pubkey; _ } =
+    match (block_production_key, block_production_pubkey, env_private_key) with
+    | Some _, Some _, _ ->
+        Mina_stdlib.Mina_user_error.raise
+          "You cannot provide both `block-producer-key` and \
+           `block_production_pubkey`"
+    | None, Some _, Some _ ->
+        Mina_stdlib.Mina_user_error.raise
+          "You cannot provide both `MINA_BP_PRIVKEY` and \
+           `block_production_pubkey`"
+    | None, None, None ->
+        No_block_producer
+    | None, None, Some base58_privkey ->
+        Env_private_key base58_privkey
+    (* CLI argument takes precedence over env variable *)
+    | Some sk_file, None, (Some _ | None) ->
+        Key_file sk_file
+    | None, Some tracked_pubkey, None ->
+        Tracked_pubkey tracked_pubkey
 end
