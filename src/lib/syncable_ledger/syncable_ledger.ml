@@ -572,6 +572,23 @@ end = struct
     let hash = merge_many nodes bottom_height in
     hash
 
+  (** The hash [addr] would have if [content] were written to the leaves under
+      it. As with [MT.set_all_accounts_rooted_at_exn], leaves past the end of
+      [content] keep their current hashes. *)
+  let hash_of_content : 'a t -> Addr.t -> Account.t list -> Hash.t =
+   fun t addr content ->
+    let ledger_depth = MT.depth t.tree in
+    let height = Addr.height ~ledger_depth addr in
+    let content_hashes = Array.of_list_map content ~f:Hash.hash_account in
+    let leaf_hashes =
+      Addr.Range.subtree_range_seq ~ledger_depth addr
+      |> Sequence.to_array
+      |> Array.mapi ~f:(fun i leaf ->
+             if i < Array.length content_hashes then content_hashes.(i)
+             else MT.get_inner_hash_at_addr_exn t.tree leaf )
+    in
+    merge_many leaf_hashes height height
+
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
   let add_content :
@@ -589,11 +606,8 @@ end = struct
       (* Content longer than the subtree under [addr] is rejected and requeued;
          [addr] stays in [waiting_content] so the retry is accepted. *)
       `Content_length_mismatch (List.length content, capacity)
-    else (
-      (* TODO #444 should we batch all the updates and do them at the end? *)
-      (* We might write the wrong data to the underlying ledger here, but if so
-         we'll requeue the address and it'll be overwritten. *)
-      MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+    else
+      let actual = hash_of_content t addr content in
       Addr.Table.remove t.waiting_content addr ;
       [%log trace]
         ~metadata:
@@ -602,9 +616,11 @@ end = struct
           ]
         "Found content addr $address, with hash $hash, removing from waiting \
          content" ;
-      let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-      if Hash.equal actual expected then `Success
-      else `Hash_mismatch (expected, actual) )
+      if Hash.equal actual expected then (
+        (* TODO #444 should we batch all the updates and do them at the end? *)
+        MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+        `Success )
+      else `Hash_mismatch (expected, actual)
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)
