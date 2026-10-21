@@ -735,11 +735,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       set_batch_accounts t addresses_and_accounts
 
-    (* set accounts in mask *)
-    let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
-      assert_is_attached t ;
-      set_all_accounts_rooted_at_exn t address accounts
-
     let token_owner t tid =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in

@@ -17,7 +17,7 @@
   ;; mina
   mina_stdlib)
  (preprocess
-  (pps ppx_jane ppx_compare ppx_deriving_yojson ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "sparse Ledger implementation"))

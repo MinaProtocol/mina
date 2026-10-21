@@ -13,15 +13,6 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-let plugin_flag =
-  if Node_config.plugins then
-    let open Command.Param in
-    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-      ~doc:
-        "PATH The path to load a .cmxs plugin from. May be passed multiple \
-         times"
-  else Command.Param.return []
-
 let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
     =
   let current_genesis_global_slot =
@@ -501,7 +492,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "full|check|none Internal, for testing. Start or connect to a network \
          with full proving (full), snark-testing with dummy proofs (check), or \
          dummy proofs (none)"
-  and plugins = plugin_flag
   and precomputed_blocks_path =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
@@ -1553,7 +1543,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
-        let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
 let daemon logger ~itn_features =

@@ -43,6 +43,6 @@
   zkapps_empty_update
   zkapps_examples)
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

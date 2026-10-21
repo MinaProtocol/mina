@@ -44,12 +44,7 @@
   trust_system
   user_command_input)
  (preprocess
-  (pps
-   ppx_compare
-   ppx_deriving.make
-   ppx_deriving_yojson
-   ppx_jane
-   ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Lib powering the client interactions with the daemon"))

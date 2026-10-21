@@ -5,7 +5,8 @@ open Async
 open Archive_lib
 
 let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-    ~extensional ~success_file ~failure_file ~log_successes ~files () =
+    ~extensional ~success_file ~failure_file ~log_successes ~instrumented ~files
+    () =
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let output_file_line path =
     match path with
@@ -72,26 +73,42 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
              ~genesis_constants ~logger ~pool ~delete_older_than:None
              ~signature_kind:Mina_signature_kind.t_DEPRECATED )
       in
-      Deferred.List.iter files ~f:(fun file ->
-          In_channel.with_file file ~f:(fun in_channel ->
-              try
-                let json = Yojson.Safe.from_channel in_channel in
-                if precomputed then add_precomputed_block ~json ~file
-                else if extensional then add_extensional_block ~json ~file
-                else failwith "Internal error, bad flags"
-              with
-              | Yojson.Json_error err ->
-                  [%log error] "Could not parse JSON from file"
-                    ~metadata:[ ("file", `String file); ("error", `String err) ] ;
-                  return (add_to_failure_file file)
-              | exn ->
-                  (* should be unreachable *)
-                  [%log error] "Internal error when processing file"
-                    ~metadata:
-                      [ ("file", `String file)
-                      ; ("error", `String (Exn.to_string exn))
-                      ] ;
-                  return (add_to_failure_file file) ) )
+      (* the probe runs only when --instrumented is given *)
+      let probe_after_block n =
+        Option.value_map instrumented ~default:Deferred.unit ~f:(fun path ->
+            Prepared_statements_probe.after_block ~pool ~logger ~path n )
+      in
+      let probe_finish () =
+        Option.value_map instrumented ~default:Deferred.unit ~f:(fun path ->
+            Prepared_statements_probe.finish ~pool ~logger ~path )
+      in
+      let%bind () =
+        Deferred.List.iteri files ~f:(fun n file ->
+            let%bind () =
+              In_channel.with_file file ~f:(fun in_channel ->
+                  try
+                    let json = Yojson.Safe.from_channel in_channel in
+                    if precomputed then add_precomputed_block ~json ~file
+                    else if extensional then add_extensional_block ~json ~file
+                    else failwith "Internal error, bad flags"
+                  with
+                  | Yojson.Json_error err ->
+                      [%log error] "Could not parse JSON from file"
+                        ~metadata:
+                          [ ("file", `String file); ("error", `String err) ] ;
+                      return (add_to_failure_file file)
+                  | exn ->
+                      (* should be unreachable *)
+                      [%log error] "Internal error when processing file"
+                        ~metadata:
+                          [ ("file", `String file)
+                          ; ("error", `String (Exn.to_string exn))
+                          ] ;
+                      return (add_to_failure_file file) )
+            in
+            probe_after_block (n + 1) )
+      in
+      probe_finish ()
 
 let () =
   Command.(
@@ -128,6 +145,14 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
+         and instrumented =
+           Param.flag "--instrumented" ~aliases:[ "instrumented" ]
+             ~doc:
+               "PATH Append the prepared-statement count of the database \
+                session after each block, and the SQL texts prepared more than \
+                once, to PATH (meaningful with CAQTI_POOL_MAX_SIZE=1)"
+             (Flag.optional Param.string)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+           ~extensional ~success_file ~failure_file ~log_successes ~instrumented
+           ~files )))

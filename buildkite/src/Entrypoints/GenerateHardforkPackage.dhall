@@ -554,8 +554,8 @@ let generateHfRelatedStepsForCodename =
                               ]
                             # DebianVersions.overrideEnvs
                           )
-                          "mkdir -p _build && ./buildkite/scripts/cache/manager.sh read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
-                                                                                                                                                                                                                                                                                                                     spec.network}_hardfork_config"
+                          "mkdir -p _build && buildkite-cache-manager read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
+                                                                                                                                                                                                                                                                                                        spec.network}_hardfork_config"
                     , label =
                         "Create hardfork packages for ${lowerNameCodename}"
                     , key = buildHfDebian
@@ -611,7 +611,7 @@ let generateHfRelatedStepsForCodename =
                             , submodules = True
                             }
                             ([] : List Text)
-                            "./buildkite/scripts/cache/manager.sh read hardfork . && ls -al ./hardfork"
+                            "buildkite-cache-manager read hardfork . && ls -al ./hardfork"
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
