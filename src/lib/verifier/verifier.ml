@@ -49,8 +49,15 @@ module For_tests = struct
     let signature_kind = Mina_signature_kind.Testnet in
     let%bind ( `Blockchain blockchain_verification_key
              , `Transaction transaction_verification_key ) =
-      get_verification_keys_eagerly ~constraint_constants ~proof_level
-        ~signature_kind
+      match (Base__Import.am_testing, proof_level) with
+      | true, Genesis_constants.Proof_level.(Check | No_check) ->
+          (* The dummy verifier only uses its keys at [Full], so skip
+             generating them. *)
+          let vk = Lazy.force Pickles.Verification_key.dummy in
+          return (`Blockchain vk, `Transaction vk)
+      | _ ->
+          get_verification_keys_eagerly ~constraint_constants ~proof_level
+            ~signature_kind
     in
     create ~logger ?enable_internal_tracing ?internal_trace_filename
       ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
