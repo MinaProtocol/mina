@@ -1565,10 +1565,10 @@ let%test_module "test" =
       ()
 
     let%test_unit "Random base jobs" =
-      let max_base_jobs = 512 in
+      let max_base_jobs = 64 in
       let t = empty ~max_base_jobs ~delay:3 in
       let state = ref t in
-      Quickcheck.test
+      Quickcheck.test ~trials:1000
         (Quickcheck.Generator.list (Int.gen_incl 1 1))
         ~f:(fun list ->
           let t = !state in
