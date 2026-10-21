@@ -10,6 +10,7 @@
   fee_payer_tests
   multisig_tests
   permissions_tests
+  ring_sig_tests
   token_symbol_tests
   transaction_snark_tests_access_permission
   verification_key_permission_tests

@@ -9,6 +9,7 @@ let () =
     ; Fee_payer_tests.Fee_payer.suite ()
     ; Multisig_tests.Multisig_account.suite ()
     ; Permissions_tests.Permissions.suite ()
+    ; Ring_sig_tests.Ring_sig.suite ()
     ; Token_symbol_tests.Token_symbol.suite ()
     ; Verification_key_tests.Verification_key.suite ()
     ; Verification_key_permission_tests.Verification_key_permission.suite ()
