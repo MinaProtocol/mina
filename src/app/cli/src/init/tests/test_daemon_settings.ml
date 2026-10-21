@@ -34,7 +34,7 @@ let public_key () =
 
 let raises_user_error f =
   match f () with
-  | (_ : Daemon_settings.Ports_and_work.t) ->
+  | _ ->
       Alcotest.fail "expected Mina_user_error"
   | exception Mina_stdlib.Mina_user_error.Mina_user_error _ ->
       ()
@@ -136,6 +136,98 @@ let test_overridden_value_not_decoded () =
     (Option.equal Signature_lib.Public_key.Compressed.equal (Some pk)
        r.run_snark_worker_flag )
 
+let resolve_block_producer ?(files = []) args =
+  Daemon_settings.Block_producer.resolve ~logger (daemon_file files)
+    (parse_flags args)
+
+let test_block_producer_defaults () =
+  let r = resolve_block_producer [] in
+  Alcotest.(check (option string)) "key" None r.block_production_key ;
+  Alcotest.(check bool) "pubkey" true (Option.is_none r.block_production_pubkey) ;
+  Alcotest.(check (option string)) "password" None r.block_production_password
+
+let test_block_producer_from_config () =
+  let pk = public_key () in
+  let r =
+    resolve_block_producer
+      ~files:
+        [ ( "a"
+          , sprintf
+              {|{"block-producer-key": "a-key", "block-producer-pubkey": "%s",
+                 "block-producer-password": "pw"}|}
+              (Signature_lib.Public_key.Compressed.to_base58_check pk) )
+        ]
+      []
+  in
+  Alcotest.(check (option string)) "key" (Some "a-key") r.block_production_key ;
+  Alcotest.(check bool)
+    "pubkey" true
+    (Option.equal Signature_lib.Public_key.Compressed.equal (Some pk)
+       r.block_production_pubkey ) ;
+  Alcotest.(check (option string))
+    "password" (Some "pw") r.block_production_password
+
+let test_block_producer_flag_beats_config () =
+  let r =
+    resolve_block_producer
+      ~files:[ ("a", {|{"block-producer-key": "file-key"}|}) ]
+      [ "--block-producer-key"; "flag-key" ]
+  in
+  Alcotest.(check (option string))
+    "key" (Some "flag-key") r.block_production_key
+
+let test_block_producer_bad_pubkey_is_user_error () =
+  raises_user_error (fun () ->
+      resolve_block_producer
+        ~files:[ ("a", {|{"block-producer-pubkey": "not-a-key"}|}) ]
+        [] )
+
+let keypair_source ?env_private_key ?key ?pubkey () =
+  Daemon_settings.Block_producer.keypair_source ~env_private_key
+    { block_production_key = key
+    ; block_production_pubkey = pubkey
+    ; block_production_password = None
+    }
+
+let source_name : Daemon_settings.Block_producer.keypair_source -> string =
+  function
+  | No_block_producer ->
+      "none"
+  | Env_private_key s ->
+      "env " ^ s
+  | Key_file s ->
+      "file " ^ s
+  | Tracked_pubkey _ ->
+      "tracked"
+
+let check_source name expected source =
+  Alcotest.(check string) name expected (source_name source)
+
+let test_keypair_source () =
+  let pubkey = public_key () in
+  check_source "nothing" "none" (keypair_source ()) ;
+  check_source "env" "env sk" (keypair_source ~env_private_key:"sk" ()) ;
+  check_source "file" "file f" (keypair_source ~key:"f" ()) ;
+  check_source "tracked" "tracked" (keypair_source ~pubkey ())
+
+(* The key file takes precedence over MINA_BP_PRIVKEY. *)
+let test_key_file_beats_env () =
+  check_source "file" "file f"
+    (keypair_source ~env_private_key:"sk" ~key:"f" ())
+
+let test_conflicting_sources_are_user_errors () =
+  let pubkey = public_key () in
+  raises_user_error (fun () -> keypair_source ~key:"f" ~pubkey ()) ;
+  raises_user_error (fun () ->
+      keypair_source ~env_private_key:"sk" ~key:"f" ~pubkey () ) ;
+  raises_user_error (fun () -> keypair_source ~env_private_key:"sk" ~pubkey ())
+
+(* MINA_BP_PRIVKEY is not decoded here: an invalid key is only rejected when
+   the keypair is loaded. *)
+let test_env_private_key_not_decoded () =
+  check_source "env" "env not-a-key"
+    (keypair_source ~env_private_key:"not-a-key" ())
+
 let () =
   Alcotest.run "Daemon_settings"
     [ ( "Ports_and_work"
@@ -152,5 +244,20 @@ let () =
             test_bad_public_key_is_user_error
         ; Alcotest.test_case "overridden value not decoded" `Quick
             test_overridden_value_not_decoded
+        ] )
+    ; ( "Block_producer"
+      , [ Alcotest.test_case "defaults" `Quick test_block_producer_defaults
+        ; Alcotest.test_case "from config" `Quick
+            test_block_producer_from_config
+        ; Alcotest.test_case "flag beats config" `Quick
+            test_block_producer_flag_beats_config
+        ; Alcotest.test_case "bad pubkey is a user error" `Quick
+            test_block_producer_bad_pubkey_is_user_error
+        ; Alcotest.test_case "keypair source" `Quick test_keypair_source
+        ; Alcotest.test_case "key file beats env" `Quick test_key_file_beats_env
+        ; Alcotest.test_case "conflicting sources are user errors" `Quick
+            test_conflicting_sources_are_user_errors
+        ; Alcotest.test_case "env private key not decoded" `Quick
+            test_env_private_key_not_decoded
         ] )
     ]
