@@ -467,6 +467,15 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Daemon_settings.Ports_and_work.resolve ~logger ~compile_config
               daemon_file flags
           in
+          let ( { Daemon_settings.Block_producer.block_production_password; _ }
+              as block_producer ) =
+            Daemon_settings.Block_producer.resolve ~logger daemon_file flags
+          in
+          let block_producer_keypair_source =
+            Daemon_settings.Block_producer.keypair_source
+              ~env_private_key:(Sys.getenv "MINA_BP_PRIVKEY")
+              block_producer
+          in
           let%bind ( precomputed_values
                    , _
                    , config
@@ -503,10 +512,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let addrs_and_ports : Node_addrs_and_ports.t =
             { external_ip; bind_ip; peer = None; client_port; libp2p_port }
           in
-          let ( { Daemon_settings.Block_producer.block_production_password; _ }
-              as block_producer ) =
-            Daemon_settings.Block_producer.resolve ~logger daemon_file flags
-          in
           Option.iter
             ~f:(fun password ->
               match Sys.getenv Secrets.Keypair.env with
@@ -519,11 +524,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
-            match
-              Daemon_settings.Block_producer.keypair_source
-                ~env_private_key:(Sys.getenv "MINA_BP_PRIVKEY")
-                block_producer
-            with
+            match block_producer_keypair_source with
             | No_block_producer ->
                 Deferred.return None
             | Env_private_key private_key ->
