@@ -1683,40 +1683,49 @@ let%test_module "scans" =
           let p = 4 in
           let max_base_jobs = Int.pow 2 p in
           let g = Int.gen_incl 0 max_base_jobs in
-          let state = State.empty ~max_base_jobs ~delay:1 in
+          let state = ref (State.empty ~max_base_jobs ~delay:1) in
+          let saw_unsplit = ref false in
+          let saw_split = ref false in
           Quickcheck.test g ~trials:1000 ~f:(fun i ->
               let data = List.init i ~f:Int64.of_int in
-              let partition = partition_if_overflowing state in
+              let partition = partition_if_overflowing !state in
               let jobs =
                 List.concat
-                @@ work_for_next_update state ~data_count:(List.length data)
+                @@ work_for_next_update !state ~data_count:(List.length data)
               in
               let jobs_done = List.map jobs ~f:job_done in
               let tree_count_before =
-                Mina_stdlib.Nonempty_list.length state.trees
+                Mina_stdlib.Nonempty_list.length !state.trees
               in
-              let _, state =
-                test_update ~data state ~completed_jobs:jobs_done
+              let result_opt, state' =
+                test_update ~data !state ~completed_jobs:jobs_done
+              in
+              state := state' ;
+              (* Emitting a result removes the completed tree. *)
+              let tree_count_before =
+                if Option.is_some result_opt then tree_count_before - 1
+                else tree_count_before
+              in
+              let tree_count_after =
+                Mina_stdlib.Nonempty_list.length state'.trees
               in
               match partition.second with
               | None ->
-                  let tree_count_after =
-                    Mina_stdlib.Nonempty_list.length state.trees
-                  in
+                  saw_unsplit := true ;
                   let expected_tree_count =
                     if i = fst partition.first then tree_count_before + 1
                     else tree_count_before
                   in
                   assert (tree_count_after = expected_tree_count)
               | Some _ ->
-                  let tree_count_after =
-                    Mina_stdlib.Nonempty_list.length state.trees
-                  in
+                  saw_split := true ;
                   let expected_tree_count =
-                    if i > fst partition.first then tree_count_before + 1
+                    if i >= fst partition.first then tree_count_before + 1
                     else tree_count_before
                   in
-                  assert (tree_count_after = expected_tree_count) )
+                  assert (tree_count_after = expected_tree_count) ) ;
+          assert !saw_unsplit ;
+          assert !saw_split
 
         let%test_unit "sequence number reset" =
           (*create jobs with unique sequence numbers starting from 1. At any
