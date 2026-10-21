@@ -608,19 +608,22 @@ end = struct
       `Content_length_mismatch (List.length content, capacity)
     else
       let actual = hash_of_content t addr content in
-      Addr.Table.remove t.waiting_content addr ;
-      [%log trace]
-        ~metadata:
-          [ ("address", Addr.to_yojson addr)
-          ; ("hash", Hash.to_yojson expected)
-          ]
-        "Found content addr $address, with hash $hash, removing from waiting \
-         content" ;
       if Hash.equal actual expected then (
         (* TODO #444 should we batch all the updates and do them at the end? *)
         MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+        Addr.Table.remove t.waiting_content addr ;
+        [%log trace]
+          ~metadata:
+            [ ("address", Addr.to_yojson addr)
+            ; ("hash", Hash.to_yojson expected)
+            ]
+          "Found content addr $address, with hash $hash, removing from waiting \
+           content" ;
         `Success )
-      else `Hash_mismatch (expected, actual)
+      else
+        (* Content with the wrong hash is rejected and requeued; [addr] stays
+           in [waiting_content] so the retry is accepted. *)
+        `Hash_mismatch (expected, actual)
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)

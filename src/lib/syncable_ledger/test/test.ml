@@ -355,6 +355,52 @@ module Make_test_content_length (Input : Input_intf) = struct
             false
         | `Timeout ->
             false )
+
+  let%test "sync completes despite a Contents_are answer with wrong accounts" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    let adjusted = ref false in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (root_hash, query) ->
+           let%bind answ_or_error =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
+           let answ = Or_error.ok_exn answ_or_error in
+           (* Once, return a Contents_are answer of the right length whose
+              accounts are all the last one. *)
+           let answ =
+             match (query, answ) with
+             | ( Syncable_ledger.Query.What_contents _
+               , Syncable_ledger.Answer.Contents_are (_ :: _ :: _ as accounts) )
+               when not !adjusted ->
+                 adjusted := true ;
+                 Syncable_ledger.Answer.Contents_are
+                   (List.map accounts ~f:(fun _ -> List.last_exn accounts))
+             | _ ->
+                 answ
+           in
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ) )
+      ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        match%map
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+                 true ) )
+        with
+        | `Result (`Ok mt) ->
+            !adjusted && Root_hash.equal desired_root (Ledger.merkle_root mt)
+        | `Result (`Target_changed _) ->
+            false
+        | `Timeout ->
+            false )
 end
 
 (* A malicious peer can answer a [Num_accounts] sync query with a count whose
