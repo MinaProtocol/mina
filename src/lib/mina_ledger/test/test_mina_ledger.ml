@@ -268,7 +268,8 @@ module Sync_ledger_answer_test = struct
       Contents_are
         (List.map accounts ~f:(fun account ->
              Answer.Raw_account.Raw
-               (Binable.to_bigstring (module Account.Stable.V3) account) ) )
+               (Bin_prot.Utils.bin_dump Account.Stable.V3.bin_writer_t account) )
+        )
     in
     let expected = Binable.to_bigstring (module Answer.Stable.Latest) answer in
     [%test_eq: Bigstring.t] expected
@@ -314,7 +315,9 @@ module Sync_ledger_answer_test = struct
             let expected =
               List.map (Root_ledger.get_all_accounts_rooted_at_exn root address)
                 ~f:(fun (addr, account) ->
-                  (addr, Binable.to_bigstring (module Account.Stable.V3) account) )
+                  ( addr
+                  , Bin_prot.Utils.bin_dump Account.Stable.V3.bin_writer_t
+                      account ) )
             in
             assert (not (List.is_empty expected)) ;
             [%test_eq: (L.Addr.t * Bigstring.t) list] expected
