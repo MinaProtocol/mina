@@ -58,6 +58,20 @@ let%test_module "Account update network id tests" =
                       failwith
                         "check_zkapp_command_with_merges_exn should cause \
                          Constraint unsatisfied"
-                  | Error _ ->
-                      () ) ) )
+                  | Error exn ->
+                      (* The zkApp proof was made for another network's
+                         account update digest, so verifying it in the
+                         segment circuit must fail. *)
+                      let msg = Exn.to_string exn in
+                      if
+                        not
+                          ( String.is_substring msg
+                              ~substring:"Constraint unsatisfied"
+                          && String.is_substring msg ~substring:"prevs_verified"
+                          )
+                      then
+                        failwithf
+                          "Expected the zkApp proof to fail verification, got \
+                           %s"
+                          msg () ) ) )
   end )
