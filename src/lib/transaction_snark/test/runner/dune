@@ -4,4 +4,12 @@
   ;; opam libraries
   alcotest
   ;; local libraries
-  fee_payer_tests))
+  app_state_tests
+  delegate_tests
+  fee_payer_tests
+  permissions_tests
+  token_symbol_tests
+  verification_key_permission_tests
+  verification_key_tests
+  voting_for_tests
+  zkapp_uri_tests))
