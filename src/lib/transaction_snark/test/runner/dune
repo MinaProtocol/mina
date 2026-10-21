@@ -17,4 +17,5 @@
   voting_for_tests
   zkapp_deploy_tests
   zkapp_payments_tests
+  zkapp_tokens_tests
   zkapp_uri_tests))
