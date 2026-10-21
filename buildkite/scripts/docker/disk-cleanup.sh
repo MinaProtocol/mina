@@ -26,7 +26,12 @@
 # prune, orphan-layer-gc.sh reclaims what interrupted `docker load`s left
 # behind, which no prune removes. 70 is the buildkite-janitor's watermark: a
 # graph brought below it keeps its image cache through the janitor's
-# `system prune --all`.
+# `system prune --all`. If that is still not enough, tagged images are removed,
+# least recently used first, until the graph is below DISK_PRUNE_TARGET.
+# Recency is the image's LastTagTime, which docker sets only on `docker tag`;
+# images never tagged go first, oldest build first. An image a container uses
+# is never removed (`docker rmi` without --force refuses), nor the helper
+# image, nor the refs in DISK_CLEANUP_KEEP (space separated).
 #
 # Honours SKIP_DOCKER_PRUNE; never fatal.
 
@@ -42,6 +47,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/graph-lib.sh"
 
 THRESHOLD="${DISK_PRUNE_THRESHOLD:-80}"
 TARGET="${DISK_PRUNE_TARGET:-70}"
+
+# Prints "<image-id> <tag> [<tag>...]" for every tagged image, least recently
+# used first. LastTagTime and Created are RFC 3339 UTC strings, which sort as
+# text; an unset LastTagTime is the zero time, so those images come first.
+images_by_recency() {
+  docker image ls -q 2>/dev/null | sort -u \
+    | xargs -r docker image inspect \
+        -f '{{or .Metadata.LastTagTime "0001-01-01T00:00:00Z"}} {{.Created}} {{.Id}} {{range .RepoTags}}{{.}} {{end}}' 2>/dev/null \
+    | awk 'NF > 3' | sort -k1,1 -k2,2 | cut -d' ' -f3-
+}
 
 HELPER=$(graph_find_helper)
 USE=""
@@ -65,6 +80,21 @@ if [[ -n "$USE" && "$USE" -ge "$TARGET" ]]; then
   echo "disk-cleanup: docker graph at ${USE}% (>= ${TARGET}%) after the prune, reclaiming orphaned layers"
   "$(dirname "${BASH_SOURCE[0]}")/orphan-layer-gc.sh" "$HELPER"
   USE=$(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')
+fi
+
+if [[ -n "$USE" && "$USE" -ge "$TARGET" ]]; then
+  echo "disk-cleanup: docker graph at ${USE}% (>= ${TARGET}%), removing least recently used images"
+  keep=" $HELPER ${DISK_CLEANUP_KEEP:-} "
+  while read -r id tags; do
+    skip=0
+    for t in $tags; do [[ "$keep" == *" $t "* ]] && skip=1; done
+    [[ "$skip" == 1 ]] && continue
+    # shellcheck disable=SC2086 # one argument per tag
+    docker rmi $tags >/dev/null 2>&1 || continue
+    USE=$(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')
+    echo "disk-cleanup: removed ${tags} (${id:7:12}), docker graph at ${USE:-?}%"
+    [[ -n "$USE" && "$USE" -lt "$TARGET" ]] && break
+  done < <(images_by_recency)
 fi
 
 echo "disk-cleanup: docker graph at ${USE:-?}% after cleanup"
