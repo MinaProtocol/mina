@@ -1,0 +1,7 @@
+(test
+ (name main)
+ (libraries
+  ;; opam libraries
+  alcotest
+  ;; local libraries
+  fee_payer_tests))
