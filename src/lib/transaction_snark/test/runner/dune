@@ -15,4 +15,5 @@
   verification_key_permission_tests
   verification_key_tests
   voting_for_tests
+  zkapp_deploy_tests
   zkapp_uri_tests))
