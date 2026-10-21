@@ -526,11 +526,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             with
             | No_block_producer ->
                 Deferred.return None
-            | Env_private_key base58_privkey ->
-                let kp =
-                  Private_key.of_base58_check_exn base58_privkey
-                  |> Keypair.of_private_key_exn
-                in
+            | Env_private_key private_key ->
+                let kp = Keypair.of_private_key_exn private_key in
                 Deferred.return (Some kp)
             | Key_file sk_file ->
                 [%log warn]

@@ -193,8 +193,8 @@ let source_name : Daemon_settings.Block_producer.keypair_source -> string =
   function
   | No_block_producer ->
       "none"
-  | Env_private_key s ->
-      "env " ^ s
+  | Env_private_key _ ->
+      "env"
   | Key_file s ->
       "file " ^ s
   | Tracked_pubkey _ ->
@@ -203,14 +203,18 @@ let source_name : Daemon_settings.Block_producer.keypair_source -> string =
 let check_source name expected source =
   Alcotest.(check string) name expected (source_name source)
 
+let private_key () =
+  Signature_lib.(Private_key.to_base58_check (Keypair.create ()).private_key)
+
 let test_keypair_source () =
   let pubkey = public_key () in
   check_source "nothing" "none" (keypair_source ()) ;
-  check_source "env" "env sk" (keypair_source ~env_private_key:"sk" ()) ;
+  check_source "env" "env" (keypair_source ~env_private_key:(private_key ()) ()) ;
   check_source "file" "file f" (keypair_source ~key:"f" ()) ;
   check_source "tracked" "tracked" (keypair_source ~pubkey ())
 
-(* The key file takes precedence over MINA_BP_PRIVKEY. *)
+(* The key file takes precedence over MINA_BP_PRIVKEY, which is then not
+   decoded. *)
 let test_key_file_beats_env () =
   check_source "file" "file f"
     (keypair_source ~env_private_key:"sk" ~key:"f" ())
@@ -222,11 +226,8 @@ let test_conflicting_sources_are_user_errors () =
       keypair_source ~env_private_key:"sk" ~key:"f" ~pubkey () ) ;
   raises_user_error (fun () -> keypair_source ~env_private_key:"sk" ~pubkey ())
 
-(* MINA_BP_PRIVKEY is not decoded here: an invalid key is only rejected when
-   the keypair is loaded. *)
-let test_env_private_key_not_decoded () =
-  check_source "env" "env not-a-key"
-    (keypair_source ~env_private_key:"not-a-key" ())
+let test_invalid_env_private_key_is_user_error () =
+  raises_user_error (fun () -> keypair_source ~env_private_key:"not-a-key" ())
 
 let () =
   Alcotest.run "Daemon_settings"
@@ -257,7 +258,7 @@ let () =
         ; Alcotest.test_case "key file beats env" `Quick test_key_file_beats_env
         ; Alcotest.test_case "conflicting sources are user errors" `Quick
             test_conflicting_sources_are_user_errors
-        ; Alcotest.test_case "env private key not decoded" `Quick
-            test_env_private_key_not_decoded
+        ; Alcotest.test_case "invalid env private key is a user error" `Quick
+            test_invalid_env_private_key_is_user_error
         ] )
     ]

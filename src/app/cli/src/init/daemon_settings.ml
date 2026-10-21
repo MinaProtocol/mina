@@ -165,8 +165,7 @@ module Block_producer = struct
   (** Where the block producer's keypair comes from. *)
   type keypair_source =
     | No_block_producer
-    | Env_private_key of string
-        (** A base58-encoded private key, from [MINA_BP_PRIVKEY]. *)
+    | Env_private_key of Private_key.t  (** From [MINA_BP_PRIVKEY]. *)
     | Key_file of string
     | Tracked_pubkey of Public_key.Compressed.t
         (** The public key of a keypair in the daemon's wallets. *)
@@ -185,8 +184,14 @@ module Block_producer = struct
            `block_production_pubkey`"
     | None, None, None ->
         No_block_producer
-    | None, None, Some base58_privkey ->
-        Env_private_key base58_privkey
+    | None, None, Some base58_privkey -> (
+        try Env_private_key (Private_key.of_base58_check_exn base58_privkey)
+        with exn ->
+          Mina_stdlib.Mina_user_error.raisef
+            ~where:"reading the block producer's private key"
+            "The environment variable MINA_BP_PRIVKEY is not a valid \
+             base58-encoded private key: %s"
+            (Core_kernel.Exn.to_string exn) )
     (* CLI argument takes precedence over env variable *)
     | Some sk_file, None, (Some _ | None) ->
         Key_file sk_file
