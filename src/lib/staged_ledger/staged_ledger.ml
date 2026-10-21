@@ -5185,8 +5185,8 @@ let%test_module "staged ledger tests" =
                         = 1 ) ;
 
                       let%bind verifier_full =
-                        Verifier.For_tests.default ~constraint_constants ~logger
-                          ~proof_level:Full ()
+                        Verifier.For_tests.commands_only ~constraint_constants
+                          ~logger ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl
