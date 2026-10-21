@@ -49,12 +49,14 @@ THRESHOLD="${DISK_PRUNE_THRESHOLD:-80}"
 TARGET="${DISK_PRUNE_TARGET:-70}"
 
 # Prints "<image-id> <tag> [<tag>...]" for every tagged image, least recently
-# used first. LastTagTime and Created are RFC 3339 UTC strings, which sort as
-# text; an unset LastTagTime is the zero time, so those images come first.
+# used first. `json` renders LastTagTime and Created as RFC 3339 UTC strings
+# whichever way the CLI decoded them, and those sort as text; an unset
+# LastTagTime is the zero time (or null), so those images come first.
 images_by_recency() {
   docker image ls -q 2>/dev/null | sort -u \
     | xargs -r docker image inspect \
-        -f '{{or .Metadata.LastTagTime "0001-01-01T00:00:00Z"}} {{.Created}} {{.Id}} {{range .RepoTags}}{{.}} {{end}}' 2>/dev/null \
+        -f '{{json .Metadata.LastTagTime}} {{json .Created}} {{.Id}} {{range .RepoTags}}{{.}} {{end}}' 2>/dev/null \
+    | tr -d '"' | sed 's/^null /0001-01-01T00:00:00Z /' \
     | awk 'NF > 3' | sort -k1,1 -k2,2 | cut -d' ' -f3-
 }
 
