@@ -70,8 +70,8 @@ echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 ./scripts/hardfork/release/upload-ledger-tarballs.sh hardfork_ledgers new_config.json
 
 # Write to cache
-./buildkite/scripts/cache/manager.sh write-to-dir hardfork_ledgers/*.tar.gz hardfork/ledgers/
-./buildkite/scripts/cache/manager.sh write-to-dir hashes.json new_config.json hardfork/
+buildkite-cache-manager write hardfork_ledgers/*.tar.gz hardfork/ledgers/
+buildkite-cache-manager write hashes.json new_config.json hardfork/
 
 # Clean up generated ledgers and config
 rm -rf hardfork_ledgers hashes.json new_config.json

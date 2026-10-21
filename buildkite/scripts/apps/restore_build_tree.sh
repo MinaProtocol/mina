@@ -63,7 +63,7 @@ if [[ -n "${MINA_APPS_CACHE_ROOT:-}" ]]; then
 fi
 
 echo "--- Restoring build manifest for ${CODENAME}/${BUILD_VARIANT}"
-if ! ./buildkite/scripts/cache/manager.sh read "${APPS_ROOT_ARGS[@]}" \
+if ! buildkite-cache-manager read "${APPS_ROOT_ARGS[@]}" \
   "build-manifest/${CODENAME}/${BUILD_VARIANT}/build-manifest.txt" "$TMP_DIR"; then
   fail_missing "manifest for ${CODENAME}/${BUILD_VARIANT} not found in cache"
 fi
@@ -74,7 +74,7 @@ while IFS= read -r relpath; do
   base="$(basename "$relpath")"
   fetch_dir="${TMP_DIR}/fetch"
   mkdir -p "$fetch_dir"
-  if ! ./buildkite/scripts/cache/manager.sh read "${APPS_ROOT_ARGS[@]}" \
+  if ! buildkite-cache-manager read "${APPS_ROOT_ARGS[@]}" \
     "${APPS_DIR}/${base}" "$fetch_dir" >/dev/null; then
     fail_missing "${base} not found in ${APPS_DIR}"
   fi
