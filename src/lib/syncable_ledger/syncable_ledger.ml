@@ -568,16 +568,17 @@ end = struct
       (* We might write the wrong data to the underlying ledger here, but if so
          we'll requeue the address and it'll be overwritten. *)
       MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-      Addr.Table.remove t.waiting_content addr ;
-      [%log trace]
-        ~metadata:
-          [ ("address", Addr.to_yojson addr)
-          ; ("hash", Hash.to_yojson expected)
-          ]
-        "Found content addr $address, with hash $hash, removing from waiting \
-         content" ;
       let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-      if Hash.equal actual expected then `Success
+      if Hash.equal actual expected then (
+        Addr.Table.remove t.waiting_content addr ;
+        [%log trace]
+          ~metadata:
+            [ ("address", Addr.to_yojson addr)
+            ; ("hash", Hash.to_yojson expected)
+            ]
+          "Found content addr $address, with hash $hash, removing from waiting \
+           content" ;
+        `Success )
       else `Hash_mismatch (expected, actual) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
@@ -660,13 +661,17 @@ end = struct
       Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
-  let empty_hash_at_height h =
-    assert (
-      h >= 0 || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
-    let rec go prev ctr =
-      if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
+  let empty_hash_at_height =
+    let cache =
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
     in
-    go Hash.empty_account 0
+    fun h ->
+      assert (
+        h >= 0
+        || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
+      cache h
 
   (** Given the hash of the smallest subtree that contains all accounts, the
       height of that hash in the tree and the height of the whole tree, compute
@@ -687,11 +692,16 @@ end = struct
     go (empty_hash_at_height start_height) hash start_height
 
   (** Given an address and the hash of the corresponding subtree, start getting
-      the children.
+      the children. If the subtree is empty, its accounts are removed instead.
   *)
   let handle_node t addr exp_hash =
     let open (val t.context) in
-    if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
+    let ledger_depth = MT.depth t.tree in
+    if
+      Hash.equal exp_hash
+        (empty_hash_at_height (Addr.height ~ledger_depth addr))
+    then MT.set_all_accounts_rooted_at_exn t.tree addr []
+    else if Addr.depth addr >= ledger_depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
