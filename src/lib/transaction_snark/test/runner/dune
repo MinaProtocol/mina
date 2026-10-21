@@ -14,6 +14,7 @@
   permissions_tests
   ring_sig_tests
   token_symbol_tests
+  transaction_union_tests
   transaction_snark_tests_access_permission
   verification_key_permission_tests
   verification_key_tests

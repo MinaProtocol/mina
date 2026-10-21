@@ -12,6 +12,7 @@ let () =
     ; Permissions_tests.Permissions.suite ()
     ; Ring_sig_tests.Ring_sig.suite ()
     ; Token_symbol_tests.Token_symbol.suite ()
+    ; Transaction_union_tests.Transaction_union.suite ()
     ; Verification_key_tests.Verification_key.suite ()
     ; Verification_key_permission_tests.Verification_key_permission.suite ()
     ; Voting_for_tests.Voting_for.suite ()
