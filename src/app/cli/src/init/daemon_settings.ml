@@ -131,3 +131,70 @@ module Ports_and_work = struct
     ; coinbase_receiver_flag
     }
 end
+
+(** The block producer's key file, public key and key-file password, resolved
+    from the flags and the configuration files' [daemon] sections. *)
+module Block_producer = struct
+  type t =
+    { block_production_key : string option
+    ; block_production_pubkey : Public_key.Compressed.t option
+    ; block_production_password : string option
+    }
+
+  let resolve ~logger daemon_file
+      ({ block_production_key
+       ; block_production_pubkey
+       ; block_production_password
+       ; _
+       } :
+        Daemon_flags.t ) =
+    let find key actual_value =
+      Daemon_file.find ~logger daemon_file key actual_value
+    in
+    let block_production_key =
+      find Key.block_producer_key block_production_key
+    in
+    let block_production_pubkey =
+      find Key.block_producer_pubkey block_production_pubkey
+    in
+    let block_production_password =
+      find Key.block_producer_password block_production_password
+    in
+    { block_production_key; block_production_pubkey; block_production_password }
+
+  (** Where the block producer's keypair comes from. *)
+  type keypair_source =
+    | No_block_producer
+    | Env_private_key of Private_key.t  (** From [MINA_BP_PRIVKEY]. *)
+    | Key_file of string
+    | Tracked_pubkey of Public_key.Compressed.t
+        (** The public key of a keypair in the daemon's wallets. *)
+
+  (** [env_private_key] is the value of [MINA_BP_PRIVKEY]. *)
+  let keypair_source ~env_private_key
+      { block_production_key; block_production_pubkey; _ } =
+    match (block_production_key, block_production_pubkey, env_private_key) with
+    | Some _, Some _, _ ->
+        Mina_stdlib.Mina_user_error.raise
+          "You cannot provide both `block-producer-key` and \
+           `block_production_pubkey`"
+    | None, Some _, Some _ ->
+        Mina_stdlib.Mina_user_error.raise
+          "You cannot provide both `MINA_BP_PRIVKEY` and \
+           `block_production_pubkey`"
+    | None, None, None ->
+        No_block_producer
+    | None, None, Some base58_privkey -> (
+        try Env_private_key (Private_key.of_base58_check_exn base58_privkey)
+        with exn ->
+          Mina_stdlib.Mina_user_error.raisef
+            ~where:"reading the block producer's private key"
+            "The environment variable MINA_BP_PRIVKEY is not a valid \
+             base58-encoded private key: %s"
+            (Core_kernel.Exn.to_string exn) )
+    (* CLI argument takes precedence over env variable *)
+    | Some sk_file, None, (Some _ | None) ->
+        Key_file sk_file
+    | None, Some tracked_pubkey, None ->
+        Tracked_pubkey tracked_pubkey
+end
