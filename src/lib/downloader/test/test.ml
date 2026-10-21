@@ -147,3 +147,144 @@ let%test_unit "[`No_peers] self-heals through `Stalled`/reset_knowledge" =
           [%test_eq: bool] (!download_attempts >= 2) true
       | `Result (Error `Finished) ->
           failwith "job was cancelled/stopped unexpectedly" )
+
+let test_peer () =
+  Peer.create
+    (Core.Unix.Inet_addr.of_string "1.2.3.4")
+    ~libp2p_port:8302
+    ~peer_id:(Peer.Id.unsafe_of_string "regression-test-peer")
+
+(* When a download fails, the jobs in it that were cancelled while it was in
+   progress must not be put back on the queue along with the rest: nobody is
+   waiting for their results any more. *)
+
+let%test_unit "a failed download does not re-enqueue its cancelled jobs" =
+  Thread_safe.block_on_async_exn (fun () ->
+      let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
+      let stop = Ivar.create () in
+      let peer = test_peer () in
+      let knowledge_context, _knowledge_w = Broadcast_pipe.create () in
+      let download_started = Ivar.create () in
+      let download = Ivar.create () in
+      let%bind downloader =
+        D.create ~peer_refresh_interval:(Time.Span.of_ms 100.) ~max_batch_size:2
+          ~stop:(Ivar.read stop) ~logger ~trust_system
+          ~get:(fun _peer _keys ->
+            Ivar.fill_if_empty download_started () ;
+            Ivar.read download )
+          ~knowledge_context
+          ~knowledge:(fun () _peer -> Deferred.return `All)
+          ~peers:(fun () -> Deferred.return [ peer ])
+          ~preferred:[] ()
+      in
+      let (_ : D.Job.t) =
+        D.download downloader ~key:1 ~attempts:Peer.Map.empty
+      in
+      let (_ : D.Job.t) =
+        D.download downloader ~key:2 ~attempts:Peer.Map.empty
+      in
+      let%bind () = Ivar.read download_started in
+      [%test_eq: int] (D.total_jobs downloader) 2 ;
+      D.cancel downloader 1 ;
+      Ivar.fill download (Or_error.error_string "simulated download failure") ;
+      let%map () = after (Time.Span.of_ms 100.) in
+      let total_jobs = D.total_jobs downloader in
+      Ivar.fill_if_empty stop () ;
+      [%test_eq: int] total_jobs 1 )
+
+(* A job cancelled while its download is in progress must not count against
+   the peer when that download then fails: the peer is not temporarily ignored,
+   so a later job is downloaded from it straight away rather than after the
+   (two-minute, by default) ignore period, and the cancelled job is not put back
+   on the queue. *)
+
+let%test_unit "a cancelled job's failed download does not penalise the peer" =
+  Thread_safe.block_on_async_exn (fun () ->
+      let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
+      let stop = Ivar.create () in
+      let peer = test_peer () in
+      let knowledge_context, _knowledge_w = Broadcast_pipe.create () in
+      let first_download_started = Ivar.create () in
+      let first_download = Ivar.create () in
+      let%bind downloader =
+        D.create ~peer_refresh_interval:(Time.Span.of_ms 100.) ~max_batch_size:1
+          ~stop:(Ivar.read stop) ~logger ~trust_system
+          ~get:(fun _peer keys ->
+            match keys with
+            | [ 1 ] ->
+                Ivar.fill_if_empty first_download_started () ;
+                Ivar.read first_download
+            | _ ->
+                Deferred.Or_error.return keys )
+          ~knowledge_context
+          ~knowledge:(fun () _peer -> Deferred.return `All)
+          ~peers:(fun () -> Deferred.return [ peer ])
+          ~preferred:[] ()
+      in
+      let (_ : D.Job.t) =
+        D.download downloader ~key:1 ~attempts:Peer.Map.empty
+      in
+      let%bind () = Ivar.read first_download_started in
+      D.cancel downloader 1 ;
+      Ivar.fill first_download
+        (Or_error.error_string "simulated download failure") ;
+      let%bind () = after (Time.Span.of_ms 100.) in
+      let job = D.download downloader ~key:2 ~attempts:Peer.Map.empty in
+      let%map result = with_timeout (Time.Span.of_sec 15.) (D.Job.result job) in
+      let total_jobs = D.total_jobs downloader in
+      Ivar.fill_if_empty stop () ;
+      ( match result with
+      | `Timeout ->
+          failwith
+            "the peer was ignored for failing a job that had been cancelled"
+      | `Result (Ok _) ->
+          ()
+      | `Result (Error `Finished) ->
+          failwith "job was cancelled/stopped unexpectedly" ) ;
+      [%test_eq: int] total_jobs 0 )
+
+(* [forget_peer_state] lifts a temporary ignore, so that a peer which failed
+   the jobs of a superseded knowledge context is used straight away for the
+   jobs of the new one rather than after the (two-minute, by default) ignore
+   period. *)
+
+let%test_unit "forget_peer_state lifts a temporary ignore" =
+  Thread_safe.block_on_async_exn (fun () ->
+      let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
+      let stop = Ivar.create () in
+      let peer = test_peer () in
+      let knowledge_context, _knowledge_w = Broadcast_pipe.create () in
+      let%bind downloader =
+        D.create ~peer_refresh_interval:(Time.Span.of_ms 100.) ~max_batch_size:1
+          ~stop:(Ivar.read stop) ~logger ~trust_system
+          ~get:(fun _peer keys ->
+            match keys with
+            | [ 1 ] ->
+                Deferred.return
+                  (Or_error.error_string "simulated download failure")
+            | _ ->
+                Deferred.Or_error.return keys )
+          ~knowledge_context
+          ~knowledge:(fun () _peer -> Deferred.return `All)
+          ~peers:(fun () -> Deferred.return [ peer ])
+          ~preferred:[] ()
+      in
+      let (_ : D.Job.t) =
+        D.download downloader ~key:1 ~attempts:Peer.Map.empty
+      in
+      let%bind () = after (Time.Span.of_ms 500.) in
+      D.cancel downloader 1 ;
+      D.forget_peer_state downloader ;
+      let job = D.download downloader ~key:2 ~attempts:Peer.Map.empty in
+      let%map result = with_timeout (Time.Span.of_sec 15.) (D.Job.result job) in
+      Ivar.fill_if_empty stop () ;
+      match result with
+      | `Timeout ->
+          failwith "the peer was still ignored after forget_peer_state"
+      | `Result (Ok _) ->
+          ()
+      | `Result (Error `Finished) ->
+          failwith "job was cancelled/stopped unexpectedly" )

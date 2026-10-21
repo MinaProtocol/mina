@@ -43,4 +43,4 @@ if [[ -f "$HELPER" ]]; then
 fi
 
 echo "--- Publishing build manifest ($(wc -l < "$MANIFEST") entries) for ${CODENAME}/${BUILD_VARIANT}"
-./buildkite/scripts/cache/manager.sh write-to-dir "$MANIFEST" "build-manifest/${CODENAME}/${BUILD_VARIANT}"
+buildkite-cache-manager write "$MANIFEST" "build-manifest/${CODENAME}/${BUILD_VARIANT}"

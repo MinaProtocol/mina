@@ -4,7 +4,7 @@ open Pipe_lib
 open Network_peer
 
 module type Ledger_intf = sig
-  include Merkle_ledger.Intf.SYNCABLE
+  include Merkle_ledger.Intf.SYNC_RECIPIENT
 
   type account_id
 
@@ -418,6 +418,50 @@ module Make_test_num_accounts_dos (Input : Input_intf) = struct
         false
 end
 
+module Make_test_target (Input : Input_intf) = struct
+  open Input
+
+  let trust_system = Trust_system.null ()
+
+  let%test_unit "target changes before the new target's first query" =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        let l1, _k1 = Ledger.load_ledger 1 1 in
+        let l2, _k2 = Ledger.load_ledger 2 2 in
+        let l3, _k3 = Ledger.load_ledger 3 3 in
+        let lsync =
+          Sync_ledger.create l1 ~context:(module Context) ~trust_system
+        in
+        let target = Sync_ledger.target lsync in
+        let qr = Sync_ledger.query_reader lsync in
+        [%test_eq: Root_hash.t option] (Broadcast_pipe.Reader.peek target) None ;
+        let expect_retarget_to h =
+          ignore
+            ( Sync_ledger.new_goal lsync h ~data:() ~equal:(fun () () -> true)
+              : [ `New | `Repeat | `Update_data ] ) ;
+          match%map Linear_pipe.read qr with
+          | `Ok (root_hash, Syncable_ledger.Query.Num_accounts) ->
+              [%test_eq: Root_hash.t] root_hash h ;
+              [%test_eq: Root_hash.t option]
+                (Broadcast_pipe.Reader.peek target)
+                (Some h)
+          | `Ok _ ->
+              failwith "expected the new target's Num_accounts query"
+          | `Eof ->
+              failwith "query pipe closed"
+        in
+        let%bind () = expect_retarget_to (Ledger.merkle_root l2) in
+        let%bind () = expect_retarget_to (Ledger.merkle_root l3) in
+        let observed =
+          Broadcast_pipe.Reader.iter target ~f:(fun _ -> Deferred.unit)
+        in
+        Sync_ledger.destroy lsync ;
+        match%map Async.with_timeout (Time.Span.of_sec 5.) observed with
+        | `Result () ->
+            ()
+        | `Timeout ->
+            failwith "target was not closed by destroy" )
+end
+
 module Root_hash = struct
   include Merkle_ledger_tests.Test_stubs.Hash
 
@@ -579,6 +623,7 @@ module Db = struct
 
   module TestDB16_Num_accounts_dos =
     Make_test_num_accounts_dos (DB16_subtree_depths86)
+  module TestDB16_Target = Make_test_target (DB16_subtree_depths86)
 
   module TestDB16_1024 =
     Make_test
@@ -624,252 +669,4 @@ module Db = struct
     Make_test_edge_cases (DB16_subtree_depths80)
   module TestDB16_Content_Length =
     Make_test_content_length (DB16_subtree_depths86)
-end
-
-module Mask = struct
-  module Make
-      (Context : Syncable_ledger.CONTEXT) (Input : sig
-        val depth : int
-
-        val mask_layers : int
-      end) =
-  struct
-    open Merkle_ledger_tests.Test_stubs
-
-    module Root_hash = struct
-      include Hash
-
-      let to_hash = Fn.id
-    end
-
-    module Maskable_and_mask =
-      Merkle_ledger_tests.Test_mask.Make_maskable_and_mask_with_depth (Input)
-
-    module Ledger = struct
-      open Merkle_ledger_tests.Test_stubs
-      module Base_db = Maskable_and_mask.Base_db
-      module Any_base = Maskable_and_mask.Any_base
-      module Base = Any_base.M
-      module Mask = Maskable_and_mask.Mask
-      module Maskable = Maskable_and_mask.Maskable
-      include Mask.Attached
-
-      (* Each account for a layer of a mask will all have the same balance.
-         Specifically, the base maskable layer will have a balance of
-         `balance`. For all of the accounts of a mask at layer n with balance
-         `b`, all of the accounts at layer n + 1 will have a balance of `2 * b` *)
-      let load_ledger num_accounts (balance : int) : t * 'a =
-        let db = Base_db.create ~depth:Input.depth () in
-        let maskable = Any_base.cast (module Base_db) db in
-        let account_ids = Account_id.gen_accounts num_accounts in
-        let initial_balance_multiplier =
-          Int.pow 2 Input.mask_layers * balance
-        in
-        List.iter account_ids ~f:(fun account_id ->
-            let T = Account_id.eq2 in
-            let account =
-              Account.create account_id
-                (Currency.Balance.of_nanomina_int_exn
-                   (initial_balance_multiplier * 2) )
-            in
-            let action, _ =
-              Maskable.get_or_create_account maskable account_id account
-              |> Or_error.ok_exn
-            in
-            assert ([%equal: [ `Added | `Existed ]] action `Added) ) ;
-        let mask = Mask.create ~depth:Input.depth () in
-        let attached_mask = Maskable.register_mask maskable mask in
-        (* On the mask, all the children will have different values *)
-        let rec construct_layered_masks iter child_balance parent_mask =
-          if Int.equal iter 0 then (
-            assert (Int.equal balance child_balance) ;
-            parent_mask )
-          else
-            let parent_base =
-              Any_base.cast (module Mask.Attached) parent_mask
-            in
-            let child_mask = Mask.create ~depth:Input.depth () in
-            let attached_mask = Maskable.register_mask parent_base child_mask in
-            List.iter account_ids ~f:(fun account_id ->
-                let T = Account_id.eq2 in
-                let account =
-                  Account.create account_id
-                    (Currency.Balance.of_nanomina_int_exn child_balance)
-                in
-                let action, location =
-                  Mask.Attached.get_or_create_account attached_mask account_id
-                    account
-                  |> Or_error.ok_exn
-                in
-                match action with
-                | `Existed ->
-                    Mask.Attached.set attached_mask location account
-                | `Added ->
-                    failwith "Expected to re-use an existing account" ) ;
-            construct_layered_masks (iter - 1) (child_balance / 2) attached_mask
-        in
-        ( construct_layered_masks Input.mask_layers initial_balance_multiplier
-            attached_mask
-        , account_ids )
-
-      type addr = Addr.t
-
-      type account = Account.t
-
-      type hash = Hash.t
-    end
-
-    module Syncable_ledger_inputs = struct
-      module Addr = Ledger.Addr
-      module MT = Ledger
-      include Base_ledger_inputs
-
-      let account_subtree_height = 6
-    end
-
-    module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
-    module Context = Context
-  end
-
-  module Mask3_Layer1 =
-    Make
-      (Context_subtree_depth32)
-      (struct
-        let depth = 3
-
-        let mask_layers = 1
-      end)
-
-  module Mask16_Layer1 =
-    Make
-      (Context_subtree_depth32)
-      (struct
-        let depth = 16
-
-        let mask_layers = 1
-      end)
-
-  module Mask16_Layer2 =
-    Make
-      (Context_subtree_depth32)
-      (struct
-        let depth = 16
-
-        let mask_layers = 2
-      end)
-
-  module Mask16_Layer2_Depth81 =
-    Make
-      (Context_subtree_depth81)
-      (struct
-        let depth = 16
-
-        let mask_layers = 2
-      end)
-
-  module Mask16_Layer2_Depth86 =
-    Make
-      (Context_subtree_depth86)
-      (struct
-        let depth = 16
-
-        let mask_layers = 2
-      end)
-
-  module Mask16_Layer2_Depth88 =
-    Make
-      (Context_subtree_depth88)
-      (struct
-        let depth = 16
-
-        let mask_layers = 2
-      end)
-
-  module Mask16_Layer2_Depth68 =
-    Make
-      (Context_subtree_depth68)
-      (struct
-        let depth = 16
-
-        let mask_layers = 2
-      end)
-
-  module Mask16_Layer2_Depth80 =
-    Make
-      (Context_subtree_depth80)
-      (struct
-        let depth = 16
-
-        let mask_layers = 2
-      end)
-
-  module TestMask3_Layer1_3 =
-    Make_test
-      (Mask3_Layer1)
-      (struct
-        let num_accts = 3
-      end)
-
-  module TestMask3_Layer1_8 =
-    Make_test
-      (Mask3_Layer1)
-      (struct
-        let num_accts = 8
-      end)
-
-  module TestMask16_Layer1_20 =
-    Make_test
-      (Mask16_Layer1)
-      (struct
-        let num_accts = 20
-      end)
-
-  module TestMask16_Layer1_1024 =
-    Make_test
-      (Mask16_Layer1)
-      (struct
-        let num_accts = 1024
-      end)
-
-  module TestMask16_Layer2_20 =
-    Make_test
-      (Mask16_Layer2)
-      (struct
-        let num_accts = 20
-      end)
-
-  module TestMask16_Layer2_1024 =
-    Make_test
-      (Mask16_Layer2)
-      (struct
-        let num_accts = 1024
-      end)
-
-  module TestMask16_Layer2_1024_Depth81 =
-    Make_test
-      (Mask16_Layer2_Depth81)
-      (struct
-        let num_accts = 1024
-      end)
-
-  module TestMask16_Layer2_1024_Depth86 =
-    Make_test
-      (Mask16_Layer2_Depth86)
-      (struct
-        let num_accts = 1024
-      end)
-
-  module TestMask16_Layer2_1024_Depth88 =
-    Make_test
-      (Mask16_Layer2_Depth88)
-      (struct
-        let num_accts = 1024
-      end)
-
-  module TestMask16_Edge_Cases_Depth68 =
-    Make_test_edge_cases (Mask16_Layer2_Depth68)
-  module TestMask16_Edge_Cases_Depth81 =
-    Make_test_edge_cases (Mask16_Layer2_Depth81)
-  module TestMask16_Edge_Cases_Depth80 =
-    Make_test_edge_cases (Mask16_Layer2_Depth80)
 end
