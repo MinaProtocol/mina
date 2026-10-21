@@ -343,7 +343,7 @@ run_one() {
   )
   python3 -I "$HERE/normalise.py" "$dir"
   # Keep the logs, drop ledgers, crash-report tarballs and other bulk.
-  rm -rf "$dir/tmp" "$dir/home"
+  rm -rf "${dir:?}/tmp" "${dir:?}/home"
   find "$dir/conf" -mindepth 1 -maxdepth 1 ! -name mina.log \
     -exec rm -rf {} + 2>/dev/null || true
 }
