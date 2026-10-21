@@ -9,4 +9,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_version ppx_jane)))
