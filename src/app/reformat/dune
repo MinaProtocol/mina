@@ -10,5 +10,5 @@
   core_kernel
   sexplib0)
  (preprocess
-  (pps ppx_jane))
+  (pps mina_ppx))
  (modes native))

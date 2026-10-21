@@ -13,7 +13,10 @@
   test_step_verifier
   test_wrap
   test_wrap_hack
-  test_encoding_regression)
+  test_encoding_regression
+  test_side_loaded
+  test_adversarial
+  test_uncorrelated_bulletproof_challenges)
  (flags
   (:standard -warn-error +a)
   -open
@@ -21,7 +24,7 @@
   -open
   Pickles)
  (preprocess
-  (pps ppx_jane))
+  (pps mina_ppx))
  (package pickles)
  (libraries
   ; Opam libraries
@@ -30,7 +33,9 @@
   fmt
   integers
   sexplib0
+  yojson
   ; Mina libraries
+  error_json
   kimchi_backend
   kimchi_backend_common
   kimchi_pasta

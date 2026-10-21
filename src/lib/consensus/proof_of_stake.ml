@@ -2687,7 +2687,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               let response_writer =
                 Mina_ledger.Sync_ledger.Root.answer_writer sync_ledger
               in
-              glue_sync_ledger ~preferred:[] query_reader response_writer ;
+              glue_sync_ledger ~preferred:[]
+                ~target:(Mina_ledger.Sync_ledger.Root.target sync_ledger)
+                query_reader response_writer ;
               match%bind
                 Mina_ledger.Sync_ledger.Root.fetch sync_ledger
                   target_ledger_hash ~data:() ~equal:(fun () () -> true)

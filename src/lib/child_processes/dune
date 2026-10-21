@@ -10,15 +10,10 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_assert
-   ppx_custom_printf
-   ppx_deriving.show
-   ppx_here
-   ppx_inline_test
-   ppx_let
-   ppx_mina
-   ppx_pipebang
-   ppx_version))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (libraries
   ;; opam libraries
   async
