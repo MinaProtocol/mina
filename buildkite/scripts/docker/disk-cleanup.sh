@@ -21,6 +21,13 @@
 # the CI agents is the DinD sidecar's own volume, not the agent's / (see
 # graph-lib.sh). If its usage cannot be read -- no usable local image, or the
 # graph is too full to start a container -- the dangling prune runs anyway.
+#
+# If the graph is still at or above DISK_PRUNE_TARGET (default 70) after that
+# prune, orphan-layer-gc.sh reclaims what interrupted `docker load`s left
+# behind, which no prune removes. 70 is the buildkite-janitor's watermark: a
+# graph brought below it keeps its image cache through the janitor's
+# `system prune --all`.
+#
 # Honours SKIP_DOCKER_PRUNE; never fatal.
 
 set +e
@@ -34,6 +41,7 @@ fi
 source "$(dirname "${BASH_SOURCE[0]}")/graph-lib.sh"
 
 THRESHOLD="${DISK_PRUNE_THRESHOLD:-80}"
+TARGET="${DISK_PRUNE_TARGET:-70}"
 
 HELPER=$(graph_find_helper)
 USE=""
@@ -51,7 +59,14 @@ fi
 
 echo "disk-cleanup: docker graph at ${USE}% (>= ${THRESHOLD}%), pruning dangling docker data (concurrency-safe, no --all)"
 docker system prune --force
+USE=$(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')
 
-echo "disk-cleanup: docker graph at $(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')% after cleanup"
+if [[ -n "$USE" && "$USE" -ge "$TARGET" ]]; then
+  echo "disk-cleanup: docker graph at ${USE}% (>= ${TARGET}%) after the prune, reclaiming orphaned layers"
+  "$(dirname "${BASH_SOURCE[0]}")/orphan-layer-gc.sh" "$HELPER"
+  USE=$(graph_usage "$HELPER" 2>/dev/null | tr -dc '0-9')
+fi
+
+echo "disk-cleanup: docker graph at ${USE:-?}% after cleanup"
 
 exit 0
