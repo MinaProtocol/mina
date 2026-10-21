@@ -24,6 +24,7 @@
   sexplib0
   uri
   ;;local libraries
+  berkeley_types
   archive_health_queries
   block_time
   mina_stdlib
@@ -83,10 +84,4 @@
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess
-  (pps
-   h_list.ppx
-   ppx_custom_printf
-   ppx_deriving_yojson
-   ppx_jane
-   ppx_mina
-   ppx_version)))
+  (pps mina_ppx)))

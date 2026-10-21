@@ -1,0 +1,19 @@
+(test
+ (name main)
+ (libraries
+  alcotest
+  archive_lib
+  core_kernel
+  currency
+  genesis_constants
+  mina_base
+  mina_block
+  mina_transaction
+  proof_cache_tag
+  yojson)
+ (deps
+  ../../../../lib/mina_block/tests/mainnet-545000-3NKc1wHM45SweeqiCZyNwmNJQnT4vjzJmeCYkG83YqXNgDPY57ZD.json)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))

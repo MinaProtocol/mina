@@ -8,4 +8,4 @@
   hex
   sexplib0)
  (preprocess
-  (pps ppx_jane ppx_version)))
+  (pps mina_ppx)))

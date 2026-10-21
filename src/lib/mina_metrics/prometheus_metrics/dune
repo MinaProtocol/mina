@@ -26,5 +26,9 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_let ppx_version ppx_pipebang ppx_custom_printf ppx_here))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (implements mina_metrics))
