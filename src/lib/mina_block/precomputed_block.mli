@@ -120,6 +120,9 @@ module Versioned : sig
 
   val of_latest : Stable.Latest.t -> t
 
+  (** The block, if it is of the latest version. *)
+  val latest : t -> Stable.Latest.t option
+
   (** Writes the version's own versioned JSON. *)
   val to_yojson : t -> Yojson.Safe.t
 

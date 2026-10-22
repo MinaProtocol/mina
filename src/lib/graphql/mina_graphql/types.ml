@@ -2762,6 +2762,20 @@ module Input = struct
           Yojson.Safe.to_basic (Mina_block.Precomputed.to_yojson x) )
   end
 
+  module VersionedPrecomputedBlock = struct
+    (* Kept as JSON, for the archive to read by the rules of the block's own
+       version. *)
+    type input = Yojson.Safe.t
+
+    let arg_typ =
+      scalar "VersionedPrecomputedBlock"
+        ~doc:
+          "Block encoded in precomputed block format, of any version the \
+           archive reads"
+        ~coerce:(fun json -> Ok (Utils.to_yojson json))
+        ~to_json:(fun (x : input) -> Yojson.Safe.to_basic x)
+  end
+
   module ExtensionalBlock = struct
     type input = Archive_lib.Extensional.Block.t
 

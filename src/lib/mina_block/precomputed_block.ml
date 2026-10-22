@@ -260,6 +260,8 @@ module Versioned = struct
 
   let of_latest (t : Stable.Latest.t) = V5 t
 
+  let latest = function V5 t -> Some t | V4 _ | V3 _ -> None
+
   let to_yojson = function
     | V5 t ->
         Stable.V5.to_yojson t

@@ -11,7 +11,12 @@ let%test_module "network pool test" =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants = precomputed_values.constraint_constants
+    (* SNARK work is rejected if the prover doesn't have an account and the fee
+       is below the account creation fee, so waive the fee for test work. *)
+    let constraint_constants =
+      { precomputed_values.constraint_constants with
+        account_creation_fee = Currency.Fee.zero
+      }
 
     let consensus_constants = precomputed_values.consensus_constants
 
@@ -108,7 +113,9 @@ let%test_module "network pool test" =
       let per_reader = work_count / 2 in
       let fee_ =
         { Mina_base.Fee_with_prover.fee = Currency.Fee.zero
-        ; prover = Signature_lib.Public_key.Compressed.empty
+        ; prover =
+            Quickcheck.random_value ~seed:(`Deterministic "prover")
+              Signature_lib.Public_key.Compressed.gen
         }
       in
       let create_work work =
@@ -135,34 +142,75 @@ let%test_module "network pool test" =
             ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
             ~block_window_duration
         in
-        List.map (List.take works per_reader) ~f:create_work
-        |> List.map ~f:(fun work ->
-               ( Envelope.Incoming.local work
-               , Mina_net2.Validation_callback.create_without_expiration () ) )
-        |> List.iter ~f:(fun diff ->
-               Mock_snark_pool.Remote_sink.push remote_sink diff
-               |> Deferred.don't_wait_for ) ;
-        List.map (List.drop works per_reader) ~f:create_work
-        |> List.iter ~f:(fun diff ->
-               Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
-               |> Deferred.don't_wait_for ) ;
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
-        don't_wait_for
-        @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-             ~f:(fun With_nonce.{ message = work_command; _ } ->
-               let work =
-                 match work_command with
-                 | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)
-                   ->
-                     work
-                 | Mock_snark_pool.Resource_pool.Diff.Empty ->
-                     assert false
-               in
-               assert (
-                 List.mem works work
-                   ~equal:Transaction_snark_work.Statement.equal ) ;
-               Deferred.unit ) ;
-        Deferred.unit
+        let remote_works = List.take works per_reader in
+        let local_works = List.drop works per_reader in
+        let remote_callbacks =
+          List.map remote_works ~f:(fun work ->
+              let cb =
+                Mina_net2.Validation_callback.create_without_expiration ()
+              in
+              Mock_snark_pool.Remote_sink.push remote_sink
+                (Envelope.Incoming.local (create_work work), cb)
+              |> Deferred.don't_wait_for ;
+              cb )
+        in
+        let local_results =
+          List.map local_works ~f:(fun work ->
+              let result = Ivar.create () in
+              Mock_snark_pool.Local_sink.push local_sink
+                (create_work work, Ivar.fill result)
+              |> Deferred.don't_wait_for ;
+              Ivar.read result )
+        in
+        (* Remote diffs are accepted for gossip by libp2p, not rebroadcast by
+           the pool. *)
+        let%bind () =
+          Deferred.List.iter remote_callbacks ~f:(fun cb ->
+              match%map Mina_net2.Validation_callback.await_exn cb with
+              | `Accept ->
+                  ()
+              | `Reject | `Ignore ->
+                  failwith "Remote work was not accepted" )
+        in
+        let%bind () =
+          Deferred.List.iter local_results ~f:(fun result ->
+              match%map result with
+              | Ok (`Broadcasted, _, _) ->
+                  ()
+              | Ok (`Not_broadcasted, _, _) ->
+                  failwith "Local work was not broadcast"
+              | Error err ->
+                  Error.raise err )
+        in
+        let%map broadcast_works =
+          Deferred.List.init (List.length local_works) ~f:(fun _ ->
+              match%map
+                Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
+              with
+              | `Ok
+                  With_nonce.
+                    { message =
+                        Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+                          (work, _)
+                    ; _
+                    } ->
+                  work
+              | `Ok { message = Mock_snark_pool.Resource_pool.Diff.Empty; _ } ->
+                  failwith "Unexpected empty diff broadcast"
+              | `Eof ->
+                  failwith "Broadcast pipe closed" )
+        in
+        [%test_eq: Transaction_snark_work.Statement.t list]
+          (List.sort ~compare:Transaction_snark_work.Statement.compare
+             broadcast_works )
+          (List.sort ~compare:Transaction_snark_work.Statement.compare
+             local_works ) ;
+        let pool = Mock_snark_pool.resource_pool network_pool in
+        List.iter works ~f:(fun work ->
+            assert (
+              Option.is_some
+                (Mock_snark_pool.Resource_pool.request_proof pool work) ) )
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
   end )
