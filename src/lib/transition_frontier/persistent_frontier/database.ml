@@ -334,6 +334,11 @@ let check t ~genesis_state_hash =
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
 
+(** The bytes stored under [Root_common], written without materialising the
+    root scan state. *)
+let serialize_root_common common =
+  Bin_prot.Utils.bin_dump Root_data.Common.bin_writer_stable common
+
 let initialize t ~root_data =
   let root_state_hash, root_transition =
     let t =
@@ -351,10 +356,8 @@ let initialize t ~root_data =
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
-      Batch.set batch ~key:Root_common
-        ~data:
-          ( root_data |> Root_data.Limited.common
-          |> Root_data.Common.read_all_proofs_from_disk ) ;
+      Batch.set_raw batch ~key:Root_common
+        ~data:(serialize_root_common (Root_data.Limited.common root_data)) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:
@@ -404,13 +407,12 @@ let add ~arcs_cache ~transition =
 
 let move_root ~old_root_hash ~new_root ~garbage =
   let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
-  let new_root_common_unwrapped =
-    Root_data.Limited.common new_root
-    |> Root_data.Common.read_all_proofs_from_disk
+  let new_root_common =
+    serialize_root_common (Root_data.Limited.common new_root)
   in
   fun batch ->
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
-    Batch.set batch ~key:Root_common ~data:new_root_common_unwrapped ;
+    Batch.set_raw batch ~key:Root_common ~data:new_root_common ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
       ~data:
         (List.map ~f:With_hash.data

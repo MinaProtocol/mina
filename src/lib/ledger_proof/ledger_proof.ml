@@ -50,6 +50,11 @@ module Cached = struct
     Transaction_snark.create ~statement
       ~proof:(Proof_cache_tag.read_proof_from_disk proof)
 
+  let bin_writer_stable : t Bin_prot.Type_class.writer =
+    Proof_carrying_data.Stable.V1.bin_writer_t
+      Mina_state.Snarked_ledger_state.With_sok.Stable.V2.bin_writer_t
+      Proof_cache_tag.bin_writer_stored
+
   let statement (t : t) = { t.data with sok_digest = () }
 
   let underlying_proof (t : t) = t.proof

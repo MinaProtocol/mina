@@ -20,6 +20,26 @@ let read_proof_from_disk = function
   | Identity proof ->
       proof
 
+let read_proof_bin_prot_from_disk = function
+  | Lmdb t ->
+      Cache.get_bin_prot t.cache_db t.cache_id
+  | Identity proof ->
+      Binable.to_bigstring
+        (module Pickles.Proof.Proofs_verified_2.Stable.Latest)
+        proof
+
+let bin_writer_stored : t Bin_prot.Type_class.writer =
+  { size = (fun t -> Bigstring.length (read_proof_bin_prot_from_disk t))
+  ; write =
+      (fun buf ~pos t ->
+        let bytes = read_proof_bin_prot_from_disk t in
+        let len = Bigstring.length bytes in
+        let next = pos + len in
+        Bin_prot.Common.check_next buf next ;
+        Bigstring.blit ~src:bytes ~src_pos:0 ~dst:buf ~dst_pos:pos ~len ;
+        next )
+  }
+
 let write_proof_to_disk db proof =
   match db with
   | Lmdb_cache cache_db ->

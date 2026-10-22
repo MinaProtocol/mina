@@ -150,8 +150,28 @@ module Ledger_proof_with_hash = struct
 
   type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
 
+  (** Equal to [hash (Ledger_proof.Cached.read_proof_from_disk p)], but hashes
+      the proof's serialization as stored in the cache instead of decoding and
+      re-encoding it. This relies on the serialization of a
+      [Proof_carrying_data.t] being that of its statement followed by that of
+      its proof. *)
   let create : Ledger_proof.Cached.t -> t =
-    let hash_data p = hash (Ledger_proof.Cached.read_proof_from_disk p) in
+    let hash_data
+        ({ Proof_carrying_data.data = statement; proof } : Ledger_proof.Cached.t)
+        =
+      let h = Digestif.SHA256.init () in
+      let h =
+        Binable.to_string
+          (module Mina_state.Snarked_ledger_state.With_sok.Stable.Latest)
+          statement
+        |> Digestif.SHA256.feed_string h
+      in
+      let h =
+        Proof_cache_tag.read_proof_bin_prot_from_disk proof
+        |> Digestif.SHA256.feed_bigstring h
+      in
+      Digestif.SHA256.get h |> Aux_hash.of_sha256
+    in
     fun p -> With_hash.of_data ~hash_data p
 end
 
@@ -1573,3 +1593,43 @@ let read_all_proofs_from_disk
         ( List.map ~f:Transaction_with_witness.read_all_proofs_from_disk tx_list
         , border_status )
     }
+
+module Border_status = struct
+  type t = [ `Border_block_continued_in_the_next_tree of bool ]
+  [@@deriving bin_io_unversioned]
+end
+
+let bin_writer_stable : t Bin_prot.Type_class.writer =
+  let merge : Ledger_proof_with_hash.t Bin_prot.Type_class.writer =
+    { size =
+        (fun { With_hash.data; _ } ->
+          Ledger_proof.Cached.bin_writer_stable.size data )
+    ; write =
+        (fun buf ~pos { With_hash.data; _ } ->
+          Ledger_proof.Cached.bin_writer_stable.write buf ~pos data )
+    }
+  in
+  let base : Transaction_with_witness.t Bin_prot.Type_class.writer =
+    { size =
+        (fun x ->
+          Transaction_with_witness.Stable.Latest.bin_size_t
+            (Transaction_with_witness.read_all_proofs_from_disk x) )
+    ; write =
+        (fun buf ~pos x ->
+          Transaction_with_witness.Stable.Latest.bin_write_t buf ~pos
+            (Transaction_with_witness.read_all_proofs_from_disk x) )
+    }
+  in
+  let scan_state = Parallel_scan.State.Stable.V1.bin_writer_t merge base in
+  let tx_list = Bin_prot.Type_class.bin_writer_list base in
+  let border_status = Border_status.bin_writer_t in
+  { size =
+      (fun { scan_state = s; previous_incomplete_zkapp_updates = txs, border } ->
+        scan_state.size s + tx_list.size txs + border_status.size border )
+  ; write =
+      (fun buf ~pos
+           { scan_state = s; previous_incomplete_zkapp_updates = txs, border } ->
+        let pos = scan_state.write buf ~pos s in
+        let pos = tx_list.write buf ~pos txs in
+        border_status.write buf ~pos border )
+  }

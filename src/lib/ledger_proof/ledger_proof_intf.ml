@@ -56,6 +56,11 @@ module type S = sig
 
     val read_proof_from_disk : t -> Stable.Latest.t
 
+    (** Writes the same bytes as serializing [read_proof_from_disk t] as
+        [Stable.Latest.t], but copies the proof's stored serialization instead
+        of decoding and re-encoding it. *)
+    val bin_writer_stable : t Bin_prot.Type_class.writer
+
     val statement : t -> Mina_state.Snarked_ledger_state.t
 
     val underlying_proof : t -> Proof_cache_tag.t
