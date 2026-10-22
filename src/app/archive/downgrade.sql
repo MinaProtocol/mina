@@ -1,6 +1,7 @@
 -- ============================================================================
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
 -- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
+-- + token_symbols.value, zkapp_uris.value: bytea -> text
 -- + record status in migration_history
 --
 -- Reverse further steps of upgrade.sql here as they are added, and bump
@@ -23,7 +24,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.2';
+SET archive.migration_version = '0.0.3';
 
 -- TODO: put below in a common script
 
@@ -98,7 +99,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes; token_symbols/zkapp_uris value to text.',
             'starting'::migration_status
         );
     ELSIF
@@ -115,7 +116,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop the user_commands account indexes; token_symbols/zkapp_uris value to text.',
             'starting'::migration_status
         );
     ELSIF
@@ -144,7 +145,29 @@ DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
 DROP INDEX IF EXISTS idx_user_commands_source_id;
 DROP INDEX IF EXISTS idx_user_commands_receiver_id;
 
--- 3. Update schema_history
+-- 3. token_symbols.value and zkapp_uris.value: bytea -> text
+--
+-- convert_from fails on a value that is not valid in the database encoding
+-- (e.g. a 0xff token symbol in a UTF8 database). The script then stops, and
+-- the column stays bytea: text cannot hold that value without loss.
+DO $$
+DECLARE
+    tbl text;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['token_symbols', 'zkapp_uris'] LOOP
+        IF (SELECT data_type FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = tbl
+              AND column_name = 'value') = 'bytea'
+        THEN
+            EXECUTE format(
+              'ALTER TABLE public.%I ALTER COLUMN value TYPE text'
+              ' USING convert_from(value, getdatabaseencoding())', tbl);
+        END IF;
+    END LOOP;
+END $$;
+
+-- 4. Update schema_history
 
 DO $$
 BEGIN
