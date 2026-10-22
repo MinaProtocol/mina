@@ -849,6 +849,8 @@ module type S = sig
       -> local_state:Local_state.t
       -> glue_sync_ledger:
            (   preferred:Network_peer.Peer.t list
+            -> target:
+                 Frozen_ledger_hash.t option Pipe_lib.Broadcast_pipe.Reader.t
             -> (Frozen_ledger_hash.t * Mina_ledger.Sync_ledger.Query.t)
                Pipe_lib.Linear_pipe.Reader.t
             -> ( Frozen_ledger_hash.t

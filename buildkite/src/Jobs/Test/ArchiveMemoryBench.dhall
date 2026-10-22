@@ -16,6 +16,14 @@ let FixPermissions = ../../Command/FixPermissions.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let dependsOn =
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.None }
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -27,6 +35,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ArchiveMemoryBench")
           , S.exactly "buildkite/scripts/tests/archive-memory-bench" "sh"
+          , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
           , S.strictlyStart (S.contains "src/test/archive/archive_memory_bench")
           ]
         , path = "Test"
@@ -43,16 +52,23 @@ in  Pipeline.build
             RunPerformanceTest.Spec::{
             , key = "archive-memory-bench"
             , label = "Archive node end-to-end memory bench"
+            , dependsOn = dependsOn
             , runCommands =
               [ FixPermissions.command Arch.Type.Amd64
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  [ "BUILDKITE_BRANCH", "BUILDKITE_COMMIT" ]
+              , RunWithPostgres.runInToolchainWithPostgresAndDebs
+                  [ "BUILDKITE_BRANCH"
+                  , "BUILDKITE_COMMIT"
+                  , "BUILDKITE_BUILD_ID"
+                  , "MINA_DEB_CODENAME=bookworm"
+                  , "APPS_BARE_BINARIES=archive_blocks.exe:mina-archive-blocks"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Script
                           "src/app/archive/create_schema.sql"
                       )
                   )
                   ContainerImages.minaToolchain
+                  ""
                   "./buildkite/scripts/tests/archive-memory-bench.sh"
               ]
             }

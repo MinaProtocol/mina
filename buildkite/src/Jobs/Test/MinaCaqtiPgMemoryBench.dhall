@@ -26,6 +26,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/MinaCaqtiPgMemoryBench")
           , S.exactly "buildkite/scripts/tests/mina-caqti-pg-memory-bench" "sh"
+          , S.exactly "buildkite/scripts/bench/memory-gate" "sh"
           ]
         , path = "Test"
         , name = "MinaCaqtiPgMemoryBench"

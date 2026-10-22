@@ -977,6 +977,42 @@ module Mutations = struct
         in
         () )
 
+  let archive_versioned_precomputed_block =
+    io_field "archiveVersionedPrecomputedBlock"
+      ~doc:
+        "Send a precomputed block of any version the archive reads to the \
+         archive, which reads it by the rules of its own version. The block is \
+         forwarded as given."
+      ~args:
+        Arg.
+          [ arg "block"
+              ~doc:"Block encoded in precomputed block format, with its version"
+              ~typ:(non_null Types.Input.VersionedPrecomputedBlock.arg_typ)
+          ]
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true)
+                ] ) ) )
+      ~resolve:(fun { ctx = mina; _ } () block ->
+        let open Deferred.Result.Let_syntax in
+        let%bind archive_location =
+          match (Mina_lib.config mina).archive_process_location with
+          | Some archive_location ->
+              return archive_location
+          | None ->
+              Deferred.Result.fail
+                "Could not find an archive process to connect to"
+        in
+        let%map () =
+          Mina_lib.Archive_client.dispatch_versioned_precomputed_block
+            archive_location block
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        () )
+
   let archive_extensional_block =
     io_field "archiveExtensionalBlock"
       ~args:
@@ -1035,6 +1071,7 @@ module Mutations = struct
     ; set_connection_gating_config
     ; add_peer
     ; archive_precomputed_block
+    ; archive_versioned_precomputed_block
     ; archive_extensional_block
     ; send_rosetta_transaction
     ; add_snark_work
@@ -2667,6 +2704,41 @@ module Queries = struct
         Work_selector.pending_work_statements ~snark_pool ~fee_opt
           snark_job_state )
 
+  let scan_state =
+    result_field "scanState"
+      ~doc:
+        "Free space and outstanding snark work in each tree of the scan state \
+         as of the given block, or of the best tip if no block is given. \
+         Returns an error if the block is not in the transition frontier or if \
+         the system is bootstrapping."
+      ~typ:(non_null Types.Scan_state.obj)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ]
+      ~resolve:(fun { ctx = mina; _ } () (state_hash_base58_opt : string option) ->
+        (let open Or_error.Let_syntax in
+        let%map breadcrumb =
+          match state_hash_base58_opt with
+          | Some state_hash_base58 ->
+              let%bind state_hash =
+                State_hash.of_base58_check state_hash_base58
+              in
+              Mina_lib.best_chain_block_by_state_hash mina state_hash
+          | None ->
+              Mina_lib.best_tip mina |> Participating_state.active
+              |> Result.of_option
+                   ~error:(Error.of_string "System is bootstrapping")
+        in
+        { Types.Scan_state.state_hash =
+            Transition_frontier.Breadcrumb.state_hash breadcrumb
+        ; trees =
+            Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+            |> Staged_ledger.scan_state |> Staged_ledger.Scan_state.tree_metrics
+        })
+        |> result_of_or_error )
+
   let snark_work_range =
     field "snarkWorkRange"
       ~doc:
@@ -3152,6 +3224,7 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; scan_state
     ; snark_work_range
     ; SnarkedLedgerMembership.snarked_ledger_account_membership
     ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership

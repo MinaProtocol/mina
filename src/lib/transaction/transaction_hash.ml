@@ -188,11 +188,7 @@ module User_command_with_valid_signature = struct
   let equal ({ hash = h1; _ } : t) ({ hash = h2; _ } : t) = T.equal h1 h2
 
   let create (c : User_command.Valid.t) : t =
-    { data = c
-    ; hash =
-        hash_command
-          (User_command.read_all_proofs_from_disk @@ User_command.forget_check c)
-    }
+    { data = c; hash = hash_command_with_hashes (User_command.forget_check c) }
 
   let data ({ data; _ } : t) = data
 
@@ -354,4 +350,15 @@ let%test_module "Transaction hashes" =
       | Error err ->
           failwithf "Error hashing new transaction: %s\n"
             (Error.to_string_hum err) ()
+
+    let%test "hash with proof cache tags matches hash with proofs" =
+      let cmd : Mina_base.User_command.Stable.Latest.t =
+        Zkapp_command new_zkapp_txn
+      in
+      let cmd_with_tags =
+        Mina_base.User_command.write_all_proofs_to_disk ~signature_kind:Testnet
+          ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+          cmd
+      in
+      equal (hash_command cmd) (hash_command_with_hashes cmd_with_tags)
   end )

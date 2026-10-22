@@ -7,16 +7,11 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_here
-   ppx_mina
-   ppx_version
-   ppx_let
-   ppx_inline_test
-   ppx_pipebang
-   ppx_custom_printf
-   ppx_deriving_yojson
+   mina_ppx
    lens.ppx_deriving
-   ppx_sexp_conv))
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (libraries
   ;; opam libraries
   async_unix

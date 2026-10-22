@@ -3021,7 +3021,6 @@ let%test_module _ =
     let%test_unit "zkapp cmd with same nonce should replace previous submitted \
                    zkapp with same nonce" =
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind () = after (Time.Span.of_sec 2.) in
           let%bind t = setup_test () in
           assert_pool_txs t [] ;
           let fee_payer_kp = test_keys.(0) in

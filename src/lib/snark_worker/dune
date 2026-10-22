@@ -48,16 +48,10 @@
   transaction_witness)
  (preprocess
   (pps
-   ppx_bin_prot
-   ppx_mina
-   ppx_here
-   ppx_custom_printf
-   ppx_deriving_yojson
-   ppx_inline_test
-   ppx_let
-   ppx_register_event
-   ppx_sexp_conv
-   ppx_version))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Lib powering the snark_worker interactions with the daemon"))

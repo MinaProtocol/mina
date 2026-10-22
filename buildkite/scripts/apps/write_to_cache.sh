@@ -36,7 +36,7 @@ find _build -type f -name "*.exe" | while read -r entry; do
     continue
   fi
 
-  ./buildkite/scripts/cache/manager.sh write-to-dir "$entry" "$DEST"
+  buildkite-cache-manager write "$entry" "$DEST"
 done
 
 # libp2p_helper is a Go binary (built under src/app/libp2p_helper/result/bin,
@@ -45,5 +45,5 @@ done
 # mirroring what the .deb installs.
 HELPER="src/app/libp2p_helper/result/bin/libp2p_helper"
 if [[ -f "$HELPER" ]]; then
-  ./buildkite/scripts/cache/manager.sh write-to-dir "$HELPER" "$DEST"
+  buildkite-cache-manager write "$HELPER" "$DEST"
 fi
