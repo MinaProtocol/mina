@@ -983,8 +983,9 @@ module Progress_reporting = struct
 
   let trust_system = Trust_system.null ()
 
-  (* Answer each query from whichever of [targets] has the query's root. *)
-  let serve lsync targets =
+  (* Answer each query from whichever of [targets] has the query's root,
+     passing each answer through [tamper] first. *)
+  let serve ?(tamper = fun _query answer -> answer) lsync targets =
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let responders =
@@ -1009,7 +1010,8 @@ module Progress_reporting = struct
                Linear_pipe.write aw
                  ( root_hash
                  , query
-                 , Envelope.Incoming.local (Or_error.ok_exn answer) ) ) )
+                 , Envelope.Incoming.local
+                     (tamper query (Or_error.ok_exn answer)) ) ) )
 
   let sync_to lsync root =
     match
@@ -1028,6 +1030,7 @@ module Progress_reporting = struct
         ; pending_child_hashes
         ; pending_contents
         ; synced
+        ; _
         } =
       Sync_ledger.progress lsync
     in
@@ -1057,4 +1060,45 @@ module Progress_reporting = struct
     check_progress lsync ~targets:2 ~synced:false ;
     sync_to lsync root_b ;
     check_progress lsync ~targets:2 ~synced:true
+
+  let%test_unit "a sync counts the answers it accepts and rejects" =
+    let local, _ = Ledger.load_ledger 1 1 in
+    let target, _ = Ledger.load_ledger 130 2 in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    let { Syncable_ledger.Progress.answers_accepted
+        ; last_accepted_answer_at
+        ; _
+        } =
+      Sync_ledger.progress lsync
+    in
+    [%test_eq: int] 0 answers_accepted ;
+    assert (Option.is_none last_accepted_answer_at) ;
+    let tampered = ref false in
+    let tamper (query : Ledger.addr Syncable_ledger.Query.t) answer =
+      match (query, answer) with
+      | ( What_contents _
+        , Syncable_ledger.Answer.Contents_are (_ :: _ :: _ as accounts) )
+        when not !tampered ->
+          tampered := true ;
+          Syncable_ledger.Answer.Contents_are (List.drop_last_exn accounts)
+      | _ ->
+          answer
+    in
+    serve ~tamper lsync [ target ] ;
+    sync_to lsync (Ledger.merkle_root target) ;
+    assert !tampered ;
+    let { Syncable_ledger.Progress.answers_accepted
+        ; answers_ignored
+        ; answers_rejected
+        ; last_accepted_answer_at
+        ; _
+        } =
+      Sync_ledger.progress lsync
+    in
+    assert (answers_accepted > 0) ;
+    [%test_eq: int] 0 answers_ignored ;
+    [%test_eq: int] 1 answers_rejected ;
+    assert (Option.is_some last_accepted_answer_at)
 end

@@ -105,6 +105,17 @@ module Progress = struct
           (** How many account subtrees the sync is waiting for the accounts
               of. *)
     ; synced : bool  (** Whether the ledger has reached the current target. *)
+    ; answers_accepted : int
+          (** How many answers have added to the ledger or confirmed part of
+              it. *)
+    ; answers_ignored : int
+          (** How many answers have arrived for queries the sync no longer
+              needed, such as those for an earlier target. *)
+    ; answers_rejected : int
+          (** How many answers have been invalid, and their queries asked
+              again. *)
+    ; last_accepted_answer_at : Core.Time.t option
+          (** When an answer was last accepted. *)
     }
 end
 
@@ -529,6 +540,10 @@ end = struct
     ; context : (module CONTEXT)
     ; mutable targets : int
     ; mutable target_set_at : Core.Time.t option
+    ; mutable answers_accepted : int
+    ; mutable answers_ignored : int
+    ; mutable answers_rejected : int
+    ; mutable last_accepted_answer_at : Core.Time.t option
     }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
@@ -833,17 +848,20 @@ end = struct
             ; ("ignored_hash", Root_hash.to_yojson root_hash)
             ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
+        t.answers_ignored <- t.answers_ignored + 1 ;
         Deferred.unit )
       else if already_done then (
         (* This can happen if we asked for hashes that turn out to be equal in
            underlying ledger and the target. *)
         [%log debug] "Got sync response when we're already finished syncing" ;
+        t.answers_ignored <- t.answers_ignored + 1 ;
         Deferred.unit )
       else
         let open Trust_system in
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
+          t.answers_rejected <- t.answers_rejected + 1 ;
           (* The target may have changed while the answer was being handled,
              and a query for a root we no longer want must not be reissued. *)
           if Root_hash.equal root_hash (desired_root_exn t) then
@@ -857,9 +875,12 @@ end = struct
             ~metadata:[ ("query", Query.to_yojson Addr.to_yojson query) ]
             "Ignoring the answer to sync ledger query $query, which is no \
              longer expected" ;
+          t.answers_ignored <- t.answers_ignored + 1 ;
           Deferred.unit
         in
         let credit_fulfilled_request () =
+          t.answers_accepted <- t.answers_accepted + 1 ;
+          t.last_accepted_answer_at <- Some (Core.Time.now ()) ;
           record_envelope_sender t.trust_system logger sender
             ( Actions.Fulfilled_request
             , Some
@@ -1052,6 +1073,10 @@ end = struct
     ; pending_child_hashes = Addr.Table.length t.waiting_parents
     ; pending_contents = Addr.Table.length t.waiting_content
     ; synced = Option.is_some (peek_valid_tree t)
+    ; answers_accepted = t.answers_accepted
+    ; answers_ignored = t.answers_ignored
+    ; answers_rejected = t.answers_rejected
+    ; last_accepted_answer_at = t.last_accepted_answer_at
     }
 
   let wait_until_valid t h =
@@ -1089,6 +1114,10 @@ end = struct
       ; context
       ; targets = 0
       ; target_set_at = None
+      ; answers_accepted = 0
+      ; answers_ignored = 0
+      ; answers_rejected = 0
+      ; last_accepted_answer_at = None
       }
     in
     don't_wait_for (main_loop t) ;
