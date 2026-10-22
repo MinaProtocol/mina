@@ -73,8 +73,14 @@ module Root_transition : sig
   module Lite : sig
     [%%versioned:
     module Stable : sig
+      module V6 : sig
+        type t
+      end
+
       module V5 : sig
         type t
+
+        val to_latest : t -> V6.t
       end
     end]
   end

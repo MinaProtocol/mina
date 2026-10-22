@@ -12,6 +12,19 @@ module Extend_blockchain_input = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V4 = struct
+      type t =
+        { chain : Blockchain.Stable.V4.t
+        ; next_state : Protocol_state.Value.Stable.V4.t
+        ; block : Snark_transition.Value.Stable.V3.t
+        ; ledger_proof : Ledger_proof.Stable.V3.t option
+        ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
+        ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
+        }
+
+      let to_latest = Fn.id
+    end
+
     module V3 = struct
       type t =
         { chain : Blockchain.Stable.V3.t
@@ -22,7 +35,23 @@ module Extend_blockchain_input = struct
         ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
         }
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ chain
+           ; next_state
+           ; block
+           ; ledger_proof
+           ; prover_state
+           ; pending_coinbase
+           } :
+            t ) : Latest.t =
+        { chain = Blockchain.Stable.V3.to_latest chain
+        ; next_state = Protocol_state.Value.Stable.V3.to_latest next_state
+        ; block = Snark_transition.Value.Stable.V2.to_latest block
+        ; ledger_proof =
+            Option.map ledger_proof ~f:Ledger_proof.Stable.V2.to_latest
+        ; prover_state
+        ; pending_coinbase
+        }
     end
   end]
 

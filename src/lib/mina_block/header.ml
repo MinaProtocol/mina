@@ -11,15 +11,15 @@ open Mina_state
 module Wire_types = Mina_wire_types.Mina_block.Header
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Header_intf.Full with type Stable.V3.t = A.V3.t
+  module type S = Header_intf.Full with type Stable.V4.t = A.V4.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
-      type t = A.V3.t =
-        { protocol_state : Protocol_state.Value.Stable.V3.t
+    module V4 = struct
+      type t = A.V4.t =
+        { protocol_state : Protocol_state.Value.Stable.V4.t
         ; protocol_state_proof : (Proof.Stable.V2.t[@sexp.opaque])
         ; delta_block_chain_proof :
             (* TODO: abstract *)
@@ -85,6 +85,35 @@ module Make_str (A : Wire_types.Concrete) = struct
             Allocation_functor.Intf.Output.Sexp_intf
               with type t := t
                and type 'a creator := 'a Creatable.creator )
+    end
+
+    module V3 = struct
+      type t =
+        { protocol_state : Protocol_state.Value.Stable.V3.t
+        ; protocol_state_proof : (Proof.Stable.V2.t[@sexp.opaque])
+        ; delta_block_chain_proof :
+            (* TODO: abstract *)
+            State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
+        ; current_protocol_version : Protocol_version.Stable.V2.t
+        ; proposed_protocol_version_opt : Protocol_version.Stable.V2.t option
+        }
+      [@@deriving fields, sexp, to_yojson]
+
+      let to_latest
+          ({ protocol_state
+           ; protocol_state_proof
+           ; delta_block_chain_proof
+           ; current_protocol_version
+           ; proposed_protocol_version_opt
+           } :
+            t ) : Latest.t =
+        { protocol_state =
+            Protocol_state.Value.Stable.V3.to_latest protocol_state
+        ; protocol_state_proof
+        ; delta_block_chain_proof
+        ; current_protocol_version
+        ; proposed_protocol_version_opt
+        }
     end
   end]
 

@@ -22,10 +22,10 @@ let transactions_impl ~get_transactions ~constraint_constants header
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      { header : Header.Stable.V3.t
-      ; body : Staged_ledger_diff.Body.Stable.V2.t
+      { header : Header.Stable.V4.t
+      ; body : Staged_ledger_diff.Body.Stable.V3.t
       }
     [@@deriving fields, sexp]
 
@@ -62,6 +62,19 @@ module Stable = struct
           Allocation_functor.Intf.Output.Basic_intf
             with type t := t
              and type 'a creator := 'a Creatable.creator )
+  end
+
+  module V3 = struct
+    type t =
+      { header : Header.Stable.V3.t
+      ; body : Staged_ledger_diff.Body.Stable.V2.t
+      }
+    [@@deriving fields, sexp]
+
+    let to_latest ({ header; body } : t) : Latest.t =
+      Latest.create
+        ~header:(Header.Stable.V3.to_latest header)
+        ~body:(Staged_ledger_diff.Body.Stable.V2.to_latest body)
   end
 end]
 

@@ -73,6 +73,6 @@ type submit_result =
           in [w] to be submitted to the work selector *)
 
 val submit_partitioned_work :
-     result:Snark_work_lib.Result.Partitioned.Stable.V1.t
+     result:Snark_work_lib.Result.Partitioned.Stable.V2.t
   -> partitioner:t
   -> submit_result

@@ -4,8 +4,8 @@ open Core_kernel
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
-    type t = { staged_ledger_diff : Diff.Stable.V3.t }
+  module V3 = struct
+    type t = { staged_ledger_diff : Diff.Stable.V4.t }
     [@@deriving equal, fields, sexp]
 
     let to_latest = Fn.id
@@ -28,6 +28,14 @@ module Stable = struct
           Allocation_functor.Intf.Output.Basic_intf
             with type t := t
              and type 'a creator := 'a Creatable.creator )
+  end
+
+  module V2 = struct
+    type t = { staged_ledger_diff : Diff.Stable.V3.t }
+    [@@deriving equal, fields, sexp]
+
+    let to_latest ({ staged_ledger_diff } : t) : Latest.t =
+      Latest.create (Diff.Stable.V3.to_latest staged_ledger_diff)
   end
 end]
 

@@ -5,13 +5,24 @@ open Mina_base
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      Block.Stable.V3.t State_hash.With_state_hashes.Stable.V1.t
+      Block.Stable.V4.t State_hash.With_state_hashes.Stable.V1.t
       * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
     [@@deriving equal]
 
     let to_latest = ident
+
+    let hashes (t, _) = With_hash.hash t
+  end
+
+  module V3 = struct
+    type t =
+      Block.Stable.V3.t State_hash.With_state_hashes.Stable.V1.t
+      * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+
+    let to_latest ((block, hashes) : t) : Latest.t =
+      (With_hash.map block ~f:Block.Stable.V3.to_latest, hashes)
 
     let hashes (t, _) = With_hash.hash t
   end

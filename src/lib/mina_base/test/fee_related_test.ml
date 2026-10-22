@@ -28,9 +28,5 @@ let fee_payer_pk () =
 let fee_excess () =
   Quickcheck.test ~trials:50 feepayer_body_generator ~f:(fun x ->
       [%test_eq: Fee_excess.t]
-        { fee_token_l = Token_id.default
-        ; fee_excess_l = Currency.Fee.Signed.of_unsigned @@ x.fee_payer.body.fee
-        ; fee_token_r = Token_id.default
-        ; fee_excess_r = Currency.Fee.Signed.zero
-        }
+        (Currency.Fee.Signed.of_unsigned x.fee_payer.body.fee)
       @@ Zkapp_command.fee_excess x )
