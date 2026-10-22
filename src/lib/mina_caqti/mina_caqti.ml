@@ -4,12 +4,16 @@ open Async
 open Core_kernel
 open Mina_base
 
-(* Build every request once, at module scope. Caqti 2.0.1 keys the server-side
-   PREPARE by the identity of the [Caqti_request.t] value, so a request built
-   inside a per-call function is prepared again on every pooled connection and
-   stays there for the life of the connection (#18857). Use [~oneshot:true]
-   only for SQL text that embeds its values and takes [Caqti_type.unit]
-   parameters: Caqti 2.0.1 sends a oneshot query without its parameter types. *)
+(* Build every request once, when its function is defined, never per call:
+     let find =
+       let query = find_req ... in
+       fun (module Conn : CONNECTION) x -> Conn.find query x
+   Caqti 2.0.1 keys the server-side PREPARE by the identity of the
+   [Caqti_request.t] value, so a request built on each call is prepared again
+   on every pooled connection and stays there for the life of the connection.
+   Use [~oneshot:true] only for SQL text that embeds its values and takes
+   [Caqti_type.unit] parameters: Caqti 2.0.1 sends a oneshot query without its
+   parameter types. *)
 let find_req ?oneshot t u s = Caqti_request.Infix.(t ->! u) ?oneshot s
 
 let find_opt_req ?oneshot t u s = Caqti_request.Infix.(t ->? u) ?oneshot s

@@ -592,15 +592,15 @@ module Sql = struct
       in
       has_account && conjunctive && not has_txn_hash
 
-    let requests = page_requests typ
-
-    let run conn ~logger ~offset ~limit input =
-      collect_page conn ~logger ~requests ~params:(Params.of_query input)
-        ~ctes:
-          (ctes ~by_account:(by_account input)
-             Transaction_query.(input.filter.Filter.op_type)
-             input.operator )
-        ~page ~offset ~limit
+    let run =
+      let requests = page_requests typ in
+      fun conn ~logger ~offset ~limit input ->
+        collect_page conn ~logger ~requests ~params:(Params.of_query input)
+          ~ctes:
+            (ctes ~by_account:(by_account input)
+               Transaction_query.(input.filter.Filter.op_type)
+               input.operator )
+          ~page ~offset ~limit
 
     let to_info ({ command = { signed_command = uc; _ } as command; _ } as t) =
       let open Result.Let_syntax in
@@ -866,12 +866,12 @@ module Sql = struct
             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let requests = page_requests typ
-
-    let run conn ~logger ~offset ~limit input =
-      collect_page conn ~logger ~requests ~params:(Params.of_query input)
-        ~ctes:(ctes input.filter.op_type input.operator)
-        ~page ~offset ~limit
+    let run =
+      let requests = page_requests typ in
+      fun conn ~logger ~offset ~limit input ->
+        collect_page conn ~logger ~requests ~params:(Params.of_query input)
+          ~ctes:(ctes input.filter.op_type input.operator)
+          ~page ~offset ~limit
 
     let to_info ({ internal_command; _ } as t : t) =
       let open Result.Let_syntax in
@@ -1039,12 +1039,12 @@ module Sql = struct
         ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
         ~op_type_filters operator
 
-    let requests = page_requests typ
-
-    let run conn ~logger ~offset ~limit input =
-      collect_page conn ~logger ~requests ~params:(Params.of_query input)
-        ~ctes:(ctes ~filters:(filters input.filter.op_type input.operator))
-        ~page ~offset ~limit
+    let run =
+      let requests = page_requests typ in
+      fun conn ~logger ~offset ~limit input ->
+        collect_page conn ~logger ~requests ~params:(Params.of_query input)
+          ~ctes:(ctes ~filters:(filters input.filter.op_type input.operator))
+          ~page ~offset ~limit
 
     include Rosetta_lib_block.Sql.Zkapp_commands.Make_common (struct
       type command = t
