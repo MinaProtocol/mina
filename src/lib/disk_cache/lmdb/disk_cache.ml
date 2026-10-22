@@ -5,11 +5,19 @@ open Lmdb_storage.Generic
 
 module Make (Data : Binable.S) = struct
   module F (Db : Db) = struct
-    type holder = (int, Data.t) Db.t
+    type holder =
+      { values : (int, Data.t) Db.t
+      ; bin_prot_values : (int, Bigstring.t) Db.t
+            (** The same database as [values], without deserialization *)
+      }
 
     let mk_maps { Db.create } =
-      create Lmdb_storage.Conv.uint32_be
-        (Lmdb_storage.Conv.bin_prot_conv Data.bin_t)
+      { values =
+          create Lmdb_storage.Conv.uint32_be
+            (Lmdb_storage.Conv.bin_prot_conv Data.bin_t)
+      ; bin_prot_values =
+          create Lmdb_storage.Conv.uint32_be Lmdb_storage.Conv.bigstring_copy
+      }
 
     let config = { default_config with initial_mmap_size = 256 lsl 20 }
   end
@@ -43,7 +51,10 @@ module Make (Data : Binable.S) = struct
   type id = { idx : int }
 
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
-    Rw.get ~env db idx |> Option.value_exn
+    Rw.get ~env db.values idx |> Option.value_exn
+
+  let get_bin_prot ({ env; db; _ } : t) ({ idx } : id) : Bigstring.t =
+    Rw.get ~env db.bin_prot_values idx |> Option.value_exn
 
   let put ({ env; db; counter; reusable_keys; queue_guard } : t) (x : Data.t) :
       id =
@@ -72,16 +83,16 @@ module Make (Data : Binable.S) = struct
 
     Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
         if Queue.length reusable_keys >= reuse_size_limit then (
-          Rw.batch_remove ~env db reusable_keys ;
+          Rw.batch_remove ~env db.values reusable_keys ;
           Queue.clear reusable_keys ) ) ;
-    Rw.set ~env db idx x ;
+    Rw.set ~env db.values idx x ;
     res
 
-  let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db ~f
+  let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db.values ~f
 
   let count ({ env; db; _ } : t) =
     let sum = ref 0 in
-    Rw.iter ~env db ~f:(fun _ _ -> incr sum ; `Continue) ;
+    Rw.iter ~env db.values ~f:(fun _ _ -> incr sum ; `Continue) ;
     !sum
 
   let int_of_id { idx } = idx
