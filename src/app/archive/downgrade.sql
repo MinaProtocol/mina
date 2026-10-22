@@ -133,8 +133,6 @@ BEGIN
     END IF;
 END$$;
 
---
-
 -- 2. Drop the user_commands account indexes added by upgrade.sql
 --
 -- DROP INDEX takes an ACCESS EXCLUSIVE lock on user_commands. lock_timeout

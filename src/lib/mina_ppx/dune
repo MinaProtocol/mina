@@ -1,0 +1,20 @@
+; The ppx rewriters used across Mina, bundled so that libraries can write
+; `(pps mina_ppx)`. Dune builds one ppx driver executable per distinct
+; `pps` list, so sharing one list keeps the number of drivers down.
+;
+; The libraries these rewriters are themselves built from cannot use this
+; bundle, as that would be a dependency cycle.
+
+(library
+ (name mina_ppx)
+ (public_name mina_ppx)
+ (kind ppx_rewriter)
+ (modules)
+ (libraries
+  h_list.ppx
+  ppx_annot
+  ppx_deriving.std
+  ppx_jane
+  ppx_mina
+  ppx_snarky
+  ppx_version))

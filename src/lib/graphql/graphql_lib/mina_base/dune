@@ -22,7 +22,7 @@
   kimchi_pasta
   kimchi_pasta.basic)
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Definitions required for graphql implementation"))

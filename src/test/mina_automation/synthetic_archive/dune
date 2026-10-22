@@ -1,22 +1,28 @@
-(library
- (name synthetic_archive)
- (public_name mina_automation.synthetic_archive)
+(test
+ (name test_synthetic_archive)
+ (deps
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  %{project_root}/app/archive/downgrade.sql
+  (env_var MINA_TEST_POSTGRES))
  (libraries
   ;; opam libraries
+  alcotest
   async
   async_kernel
+  async_unix
   core
   core_kernel
   caqti
+  caqti-async
+  caqti-driver-postgresql
   uri
   ;; local libraries
   archive_lib
+  archive_hardfork_toolbox.lib
   mina_automation
-  mina_base
+  mina_automation.synthetic_archive
   mina_caqti
-  pickles_types
   signature_lib)
- (instrumentation
-  (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane)))
+  (pps mina_ppx)))

@@ -24,8 +24,13 @@
  (deps
   ../mina_archive_healthcheck.exe
   %{project_root}/app/archive/create_schema.sql
-  %{project_root}/app/archive/upgrade.sql)
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_deriving_yojson)))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

@@ -9,6 +9,8 @@ Use this skill when working in `MinaProtocol/mina` and the user asks for a chang
 
 Entries feed the Release Notes for an upcoming release. The reader is a node operator, exchange integrator, or zkApp developer — someone who runs Mina but has never opened this repo. Write for them.
 
+If the change has no user-facing impact, then you *must not* write a changelog entry, to ensure that the target audiences are not exposed to irrelevant details. You can recommend to a user that they use the bypass below.
+
 ## Hard rules from CI
 
 The `Lint: Changelog` job (`buildkite/scripts/changelog.sh`, wired up in `buildkite/src/Jobs/Lint/Changelog.dhall`) enforces:

@@ -11,6 +11,10 @@
   interruptible
   run_in_thread)
  (preprocess
-  (pps ppx_deriving.std ppx_let ppx_sexp_conv ppx_version))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx)))

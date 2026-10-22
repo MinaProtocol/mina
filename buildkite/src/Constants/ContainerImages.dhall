@@ -2,12 +2,11 @@
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBookworm
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
--- NOTE: minaReleaseToolkit bundles the deb-toolkit binary and is published by
+-- NOTE: minaReleaseToolkit bundles the mina-release-toolkit CLIs and is published by
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
---       (not a moving tag like :latest) for reproducible CI; bump it
---       deliberately when a newer toolkit is wanted. minaReleaseToolkitVersion
---       must match it: the same version's release .deb provides release-manager
---       on the agent host (buildkite/scripts/release/release-manager.sh).
+--       (not a moving tag like :latest) for reproducible CI. The toolchain image
+--       installs the CLIs from the same version (dockerfiles/toolchain/3-toolchain),
+--       so bump both together.
 -- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
 --       built from THIS branch: develop's pins carry v0.14 and will not build
 --       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
@@ -37,18 +36,18 @@
 --       mirror one and repoint the constant if Docker Hub pull limits start to bite
 { toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:d7ffaee-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:f009c00-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:d7ffaee-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:e1cea26-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:d7ffaee-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:e1cea26-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:d7ffaee-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:e1cea26-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:d7ffaee-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:e1cea26-bookworm-devnet"
+    "docker.io/minaprotocol/mina-toolchain:d7ffaee-bookworm-devnet"
 , minaBaseBookworm =
     { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
     , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
@@ -62,6 +61,5 @@
 , postgres = "docker.io/library/postgres:17-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "docker.io/minaprotocol/nixos:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.6"
-, minaReleaseToolkitVersion = "0.0.6"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.8"
 }
