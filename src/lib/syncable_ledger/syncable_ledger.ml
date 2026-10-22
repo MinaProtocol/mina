@@ -535,7 +535,7 @@ end = struct
         ; ("hash", Hash.to_yojson expected)
         ]
       "Expecting children parent $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
+    Addr.Table.set t.waiting_parents ~key:parent_addr ~data:expected
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
@@ -544,20 +544,20 @@ end = struct
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
+    Addr.Table.set t.waiting_content ~key:addr ~data:expected
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
   let add_content :
          'a t
       -> Addr.t
+      -> expected:Hash.t
       -> Account.t list
       -> [ `Success
          | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *)
          | `Content_length_mismatch of int * int  (** received, capacity *) ] =
-   fun t addr content ->
+   fun t addr ~expected content ->
     let open (val t.context) in
-    let expected = Addr.Table.find_exn t.waiting_content addr in
     let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
     if List.length content > capacity then
       (* Content longer than the subtree under [addr] is rejected and requeued;
@@ -568,16 +568,17 @@ end = struct
       (* We might write the wrong data to the underlying ledger here, but if so
          we'll requeue the address and it'll be overwritten. *)
       MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-      Addr.Table.remove t.waiting_content addr ;
-      [%log trace]
-        ~metadata:
-          [ ("address", Addr.to_yojson addr)
-          ; ("hash", Hash.to_yojson expected)
-          ]
-        "Found content addr $address, with hash $hash, removing from waiting \
-         content" ;
       let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-      if Hash.equal actual expected then `Success
+      if Hash.equal actual expected then (
+        Addr.Table.remove t.waiting_content addr ;
+        [%log trace]
+          ~metadata:
+            [ ("address", Addr.to_yojson addr)
+            ; ("hash", Hash.to_yojson expected)
+            ]
+          "Found content addr $address, with hash $hash, removing from waiting \
+           content" ;
+        `Success )
       else `Hash_mismatch (expected, actual) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
@@ -611,12 +612,13 @@ end = struct
   let add_subtree :
          'a t
       -> Addr.t
+      -> expected:Hash.t
       -> Hash.t array
       -> int
       -> [ `Good of (Addr.t * Hash.t) array
          | `Hash_mismatch of Hash.t * Hash.t
          | `Invalid_length ] =
-   fun t addr nodes requested_depth ->
+   fun t addr ~expected nodes requested_depth ->
     let open (val t.context) in
     let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
@@ -626,10 +628,6 @@ end = struct
     let valid_length = is_power && is_more_than_two && less_than_requested in
     if valid_length then
       let ledger_depth = MT.depth t.tree in
-      let expected =
-        Option.value_exn ~message:"Forgot to wait for a node"
-          (Addr.Table.find t.waiting_parents addr)
-      in
       let merged =
         merge_many nodes (ledger_depth - Addr.depth addr) subtree_depth
       in
@@ -650,6 +648,32 @@ end = struct
       else `Hash_mismatch (expected, merged)
     else `Invalid_length
 
+  (** [add_content], for the expected hash of [addr], or [`Not_expected] if
+      the syncer is not waiting for its content. *)
+  let add_content_if_expected t addr content =
+    match Addr.Table.find t.waiting_content addr with
+    | None ->
+        `Not_expected
+    | Some expected ->
+        ( add_content t addr ~expected content
+          :> [ `Success
+             | `Hash_mismatch of Hash.t * Hash.t
+             | `Content_length_mismatch of int * int
+             | `Not_expected ] )
+
+  (** [add_subtree], for the expected hash of [addr], or [`Not_expected] if
+      the syncer is not waiting for its children. *)
+  let add_subtree_if_expected t addr nodes requested_depth =
+    match Addr.Table.find t.waiting_parents addr with
+    | None ->
+        `Not_expected
+    | Some expected ->
+        ( add_subtree t addr ~expected nodes requested_depth
+          :> [ `Good of (Addr.t * Hash.t) array
+             | `Hash_mismatch of Hash.t * Hash.t
+             | `Invalid_length
+             | `Not_expected ] )
+
   let all_done t =
     let open (val t.context) in
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
@@ -660,13 +684,17 @@ end = struct
       Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
-  let empty_hash_at_height h =
-    assert (
-      h >= 0 || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
-    let rec go prev ctr =
-      if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
+  let empty_hash_at_height =
+    let cache =
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
     in
-    go Hash.empty_account 0
+    fun h ->
+      assert (
+        h >= 0
+        || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
+      cache h
 
   (** Given the hash of the smallest subtree that contains all accounts, the
       height of that hash in the tree and the height of the whole tree, compute
@@ -687,11 +715,16 @@ end = struct
     go (empty_hash_at_height start_height) hash start_height
 
   (** Given an address and the hash of the corresponding subtree, start getting
-      the children.
+      the children. If the subtree is empty, its accounts are removed instead.
   *)
   let handle_node t addr exp_hash =
     let open (val t.context) in
-    if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
+    let ledger_depth = MT.depth t.tree in
+    if
+      Hash.equal exp_hash
+        (empty_hash_at_height (Addr.height ~ledger_depth addr))
+    then MT.set_all_accounts_rooted_at_exn t.tree addr []
+    else if Addr.depth addr >= ledger_depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
@@ -779,6 +812,15 @@ end = struct
             Linear_pipe.write_without_pushback_if_open t.queries
               (root_hash, query)
         in
+        (* After the target changes, answers can arrive for queries the syncer
+           no longer expects. They are not the sender's fault. *)
+        let ignore_answer () =
+          [%log debug]
+            ~metadata:[ ("query", Query.to_yojson Addr.to_yojson query) ]
+            "Ignoring the answer to sync ledger query $query, which is no \
+             longer expected" ;
+          Deferred.unit
+        in
         let credit_fulfilled_request () =
           record_envelope_sender t.trust_system logger sender
             ( Actions.Fulfilled_request
@@ -789,9 +831,11 @@ end = struct
         let%bind _ =
           match (query, answer) with
           | Query.What_contents addr, Answer.Contents_are leaves -> (
-              match add_content t addr leaves with
+              match add_content_if_expected t addr leaves with
               | `Success ->
                   credit_fulfilled_request ()
+              | `Not_expected ->
+                  ignore_answer ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
                     record_envelope_sender t.trust_system logger sender
@@ -853,7 +897,11 @@ end = struct
                   requeue_query () )
           | ( Query.What_child_hashes (address, requested_depth)
             , Answer.Child_hashes_are hashes ) -> (
-              match add_subtree t address hashes requested_depth with
+              match
+                add_subtree_if_expected t address hashes requested_depth
+              with
+              | `Not_expected ->
+                  ignore_answer ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
                     record_envelope_sender t.trust_system logger sender

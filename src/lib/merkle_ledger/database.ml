@@ -511,6 +511,156 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let set_hash mdb location new_hash =
     set_hash_batch mdb [ (location, new_hash) ]
 
+  (** The address of the rightmost leaf whose hash is not the empty hash, or
+      [None] if the ledger is empty. An account that hashes to the empty hash
+      can't be told apart from an empty leaf, and is not found. *)
+  let last_non_empty_leaf mdb =
+    let ledger_depth = mdb.depth in
+    let is_empty addr =
+      Hash.equal
+        (get_inner_hash_at_addr_exn mdb addr)
+        (empty_hash (Addr.height ~ledger_depth addr))
+    in
+    let rec go addr =
+      if Addr.depth addr = ledger_depth then addr
+      else
+        let right = Addr.child_exn ~ledger_depth addr Right in
+        if is_empty right then go (Addr.child_exn ~ledger_depth addr Left)
+        else go right
+    in
+    let root = Addr.root () in
+    if is_empty root then None else Some (go root)
+
+  (** Remove the accounts at the given account locations, leaving their leaves
+      empty.
+
+      An account's location and token entries are only removed if its location
+      entry still points at the cleared location: an account that has since
+      been written at another location keeps them.
+
+      If the last filled location is cleared, it is moved back to the
+      rightmost non-empty leaf. *)
+  let remove_accounts_at_locations mdb locations =
+    if not (List.is_empty locations) then (
+      let ledger_depth = mdb.depth in
+      let occupants =
+        List.filter_map (get_batch mdb locations) ~f:(fun (location, account) ->
+            Option.map account ~f:(fun account ->
+                (location, Account.identifier account) ) )
+      in
+      let recorded_locations =
+        Account_location.get_batch mdb (List.map occupants ~f:snd)
+      in
+      let evicted =
+        List.filter_map (List.zip_exn occupants recorded_locations)
+          ~f:(fun ((location, account_id), recorded) ->
+            match recorded with
+            | Some recorded when Location.equal recorded location ->
+                Some account_id
+            | _ ->
+                None )
+      in
+      let tokens_to_remove =
+        List.fold evicted ~init:Key.Map.empty ~f:(fun map account_id ->
+            Map.update map (Account_id.public_key account_id) ~f:(fun tids ->
+                Set.add
+                  (Option.value tids ~default:Token_id.Set.empty)
+                  (Account_id.token_id account_id) ) )
+      in
+      let token_set_updates, emptied_token_sets =
+        Map.fold tokens_to_remove ~init:([], [])
+          ~f:(fun ~key:pk ~data:tids (updates, emptied) ->
+            let remaining = Set.diff (Tokens.get mdb pk) tids in
+            if Set.is_empty remaining then
+              (updates, Tokens.build_location pk :: emptied)
+            else
+              ( Tokens.serialize_kv ~ledger_depth (pk, remaining) :: updates
+              , emptied ) )
+      in
+      let removed_owners =
+        List.filter_map evicted ~f:(fun account_id ->
+            let token_id = Account_id.derive_token_id ~owner:account_id in
+            match Tokens.Owner.get mdb token_id with
+            | Some owner when Account_id.equal owner account_id ->
+                Some (Tokens.Owner.build_location token_id)
+            | _ ->
+                None )
+      in
+      let remove_keys =
+        List.map
+          ~f:(Location.serialize ~ledger_depth)
+          ( locations
+          @ List.map evicted ~f:Account_location.build_location
+          @ emptied_token_sets @ removed_owners )
+      in
+      Kvdb.set_batch mdb.kvdb ~remove_keys ~key_data_pairs:token_set_updates ;
+      set_hash_batch mdb
+        (List.map locations ~f:(fun location ->
+             (Location.Hash (Location.to_path_exn location), Hash.empty_account) )
+        ) ;
+      let last_cleared =
+        Option.value_map (Account_location.last_location mdb) ~default:false
+          ~f:(fun last -> List.mem locations last ~equal:Location.equal)
+      in
+      if last_cleared then
+        match last_non_empty_leaf mdb with
+        | None ->
+            delete_raw mdb (Account_location.last_location_key ())
+        | Some addr ->
+            set_raw mdb
+              (Account_location.last_location_key ())
+              (Location.serialize ~ledger_depth (Location.Account addr)) )
+
+  (** Replace the accounts in the subtree at [address]: the given accounts fill
+      its leftmost leaves, and any accounts in the leaves after them are
+      removed. An account overwritten by one with a different identifier is
+      removed first, so that it keeps no location or token entries for the
+      overwritten leaf. *)
+  let set_all_accounts_rooted_at_exn mdb address accounts =
+    let ledger_depth = mdb.depth in
+    let first, last = Addr.Range.subtree_range ~ledger_depth address in
+    let first = Addr.to_int first in
+    let capacity = Addr.to_int last - first + 1 in
+    let num_accounts = List.length accounts in
+    if num_accounts > capacity then
+      failwithf
+        "set_all_accounts_rooted_at_exn: %d accounts do not fit in a subtree \
+         of %d leaves"
+        num_accounts capacity () ;
+    let addresses_and_accounts =
+      List.mapi accounts ~f:(fun i account ->
+          (Addr.of_int_exn ~ledger_depth (first + i), account) )
+    in
+    let displaced =
+      List.filter_map
+        (List.zip_exn
+           (get_batch mdb
+              (List.map addresses_and_accounts ~f:(fun (addr, _) ->
+                   Location.Account addr ) ) )
+           accounts )
+        ~f:(fun ((location, occupant), account) ->
+          Option.bind occupant ~f:(fun occupant ->
+              Option.some_if
+                (not
+                   (Account_id.equal
+                      (Account.identifier occupant)
+                      (Account.identifier account) ) )
+                location ) )
+    in
+    remove_accounts_at_locations mdb displaced ;
+    set_batch_accounts mdb addresses_and_accounts ;
+    let clear_from = first + num_accounts in
+    let clear_to =
+      Option.value_map (Account_location.last_location_address mdb)
+        ~default:(-1) ~f:(fun last_filled ->
+          Int.min (Addr.to_int last_filled) (first + capacity - 1) )
+    in
+    remove_accounts_at_locations mdb
+      (List.init
+         (Int.max 0 (clear_to - clear_from + 1))
+         ~f:(fun i ->
+           Location.Account (Addr.of_int_exn ~ledger_depth (clear_from + i)) ) )
+
   module For_tests = struct
     let gen_account_location ~ledger_depth =
       let open Quickcheck.Let_syntax in

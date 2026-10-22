@@ -1076,24 +1076,6 @@ module Specific = struct
   end
 
   module Real = Impl (Deferred.Result)
-
-  let%test_module "blocks" =
-    ( module struct
-      module Mock = Impl (Result)
-
-      (* This test intentionally fails as there has not been time to implement
-       * it properly yet *)
-      (*
-      let%test_unit "all dummies" =
-        Test.assert_ ~f:Block_response.to_yojson
-          ~expected:
-            (Mock.handle ~env:Env.mock
-               (Block_request.create
-                  (Network_identifier.create "x" "y")
-                  (Partial_block_identifier.create ())))
-          ~actual:(Result.fail (Errors.create (`Json_parse None)))
-    *)
-    end )
 end
 
 let router ~graphql_uri ~minimum_user_command_fee ~logger ~with_db
