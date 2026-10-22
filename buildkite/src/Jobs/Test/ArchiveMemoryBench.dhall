@@ -8,6 +8,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let MemoryGate = ../../Constants/MemoryGate.dhall
 
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
@@ -56,23 +58,24 @@ in  Pipeline.build
             , label = "Archive node end-to-end memory bench"
             , dependsOn = dependsOn
             , runCommands =
-              [ FixPermissions.command Arch.Type.Amd64
-              , RunWithPostgres.runInToolchainWithPostgresAndDebs
-                  [ "BUILDKITE_BRANCH"
-                  , "BUILDKITE_COMMIT"
-                  , "BUILDKITE_BUILD_ID"
-                  , "MINA_DEB_CODENAME=bookworm"
-                  , "APPS_BARE_BINARIES=archive_blocks.exe:mina-archive-blocks"
-                  ]
-                  ( Some
-                      ( RunWithPostgres.ScriptOrArchive.Script
-                          "src/app/archive/create_schema.sql"
+                  RunInToolchain.submodulesInit True
+                # [ FixPermissions.command Arch.Type.Amd64
+                  , RunWithPostgres.runInToolchainWithPostgresAndDebs
+                      [ "BUILDKITE_BRANCH"
+                      , "BUILDKITE_COMMIT"
+                      , "BUILDKITE_BUILD_ID"
+                      , "MINA_DEB_CODENAME=bookworm"
+                      , "APPS_BARE_BINARIES=archive_blocks.exe:mina-archive-blocks"
+                      ]
+                      ( Some
+                          ( RunWithPostgres.ScriptOrArchive.Script
+                              "src/app/archive/create_schema.sql"
+                          )
                       )
-                  )
-                  ContainerImages.minaToolchain
-                  ""
-                  "./buildkite/scripts/tests/archive-memory-bench.sh"
-              ]
+                      ContainerImages.minaToolchain
+                      ""
+                      "./buildkite/scripts/tests/archive-memory-bench.sh"
+                  ]
             , softFail = Some MemoryGate.softFail
             }
         ]
