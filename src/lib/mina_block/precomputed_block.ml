@@ -73,12 +73,12 @@ module Stable = struct
 
   [@@@with_versioned_json]
 
-  module V4 = struct
+  module V5 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
-      ; protocol_state : Protocol_state.Value.Stable.V3.t
+      ; protocol_state : Protocol_state.Value.Stable.V4.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
-      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V2.t
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V3.t
             (* TODO: Delete this or find out why it is here. *)
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
@@ -92,6 +92,56 @@ module Stable = struct
       }
 
     let to_latest = Fn.id
+  end
+
+  module V4 = struct
+    type t =
+      { scheduled_time : Block_time.Stable.V1.t
+      ; protocol_state : Protocol_state.Value.Stable.V3.t
+      ; protocol_state_proof :
+          (Mina_base.Proof.Stable.V2.t
+          [@to_yojson Proof.to_yojson] [@of_yojson Proof.of_yojson] )
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V2.t
+            (* TODO: Delete this or find out why it is here. *)
+      ; delta_transition_chain_proof :
+          Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      ; protocol_version : Protocol_version.Stable.V2.t
+      ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+            [@default None]
+      ; accounts_accessed : (int * Account.Stable.V3.t) list
+      ; accounts_created :
+          (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+      }
+    [@@deriving yojson]
+
+    let to_latest
+        ({ scheduled_time
+         ; protocol_state
+         ; protocol_state_proof
+         ; staged_ledger_diff
+         ; delta_transition_chain_proof
+         ; protocol_version
+         ; proposed_protocol_version
+         ; accounts_accessed
+         ; accounts_created
+         ; tokens_used
+         } :
+          t ) : Latest.t =
+      { scheduled_time
+      ; protocol_state = Protocol_state.Value.Stable.V3.to_latest protocol_state
+      ; protocol_state_proof
+      ; staged_ledger_diff =
+          Legacy_format.Staged_ledger_diff.Stable.V2.to_latest
+            staged_ledger_diff
+      ; delta_transition_chain_proof
+      ; protocol_version
+      ; proposed_protocol_version
+      ; accounts_accessed
+      ; accounts_created
+      ; tokens_used
+      }
   end
 end]
 
@@ -204,19 +254,21 @@ module V3 = struct
 end
 
 module Versioned = struct
-  type t = V3 of V3.t | V4 of Stable.V4.t
+  type t = V5 of Stable.V5.t | V4 of Stable.V4.t | V3 of V3.t
 
-  let version = function V3 _ -> 3 | V4 _ -> 4
+  let version = function V5 _ -> 5 | V4 _ -> 4 | V3 _ -> 3
 
-  let of_latest (t : Stable.Latest.t) = V4 t
+  let of_latest (t : Stable.Latest.t) = V5 t
 
-  let latest = function V4 t -> Some t | V3 _ -> None
+  let latest = function V5 t -> Some t | V4 _ | V3 _ -> None
 
   let to_yojson = function
-    | V3 t ->
-        `Assoc [ ("version", `Int 3); ("data", V3.to_yojson t) ]
+    | V5 t ->
+        Stable.V5.to_yojson t
     | V4 t ->
         Stable.V4.to_yojson t
+    | V3 t ->
+        `Assoc [ ("version", `Int 3); ("data", V3.to_yojson t) ]
 
   let of_yojson json =
     let open Result.Let_syntax in
@@ -235,32 +287,42 @@ module Versioned = struct
           Error "Precomputed.Versioned.of_yojson: missing version tag"
     in
     match version with
+    | 5 ->
+        Stable.V5.of_yojson json >>| fun t -> V5 t
+    | 4 ->
+        Stable.V4.of_yojson json >>| fun t -> V4 t
     | 3 -> (
         match List.Assoc.find fields ~equal:String.equal "data" with
         | Some data ->
             V3.of_yojson data >>| fun t -> V3 t
         | None ->
             Error "Precomputed.Versioned.of_yojson: missing data" )
-    | 4 ->
-        Stable.V4.of_yojson json >>| fun t -> V4 t
     | _ ->
         Error
           (sprintf "Precomputed.Versioned.of_yojson: unsupported version %d"
              version )
 
-  module V3 = struct
-    (* The protocol state of a V3 block has the type of a V4 block's, and its
-       hash is computed in the same way. *)
-    let state_hashes (t : V3.t) = Protocol_state.hashes t.protocol_state
+  module V5 = struct
+    let state_hashes (t : Stable.V5.t) = Protocol_state.hashes t.protocol_state
   end
 
   module V4 = struct
-    let state_hashes (t : Stable.V4.t) = Protocol_state.hashes t.protocol_state
+    let state_hashes (t : Stable.V4.t) =
+      Protocol_state.Value.Stable.V3.hashes t.protocol_state
+  end
+
+  module V3 = struct
+    (* The protocol state of a V3 block has the type of a V4 block's, and its
+       hash is computed in the same way. *)
+    let state_hashes (t : V3.t) =
+      Protocol_state.Value.Stable.V3.hashes t.protocol_state
   end
 
   let state_hashes = function
-    | V3 t ->
-        V3.state_hashes t
+    | V5 t ->
+        V5.state_hashes t
     | V4 t ->
         V4.state_hashes t
+    | V3 t ->
+        V3.state_hashes t
 end

@@ -16,10 +16,10 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'consensus_state
         , 'constants )
         A.Body.Poly.V1.t
-       and type Body.Value.Stable.V3.t = A.Body.Value.V3.t
+       and type Body.Value.Stable.V4.t = A.Body.Value.V4.t
        and type ('state_hash, 'body) Poly.Stable.V1.t =
         ('state_hash, 'body) A.Poly.V1.t
-       and type Value.Stable.V3.t = A.Value.V3.t
+       and type Value.Stable.V4.t = A.Value.V4.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -70,6 +70,18 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Value = struct
       [%%versioned
       module Stable = struct
+        module V4 = struct
+          type t =
+            ( State_hash.Stable.V1.t
+            , Blockchain_state.Value.Stable.V3.t
+            , Consensus.Data.Consensus_state.Value.Stable.V3.t
+            , Protocol_constants_checked.Value.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
+
+          let to_latest = Fn.id
+        end
+
         module V3 = struct
           type t =
             ( State_hash.Stable.V1.t
@@ -79,7 +91,28 @@ module Make_str (A : Wire_types.Concrete) = struct
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
-          let to_latest = Fn.id
+          let to_latest (t : t) : Latest.t =
+            { t with
+              blockchain_state =
+                Blockchain_state.Value.Stable.V2.to_latest t.blockchain_state
+            }
+
+          let hash
+              ({ Poly.genesis_state_hash : State_hash.t
+               ; blockchain_state
+               ; consensus_state
+               ; constants
+               } :
+                t ) =
+            Random_oracle.Input.Chunked.(
+              append
+                (Blockchain_state.Value.Stable.V2.to_input blockchain_state)
+                (Consensus.Data.Consensus_state.to_input consensus_state)
+              |> append (field (genesis_state_hash :> Field.t))
+              |> append (Protocol_constants_checked.to_input constants))
+            |> Random_oracle.pack_input
+            |> Random_oracle.hash ~init:Hash_prefix.protocol_state_body
+            |> State_body_hash.of_hash
         end
       end]
     end
@@ -187,12 +220,23 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Value = struct
     [%%versioned
     module Stable = struct
+      module V4 = struct
+        type t =
+          (State_hash.Stable.V1.t, Body.Value.Stable.V4.t) Poly.Stable.V1.t
+        [@@deriving sexp, hash, compare, equal, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V3 = struct
         type t =
           (State_hash.Stable.V1.t, Body.Value.Stable.V3.t) Poly.Stable.V1.t
         [@@deriving sexp, hash, compare, equal, yojson]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : Latest.t =
+          { t with body = Body.Value.Stable.V3.to_latest t.body }
+
+        let hashes = hashes_abstract ~hash_body:Body.Value.Stable.V3.hash
       end
     end]
 

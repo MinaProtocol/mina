@@ -9,6 +9,7 @@ open Async
     - [init_script]: The initialization script file name.
     - [precomputed_blocks_zip]: The precomputed blocks archive file name.
     - [genesis_ledger_file]: The genesis ledger file name.
+    - [genesis_block_file]: The file name of the genesis block, as a versioned precomputed block.
     - [replayer_input_file]: The replayer input file name.
     - [folder]: The folder containing the files.
 
@@ -19,12 +20,14 @@ open Async
   - [replayer_input_file_path t]: Returns the full path to the replayer input file.
   - [precomputed_blocks_zip t]: Returns the full path to the precomputed blocks archive file.
   - [genesis_ledger_path t]: Returns the full path to the genesis ledger file.
+  - [genesis_block_path t]: Returns the full path to the genesis block file.
   - [untar_precomputed_blocks t output]: Extracts the precomputed blocks archive to the specified output directory and returns a sorted list of the extracted files.
 *)
 type t =
   { init_script : String.t
   ; precomputed_blocks_zip : String.t
   ; genesis_ledger_file : String.t
+  ; genesis_block_file : String.t
   ; replayer_input_file : String.t
   ; folder : String.t
   }
@@ -32,6 +35,7 @@ type t =
 let create folder =
   { init_script = "archive_db.sql"
   ; genesis_ledger_file = "genesis.json"
+  ; genesis_block_file = "genesis_block.json"
   ; precomputed_blocks_zip = "precomputed_blocks.tar.xz"
   ; replayer_input_file = "replayer_input_file.json"
   ; folder
@@ -44,6 +48,8 @@ let replayer_input_file_path t = t.folder ^ "/" ^ t.replayer_input_file
 let precomputed_blocks_zip t = t.folder ^ "/" ^ t.precomputed_blocks_zip
 
 let genesis_ledger_path t = t.folder ^ "/" ^ t.genesis_ledger_file
+
+let genesis_block_path t = t.folder ^ "/" ^ t.genesis_block_file
 
 let untar_precomputed_blocks t output =
   let open Deferred.Let_syntax in

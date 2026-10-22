@@ -28,8 +28,7 @@
   mina_transaction_logic)
  (library_flags -linkall)
  (inline_tests
-  (flags -verbose -show-counts)
-  (deps proof_cache.json))
+  (flags -verbose -show-counts))
  (preprocess
   (pps mina_ppx))
  (instrumentation

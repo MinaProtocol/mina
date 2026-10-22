@@ -5,17 +5,8 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
-let proof_cache =
-  lazy
-    ( Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-    @@ Yojson.Safe.from_file "proof_cache.json" )
-
 let%test_module "Valid_while precondition tests" =
   ( module struct
-    let proof_cache = Lazy.force proof_cache
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
     let constraint_constants = U.constraint_constants
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -110,10 +101,6 @@ let%test_module "Valid_while precondition tests" =
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
-    let proof_cache = Lazy.force proof_cache
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
     let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -422,10 +409,6 @@ let%test_module "Protocol state precondition tests" =
 
 let%test_module "Account precondition tests" =
   ( module struct
-    let proof_cache = Lazy.force proof_cache
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
@@ -1028,11 +1011,4 @@ let%test_module "Account precondition tests" =
                   failwith
                     "Expected transaction to fail due to invalid account \
                      precondition in the fee payer" ) )
-
-    let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
   end )
