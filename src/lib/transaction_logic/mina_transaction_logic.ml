@@ -2247,20 +2247,9 @@ module For_tests = struct
   open Currency
 
   module Account_without_receipt_chain_hash = struct
-    type t =
-      ( Public_key.Compressed.t
-      , Token_id.t
-      , Account.Token_symbol.t
-      , Balance.t
-      , Account_nonce.t
-      , unit
-      , Public_key.Compressed.t option
-      , State_hash.t
-      , Account_timing.t
-      , Permissions.t
-      , Zkapp_account.t option )
-      Account.Poly.t
-    [@@deriving sexp, compare]
+    (** An account whose receipt chain hash has been reset to
+        [Receipt.Chain_hash.empty], for comparisons that ignore it. *)
+    type t = Account.t [@@deriving sexp, compare]
   end
 
   let min_init_balance = Int64.of_string "8000000000"
@@ -2577,7 +2566,7 @@ module For_tests = struct
                 a ()
             in
             let hide_rc (a : Account.t) =
-              { (Account.to_poly a) with receipt_chain_hash = () }
+              { a with receipt_chain_hash = Receipt.Chain_hash.empty }
             in
             match L.(location_of_account l1 a, location_of_account l2 a) with
             | None, None ->

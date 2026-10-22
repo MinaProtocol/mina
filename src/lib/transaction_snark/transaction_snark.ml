@@ -566,10 +566,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       [%with_label_ "check signature"] (fun () ->
           Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
 
-    let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
+    let check_timing ~balance_check ~timed_balance_check
+        ~balance:account_balance ~timing:account_timing ~txn_amount
         ~txn_global_slot =
       (* calculations should track Mina_transaction_logic.validate_timing *)
-      let open Account.Poly in
       let open Account.Timing.As_record in
       let { is_timed
           ; initial_minimum_balance
@@ -578,7 +578,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; vesting_period
           ; vesting_increment
           } =
-        account.timing
+        account_timing
       in
       let%bind curr_min_balance =
         Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
@@ -589,13 +589,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         match txn_amount with
         | Some txn_amount ->
             let%bind proposed_balance, `Underflow underflow =
-              Balance.Checked.sub_amount_flagged account.balance txn_amount
+              Balance.Checked.sub_amount_flagged account_balance txn_amount
             in
             (* underflow indicates insufficient balance *)
             let%map () = balance_check (Boolean.not underflow) in
             proposed_balance
         | None ->
-            return account.balance
+            return account_balance
       in
       let%bind sufficient_timed_balance =
         Balance.Checked.( >= ) proposed_balance curr_min_balance
@@ -616,7 +616,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let%map timing =
         Account.Timing.if_ is_untimed ~then_:Account.Timing.untimed_var
-          ~else_:account.timing
+          ~else_:account_timing
       in
       (`Min_balance curr_min_balance, timing)
 
@@ -946,12 +946,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             With_hash.of_data account ~hash_data:(fun a ->
                 lazy
                   (let a =
-                     { a with
-                       zkapp =
+                     Account.Checked.Unhashed.to_var a
+                       ~zkapp:
                          ( Zkapp_account.Checked.digest a.zkapp
                          , exists (Typ.prover_value ()) ~compute:(fun () ->
                                None ) )
-                     }
                    in
                    run_checked (Account.Checked.digest a) ) )
 
@@ -963,7 +962,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             { account with data = { account.data with timing } }
 
           let is_timed ({ data = account; _ } : t) =
-            let open Account.Poly in
             let open Account.Timing.As_record in
             let { is_timed; _ } = account.timing in
             is_timed
@@ -986,7 +984,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             let `Min_balance _, timing =
               run_checked
               @@ [%with_label.Snark_params.Tick "Check zkapp timing"] (fun () ->
-                     check_timing ~balance_check ~timed_balance_check ~account
+                     check_timing ~balance_check ~timed_balance_check
+                       ~balance:account.balance ~timing:account.timing
                        ~txn_amount:None ~txn_global_slot )
             in
             (`Invalid_timing (Option.value_exn !invalid_timing), timing)
@@ -2598,8 +2597,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       let%bind `Min_balance _, timing =
                         check_timing ~balance_check ~timed_balance_check
-                          ~account ~txn_amount:(Some txn_amount)
-                          ~txn_global_slot
+                          ~balance:account.balance ~timing:account.timing
+                          ~txn_amount:(Some txn_amount) ~txn_global_slot
                       in
                       Account_timing.if_ update_account ~then_:timing
                         ~else_:account.timing )
@@ -2626,7 +2625,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~then_:(Account_id.Checked.public_key fee_payer)
                     ~else_:account.delegate
                 in
-                { Account.Poly.balance
+                { Account.Var.balance
                 ; public_key
                 ; token_id
                 ; token_symbol = account.token_symbol
@@ -2841,7 +2840,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                         ~else_:account.token_id )
                 in
-                { Account.Poly.balance
+                { Account.Var.balance
                 ; public_key
                 ; token_id
                 ; token_symbol = account.token_symbol
@@ -2978,7 +2977,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       let%bind `Min_balance _, timing =
                         check_timing ~balance_check ~timed_balance_check
-                          ~account ~txn_amount:(Some amount) ~txn_global_slot
+                          ~balance:account.balance ~timing:account.timing
+                          ~txn_amount:(Some amount) ~txn_global_slot
                       in
                       Account_timing.if_ update_account ~then_:timing
                         ~else_:account.timing )
@@ -3007,7 +3007,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    of [user_command_fails], but we throw the resulting hash away
                    in [final_root] below, so it shouldn't matter.
                 *)
-                { Account.Poly.balance
+                { Account.Var.balance
                 ; public_key = account.public_key
                 ; token_id = account.token_id
                 ; token_symbol = account.token_symbol

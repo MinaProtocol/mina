@@ -175,9 +175,6 @@ module Token_symbol = struct
     in
     Field.Checked.Assert.equal t actual
 
-  let var_of_value x =
-    Pickles_types.Vector.map ~f:Boolean.var_of_value (to_bits x)
-
   let of_field (x : Field.t) : t =
     of_bits
       (Pickles_types.Vector.of_list_and_length_exn
@@ -193,82 +190,6 @@ module Token_symbol = struct
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
   let if_ = Tick.Run.Field.if_
-end
-
-(* the `token_symbol` describes a token id owned by the account id
-   from this account, not the token id used by this account
-*)
-module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type ( 'pk
-           , 'id
-           , 'token_symbol
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'zkapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'id
-        ; token_symbol : 'token_symbol
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; zkapp : 'zkapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  type ( 'pk
-       , 'id
-       , 'token_symbol
-       , 'amount
-       , 'nonce
-       , 'receipt_chain_hash
-       , 'delegate
-       , 'state_hash
-       , 'timing
-       , 'permissions
-       , 'zkapp_opt )
-       t =
-        ( 'pk
-        , 'id
-        , 'token_symbol
-        , 'amount
-        , 'nonce
-        , 'receipt_chain_hash
-        , 'delegate
-        , 'state_hash
-        , 'timing
-        , 'permissions
-        , 'zkapp_opt )
-        Stable.Latest.t =
-    { public_key : 'pk
-    ; token_id : 'id
-    ; token_symbol : 'token_symbol
-    ; balance : 'amount
-    ; nonce : 'nonce
-    ; receipt_chain_hash : 'receipt_chain_hash
-    ; delegate : 'delegate
-    ; voting_for : 'state_hash
-    ; timing : 'timing
-    ; permissions : 'permissions
-    ; zkapp : 'zkapp_opt
-    }
-  [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
 end
 
 module Key = struct
@@ -369,6 +290,9 @@ module Stable = struct
   end
 end]
 
+(* the `token_symbol` describes a token id owned by the account id
+   from this account, not the token id used by this account
+*)
 type t = Stable.Latest.t =
   { public_key : Public_key.Compressed.t
   ; token_id : Token_id.t
@@ -382,62 +306,10 @@ type t = Stable.Latest.t =
   ; permissions : Permissions.t
   ; zkapp : Zkapp_account.t option
   }
-[@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
+[@@deriving sexp, equal, hash, compare, yojson, hlist, fields, annot]
 
 [%%define_locally
 Stable.Latest.(sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson)]
-
-let to_poly
-    { public_key
-    ; token_id
-    ; token_symbol
-    ; balance
-    ; nonce
-    ; receipt_chain_hash
-    ; delegate
-    ; voting_for
-    ; timing
-    ; permissions
-    ; zkapp
-    } =
-  { Poly.public_key
-  ; token_id
-  ; token_symbol
-  ; balance
-  ; nonce
-  ; receipt_chain_hash
-  ; delegate
-  ; voting_for
-  ; timing
-  ; permissions
-  ; zkapp
-  }
-
-let of_poly
-    { Poly.public_key
-    ; token_id
-    ; token_symbol
-    ; balance
-    ; nonce
-    ; receipt_chain_hash
-    ; delegate
-    ; voting_for
-    ; timing
-    ; permissions
-    ; zkapp
-    } =
-  { public_key
-  ; token_id
-  ; token_symbol
-  ; balance
-  ; nonce
-  ; receipt_chain_hash
-  ; delegate
-  ; voting_for
-  ; timing
-  ; permissions
-  ; zkapp
-  }
 
 [%%define_locally Stable.Latest.(public_key)]
 
@@ -496,25 +368,30 @@ let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
 
-type var =
-  ( Public_key.Compressed.var
-  , Token_id.Checked.t
-  , Token_symbol.var
-  , Balance.var
-  , Nonce.Checked.t
-  , Receipt.Chain_hash.var
-  , Public_key.Compressed.var
-  , State_hash.var
-  , Timing.var
-  , Permissions.Checked.t
-    (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
-  , Field.Var.t * Zkapp_account.t option Typ.prover_value )
-  Poly.t
+module Var = struct
+  type t =
+    { public_key : Public_key.Compressed.var
+    ; token_id : Token_id.Checked.t
+    ; token_symbol : Token_symbol.var
+    ; balance : Balance.var
+    ; nonce : Nonce.Checked.t
+    ; receipt_chain_hash : Receipt.Chain_hash.var
+    ; delegate : Public_key.Compressed.var
+    ; voting_for : State_hash.var
+    ; timing : Timing.var
+    ; permissions : Permissions.Checked.t
+          (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
+    ; zkapp : Field.Var.t * Zkapp_account.t option Typ.prover_value
+    }
+  [@@deriving hlist, fields]
+end
+
+type var = Var.t
 
 let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
-let typ' zkapp =
+let typ' ~var_to_hlist ~var_of_hlist zkapp =
   Typ.of_hlistable
     [ Public_key.Compressed.typ
     ; Token_id.typ
@@ -531,8 +408,8 @@ let typ' zkapp =
     ; Permissions.typ
     ; zkapp
     ]
-    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    ~var_to_hlist ~var_of_hlist ~value_to_hlist:to_hlist
+    ~value_of_hlist:of_hlist
 
 let typ : (var, value) Typ.t =
   let zkapp :
@@ -547,53 +424,54 @@ let typ : (var, value) Typ.t =
     Typ.(Field.typ * account)
     |> Typ.transport ~there:(fun x -> (hash_zkapp_account_opt x, x)) ~back:snd
   in
-  typ' zkapp
-
-let var_of_t
-    ({ public_key
-     ; token_id
-     ; token_symbol
-     ; balance
-     ; nonce
-     ; receipt_chain_hash
-     ; delegate
-     ; voting_for
-     ; timing
-     ; permissions
-     ; zkapp
-     } :
-      value ) =
-  { Poly.public_key = Public_key.Compressed.var_of_t public_key
-  ; token_id = Token_id.Checked.constant token_id
-  ; token_symbol = Token_symbol.var_of_value token_symbol
-  ; balance = Balance.var_of_t balance
-  ; nonce = Nonce.Checked.constant nonce
-  ; receipt_chain_hash = Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate = Public_key.Compressed.var_of_t (delegate_opt delegate)
-  ; voting_for = State_hash.var_of_t voting_for
-  ; timing = Timing.var_of_t timing
-  ; permissions = Permissions.Checked.constant permissions
-  ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
-  }
+  typ' ~var_to_hlist:Var.to_hlist ~var_of_hlist:Var.of_hlist zkapp
 
 module Checked = struct
   module Unhashed = struct
     type t =
-      ( Public_key.Compressed.var
-      , Token_id.Checked.t
-      , Token_symbol.var
-      , Balance.var
-      , Nonce.Checked.t
-      , Receipt.Chain_hash.var
-      , Public_key.Compressed.var
-      , State_hash.var
-      , Timing.var
-      , Permissions.Checked.t
-      , Zkapp_account.Checked.t )
-      Poly.t
+      { public_key : Public_key.Compressed.var
+      ; token_id : Token_id.Checked.t
+      ; token_symbol : Token_symbol.var
+      ; balance : Balance.var
+      ; nonce : Nonce.Checked.t
+      ; receipt_chain_hash : Receipt.Chain_hash.var
+      ; delegate : Public_key.Compressed.var
+      ; voting_for : State_hash.var
+      ; timing : Timing.var
+      ; permissions : Permissions.Checked.t
+      ; zkapp : Zkapp_account.Checked.t
+      }
+    [@@deriving hlist]
+
+    let to_var ~zkapp
+        ({ public_key
+         ; token_id
+         ; token_symbol
+         ; balance
+         ; nonce
+         ; receipt_chain_hash
+         ; delegate
+         ; voting_for
+         ; timing
+         ; permissions
+         ; zkapp = _
+         } :
+          t ) : var =
+      { Var.public_key
+      ; token_id
+      ; token_symbol
+      ; balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for
+      ; timing
+      ; permissions
+      ; zkapp
+      }
 
     let typ : (t, Stable.Latest.t) Typ.t =
-      typ'
+      typ' ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         (Typ.transport Zkapp_account.typ
            ~there:(fun t -> Option.value t ~default:Zkapp_account.default)
            ~back:(fun t -> Some t) )
@@ -603,7 +481,7 @@ module Checked = struct
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     let open Random_oracle.Input.Chunked in
     List.reduce_exn ~f:append
-      (Poly.Fields.fold ~init:[]
+      (Var.Fields.fold ~init:[]
          ~zkapp:(f (fun (x, _) -> field x))
          ~permissions:(f Permissions.Checked.to_input)
          ~public_key:(f Public_key.Compressed.Checked.to_input)
@@ -811,14 +689,14 @@ let cliff_time { timing; _ } =
 let cliff_amount { timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
 
-let vesting_increment Poly.{ timing; _ } =
+let vesting_increment ({ timing; _ } : t) =
   match timing with
   | Timing.Untimed ->
       None
   | Timed t ->
       Some t.vesting_increment
 
-let vesting_period Poly.{ timing; _ } =
+let vesting_period ({ timing; _ } : t) =
   match timing with Timing.Untimed -> None | Timed t -> Some t.vesting_period
 
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
@@ -1133,14 +1011,14 @@ let gen_timed : t Quickcheck.Generator.t =
 
 let deriver obj =
   let open Fields_derivers_zkapps in
-  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  let ( !. ) = ( !. ) ~t_fields_annots in
   let receipt_chain_hash =
     needs_custom_js ~js_type:field ~name:"ReceiptChainHash" field
   in
-  finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
-  @@ Poly.Fields.make_creator ~public_key:!.public_key
-       ~token_id:!.Token_id.deriver ~token_symbol:!.string ~balance:!.balance
-       ~nonce:!.uint32 ~receipt_chain_hash:!.receipt_chain_hash
+  finish "Account" ~t_toplevel_annots
+  @@ Fields.make_creator ~public_key:!.public_key ~token_id:!.Token_id.deriver
+       ~token_symbol:!.string ~balance:!.balance ~nonce:!.uint32
+       ~receipt_chain_hash:!.receipt_chain_hash
        ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
        ~voting_for:!.field ~timing:!.Timing.deriver
        ~permissions:!.Permissions.deriver

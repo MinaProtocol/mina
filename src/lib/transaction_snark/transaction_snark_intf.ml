@@ -288,24 +288,8 @@ module type Full = sig
     val check_timing :
          balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
       -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
-      -> account:
-           ( 'b
-           , 'd
-           , 'e
-           , Currency.Balance.var
-           , 'f
-           , 'g
-           , 'h
-           , 'i
-           , ( Tick.Boolean.var
-             , Mina_numbers.Global_slot_since_genesis.Checked.var
-             , Mina_numbers.Global_slot_span.Checked.var
-             , Currency.Balance.var
-             , Currency.Amount.var )
-             Account_timing.As_record.t
-           , 'j
-           , 'k )
-           Account.Poly.t
+      -> balance:Currency.Balance.var
+      -> timing:Account_timing.var
       -> txn_amount:Currency.Amount.var option
       -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.Checked.var
       -> ( [> `Min_balance of Currency.Balance.var ]
