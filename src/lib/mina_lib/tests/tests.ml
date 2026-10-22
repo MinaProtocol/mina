@@ -246,9 +246,6 @@ let%test_module "Epoch ledger sync tests" =
         (snark_remote_sink, snark_pool)
       in
       let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
-      let genesis_ledger_hash =
-        Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
-      in
       let is_seed = instance = 0 in
       let libp2p_keypair =
         Mina_net2.Keypair.of_string libp2p_keypair_str |> Or_error.ok_exn
@@ -317,7 +314,7 @@ let%test_module "Epoch ledger sync tests" =
         }
       in
       let config : Mina_networking.Config.t =
-        { genesis_ledger_hash; creatable_gossip_net; is_seed; log_gossip_heard }
+        { creatable_gossip_net; is_seed; log_gossip_heard }
       in
       let rpc_error name _ =
         return
