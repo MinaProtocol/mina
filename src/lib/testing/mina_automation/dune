@@ -16,6 +16,7 @@
   uri
   cohttp
   cohttp-async
+  caqti
   ;; mina libraries
   init
   mina_healthcheck_lib
@@ -25,6 +26,8 @@
   mina_graphql_client
   mina_runtime_config
   mina_caqti
+  archive_lib
+  cli_lib
   mina_ledger
   mina_base
   mina_block
