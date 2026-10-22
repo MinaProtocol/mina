@@ -975,3 +975,86 @@ module Stale_answers = struct
       | _ ->
           false )
 end
+
+(* The progress a sync reports as it is given targets and reaches them. *)
+module Progress_reporting = struct
+  open Db.DB16_subtree_depths86
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  (* Answer each query from whichever of [targets] has the query's root. *)
+  let serve lsync targets =
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let responders =
+      List.map targets ~f:(fun target ->
+          ( Ledger.merkle_root target
+          , Sync_responder.create target ignore
+              ~context:(module Context)
+              ~trust_system ) )
+    in
+    don't_wait_for
+      (Linear_pipe.iter qr ~f:(fun (root_hash, query) ->
+           match
+             List.Assoc.find responders root_hash ~equal:Root_hash.equal
+           with
+           | None ->
+               Deferred.unit
+           | Some responder ->
+               let%bind answer =
+                 Sync_responder.answer_query responder
+                   (Envelope.Incoming.local query)
+               in
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local (Or_error.ok_exn answer) ) ) )
+
+  let sync_to lsync root =
+    match
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.fetch lsync root ~data:() ~equal:(fun () () -> true)) )
+    with
+    | `Result (`Ok _) ->
+        ()
+    | `Result (`Target_changed _) | `Timeout ->
+        failwith "the sync did not reach its target"
+
+  let check_progress lsync ~targets ~synced:expect_synced =
+    let { Syncable_ledger.Progress.targets = actual_targets
+        ; target_set_at
+        ; pending_child_hashes
+        ; pending_contents
+        ; synced
+        } =
+      Sync_ledger.progress lsync
+    in
+    [%test_eq: int] targets actual_targets ;
+    [%test_eq: bool] (targets > 0) (Option.is_some target_set_at) ;
+    [%test_eq: bool] expect_synced synced ;
+    if synced then (
+      [%test_eq: int] 0 pending_child_hashes ;
+      [%test_eq: int] 0 pending_contents )
+
+  let%test_unit "a sync reports its targets and when it reaches them" =
+    let local, _ = Ledger.load_ledger 1 1 in
+    let target_a, _ = Ledger.load_ledger 130 2 in
+    let target_b, _ = Ledger.load_ledger 130 3 in
+    let root_a = Ledger.merkle_root target_a in
+    let root_b = Ledger.merkle_root target_b in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    check_progress lsync ~targets:0 ~synced:false ;
+    serve lsync [ target_a; target_b ] ;
+    sync_to lsync root_a ;
+    check_progress lsync ~targets:1 ~synced:true ;
+    ignore
+      ( Sync_ledger.new_goal lsync root_b ~data:() ~equal:(fun () () -> true)
+        : [ `New | `Repeat | `Update_data ] ) ;
+    check_progress lsync ~targets:2 ~synced:false ;
+    sync_to lsync root_b ;
+    check_progress lsync ~targets:2 ~synced:true
+end

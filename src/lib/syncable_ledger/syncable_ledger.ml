@@ -92,6 +92,22 @@ module type CONTEXT = sig
   val ledger_sync_config : daemon_config
 end
 
+(** A snapshot of how far a ledger sync has progressed, for reporting. *)
+module Progress = struct
+  type t =
+    { targets : int
+          (** How many times the sync has been given a new root to reach. *)
+    ; target_set_at : Core.Time.t option
+          (** When the current target was set. *)
+    ; pending_child_hashes : int
+          (** How many inner nodes the sync is waiting for the children of. *)
+    ; pending_contents : int
+          (** How many account subtrees the sync is waiting for the accounts
+              of. *)
+    ; synced : bool  (** Whether the ledger has reached the current target. *)
+    }
+end
+
 module type Inputs_base_intf = sig
   module Addr : module type of Merkle_address
 
@@ -232,6 +248,11 @@ module type S = sig
   val merkle_path_at_addr : 'a t -> addr -> merkle_path Or_error.t
 
   val get_account_at_addr : 'a t -> addr -> account Or_error.t
+
+  (** How far the sync has progressed towards its current target. Until the
+      new target's account count arrives, the pending work counted is that of
+      the previous target. *)
+  val progress : 'a t -> Progress.t
 
   val handle_num_accounts :
        'a t
@@ -506,6 +527,8 @@ end = struct
     ; mutable validity_listener :
         [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
     ; context : (module CONTEXT)
+    ; mutable targets : int
+    ; mutable target_set_at : Core.Time.t option
     }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
@@ -992,6 +1015,8 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
+      t.targets <- t.targets + 1 ;
+      t.target_set_at <- Some (Core.Time.now ()) ;
       ( try don't_wait_for (Broadcast_pipe.Writer.write t.target_writer (Some h))
         with Broadcast_pipe.Already_closed _ -> () ) ;
       t.auxiliary_data <- Some data ;
@@ -1020,6 +1045,14 @@ end = struct
           Some t.tree
       | `Target_changed _ ->
           None )
+
+  let progress t : Progress.t =
+    { targets = t.targets
+    ; target_set_at = t.target_set_at
+    ; pending_child_hashes = Addr.Table.length t.waiting_parents
+    ; pending_contents = Addr.Table.length t.waiting_content
+    ; synced = Option.is_some (peek_valid_tree t)
+    }
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
@@ -1054,6 +1087,8 @@ end = struct
       ; waiting_content = Addr.Table.create ()
       ; validity_listener = Ivar.create ()
       ; context
+      ; targets = 0
+      ; target_set_at = None
       }
     in
     don't_wait_for (main_loop t) ;
