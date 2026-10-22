@@ -15,6 +15,7 @@
   mina_base
   mina_state
   mina_stdlib_unix
+  pickles
   proof_cache_tag
   transaction_snark_scan_state
   with_hash)
