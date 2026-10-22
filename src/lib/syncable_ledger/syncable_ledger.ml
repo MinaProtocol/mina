@@ -116,6 +116,14 @@ module Progress = struct
               again. *)
     ; last_accepted_answer_at : Core.Time.t option
           (** When an answer was last accepted. *)
+    ; num_accounts : int option
+          (** How many accounts the current target holds, once a peer has
+              said. *)
+    ; accounts_settled : int
+          (** How many of the current target's accounts the ledger is known
+              to hold, whether received or already present. *)
+    ; accounts_received : int
+          (** How many accounts peers have sent, over all targets. *)
     }
 end
 
@@ -544,6 +552,9 @@ end = struct
     ; mutable answers_ignored : int
     ; mutable answers_rejected : int
     ; mutable last_accepted_answer_at : Core.Time.t option
+    ; mutable num_accounts : int option
+    ; mutable accounts_settled : int
+    ; mutable accounts_received : int
     }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
@@ -583,6 +594,15 @@ end = struct
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.set t.waiting_content ~key:addr ~data:expected
+
+  (** Count the accounts under [addr] as held, once they match the target. *)
+  let settle : 'a t -> Addr.t -> unit =
+   fun t addr ->
+    Option.iter t.num_accounts ~f:(fun num_accounts ->
+        let height = Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+        let first = Addr.to_int addr lsl height in
+        let last = Int.min num_accounts (first + (1 lsl height)) in
+        t.accounts_settled <- t.accounts_settled + Int.max 0 (last - first) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
   let merge_siblings : Hash.t array -> index -> Hash.t array =
@@ -647,6 +667,8 @@ end = struct
         (* TODO #444 should we batch all the updates and do them at the end? *)
         MT.set_all_accounts_rooted_at_exn t.tree addr content ;
         Addr.Table.remove t.waiting_content addr ;
+        settle t addr ;
+        t.accounts_received <- t.accounts_received + List.length content ;
         [%log trace]
           ~metadata:
             [ ("address", Addr.to_yojson addr)
@@ -693,10 +715,11 @@ end = struct
         let should_fetch_children addr hash =
           not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
         in
-        let subtrees_to_fetch =
+        let subtrees_to_fetch, subtrees_held =
           addresses_and_hashes
-          |> Array.filter ~f:(Tuple2.uncurry should_fetch_children)
+          |> Array.partition_tf ~f:(Tuple2.uncurry should_fetch_children)
         in
+        Array.iter subtrees_held ~f:(fun (addr, _) -> settle t addr) ;
         `Good subtrees_to_fetch )
       else `Hash_mismatch (expected, merged)
     else `Invalid_length
@@ -776,7 +799,9 @@ end = struct
     if
       Hash.equal exp_hash
         (empty_hash_at_height (Addr.height ~ledger_depth addr))
-    then MT.set_all_accounts_rooted_at_exn t.tree addr []
+    then (
+      MT.set_all_accounts_rooted_at_exn t.tree addr [] ;
+      settle t addr )
     else if Addr.depth addr >= ledger_depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
@@ -807,6 +832,8 @@ end = struct
       (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
       let actual = complete_with_empties content_hash height ledger_depth in
       if Hash.equal actual rh then (
+        t.num_accounts <- Some n ;
+        t.accounts_settled <- 0 ;
         Addr.Table.clear t.waiting_parents ;
         (* We should use this information to set the empty account slots empty and
            start syncing at the content root. See #1972. *)
@@ -1037,6 +1064,8 @@ end = struct
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
       t.targets <- t.targets + 1 ;
+      t.num_accounts <- None ;
+      t.accounts_settled <- 0 ;
       t.target_set_at <- Some (Core.Time.now ()) ;
       ( try don't_wait_for (Broadcast_pipe.Writer.write t.target_writer (Some h))
         with Broadcast_pipe.Already_closed _ -> () ) ;
@@ -1077,6 +1106,9 @@ end = struct
     ; answers_ignored = t.answers_ignored
     ; answers_rejected = t.answers_rejected
     ; last_accepted_answer_at = t.last_accepted_answer_at
+    ; num_accounts = t.num_accounts
+    ; accounts_settled = t.accounts_settled
+    ; accounts_received = t.accounts_received
     }
 
   let wait_until_valid t h =
@@ -1118,6 +1150,9 @@ end = struct
       ; answers_ignored = 0
       ; answers_rejected = 0
       ; last_accepted_answer_at = None
+      ; num_accounts = None
+      ; accounts_settled = 0
+      ; accounts_received = 0
       }
     in
     don't_wait_for (main_loop t) ;
