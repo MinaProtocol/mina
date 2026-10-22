@@ -275,3 +275,9 @@ val write_all_proofs_to_disk :
   -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+(** Writes the same bytes as serializing [read_all_proofs_from_disk t] as
+    [Stable.Latest.t], without loading the whole scan state: merge proofs are
+    copied from the proof cache as stored, and base jobs are loaded one at a
+    time. Each call to [size] or [write] reads them again. *)
+val bin_writer_stable : t Bin_prot.Type_class.writer
