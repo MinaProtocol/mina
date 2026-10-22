@@ -64,6 +64,23 @@ let snarked_local_state (t : _ Poly.t) =
 module Value = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        ( Staged_ledger_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Local_state.Stable.V1.t
+        , Block_time.Stable.V1.t
+        , Consensus.Body_reference.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V2.t
+        , unit )
+        Poly.Stable.V2.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Staged_ledger_hash.Stable.V1.t
@@ -78,7 +95,28 @@ module Value = struct
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : Latest.t =
+        { t with
+          ledger_proof_statement =
+            Snarked_ledger_state.Stable.V2.to_latest t.ledger_proof_statement
+        }
+
+      let to_input
+          ({ staged_ledger_hash
+           ; genesis_ledger_hash
+           ; timestamp
+           ; body_reference
+           ; ledger_proof_statement
+           } :
+            t ) =
+        let open Random_oracle.Input.Chunked in
+        List.reduce_exn ~f:append
+          [ Staged_ledger_hash.to_input staged_ledger_hash
+          ; Frozen_ledger_hash.to_input genesis_ledger_hash
+          ; Snarked_ledger_state.Stable.V2.to_input ledger_proof_statement
+          ; Block_time.to_input timestamp
+          ; Consensus.Body_reference.to_input body_reference
+          ]
     end
   end]
 end

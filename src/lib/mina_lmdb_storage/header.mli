@@ -3,6 +3,19 @@ open Mina_base
 module Entry : sig
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type t =
+        | Header of Mina_block.Header.Stable.V4.t
+        | Invalid of
+            { parent_state_hash : State_hash.Stable.V1.t
+            ; blockchain_length : Mina_numbers.Length.Stable.V1.t
+                  (* This field is set only if at the time of transition's
+                     invalidation, body was present in block storage *)
+            ; body_ref : Consensus.Body_reference.Stable.V1.t option
+            }
+      [@@deriving bin_io]
+    end
+
     module V2 : sig
       type t =
         | Header of Mina_block.Header.Stable.V3.t
@@ -14,6 +27,8 @@ module Entry : sig
             ; body_ref : Consensus.Body_reference.Stable.V1.t option
             }
       [@@deriving bin_io]
+
+      val to_latest : t -> V3.t
     end
   end]
 end

@@ -2,7 +2,7 @@ open Utils
 
 module Types : sig
   module type S = sig
-    module V2 : S0
+    module V3 : S0
   end
 end
 
@@ -13,9 +13,9 @@ module type Concrete = sig
     end
   end
 
-  module V2 : sig
+  module V3 : sig
     type t =
-      ( Mina_state.Snarked_ledger_state.With_sok.V2.t
+      ( Mina_state.Snarked_ledger_state.With_sok.V3.t
       , Proof.V2.t )
       Proof_carrying_data.V1.t
   end
@@ -29,4 +29,4 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module V2 = M.V2
+include Types.S with module V3 = M.V3
