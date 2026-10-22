@@ -210,6 +210,8 @@ module Versioned = struct
 
   let of_latest (t : Stable.Latest.t) = V4 t
 
+  let latest = function V4 t -> Some t | V3 _ -> None
+
   let to_yojson = function
     | V3 t ->
         `Assoc [ ("version", `Int 3); ("data", V3.to_yojson t) ]
