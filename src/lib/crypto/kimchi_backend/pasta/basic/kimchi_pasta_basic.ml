@@ -25,8 +25,6 @@ end = struct
   module Wrap_vector = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a Vector.Vector_15.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
@@ -46,8 +44,6 @@ end = struct
   module Step_vector = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a Vector.Vector_16.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]

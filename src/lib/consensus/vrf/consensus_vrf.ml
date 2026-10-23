@@ -192,6 +192,8 @@ module Output = struct
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
     include Codable.Make_base58_check (struct
       type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
@@ -406,8 +408,6 @@ end
 module Output_hash = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       module T = struct
         type t = (Snark_params.Tick.Field.t[@version_asserted])

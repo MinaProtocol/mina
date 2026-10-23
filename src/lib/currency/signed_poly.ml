@@ -10,4 +10,8 @@ module Stable = struct
   end
 end]
 
+type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
+  { magnitude : 'magnitude; sgn : 'sgn }
+[@@deriving annot, sexp, hash, compare, equal, yojson, fields]
+
 let map ~f { magnitude; sgn } = { magnitude = f magnitude; sgn }

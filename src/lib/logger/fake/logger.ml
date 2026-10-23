@@ -71,6 +71,8 @@ module Metadata = struct
     end
   end]
 
+  type t = Stable.Latest.t
+
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
   let empty = String.Map.empty

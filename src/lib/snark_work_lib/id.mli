@@ -13,6 +13,10 @@ module Single : sig
       val to_latest : t -> t
     end
   end]
+
+  type t = Stable.Latest.t =
+    { which_one : [ `First | `Second | `One ]; pairing_id : int64 }
+  [@@deriving compare, hash, sexp, yojson, equal]
 end
 
 module Range : sig
@@ -27,6 +31,9 @@ module Range : sig
       val to_latest : t -> t
     end
   end]
+
+  type t = Stable.Latest.t = { first : int; last : int }
+  [@@deriving compare, hash, sexp, equal, yojson]
 end
 
 (** A Sub_zkapp.t identifies a sub-zkapp level work *)
@@ -47,6 +54,13 @@ module Sub_zkapp : sig
     end
   end]
 
+  type t = Stable.Latest.t =
+    { which_one : [ `First | `Second | `One ]
+    ; pairing_id : int64
+    ; range : Range.t
+    }
+  [@@deriving compare, hash, sexp, yojson, equal]
+
   val of_single : range:Range.t -> Single.t -> t
 
   val to_single : t -> Single.t
@@ -64,4 +78,7 @@ module Any : sig
       val to_latest : t -> t
     end
   end]
+
+  type t = Stable.Latest.t = Single of Single.t | Sub_zkapp of Sub_zkapp.t
+  [@@deriving compare, hash, sexp, yojson, equal]
 end

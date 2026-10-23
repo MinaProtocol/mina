@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     type t =
       { id : Id.Any.Stable.V1.t

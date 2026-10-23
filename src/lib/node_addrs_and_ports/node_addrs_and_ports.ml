@@ -29,6 +29,15 @@ module Display = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { external_ip : Mina_stdlib.Bounded_types.String.t
+    ; bind_ip : Mina_stdlib.Bounded_types.String.t
+    ; peer : Peer.Display.t option
+    ; libp2p_port : int
+    ; client_port : int
+    }
+  [@@deriving fields, yojson, sexp]
 end
 
 let to_display (t : t) =

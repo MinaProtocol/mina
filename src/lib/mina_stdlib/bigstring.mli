@@ -11,6 +11,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, compare]
+
 include Hashable.S with type t := t
 
 val get : t -> int -> char

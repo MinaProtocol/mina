@@ -24,6 +24,8 @@ module Compressed = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t
   end
 
   let compress (x, y) = { Poly.x; is_odd = parity y }
@@ -67,6 +69,8 @@ module Compressed = struct
         compress uncompressed
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving equal, compare, hash]
 
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)
@@ -213,6 +217,8 @@ module Uncompressed = struct
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, equal, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)
