@@ -369,10 +369,6 @@ MOCKEXE
     create_mock_exe "default/src/app/zkapp_limits/zkapp_limits.exe"
     create_mock_exe "default/src/test/archive/patch_archive_test/patch_archive_test.exe"
     create_mock_exe "default/src/test/archive/archive_node_tests/archive_node_tests.exe"
-    create_mock_exe "default/src/app/rosetta/rosetta_mainnet_signatures.exe"
-    create_mock_exe "default/src/app/rosetta/rosetta_testnet_signatures.exe"
-    create_mock_exe "default/src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
-    create_mock_exe "default/src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe"
     # Unified (profile-dispatched-at-runtime) rosetta binaries used by the
     # build_rosetta_deb / build_rosetta_generic_deb functions.
     create_mock_exe "default/src/app/rosetta/rosetta.exe"
@@ -387,8 +383,6 @@ MOCKEXE
     create_mock_exe "default/src/lib/snark_worker/standalone/run_snark_worker.exe"
     create_mock_exe "default/src/app/rocksdb-scanner/rocksdb_scanner.exe"
     create_mock_exe "default/src/app/mina_healthcheck/mina_healthcheck.exe"
-    create_mock_exe "default/src/app/cli/src/mina_mainnet_signatures.exe"
-    create_mock_exe "default/src/app/cli/src/mina_testnet_signatures.exe"
     create_mock_exe "default/src/app/archive/archive.exe"
     create_mock_exe "default/src/app/archive_blocks/archive_blocks.exe"
     create_mock_exe "default/src/app/extract_blocks/extract_blocks.exe"
