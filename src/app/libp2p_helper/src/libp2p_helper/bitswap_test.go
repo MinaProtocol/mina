@@ -248,8 +248,11 @@ func (at bitswapTestAttempt) awaitResourceDownload(nodes []testNode, roots []Bit
 	ctxs := make([]context.Context, len(at))
 	cancels := make([]context.CancelFunc, len(at))
 	for ni := range at {
-		// ctx, cancelF := context.WithTimeout(nodes[ni].node.Ctx, 5*time.Second)
-		ctx, cancelF := context.WithCancel(nodes[ni].node.Ctx)
+		// Once the helper's own download timeout has passed, it drops the
+		// download without sending a ResourceUpdate, so waiting longer cannot
+		// succeed.
+		timeout := nodes[ni].node.bitswapCtx.dataConfig[BlockBodyTag].downloadTimeout + 30*time.Second
+		ctx, cancelF := context.WithTimeout(nodes[ni].node.Ctx, timeout)
 		ctxs[ni] = ctx
 		cancels[ni] = cancelF
 		go func(ni int) {
@@ -309,7 +312,7 @@ loop:
 			if ctx.Err() == context.Canceled {
 				continue loop
 			} else {
-				err = fmt.Errorf("%d: %v", i, ctx.Err())
+				err = fmt.Errorf("node %d: %v waiting for resources %v", i, ctx.Err(), getRequests(&at[i]))
 			}
 		case err = <-errChan:
 		}
