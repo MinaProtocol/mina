@@ -53,8 +53,8 @@ let make_dispatch_block rpc ?(max_tries = 5)
       match%bind
         Daemon_rpcs.Client.dispatch rpc block archive_location.value
       with
-      | Ok () ->
-          return (Ok ())
+      | Ok response ->
+          return (Ok response)
       | Error e ->
           go (tries_left - 1) (e :: errs)
   in
@@ -65,6 +65,12 @@ let dispatch_precomputed_block =
 
 let dispatch_extensional_block =
   make_dispatch_block Archive_lib.Rpc.extensional_block
+
+let dispatch_versioned_precomputed_block ?max_tries archive_location json =
+  make_dispatch_block Archive_lib.Rpc.versioned_precomputed_block ?max_tries
+    archive_location
+    (Yojson.Safe.to_string json)
+  >>| Or_error.join
 
 let transfer
     (breadcrumb_reader :

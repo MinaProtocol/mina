@@ -268,6 +268,16 @@ mutation ($block: PrecomputedBlock!) @encoders(module: "Encoders"){
 }
 |}]
 
+module Archive_versioned_precomputed_block =
+[%graphql
+{|
+mutation ($block: VersionedPrecomputedBlock!) @encoders(module: "Encoders"){
+  archiveVersionedPrecomputedBlock(block: $block) {
+      applied
+  }
+}
+|}]
+
 module Archive_extensional_block =
 [%graphql
 {|

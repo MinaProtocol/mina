@@ -4,14 +4,24 @@ open Async
 open Core_kernel
 open Mina_base
 
-(* custom Caqti types for generating type annotations on queries *)
-let find_req t u s = Caqti_request.Infix.(t ->! u) s
+(* Build every request once, when its function is defined, never per call:
+     let find =
+       let query = find_req ... in
+       fun (module Conn : CONNECTION) x -> Conn.find query x
+   Caqti 2.0.1 keys the server-side PREPARE by the identity of the
+   [Caqti_request.t] value, so a request built on each call is prepared again
+   on every pooled connection and stays there for the life of the connection.
+   Use [~oneshot:true] only for SQL text that embeds its values and takes
+   [Caqti_type.unit] parameters: Caqti 2.0.1 sends a oneshot query without its
+   parameter types. *)
+let find_req ?oneshot t u s = Caqti_request.Infix.(t ->! u) ?oneshot s
 
-let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
+let find_opt_req ?oneshot t u s = Caqti_request.Infix.(t ->? u) ?oneshot s
 
-let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+let collect_req ?oneshot t u s = Caqti_request.Infix.(t ->* u) ?oneshot s
 
-let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s
+let exec_req ?oneshot t s =
+  Caqti_request.Infix.(t ->. Caqti_type.unit) ?oneshot s
 
 module type CONNECTION = sig
   include Caqti_async.CONNECTION
@@ -400,27 +410,42 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
   | None ->
       sprintf "%s RETURNING %s" insert returning
 
+(* Prepared statements. The helpers below take their SQL-shaping arguments,
+   build their requests then, and return a [prepared] whose [run] reuses them.
+   Build each [prepared] once, in module scope (see the rule at the top of this
+   file); a [prepared] built inside a per-call function rebuilds its requests on
+   every call. *)
+
+type ('a, 'b) prepared =
+  { run :
+      'e.
+         (module CONNECTION)
+      -> 'a
+      -> ('b, ([> Caqti_error.call_or_retrieve ] as 'e)) Deferred.Result.t
+  }
+
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
 *)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
-    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
-    (module Conn : CONNECTION) (value : 'cols) =
-  let open Deferred.Result.Let_syntax in
-  Conn.find_opt
-    ( Caqti_request.Infix.(snd cols ->? snd select)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t) ()
+    : ('cols, 'select) prepared =
+  let select_req =
+    Caqti_request.Infix.(snd cols ->? snd select)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
-    )
-    value
-  >>= function
-  | Some id ->
-      return id
-  | None ->
-      Conn.find
-        ( Caqti_request.Infix.(snd cols ->! snd select)
-        @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-             ~cols:(fst cols) () )
-        value
+  in
+  let insert_req =
+    Caqti_request.Infix.(snd cols ->! snd select)
+    @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
+         ~cols:(fst cols) ()
+  in
+  { run =
+      (fun (module Conn : CONNECTION) (value : 'cols) ->
+        let open Deferred.Result.Let_syntax in
+        Conn.find_opt select_req value
+        >>= function Some id -> return id | None -> Conn.find insert_req value
+        )
+  }
 
 (* A [text[]] query parameter. Every element is double-quoted and escaped, so
    any string (including [NULL], commas, braces, quotes, backslashes) round-trips
@@ -445,13 +470,12 @@ let text_array_param_typ : string list Caqti_type.t =
    conflicts, and return the (value, id) pairs of the matching rows. The whole
    batch is bound as one [text[]] parameter and expanded with [unnest], so it
    costs two round trips regardless of size, and no value enters the SQL text.
-   Requests are [~oneshot:true] because the SQL depends on [table_name]/[col]. *)
-let insert_multi_into_col ~(table_name : string) ~(col : string)
-    (module Conn : CONNECTION) (values : string list) =
-  let open Deferred.Result.Let_syntax in
+   The SQL depends only on [table_name] and [col], so both requests are built
+   once, at staging. *)
+let insert_multi_into_col ~(table_name : string) ~(col : string) () :
+    (string list, (string * int) list) prepared =
   let insert_req =
     Caqti_request.Infix.(text_array_param_typ ->. Caqti_type.unit)
-      ~oneshot:true
       (sprintf
          "INSERT INTO %s (%s) SELECT unnest(?::text[]) ON CONFLICT (%s) DO \
           NOTHING"
@@ -459,25 +483,30 @@ let insert_multi_into_col ~(table_name : string) ~(col : string)
   in
   let select_req =
     Caqti_request.Infix.(text_array_param_typ ->* Caqti_type.(t2 string int))
-      ~oneshot:true
       (sprintf "SELECT %s, id FROM %s WHERE %s = ANY(?::text[])" col table_name
          col )
   in
-  let%bind () = Conn.exec insert_req values in
-  Conn.collect_list select_req values
+  { run =
+      (fun (module Conn : CONNECTION) (values : string list) ->
+        let open Deferred.Result.Let_syntax in
+        let%bind () = Conn.exec insert_req values in
+        Conn.collect_list select_req values )
+  }
 
 (* Like the [None] branch of [select_insert_into_cols]: always INSERT and return
    the new [returning] value. Performs NO content lookup/dedup, so it is safe for
    columns without a UNIQUE constraint or index (e.g. the unbounded int[]
    zkapp_events/zkapp_field_array.element_ids whose UNIQUE/index was dropped). *)
 let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
-    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
-    (module Conn : CONNECTION) (value : 'cols) =
-  Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t) ()
+    : ('cols, 'r) prepared =
+  let req =
+    Caqti_request.Infix.(snd cols ->! snd returning)
     @@ insert_into_cols ~returning:(fst returning) ~table_name ?tannot
-         ~cols:(fst cols) () )
-    value
+         ~cols:(fst cols) ()
+  in
+  { run = (fun (module Conn : CONNECTION) (value : 'cols) -> Conn.find req value)
+  }
 
 (* Like [insert_into_cols] but generates an upsert:
    INSERT INTO table (cols) VALUES (params)
@@ -494,13 +523,14 @@ let upsert_into_cols ~(on_conflict : string) ~(returning : string)
    or the existing row that caused the conflict. *)
 let upsert_into_cols_returning ~(on_conflict : string)
     ~(returning : string * 'r Caqti_type.t) ~(table_name : string) ?tannot
-    ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
-    (value : 'cols) =
-  Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ~(cols : string list * 'cols Caqti_type.t) () : ('cols, 'r) prepared =
+  let req =
+    Caqti_request.Infix.(snd cols ->! snd returning)
     @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
-         ?tannot ~cols:(fst cols) () )
-    value
+         ?tannot ~cols:(fst cols) ()
+  in
+  { run = (fun (module Conn : CONNECTION) (value : 'cols) -> Conn.find req value)
+  }
 
 (* No-dedup insert of int arrays into the [int[]] column [col] of
    [table_name], returning the new ids in [values] order. There is NO
@@ -512,38 +542,39 @@ let upsert_into_cols_returning ~(on_conflict : string)
    explicitly, so the id-to-value mapping does not depend on the row order of
    [RETURNING]. Arrays are ragged, so each is bound as one [text[]] element and
    cast to [int[]] by the server. Two round trips regardless of size. *)
-let insert_int_arrays_no_dedup ~(table_name : string) ~(col : string)
-    (module Conn : CONNECTION) (values : int array list) =
-  let open Deferred.Result.Let_syntax in
-  match values with
-  | [] ->
-      return []
-  | _ ->
-      let reserve_req =
-        Caqti_request.Infix.(Caqti_type.int ->* Caqti_type.int)
-          ~oneshot:true
-          (sprintf
-             "SELECT nextval(pg_get_serial_sequence('%s', 'id')) FROM \
-              generate_series(1, ?)"
-             table_name )
-      in
-      let insert_req =
-        Caqti_request.Infix.(
-          Caqti_type.(t2 array_int_typ text_array_param_typ) ->. Caqti_type.unit)
-          ~oneshot:true
-          (sprintf
-             "INSERT INTO %s (id, %s) SELECT i, e::int[] FROM unnest(?::int[], \
-              ?::text[]) AS u(i, e)"
-             table_name col )
-      in
-      let%bind ids = Conn.collect_list reserve_req (List.length values) in
-      let literals =
-        List.map values ~f:(fun xs ->
-            Array.to_list xs |> List.map ~f:Int.to_string
-            |> String.concat ~sep:"," |> sprintf "{%s}" )
-      in
-      let%map () = Conn.exec insert_req (Array.of_list ids, literals) in
-      ids
+let insert_int_arrays_no_dedup ~(table_name : string) ~(col : string) () :
+    (int array list, int list) prepared =
+  let reserve_req =
+    Caqti_request.Infix.(Caqti_type.int ->* Caqti_type.int)
+      (sprintf
+         "SELECT nextval(pg_get_serial_sequence('%s', 'id')) FROM \
+          generate_series(1, ?)"
+         table_name )
+  in
+  let insert_req =
+    Caqti_request.Infix.(
+      Caqti_type.(t2 array_int_typ text_array_param_typ) ->. Caqti_type.unit)
+      (sprintf
+         "INSERT INTO %s (id, %s) SELECT i, e::int[] FROM unnest(?::int[], \
+          ?::text[]) AS u(i, e)"
+         table_name col )
+  in
+  { run =
+      (fun (module Conn : CONNECTION) (values : int array list) ->
+        let open Deferred.Result.Let_syntax in
+        match values with
+        | [] ->
+            return []
+        | _ ->
+            let%bind ids = Conn.collect_list reserve_req (List.length values) in
+            let literals =
+              List.map values ~f:(fun xs ->
+                  Array.to_list xs |> List.map ~f:Int.to_string
+                  |> String.concat ~sep:"," |> sprintf "{%s}" )
+            in
+            let%map () = Conn.exec insert_req (Array.of_list ids, literals) in
+            ids )
+  }
 
 (** Unwrap a Caqti result, raising on error. [ctx] names the operation being
     performed and is prepended to the message. *)
