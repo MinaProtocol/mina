@@ -40,7 +40,13 @@ module type Inputs_intf = sig
 
   val set_raw_hash_batch : Base.t -> (Location.t * Hash.t) list -> unit
 
-  val set_raw_account_batch : Base.t -> (Location.t * Account.t) list -> unit
+  (** Write the accounts at their locations, and update the indexes kept for
+      the accounts that [reindex] selects. *)
+  val set_raw_account_batch :
+       reindex:(Location.t * Account.t -> bool)
+    -> Base.t
+    -> (Location.t * Account.t) list
+    -> unit
 
   val set_location_batch :
        last_location:Location.t
@@ -60,6 +66,16 @@ module Make (Inputs : Inputs_intf) : sig
 
   val set_batch :
        ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+    -> Inputs.Base.t
+    -> (Inputs.Location.t * Inputs.Account.t) list
+    -> unit
+
+  (** [set_batch], updating the indexes kept for an account only if [reindex]
+      selects it: an account replacing one with the same identifier keeps the
+      entries of the one it replaces. *)
+  val set_batch_reindexing :
+       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+    -> reindex:(Inputs.Location.t * Inputs.Account.t -> bool)
     -> Inputs.Base.t
     -> (Inputs.Location.t * Inputs.Account.t) list
     -> unit
