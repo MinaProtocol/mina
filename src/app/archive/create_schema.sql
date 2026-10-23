@@ -31,9 +31,10 @@ CREATE TABLE tokens
 , owner_token_id       int               REFERENCES tokens(id)
 );
 
+/* value is bytea: a token symbol is any 0..6 bytes, not necessarily UTF-8 */
 CREATE TABLE token_symbols
 ( id          serial PRIMARY KEY
-, value text  NOT NULL
+, value bytea NOT NULL
 );
 
 CREATE INDEX idx_token_symbols_value ON token_symbols(value);
@@ -280,9 +281,10 @@ CREATE TABLE zkapp_timing_info
 , vesting_increment        text    NOT NULL
 );
 
+/* value is bytea: a zkApp URI is any bytes, not necessarily UTF-8 */
 CREATE TABLE zkapp_uris
 ( id                 serial  PRIMARY KEY
-, value              text    NOT NULL UNIQUE
+, value              bytea   NOT NULL UNIQUE
 );
 
 /* NULL convention */
