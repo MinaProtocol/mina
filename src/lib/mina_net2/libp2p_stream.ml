@@ -25,7 +25,7 @@ type t =
   ; peer : Peer.t
   ; incoming_r : string Pipe.Reader.t
   ; incoming_w : string Pipe.Writer.t
-  ; outgoing_w : string Pipe.Writer.t
+  ; outgoing_w : Bigstring.t Pipe.Writer.t
   }
 
 let id { id; _ } = id
@@ -130,15 +130,15 @@ let stream_closed ~logger ~who_closed t =
 
 let max_chunk_size = 16777216 (* 16 MiB *)
 
-let split_string ~every b =
-  let blen = String.length b in
+let split_bigstring ~every b =
+  let blen = Bigstring.length b in
   let num_chunks = (blen + every - 1) / every in
   Sequence.init num_chunks ~f:(fun i ->
       let pos = i * every in
       let len = if i + 1 = num_chunks then blen - pos else every in
-      String.sub ~pos ~len b )
+      Bigstring.To_string.sub ~pos ~len b )
 
-let%test_unit "split_string" =
+let%test_unit "split_bigstring" =
   let gen =
     let module Gen = Quickcheck.Generator in
     let%bind.Gen every = Gen.small_positive_int in
@@ -156,10 +156,10 @@ let%test_unit "split_string" =
     (every, List.append rest last)
   in
   Quickcheck.test gen ~f:(fun (every, expected) ->
-      let s = String.concat expected in
+      let s = Bigstring.of_string (String.concat expected) in
       assert (
         List.equal String.equal expected
-        @@ Sequence.to_list (split_string ~every s) ) )
+        @@ Sequence.to_list (split_bigstring ~every s) ) )
 
 let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     ~release_stream =
@@ -195,7 +195,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
                 in
                 send_parts parts
           in
-          match%map send_parts (split_string msg ~every:max_chunk_size) with
+          match%map send_parts (split_bigstring msg ~every:max_chunk_size) with
           | Ok _ ->
               false
           | Error e ->
