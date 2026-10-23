@@ -1702,7 +1702,25 @@ let%test_module _ =
 
     let logger = Logger.null ()
 
-    let time_controller = Block_time.Controller.basic ~logger
+    (* Block time only moves when a test advances it. It starts in the middle
+       of the current slot, so that the controller's small inaccuracy never
+       changes which slot it reads. *)
+    let time_controller, advance_time =
+      let slot_start =
+        Consensus.Data.Consensus_time.(
+          of_time_exn ~constants:consensus_constants
+            (Block_time.now (Block_time.Controller.basic ~logger))
+          |> start_time ~constants:consensus_constants)
+      in
+      let half_block_window =
+        Int64.(
+          Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+          / 2L)
+        |> Block_time.Span.of_ms
+      in
+      Block_time.Controller.For_tests.manual
+        ~start:
+          (Block_time.to_time_exn (Block_time.add slot_start half_block_window))
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -2478,15 +2496,6 @@ let%test_module _ =
 
     let mk_expired_not_accepted_test t ~padding cmds =
       assert_pool_txs t [] ;
-      let%bind () =
-        let current_time = Block_time.now time_controller in
-        let slot_end =
-          Consensus.Data.Consensus_time.(
-            of_time_exn ~constants:consensus_constants current_time
-            |> end_time ~constants:consensus_constants)
-        in
-        at (Block_time.to_time_exn slot_end)
-      in
       let curr_slot = current_global_slot () in
       let slot_padding = Mina_numbers.Global_slot_span.of_int padding in
       let curr_slot_plus_padding =
@@ -2504,14 +2513,12 @@ let%test_module _ =
             ~amount:1_000_000_000 ~signature_kind ()
         ]
       in
-      (* Wait till global slot increases by 1 which invalidates
+      (* Move to the next global slot, which invalidates
          the commands with valid_until = curr_slot
       *)
-      let%bind () =
-        after
-          (Block_time.Span.to_time_span
-             consensus_constants.block_window_duration_ms )
-      in
+      advance_time
+        (Block_time.Span.to_time_span
+           consensus_constants.block_window_duration_ms ) ;
       let all_valid_commands = cmds @ [ valid_command ] in
       let%bind () =
         add_commands t (all_valid_commands @ expired_commands)
@@ -2593,9 +2600,7 @@ let%test_module _ =
               * n)
             |> Block_time.Span.of_ms
           in
-          let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 3L))
-          in
+          advance_time (Block_time.Span.to_time_span (n_block_times 3L)) ;
           modify_ledger !(t.best_tip_ref) ~idx:0 ~balance:1_000_000_000_000_000
             ~nonce:1 ;
           let%bind _ = reorg t [ valid_forever ] removed_commands in
@@ -2606,9 +2611,7 @@ let%test_module _ =
             ( expires_later1 :: expires_later2 :: unexpired_command
             :: List.drop few_now 1 ) ;
           (* after 5 block times there should be no expired transactions *)
-          let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 5L))
-          in
+          advance_time (Block_time.Span.to_time_span (n_block_times 5L)) ;
           let%bind _ = reorg t [] [] in
           assert_pool_txs t (List.drop few_now 1) ;
           Deferred.unit )
@@ -2651,15 +2654,11 @@ let%test_module _ =
               * n)
             |> Block_time.Span.of_ms
           in
-          let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 4L))
-          in
+          advance_time (Block_time.Span.to_time_span (n_block_times 4L)) ;
           let%bind () = reorg t [] [] in
           assert_pool_txs t (expires_later2 :: few_now) ;
           (* after 5 block times there should be no expired transactions *)
-          let%bind () =
-            after (Block_time.Span.to_time_span (n_block_times 5L))
-          in
+          advance_time (Block_time.Span.to_time_span (n_block_times 5L)) ;
           let%bind () = reorg t [] [] in
           assert_pool_txs t few_now ; Deferred.unit )
 
