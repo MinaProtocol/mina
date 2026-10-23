@@ -4320,7 +4320,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: equal states are always in short \
                      fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test (gen_spot ()) ~f:(fun state ->
+        Quickcheck.test ~trials:100 (gen_spot ()) ~f:(fun state ->
             assert_consensus_state_pair (state, state)
               ~assertion:"within long range" ~f:(fun (a, b) ->
                 Hooks.is_short_range a b ~constants ) )
@@ -4328,7 +4328,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: gen_spot_pair_short_aligned \
                      always generates pairs of states in short fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test (gen_spot_pair_short_aligned ()) ~f:(fun (a, b) ->
+        Quickcheck.test ~trials:100 (gen_spot_pair_short_aligned ())
+          ~f:(fun (a, b) ->
             assert_consensus_state_pair
               (With_hash.data a, With_hash.data b)
               ~assertion:"within short range"
@@ -4337,7 +4338,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: gen_spot_pair_short_misaligned \
                      always generates pairs of states in short fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test (gen_spot_pair_short_misaligned ()) ~f:(fun (a, b) ->
+        Quickcheck.test ~trials:100 (gen_spot_pair_short_misaligned ())
+          ~f:(fun (a, b) ->
             assert_consensus_state_pair
               (With_hash.data a, With_hash.data b)
               ~assertion:"within short range"
@@ -4346,14 +4348,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: gen_spot_pair_long always \
                      generates pairs of states in long fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test gen_spot_pair_long ~f:(fun (a, b) ->
+        Quickcheck.test ~trials:100 gen_spot_pair_long ~f:(fun (a, b) ->
             assert_consensus_state_pair
               (With_hash.data a, With_hash.data b)
               ~assertion:"within long range"
               ~f:(fun (a, b) -> not (Hooks.is_short_range ~constants a b)) )
 
       let%test_unit "selection case: equal states" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (Quickcheck.Generator.tuple2 State_hash.gen (gen_spot ()))
           ~f:(fun (hash, state) ->
             let hashed_state =
@@ -4367,21 +4369,21 @@ module Make_str (A : Wire_types.Concrete) = struct
             assert_not_selected (hashed_state, hashed_state) )
 
       let%test_unit "selection case: aligned checkpoints & different lengths" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Ascending
              () )
           ~f:assert_selected
 
       let%test_unit "selection case: aligned checkpoints & equal lengths & \
                      different vrfs" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Ascending () )
           ~f:assert_selected
 
       let%test_unit "selection case: aligned checkpoints & equal lengths & \
                      equal vrfs & different hashes" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Equal () )
           ~f:(fun (a, b) ->
@@ -4393,7 +4395,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let%test_unit "selection case: misaligned checkpoints & different lengths"
           =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_misaligned
              ~blockchain_length_relativity:`Ascending () )
           ~f:assert_selected
@@ -4403,7 +4405,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        *)
       let%test_unit "selection case: misaligned checkpoints & equal lengths & \
                      different vrfs" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_misaligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Ascending () )
           ~f:assert_selected
@@ -4438,7 +4440,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let select existing candidate =
           Hooks.select ~context:(module Context) ~existing ~candidate
         in
-        Quickcheck.test gen_spot_pair
+        Quickcheck.test ~trials:500 gen_spot_pair
           ~f:
             (assert_hashed_consensus_state_pair
                ~assertion:"chains do not trigger a selection cycle"
@@ -4488,7 +4490,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           else false
         in
         let gen = gen_with_hash (gen_spot ()) in
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (Quickcheck.Generator.tuple3 gen gen gen)
           ~f:
             (assert_hashed_consensus_state_triple

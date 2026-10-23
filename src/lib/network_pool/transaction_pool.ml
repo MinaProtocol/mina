@@ -3174,7 +3174,7 @@ let%test_module _ =
               authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
-            Verifier.For_tests.default ~constraint_constants ~logger
+            Verifier.For_tests.commands_only ~constraint_constants ~logger
               ~proof_level:Full ()
           in
           let%bind test =
