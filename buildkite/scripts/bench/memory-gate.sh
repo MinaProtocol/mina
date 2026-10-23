@@ -12,8 +12,6 @@
 #
 #   memory-gate.sh verdict
 #       Run after the upload. Exits 42 if a gate failed in this job, else 0.
-#       A job that sets soft_fail on exit status 42 so reports a failed gate
-#       without failing; every other failure of the job stays a failure.
 
 set -uo pipefail
 

@@ -3240,7 +3240,7 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 Option.is_none
-                  (Ledger.location_of_account test_mask
+                  (Ledger.location_of_account (Sl.ledger !sl)
                      (Account_id.create snark_worker_pk Token_id.default) ) ) )
           )
 
@@ -3302,7 +3302,7 @@ let%test_module "staged ledger tests" =
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger:_ sl _test_mask ->
               let%map checked =
-                iter_cmds_acc cmds iters true
+                iter_cmds_acc cmds iters false
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
                     let scan_state = Sl.scan_state !sl in
                     let work =

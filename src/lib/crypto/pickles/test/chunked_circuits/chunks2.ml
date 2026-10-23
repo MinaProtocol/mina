@@ -126,6 +126,5 @@ let test () =
   test_prove ()
 
 let () =
-  test () ;
   Alcotest.run "Chunked circuit"
     [ ("2^16", [ ("prove and verify", `Quick, test) ]) ]

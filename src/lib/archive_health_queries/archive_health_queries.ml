@@ -26,29 +26,28 @@ module Missing_blocks_count = struct
      an empty [blocks] table [MIN]/[MAX] are NULL, so the whole
      expression is NULL; the outer [COALESCE(..., 0)] keeps the
      mli contract (returns 0, never NULL). *)
-  let query missing_blocks_width =
-    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
-      (Core_kernel.sprintf
-         {sql|
-        WITH extremes AS (
-          SELECT MIN(height) AS min_block, MAX(height) AS max_block
-          FROM blocks
-        ), window_bounds AS (
-          SELECT GREATEST(min_block, max_block - %d) AS window_start,
-                 max_block AS window_end
-          FROM extremes
-        )
-        SELECT COALESCE(
-                 (window_end - window_start + 1)
-                 - (SELECT COUNT(DISTINCT height) FROM blocks
-                    WHERE height BETWEEN window_start AND window_end),
-                 0)::int AS missing_blocks
-        FROM window_bounds
-      |sql}
-         missing_blocks_width )
-
-  let run (module Conn : Mina_caqti.CONNECTION) ~missing_blocks_width () =
-    Conn.find (query missing_blocks_width) ()
+  let run =
+    let query =
+      Mina_caqti.find_req Caqti_type.int Caqti_type.int
+        {sql|
+          WITH extremes AS (
+            SELECT MIN(height) AS min_block, MAX(height) AS max_block
+            FROM blocks
+          ), window_bounds AS (
+            SELECT GREATEST(min_block, max_block - $1) AS window_start,
+                   max_block AS window_end
+            FROM extremes
+          )
+          SELECT COALESCE(
+                   (window_end - window_start + 1)
+                   - (SELECT COUNT(DISTINCT height) FROM blocks
+                      WHERE height BETWEEN window_start AND window_end),
+                   0)::int AS missing_blocks
+          FROM window_bounds
+        |sql}
+    in
+    fun (module Conn : Mina_caqti.CONNECTION) ~missing_blocks_width () ->
+      Conn.find query missing_blocks_width
 end
 
 module Unparented_blocks_count = struct

@@ -236,6 +236,9 @@ end
 module type SYNC_RECIPIENT = sig
   include SYNC_CANDIDATE
 
+  (** Replace the accounts in the subtree at the given address: the given
+      accounts fill its leftmost leaves, and any accounts in the leaves after
+      them are removed. *)
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 end
 
@@ -477,6 +480,7 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
+    (** See [SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. *)
     val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
 
     val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
@@ -558,6 +562,8 @@ module Ledger = struct
 
       module Config : Config
 
+      (** See [SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. Both ledgers are
+          updated. *)
       val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
 
       val dbs_synced : primary_ledger -> converting_ledger -> bool

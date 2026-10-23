@@ -2,27 +2,22 @@
 
 BUILD_DIR=./bin
 
-BINARIES=hardfork-runner nightly-promoter
+BINARIES=hardfork-runner
 
 build:
 	@echo "Building all binaries..."
 	@mkdir -p $(BUILD_DIR)
 	@go build -o $(BUILD_DIR)/hardfork-runner ./cmd/hardfork-runner
-	@go build -o $(BUILD_DIR)/nightly-promoter ./cmd/nightly-promoter
 	@echo "Build complete: $(BUILD_DIR)/"
 
 build-hardfork-runner:
 	@mkdir -p $(BUILD_DIR)
 	@go build -o $(BUILD_DIR)/hardfork-runner ./cmd/hardfork-runner
 
-build-nightly-promoter:
-	@mkdir -p $(BUILD_DIR)
-	@go build -buildvcs=false -o $(BUILD_DIR)/nightly-promoter ./cmd/nightly-promoter
 
 install: build
 	@echo "Installing binaries to /usr/local/bin..."
 	@sudo cp $(BUILD_DIR)/hardfork-runner /usr/local/bin/
-	@sudo cp $(BUILD_DIR)/nightly-promoter /usr/local/bin/
 	@echo "Installed successfully"
 
 clean:

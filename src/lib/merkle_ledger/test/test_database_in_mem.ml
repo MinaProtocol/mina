@@ -591,6 +591,150 @@ module Make (Test : Test_intf) = struct
                 in
                 assert (Int.equal retrieved_total total) ) ) )
 
+  (* The accounts at indices 0-13, with distinct identifiers. *)
+  let fourteen_accounts () =
+    let accounts =
+      Quickcheck.random_value
+        (Quickcheck.Generator.list_with_length 64 Account.gen)
+      |> dedup_accounts |> Fn.flip List.take 14
+    in
+    assert (List.length accounts = 14) ;
+    accounts
+
+  (* The address at [depth - height] whose subtree holds the leaves from
+     [index * 2^height]. *)
+  let subtree_address mdb ~height index =
+    MT.Addr.of_int_exn ~ledger_depth:(MT.depth mdb - height) index
+
+  (* Check that [mdb] holds exactly [expected], the accounts expected at each
+     index, and has no entries for [removed]. *)
+  let check_holds_exactly mdb ~expected ~removed =
+    let reference = Test.with_instance Fn.id in
+    MT.set_batch_accounts reference
+      (List.filter_map expected ~f:(fun (index, account) ->
+           Option.map account ~f:(fun account ->
+               ( MT.Addr.of_int_exn ~ledger_depth:(MT.depth reference) index
+               , account ) ) ) ) ;
+    [%test_eq: Md5.t] (MT.merkle_root reference) (MT.merkle_root mdb) ;
+    [%test_eq: int] (MT.num_accounts reference) (MT.num_accounts mdb) ;
+    List.iter removed ~f:(fun account ->
+        let account_id = Account.identifier account in
+        assert (Option.is_none (MT.location_of_account mdb account_id)) ;
+        assert (
+          not
+            (Set.mem
+               (MT.tokens mdb (Account_id.public_key account_id))
+               (Account_id.token_id account_id) ) ) ;
+        assert (
+          Option.is_none
+            (MT.token_owner mdb (Account_id.derive_token_id ~owner:account_id)) ) )
+
+  let indexed accounts =
+    List.mapi accounts ~f:(fun i account -> (i, Some account))
+
+  let with_fourteen_accounts f =
+    Test.with_instance (fun mdb ->
+        let accounts = fourteen_accounts () in
+        List.iter accounts ~f:(fun account ->
+            ignore (create_new_account_exn mdb account : MT.Location.t) ) ;
+        f mdb accounts )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn removes the accounts after the given ones"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            (* Leaves 12-15 hold accounts 12 and 13; keep only account 12. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 3)
+              [ List.nth_exn accounts 12 ] ;
+            check_holds_exactly mdb
+              ~expected:(indexed (List.take accounts 13))
+              ~removed:[ List.nth_exn accounts 13 ] ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn with no accounts empties a subtree"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 3)
+              [] ;
+            check_holds_exactly mdb
+              ~expected:(indexed (List.take accounts 12))
+              ~removed:(List.drop accounts 12) ) )
+
+  let () =
+    add_test
+      "emptying the subtree with the last account skips over emptied leaves"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            (* Empty leaves 4-7, leaving a gap before the last account. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 1)
+              [] ;
+            check_holds_exactly mdb
+              ~expected:
+                (List.mapi accounts ~f:(fun i account ->
+                     (i, Option.some_if (i < 4 || i >= 8) account) ) )
+              ~removed:(List.sub accounts ~pos:4 ~len:4) ;
+            (* Empty leaves 8-15, which hold the last account. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 1)
+              [] ;
+            check_holds_exactly mdb
+              ~expected:(indexed (List.take accounts 4))
+              ~removed:(List.drop accounts 4) ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn can empty the ledger" (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            MT.set_all_accounts_rooted_at_exn mdb (MT.Addr.root ()) [] ;
+            check_holds_exactly mdb ~expected:[] ~removed:accounts ;
+            assert (Option.is_none (MT.last_filled mdb)) ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn evicts overwritten accounts"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let replacement =
+              Quickcheck.random_value
+                (Quickcheck.Generator.filter Account.gen ~f:(fun account ->
+                     not
+                       (List.mem accounts account ~equal:(fun a b ->
+                            Account_id.equal (Account.identifier a)
+                              (Account.identifier b) ) ) ) )
+            in
+            (* Overwrite account 12 with an account not in the ledger. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 3)
+              [ replacement; List.nth_exn accounts 13 ] ;
+            check_holds_exactly mdb
+              ~expected:
+                (indexed
+                   ( List.take accounts 12
+                   @ [ replacement; List.nth_exn accounts 13 ] ) )
+              ~removed:[ List.nth_exn accounts 12 ] ;
+            [%test_eq: int] 12
+              (MT.index_of_account_exn mdb (Account.identifier replacement)) ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn keeps accounts that move leaves"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let account_12 = List.nth_exn accounts 12 in
+            let account_13 = List.nth_exn accounts 13 in
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:2 3)
+              [ account_13; account_12 ] ;
+            check_holds_exactly mdb
+              ~expected:
+                (indexed (List.take accounts 12 @ [ account_13; account_12 ]))
+              ~removed:[] ;
+            [%test_eq: int] 13
+              (MT.index_of_account_exn mdb (Account.identifier account_12)) ;
+            [%test_eq: int] 12
+              (MT.index_of_account_exn mdb (Account.identifier account_13)) ) )
+
   let tests =
     let actual_tests = Stack.fold test_stack ~f:(fun l t -> t :: l) ~init:[] in
     (test_section_name, actual_tests)
