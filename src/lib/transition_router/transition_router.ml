@@ -491,7 +491,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
                   ~local_state:consensus_local_state
                   ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
                   ~context:(module Context)
-                  ~trust_system sync_jobs
+                  ~trust_system ~bootstrap_status sync_jobs
               with
               | Error e ->
                   Error.tag e ~tag:"Local state sync failed" |> Error.raise

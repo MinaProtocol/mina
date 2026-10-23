@@ -563,7 +563,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   ~context:(module Context)
                   ~local_state:consensus_local_state ~trust_system
                   ~glue_sync_ledger:(Mina_networking.glue_sync_ledger t.network)
-                  sync_jobs
+                  ~bootstrap_status sync_jobs
               in
               (true, result) )
       in

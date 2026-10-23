@@ -2602,7 +2602,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    } ) )
 
     let sync_local_state ~context:(module Context : CONTEXT_WITH_LEDGER_SYNC)
-        ~trust_system ~local_state ~glue_sync_ledger requested_syncs =
+        ~trust_system ~local_state ~glue_sync_ledger ~bootstrap_status
+        requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2690,9 +2691,23 @@ module Make_str (A : Wire_types.Concrete) = struct
               glue_sync_ledger ~preferred:[]
                 ~target:(Mina_ledger.Sync_ledger.Root.target sync_ledger)
                 query_reader response_writer ;
+              let ledger : Bootstrap_status.Ledger.t =
+                match snapshot_id with
+                | Staking_epoch_snapshot ->
+                    Staking_epoch
+                | Next_epoch_snapshot ->
+                    Next_epoch
+              in
               match%bind
-                Mina_ledger.Sync_ledger.Root.fetch sync_ledger
-                  target_ledger_hash ~data:() ~equal:(fun () () -> true)
+                Bootstrap_status.with_ledger_sync bootstrap_status ledger
+                  ~target:(fun () ->
+                    Pipe_lib.Broadcast_pipe.Reader.peek
+                      (Mina_ledger.Sync_ledger.Root.target sync_ledger) )
+                  ~progress:(fun () ->
+                    Mina_ledger.Sync_ledger.Root.progress sync_ledger )
+                  ~f:(fun () ->
+                    Mina_ledger.Sync_ledger.Root.fetch sync_ledger
+                      target_ledger_hash ~data:() ~equal:(fun () () -> true) )
               with
               | `Ok ledger ->
                   [%log info]
