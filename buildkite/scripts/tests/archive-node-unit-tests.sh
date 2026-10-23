@@ -72,6 +72,9 @@ dune runtest src/test/rosetta_fork_balance
 # Rosetta account balances read from the archive: blocks and genesis ledgers
 dune runtest src/test/rosetta_genesis_balances
 
+# Rosetta's liquid and total balance of a vesting account, read from the archive
+dune runtest src/test/rosetta_vesting_balance
+
 # mina-archive-healthcheck: hermetic CLI smoke tests, plus DB-backed tests on
 # the same server ($MINA_TEST_POSTGRES)
 dune runtest src/app/mina_archive_healthcheck
