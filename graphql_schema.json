@@ -7320,6 +7320,52 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "TransactionPoolStatus",
+          "description":
+            "Occupancy of the transaction pool. When the pool is full, admitting a new command evicts the command with the lowest fee per weight unit, together with every later-nonce command from the same fee payer",
+          "fields": [
+            {
+              "name": "size",
+              "description": "Number of commands currently in the pool",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "maxSize",
+              "description":
+                "Number of commands the pool holds before it starts evicting commands",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "minimumFeePerWeightUnit",
+              "description":
+                "The lowest fee per weight unit of any command in the pool, in nanomina, as a decimal integer or a fraction 'n/d'. Null if the pool is empty. Once the pool is full, a new command must pay strictly more than this to be admitted. Payments and stake delegations have weight 1",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "ID",
           "description": null,
@@ -15526,6 +15572,23 @@
                       "ofType": null
                     }
                   }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "transactionPoolStatus",
+              "description":
+                "Occupancy of this daemon's transaction pool, and the fee a new command must beat once the pool is full. Cheap enough to poll before each submission, as a back-pressure signal",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "TransactionPoolStatus",
+                  "ofType": null
                 }
               },
               "isDeprecated": false,

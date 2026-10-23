@@ -2172,6 +2172,18 @@ module Queries = struct
                   ; data = { cmd_with_hash with data = zkapp_cmd }
                   } ) )
 
+  let transaction_pool_status =
+    field "transactionPoolStatus"
+      ~doc:
+        "Occupancy of this daemon's transaction pool, and the fee a new \
+         command must beat once the pool is full. Cheap enough to poll before \
+         each submission, as a back-pressure signal"
+      ~typ:(non_null Types.transaction_pool_status)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        Mina_lib.transaction_pool mina
+        |> Network_pool.Transaction_pool.resource_pool )
+
   let sync_status =
     io_field "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun { ctx = mina; _ } () ->
@@ -3219,6 +3231,7 @@ module Queries = struct
     ; get_peers
     ; pooled_user_commands
     ; pooled_zkapp_commands
+    ; transaction_pool_status
     ; transaction_status
     ; trust_status
     ; trust_status_all
