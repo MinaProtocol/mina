@@ -32,17 +32,9 @@
   ppx_version.runtime)
  (preprocess
   (pps
-   ppx_snarky
-   ppx_mina
-   ppx_version
-   ppx_let
-   ppx_hash
-   ppx_compare
-   ppx_sexp_conv
-   ppx_inline_test
-   ppx_deriving_yojson
-   ppx_compare
-   h_list.ppx
-   ppx_custom_printf))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx)))

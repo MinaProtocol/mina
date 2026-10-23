@@ -10,7 +10,7 @@
   sexplib0
   ppx_version.runtime)
  (preprocess
-  (pps ppx_jane ppx_version ppx_deriving_yojson))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Different kinds of status for Coda "))

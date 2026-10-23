@@ -20,6 +20,6 @@
   staged_ledger_diff)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot))
+  (pps mina_ppx ppxlib.metaquot))
  (instrumentation
   (backend bisect_ppx)))

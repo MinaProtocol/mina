@@ -22,12 +22,12 @@ ROOT="${MINA_READ_CACHE_ROOT:-$ROOT}"
 
 mkdir -p "$LOCAL_DEB_FOLDER"
 source ./buildkite/scripts/export-git-env-vars.sh
-./buildkite/scripts/cache/manager.sh read --root legacy/debians "$MINA_DEB_CODENAME/*" "${LOCAL_DEB_FOLDER}"
-./buildkite/scripts/cache/manager.sh read --root "${ROOT}" "debians/$MINA_DEB_CODENAME/*" "${LOCAL_DEB_FOLDER}"
+buildkite-cache-manager read --root legacy/debians "$MINA_DEB_CODENAME/*" "${LOCAL_DEB_FOLDER}"
+buildkite-cache-manager read --root "${ROOT}" "debians/$MINA_DEB_CODENAME/*" "${LOCAL_DEB_FOLDER}"
 
 # MINA_GENERIC_CACHE_ROOT names the build that made the network-less packages
 # (mina-generic, *-generic, logproc). A network packaging run built without
 # them, so their .debs come from that build.
 if [[ -n "${MINA_GENERIC_CACHE_ROOT:-}" ]]; then
-  ./buildkite/scripts/cache/manager.sh read --root "${MINA_GENERIC_CACHE_ROOT}" "debians/$MINA_DEB_CODENAME/*" "${LOCAL_DEB_FOLDER}"
+  buildkite-cache-manager read --root "${MINA_GENERIC_CACHE_ROOT}" "debians/$MINA_DEB_CODENAME/*" "${LOCAL_DEB_FOLDER}"
 fi

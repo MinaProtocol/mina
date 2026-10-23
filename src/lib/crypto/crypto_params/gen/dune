@@ -31,7 +31,12 @@
   logger.fake)
  (forbidden_libraries mina_node_config)
  (preprocess
-  (pps ppx_version ppxlib.metaquot))
+  (pps
+   mina_ppx
+   ppxlib.metaquot
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (modes native))

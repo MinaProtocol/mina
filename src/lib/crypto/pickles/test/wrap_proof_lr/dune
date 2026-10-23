@@ -2,7 +2,7 @@
  (name test_wrap_proof_lr)
  (flags (:standard) -open Core_kernel -open Pickles)
  (preprocess
-  (pps ppx_jane))
+  (pps mina_ppx))
  (libraries
   alcotest
   core_kernel

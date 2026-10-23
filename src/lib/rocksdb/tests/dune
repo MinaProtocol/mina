@@ -16,4 +16,4 @@
   mina_stdlib_unix
   rocksdb)
  (preprocess
-  (pps ppx_version ppx_jane)))
+  (pps mina_ppx)))

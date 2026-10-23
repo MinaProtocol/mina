@@ -201,8 +201,9 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let open Context in
   let query_reader = Sync_ledger.Root.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Root.answer_writer root_sync_ledger in
-  Mina_networking.glue_sync_ledger ~preferred t.network query_reader
-    response_writer ;
+  Mina_networking.glue_sync_ledger ~preferred t.network
+    ~target:(Sync_ledger.Root.target root_sync_ledger)
+    query_reader response_writer ;
   Pipe_lib.Choosable_synchronous_pipe.iter sync_ledger_reader
     ~f:(fun (b_or_h, `Valid_cb vc) ->
       let header_with_hash, sender, transition_cache_element =

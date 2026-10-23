@@ -154,6 +154,17 @@
         },
         {
           "kind": "SCALAR",
+          "name": "VersionedPrecomputedBlock",
+          "description":
+            "Block encoded in precomputed block format, of any version the archive reads",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "PrecomputedBlock",
           "description": "Block encoded in precomputed block format",
           "fields": null,
@@ -5440,6 +5451,39 @@
               "deprecationReason": null
             },
             {
+              "name": "archiveVersionedPrecomputedBlock",
+              "description":
+                "Send a precomputed block of any version the archive reads to the archive, which reads it by the rules of its own version. The block is forwarded as given.",
+              "args": [
+                {
+                  "name": "block",
+                  "description":
+                    "Block encoded in precomputed block format, with its version",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "VersionedPrecomputedBlock",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Applied",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "archiveExtensionalBlock",
               "description": null,
               "args": [
@@ -6875,6 +6919,110 @@
                   "kind": "OBJECT",
                   "name": "WorkBundleSpec",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ScanStateTree",
+          "description":
+            "Free space and outstanding snark work in one tree of the scan state",
+          "fields": [
+            {
+              "name": "availableSpace",
+              "description":
+                "Number of transaction slots still free in this tree",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "baseJobsTodo",
+              "description":
+                "Number of base jobs in this tree that are yet to be done",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "mergeJobsTodo",
+              "description":
+                "Number of merge jobs in this tree that are yet to be done",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ScanState",
+          "description": "Status of the scan state as of a block",
+          "fields": [
+            {
+              "name": "stateHash",
+              "description":
+                "State hash of the block whose scan state this is",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "StateHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trees",
+              "description":
+                "Status of each tree in the scan state, oldest first",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ScanStateTree",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -15578,6 +15726,34 @@
                       "ofType": null
                     }
                   }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "scanState",
+              "description":
+                "Free space and outstanding snark work in each tree of the scan state as of the given block, or of the best tip if no block is given. Returns an error if the block is not in the transition frontier or if the system is bootstrapping.",
+              "args": [
+                {
+                  "name": "stateHash",
+                  "description": "The state hash of the desired block",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ScanState",
+                  "ofType": null
                 }
               },
               "isDeprecated": false,

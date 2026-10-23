@@ -43,8 +43,9 @@
   genesis_ledger_helper
   mina_runtime_config
   precomputed_values
-  logger)
+  logger
+  delegation_verify_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane h_list.ppx)))
+  (pps mina_ppx)))

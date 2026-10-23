@@ -21,7 +21,7 @@
   ;; local libraries
   mina_metrics)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Performance monitoring with histograms"))

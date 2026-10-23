@@ -136,15 +136,18 @@ let interrupted server_uri () =
             (Or_error.ok_exn found) )
       |> Deferred.ok )
 
-(* A database that never ran the schema upgrade: nothing is written and
+(* A database created before the table was added: nothing is written and
    nothing is found, and neither is an error. *)
 let without_table server_uri () =
   B.Db.with_fresh ~server_uri ~name:"test_genesis_accounts_no_table" (fun db ->
       let open Deferred.Or_error.Let_syntax in
-      (* upgrade.sql then downgrade.sql: the schema of an archive from before
-         the table *)
-      let%bind () = B.Db.run_script db `Upgrade in
-      let%bind () = B.Db.run_script db `Rollback in
+      let%bind () =
+        with_conn db (fun (module Conn : Mina_caqti.CONNECTION) ->
+            Conn.exec
+              (Caqti_request.Infix.( ->. ) Caqti_type.unit Caqti_type.unit
+                 "DROP TABLE genesis_accounts" )
+              () )
+      in
       let%bind written = add db ~genesis_height:1 [ alice ] in
       check_outcome "write" "no table" written ;
       let%map found = latest db "alice" ~height:1 in

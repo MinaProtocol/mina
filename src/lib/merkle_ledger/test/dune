@@ -4,11 +4,7 @@
  (modules (:standard \ test))
  (flags (:standard -warn-error +a))
  (preprocess
-  (pps
-   ppx_version
-   ppx_jane
-   ppx_deriving.show
-   ppx_deriving_yojson))
+  (pps mina_ppx))
  (libraries
   alcotest
   async
@@ -46,11 +42,7 @@
  (modules test)
  (flags (:standard -warn-error +a))
  (preprocess
-  (pps
-   ppx_version
-   ppx_jane
-   ppx_deriving.show
-   ppx_deriving_yojson))
+  (pps mina_ppx))
  (libraries
   alcotest
   merkle_ledger_tests)

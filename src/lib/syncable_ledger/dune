@@ -24,7 +24,7 @@
   ppx_version.runtime
   mina_compile_config)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Synchronization of Merkle-tree backed ledgers"))
