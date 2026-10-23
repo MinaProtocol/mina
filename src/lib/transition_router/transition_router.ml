@@ -176,7 +176,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~context:(module Context)
        ~trust_system ~verifier ~network ~consensus_local_state
        ~network_transition_pipe ~persistent_frontier ~persistent_root
-       ~initial_root_transition ~preferred_peers ~catchup_mode )
+       ~initial_root_transition ~preferred_peers ~catchup_mode ~bootstrap_status )
     (fun (new_frontier, collected_transitions) ->
       start_transition_frontier_controller
         ~context:(module Context)
