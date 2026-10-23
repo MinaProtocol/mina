@@ -11706,16 +11706,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "LedgerHash",
-          "description": "Base58Check-encoded ledger hash",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "BlockchainState",
           "description": null,
@@ -13409,16 +13399,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Boolean",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "GetFilteredLogEntries",
           "description": null,
@@ -13459,6 +13439,459 @@
                   "kind": "SCALAR",
                   "name": "Boolean",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "LedgerSyncProgress",
+          "description": "How far a ledger sync has progressed",
+          "fields": [
+            {
+              "name": "targets",
+              "description":
+                "How many times the sync has been given a new root to reach",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetSetAt",
+              "description": "When the current target was set",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Time", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "pendingChildHashes",
+              "description":
+                "How many inner nodes the sync is waiting for the children of",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "pendingContents",
+              "description":
+                "How many account subtrees the sync is waiting for the accounts of",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "synced",
+              "description":
+                "Whether the ledger has reached the current target",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "answersAccepted",
+              "description":
+                "How many answers from peers have added to the ledger or confirmed part of it",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "answersIgnored",
+              "description":
+                "How many answers have arrived for queries the sync no longer needed, such as those for an earlier target",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "answersRejected",
+              "description":
+                "How many answers have been invalid, and their queries asked again",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lastAcceptedAnswerAt",
+              "description": "When an answer was last accepted",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Time", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "numAccounts",
+              "description":
+                "How many accounts the current target holds, once a peer has said",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountsSettled",
+              "description":
+                "How many of the current target's accounts the ledger is known to hold, whether received or already present. A sync whose ledger already matched its target can finish before any are counted, so a synced ledger should be read as complete.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "accountsReceived",
+              "description":
+                "How many accounts peers have sent, over all targets",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Boolean",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "LedgerHash",
+          "description": "Base58Check-encoded ledger hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "ENUM",
+          "name": "SyncedLedger",
+          "description": "A ledger that a node syncs from its peers",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "ROOT_SNARKED",
+              "description":
+                "The snarked ledger at the root of the transition frontier",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "STAKING_EPOCH",
+              "description": "The staking epoch ledger",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "NEXT_EPOCH",
+              "description": "The next epoch ledger",
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "LedgerSync",
+          "description": "The most recent sync of a ledger from peers",
+          "fields": [
+            {
+              "name": "ledger",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "SyncedLedger",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "target",
+              "description": "The root the sync is reaching",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "LedgerHash",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "active",
+              "description": "Whether the sync is still running",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "progress",
+              "description":
+                "For a sync that has ended, its progress when it ended",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "LedgerSyncProgress",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "ENUM",
+          "name": "BootstrapPhase",
+          "description":
+            "The step a node is in on its way to reaching the network's chain",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "STARTING",
+              "description": "Initialisation has not begun",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WAITING_FOR_GENESIS",
+              "description": "The chain has not started yet",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "WAITING_FOR_PEERS",
+              "description": "Connecting to enough peers to begin",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "FETCHING_BEST_TIP",
+              "description":
+                "Asking peers for their best tip, while loading the transition frontier from disk",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "SYNCING_ROOT_LEDGER",
+              "description": "Bootstrap: syncing the root's snarked ledger",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "DOWNLOADING_SCAN_STATE",
+              "description":
+                "Bootstrap: downloading the root's scan state and pending coinbases",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "BUILDING_STAGED_LEDGER",
+              "description":
+                "Bootstrap: building the root's staged ledger, which checks the scan state against the snarked ledger",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "SYNCING_EPOCH_LEDGERS",
+              "description": "Syncing the staking and next epoch ledgers",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LOADING_FRONTIER",
+              "description":
+                "Bootstrap: loading a transition frontier at the new root",
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "PARTICIPATING",
+              "description": "The transition frontier is running",
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "BootstrapStatus",
+          "description": "What a node is doing to reach the network's chain",
+          "fields": [
+            {
+              "name": "phase",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "BootstrapPhase",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "phaseStartedAt",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Time",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bootstrapStartedAt",
+              "description":
+                "When the current or most recent bootstrap started",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Time", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bootstrapAttempts",
+              "description":
+                "How many attempts the current or most recent bootstrap has started",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lastAttemptFailure",
+              "description":
+                "Why that bootstrap's last failed attempt failed",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "ledgerSyncs",
+              "description": "The most recent sync of each ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "LedgerSync",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -14927,6 +15360,23 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "DaemonStatus",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bootstrapStatus",
+              "description":
+                "What the node is doing to reach the network's chain: its step of initialisation or bootstrap, and its ledger syncs",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "BootstrapStatus",
                   "ofType": null
                 }
               },
