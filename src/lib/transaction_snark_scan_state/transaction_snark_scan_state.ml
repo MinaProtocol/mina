@@ -150,8 +150,28 @@ module Ledger_proof_with_hash = struct
 
   type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
 
+  (** Equal to [hash (Ledger_proof.Cached.read_proof_from_disk p)], but hashes
+      the proof's serialization as stored in the cache instead of decoding and
+      re-encoding it. This relies on the serialization of a
+      [Proof_carrying_data.t] being that of its statement followed by that of
+      its proof. *)
   let create : Ledger_proof.Cached.t -> t =
-    let hash_data p = hash (Ledger_proof.Cached.read_proof_from_disk p) in
+    let hash_data
+        ({ Proof_carrying_data.data = statement; proof } : Ledger_proof.Cached.t)
+        =
+      let h = Digestif.SHA256.init () in
+      let h =
+        Binable.to_string
+          (module Mina_state.Snarked_ledger_state.With_sok.Stable.Latest)
+          statement
+        |> Digestif.SHA256.feed_string h
+      in
+      let h =
+        Proof_cache_tag.read_proof_bin_prot_from_disk proof
+        |> Digestif.SHA256.feed_bigstring h
+      in
+      Digestif.SHA256.get h |> Aux_hash.of_sha256
+    in
     fun p -> With_hash.of_data ~hash_data p
 end
 
