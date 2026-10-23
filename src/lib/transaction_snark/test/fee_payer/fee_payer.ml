@@ -7,14 +7,11 @@ module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 open Mina_transaction
 
-let%test_module "Fee payer tests" =
-  ( module struct
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
+let suite () =
+  Transaction_snark_test_suite.make ~name:"fee_payer"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
@@ -28,8 +25,11 @@ let%test_module "Fee payer tests" =
               Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
       }
 
-    let%test_unit "update a snapp account with signature and fee paid by the \
-                   snapp account" =
+    let () =
+      test
+        "update a snapp account with signature and fee paid by the snapp \
+         account"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -54,8 +54,11 @@ let%test_module "Fee payer tests" =
           U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "update a snapp account with signature and fee paid by a \
-                   non-snapp account" =
+    let () =
+      test
+        "update a snapp account with signature and fee paid by a non-snapp \
+         account"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -81,8 +84,9 @@ let%test_module "Fee payer tests" =
           U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "update a snapp account with proof and fee paid by the snapp \
-                   account" =
+    let () =
+      test "update a snapp account with proof and fee paid by the snapp account"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -110,8 +114,10 @@ let%test_module "Fee payer tests" =
             test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "update a snapp account with proof and fee paid by a \
-                   non-snapp account" =
+    let () =
+      test
+        "update a snapp account with proof and fee paid by a non-snapp account"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -140,7 +146,9 @@ let%test_module "Fee payer tests" =
             test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "snapp transaction with non-existent fee payer account" =
+    let () =
+      test "snapp transaction with non-existent fee payer account"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1
         Quickcheck.Generator.(tuple2 U.gen_snapp_ledger small_positive_int)
@@ -250,7 +258,9 @@ let%test_module "Fee payer tests" =
               let account = get_account ledger zkapp_acc_id in
               assert (Option.is_none account.zkapp) ) )
 
-    let%test_unit "unchanged zkapp field when zkapp update is noop" =
+    let () =
+      test "unchanged zkapp field when zkapp update is noop"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -286,7 +296,9 @@ let%test_module "Fee payer tests" =
           test_empty_update ~new_account:false existing_account_spec init_ledger
             (fst spec.sender) )
 
-    let%test_unit "No account updates, only fee payer in a zkapp transaction" =
+    let () =
+      test "No account updates, only fee payer in a zkapp transaction"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -323,11 +335,5 @@ let%test_module "Fee payer tests" =
                     List.is_empty
                       (Zkapp_command.account_updates_list zkapp_command) ) ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
-
-    let () =
-      match Sys.getenv "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  end )
+  end in
+  ()
