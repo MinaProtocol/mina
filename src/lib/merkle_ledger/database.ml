@@ -511,6 +511,18 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let set_hash mdb location new_hash =
     set_hash_batch mdb [ (location, new_hash) ]
 
+  let get_all_raw_accounts_rooted_at_exn mdb address =
+    let addresses =
+      Location.Addr.Range.fold
+        (Location.Addr.Range.subtree_range ~ledger_depth:mdb.depth address)
+        ~init:[] ~f:(fun addr acc -> addr :: acc)
+      |> List.rev
+    in
+    get_raw_batch mdb (List.map addresses ~f:(fun addr -> Location.Account addr))
+    |> List.zip_exn addresses
+    |> List.filter_map ~f:(fun (addr, raw) ->
+           Option.map raw ~f:(fun raw -> (addr, raw)) )
+
   (** The address of the rightmost leaf whose hash is not the empty hash, or
       [None] if the ledger is empty. An account that hashes to the empty hash
       can't be told apart from an empty leaf, and is not found. *)
