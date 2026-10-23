@@ -8,8 +8,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let MemoryGate = ../../Constants/MemoryGate.dhall
-
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
@@ -73,7 +71,6 @@ in  Pipeline.build
                   ""
                   "./buildkite/scripts/tests/archive-memory-bench.sh"
               ]
-            , softFail = Some MemoryGate.softFail
             }
         ]
       }
