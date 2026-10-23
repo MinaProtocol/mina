@@ -24,6 +24,15 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Archive_precomputed_blocks_test) ) )
         ] )
+    ; ( "non_utf8_token_symbol"
+      , [ test_case
+            "Archive mainnet blocks with a 0xff token symbol sent from mock \
+             daemon"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
+                          (Non_utf8_token_symbol) ) )
+        ] )
     ; ( "genesis_load"
       , [ test_case "Load mainnet genesis ledger without memory leak" `Quick
             (Runner.run_blocking
