@@ -1,0 +1,18 @@
+(tests
+ (names test_bootstrap_status)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  ;; local libraries
+  bootstrap_status
+  mina_base
+  syncable_ledger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx)))
