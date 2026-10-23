@@ -546,41 +546,6 @@ end = struct
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.set t.waiting_content ~key:addr ~data:expected
 
-  (** Given an address and the accounts below that address, fill in the tree
-      with them. *)
-  let add_content :
-         'a t
-      -> Addr.t
-      -> expected:Hash.t
-      -> Account.t list
-      -> [ `Success
-         | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *)
-         | `Content_length_mismatch of int * int  (** received, capacity *) ] =
-   fun t addr ~expected content ->
-    let open (val t.context) in
-    let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
-    if List.length content > capacity then
-      (* Content longer than the subtree under [addr] is rejected and requeued;
-         [addr] stays in [waiting_content] so the retry is accepted. *)
-      `Content_length_mismatch (List.length content, capacity)
-    else (
-      (* TODO #444 should we batch all the updates and do them at the end? *)
-      (* We might write the wrong data to the underlying ledger here, but if so
-         we'll requeue the address and it'll be overwritten. *)
-      MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-      let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-      if Hash.equal actual expected then (
-        Addr.Table.remove t.waiting_content addr ;
-        [%log trace]
-          ~metadata:
-            [ ("address", Addr.to_yojson addr)
-            ; ("hash", Hash.to_yojson expected)
-            ]
-          "Found content addr $address, with hash $hash, removing from waiting \
-           content" ;
-        `Success )
-      else `Hash_mismatch (expected, actual) )
-
   (* Merges each 2 contigous nodes, halving the size of the array *)
   let merge_siblings : Hash.t array -> index -> Hash.t array =
    fun nodes height ->
@@ -606,6 +571,56 @@ end = struct
     let bottom_height = height - subtree_depth in
     let hash = merge_many nodes bottom_height in
     hash
+
+  (** The hash [addr] would have if [content] were written to the leaves under
+      it. As with [MT.set_all_accounts_rooted_at_exn], leaves past the end of
+      [content] are empty. *)
+  let hash_of_content : 'a t -> Addr.t -> Account.t list -> Hash.t =
+   fun t addr content ->
+    let height = Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+    let content_hashes = Array.of_list_map content ~f:Hash.hash_account in
+    let leaf_hashes =
+      Array.init (1 lsl height) ~f:(fun i ->
+          if i < Array.length content_hashes then content_hashes.(i)
+          else Hash.empty_account )
+    in
+    merge_many leaf_hashes height height
+
+  (** Given an address and the accounts below that address, fill in the tree
+      with them. *)
+  let add_content :
+         'a t
+      -> Addr.t
+      -> expected:Hash.t
+      -> Account.t list
+      -> [ `Success
+         | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *)
+         | `Content_length_mismatch of int * int  (** received, capacity *) ] =
+   fun t addr ~expected content ->
+    let open (val t.context) in
+    let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+    if List.length content > capacity then
+      (* Content longer than the subtree under [addr] is rejected and requeued;
+         [addr] stays in [waiting_content] so the retry is accepted. *)
+      `Content_length_mismatch (List.length content, capacity)
+    else
+      let actual = hash_of_content t addr content in
+      if Hash.equal actual expected then (
+        (* TODO #444 should we batch all the updates and do them at the end? *)
+        MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+        Addr.Table.remove t.waiting_content addr ;
+        [%log trace]
+          ~metadata:
+            [ ("address", Addr.to_yojson addr)
+            ; ("hash", Hash.to_yojson expected)
+            ]
+          "Found content addr $address, with hash $hash, removing from waiting \
+           content" ;
+        `Success )
+      else
+        (* Content with the wrong hash is rejected and requeued; [addr] stays
+           in [waiting_content] so the retry is accepted. *)
+        `Hash_mismatch (expected, actual)
 
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)
