@@ -500,11 +500,12 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         addresses_and_accounts ;
       let token_owner_changes =
         List.filter_map addresses_and_accounts ~f:(fun (location, account) ->
-            Option.some_if
-              (reindex (location, account))
-              (let aid = Account.identifier account in
-               Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                 (Account_id.derive_token_id ~owner:aid, aid) ) )
+            if reindex (location, account) then
+              let aid = Account.identifier account in
+              Some
+                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+                   (Account_id.derive_token_id ~owner:aid, aid) )
+            else None )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes
