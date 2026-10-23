@@ -194,6 +194,8 @@ val best_tip : t -> Transition_frontier.Breadcrumb.t Participating_state.t
 
 val sync_status : t -> Sync_status.t Mina_incremental.Status.Observer.t
 
+val bootstrap_status : t -> Bootstrap_status.t
+
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
