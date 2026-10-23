@@ -133,7 +133,7 @@ let max_chunk_size = 16777216 (* 16 MiB *)
 let split_string ~every b =
   let blen = String.length b in
   let num_chunks = (blen + every - 1) / every in
-  List.init num_chunks ~f:(fun i ->
+  Sequence.init num_chunks ~f:(fun i ->
       let pos = i * every in
       let len = if i + 1 = num_chunks then blen - pos else every in
       String.sub ~pos ~len b )
@@ -157,7 +157,9 @@ let%test_unit "split_string" =
   in
   Quickcheck.test gen ~f:(fun (every, expected) ->
       let s = String.concat expected in
-      assert (List.equal String.equal expected @@ split_string ~every s) )
+      assert (
+        List.equal String.equal expected
+        @@ Sequence.to_list (split_string ~every s) ) )
 
 let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     ~release_stream =
@@ -179,14 +181,21 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
           (* The stream has already failed, no need to process this message. *)
           Deferred.return encountered_error
         else
-          let parts = split_string msg ~every:max_chunk_size in
-          match%map
-            Deferred.Or_error.List.iter parts ~f:(fun data ->
-                Deferred.Or_error.ignore_m
-                @@ Libp2p_helper.do_rpc helper
-                     (module Libp2p_ipc.Rpcs.SendStream)
-                     (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
-          with
+          let rec send_parts parts =
+            match Sequence.next parts with
+            | None ->
+                Deferred.Or_error.return ()
+            | Some (data, parts) ->
+                let%bind.Deferred.Or_error () =
+                  Deferred.Or_error.ignore_m
+                  @@ Libp2p_helper.do_rpc helper
+                       (module Libp2p_ipc.Rpcs.SendStream)
+                       (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id
+                          ~data )
+                in
+                send_parts parts
+          in
+          match%map send_parts (split_string msg ~every:max_chunk_size) with
           | Ok _ ->
               false
           | Error e ->
