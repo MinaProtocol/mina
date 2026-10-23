@@ -324,7 +324,7 @@ let%test_module "all-ipc test" =
          This message may be removed in future after implementing the proper
          stream closing. *)
       let%bind () =
-        Pipe.write stream1_out msgs.stream_1_msg_2
+        Pipe.write stream1_out (Bigstring.of_string msgs.stream_1_msg_2)
         |> or_timeout ~msg:"Send message 2 on stream 1"
       in
 
@@ -435,7 +435,7 @@ let%test_module "all-ipc test" =
       let stream1_in, stream1_out = Libp2p_stream.pipes stream1 in
       (* Send message 1 on stream 1 *)
       let%bind () =
-        Pipe.write stream1_out msgs.stream_1_msg_1
+        Pipe.write stream1_out (Bigstring.of_string msgs.stream_1_msg_1)
         |> or_timeout ~msg:"Bob: send message 1 to stream 1"
       in
 
@@ -520,7 +520,7 @@ let%test_module "all-ipc test" =
       (* Notify Alice that publishing on topic "a" is finished and
          protocol is closed *)
       let%bind () =
-        Pipe.write stream2_out msgs.stream_2_msg_1
+        Pipe.write stream2_out (Bigstring.of_string msgs.stream_2_msg_1)
         |> or_timeout ~msg:"Carol: send message 1 on stream 2"
       in
 
