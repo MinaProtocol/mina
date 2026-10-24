@@ -58,7 +58,7 @@ in  Pipeline.build
         , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "DebianAutomodeTransitionTestMainnet"
-        , scope = [ PipelineScope.Type.MainlineNightly ]
+        , scope = [ PipelineScope.Type.Release ]
         , tags =
           [ PipelineTag.Type.Packaging
           , PipelineTag.Type.Test
