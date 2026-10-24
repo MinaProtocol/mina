@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Repository hook: runs on the agent before every step's command.
+#
+# The images a step builds or loads from the CI cache are its own: nobody else
+# on the agent needs them once the step ends, and disk-cleanup.sh (dangling
+# only) never reclaims a tagged image. Every script that loads or builds an
+# image appends its ref to this file (load_from_cache.sh, scripts/docker/build.sh,
+# verify-toolchain-cache.sh); the pre-exit hook removes them, on success and on
+# failure. The toolchain is shared by every job on the agent and is never
+# recorded (see load_from_cache.sh).
+
+export OWNED_REFS_FILE="${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}/docker-owned-refs"

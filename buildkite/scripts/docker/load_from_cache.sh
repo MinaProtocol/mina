@@ -67,3 +67,11 @@ if docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 zstd -dc "$CACHE_FILE" | docker load
+
+# The step owns what it loaded and the pre-exit hook removes it
+# (.buildkite/hooks/pre-command). Not the toolchain: every job on the agent
+# runs in it, so it stays for the next one. An image that was already local
+# belongs to whoever loaded it.
+if [[ -n "${OWNED_REFS_FILE:-}" && "$SERVICE" != "mina-toolchain" ]]; then
+  echo "$IMAGE" >> "$OWNED_REFS_FILE"
+fi
