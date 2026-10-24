@@ -218,6 +218,14 @@ let generateDockerForCodename =
                   }
                 ]
 
+          let persistArtifacts =
+                "mina-logproc mina-${Profiles.lowerName
+                                       profile}-profile mina-${Profiles.lowerName
+                                                                 profile}-generic mina-${Network.lowerName
+                                                                                           spec.network} mina-archive-${Network.lowerName
+                                                                                                                          spec.network} mina-rosetta-${Network.lowerName
+                                                                                                                                                         spec.network} mina-tx-tools mina-daemon-storage-toolbox"
+
           let buildOrGetArtifacts =
                 merge
                   { Some =
@@ -232,16 +240,9 @@ let generateDockerForCodename =
                                     , submodules = True
                                     }
                                     [ "FORCE_DOCKER_OVERWRITE" ]
-                                    (     "./buildkite/scripts/release/manager.sh persist "
-                                      ++  " --backend local --artifacts mina-logproc,mina-${Profiles.lowerName
-                                                                                              profile}-profile,mina-${Profiles.lowerName
-                                                                                                                        profile}-generic,mina-${Network.lowerName
-                                                                                                                                                  spec.network},mina-archive-${Network.lowerName
-                                                                                                                                                                                 spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                                                                                spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
-                                      ++  " --buildkite-build-id ${cached_build_id}"
-                                      ++  " --codename ${lowerNameCodename} "
-                                      ++  " --target \\\${BUILDKITE_BUILD_ID} "
+                                    (     "tmp=\$(mktemp -d) && "
+                                      ++  "for a in ${persistArtifacts}; do buildkite-cache-manager read --root ${cached_build_id} \"debians/${lowerNameCodename}/\${a}_*_amd64.deb\" \"\$tmp\"; done && "
+                                      ++  "buildkite-cache-manager write \"\$tmp\"/* debians/${lowerNameCodename}/"
                                     )
                               , label =
                                   "Download cached packages for ${lowerNameCodename}"
