@@ -173,24 +173,23 @@ end = struct
 
   module Knowledge = struct
     module Key_set = struct
-      type t = Key.Hash_set.t [@@deriving sexp]
+      type t = Key.Set.t [@@deriving sexp]
 
-      let to_yojson t = `List (List.map (Hash_set.to_list t) ~f:Key.to_yojson)
+      let to_yojson t = `List (List.map (Set.to_list t) ~f:Key.to_yojson)
     end
 
     type t =
       { claimed : Key.t Claimed_knowledge.t option
-      ; tried_and_failed : Key_set.t
+      ; mutable tried_and_failed : Key_set.t
       }
     [@@deriving sexp_of, to_yojson]
 
-    let clear t = Hash_set.clear t.tried_and_failed
+    let clear t = t.tried_and_failed <- Key.Set.empty
 
-    let create () =
-      { claimed = None; tried_and_failed = Key.Hash_set.create () }
+    let create () = { claimed = None; tried_and_failed = Key.Set.empty }
 
     let knows t k =
-      if Hash_set.mem t.tried_and_failed k then `No
+      if Set.mem t.tried_and_failed k then `No
       else
         match t.claimed with
         | None ->
@@ -272,7 +271,7 @@ end = struct
       (* Reset preferred *)
       Preferred_heap.clear t.all_preferred ;
       Hashtbl.filter_mapi_inplace t.knowledge ~f:(fun ~key:p ~data:k ->
-          Hash_set.clear k.tried_and_failed ;
+          Knowledge.clear k ;
           if Set.mem all_peers p then Some { k with claimed = None } else None ) ;
       Set.iter all_peers ~f:(fun p ->
           if not (Hashtbl.mem t.knowledge p) then
@@ -492,7 +491,8 @@ end = struct
 
     let jobs_no_longer_needed t ks =
       Hashtbl.iter t.knowledge ~f:(fun s ->
-          List.iter ks ~f:(Hash_set.remove s.tried_and_failed) )
+          s.tried_and_failed <-
+            List.fold ks ~init:s.tried_and_failed ~f:Set.remove )
 
     let update t u =
       O1trace.sync_thread "update_downloader" (fun () ->
@@ -503,7 +503,7 @@ end = struct
               Hashtbl.update t.knowledge peer ~f:(function
                 | None ->
                     { Knowledge.claimed = Some (`Some claimed)
-                    ; tried_and_failed = Key.Hash_set.create ()
+                    ; tried_and_failed = Key.Set.empty
                     }
                 | Some k ->
                     let claimed =
@@ -517,8 +517,8 @@ end = struct
                       | Some `All ->
                           `All
                       | Some (`Call f) ->
-                          let s = Key.Hash_set.of_list claimed in
-                          `Call (fun key -> f key || Hash_set.mem s key)
+                          let s = Key.Set.of_list claimed in
+                          `Call (fun key -> f key || Set.mem s key)
                     in
                     { k with claimed = Some claimed } )
           | Knowledge_request_starting peer ->
@@ -530,32 +530,30 @@ end = struct
                 let s =
                   match Hashtbl.find t.knowledge peer with
                   | None ->
-                      Key.Hash_set.create ()
+                      Key.Set.empty
                   | Some { tried_and_failed; _ } ->
                       tried_and_failed
                 in
-                List.iter active_jobs ~f:(fun j ->
+                List.fold active_jobs ~init:s ~f:(fun s j ->
                     match Map.find j.J.attempts peer with
                     | None ->
-                        ()
+                        s
                     | Some a ->
-                        if not (Attempt.worth_retrying a) then
-                          Hash_set.add s j.key ) ;
-                s
+                        if not (Attempt.worth_retrying a) then Set.add s j.key
+                        else s )
               in
               Hashtbl.set t.knowledge ~key:peer
                 ~data:{ Knowledge.claimed = Some claimed; tried_and_failed }
           | Job_cancelled h ->
               jobs_no_longer_needed t [ h ] ;
               Hashtbl.iter t.knowledge ~f:(fun s ->
-                  Hash_set.remove s.tried_and_failed h )
+                  s.tried_and_failed <- Set.remove s.tried_and_failed h )
           | Forget_peer_state ->
               Hashtbl.iter t.temporary_ignores ~f:(fun e ->
                   Clock.Event.abort_if_possible e () ) ;
               Hashtbl.clear t.temporary_ignores ;
               Hashtbl.map_inplace t.knowledge ~f:(fun k ->
-                  Hash_set.clear k.tried_and_failed ;
-                  { k with claimed = None } )
+                  Knowledge.clear k ; { k with claimed = None } )
           | Download_starting peer ->
               Hash_set.add t.downloading_peers peer
           | Download_finished (peer0, `Successful succs, `Unsuccessful unsuccs)
@@ -583,8 +581,9 @@ end = struct
               match Hashtbl.find t.knowledge peer0 with
               | None ->
                   ()
-              | Some { tried_and_failed; claimed = _ } ->
-                  List.iter unsuccs ~f:(Hash_set.add tried_and_failed) )
+              | Some k ->
+                  k.tried_and_failed <-
+                    List.fold unsuccs ~init:k.tried_and_failed ~f:Set.add )
           | Refreshed_peers { all_peers } ->
               Hashtbl.filter_keys_inplace t.knowledge ~f:(Set.mem all_peers) ;
               Set.iter all_peers ~f:(fun p ->
@@ -592,7 +591,7 @@ end = struct
                     Hashtbl.add_exn t.knowledge ~key:p
                       ~data:
                         { Knowledge.claimed = None
-                        ; tried_and_failed = Key.Hash_set.create ()
+                        ; tried_and_failed = Key.Set.empty
                         } ) )
 
     let update t u : unit =
