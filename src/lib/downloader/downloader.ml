@@ -139,7 +139,7 @@ end = struct
     let result = Job.result
   end
 
-  module Make_hash_queue (Key : Comparable.S) = struct
+  module Make_key_queue (Key : Comparable.S) = struct
     (* Jobs are dequeued in the order of their keys. Keys are compared rather
        than hashed, since comparing a ledger or state hash is much cheaper
        than hashing it. *)
@@ -169,7 +169,7 @@ end = struct
     let create () = { jobs = Key.Map.empty }
   end
 
-  module Q = Make_hash_queue (Key)
+  module Q = Make_key_queue (Key)
 
   module Knowledge = struct
     module Key_set = struct
