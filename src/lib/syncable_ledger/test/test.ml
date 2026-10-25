@@ -355,6 +355,52 @@ module Make_test_content_length (Input : Input_intf) = struct
             false
         | `Timeout ->
             false )
+
+  let%test "sync completes despite a Contents_are answer with wrong accounts" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    let adjusted = ref false in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (root_hash, query) ->
+           let%bind answ_or_error =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
+           let answ = Or_error.ok_exn answ_or_error in
+           (* Once, return a Contents_are answer of the right length whose
+              accounts are all the last one. *)
+           let answ =
+             match (query, answ) with
+             | ( Syncable_ledger.Query.What_contents _
+               , Syncable_ledger.Answer.Contents_are (_ :: _ :: _ as accounts) )
+               when not !adjusted ->
+                 adjusted := true ;
+                 Syncable_ledger.Answer.Contents_are
+                   (List.map accounts ~f:(fun _ -> List.last_exn accounts))
+             | _ ->
+                 answ
+           in
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ) )
+      ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        match%map
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+                 true ) )
+        with
+        | `Result (`Ok mt) ->
+            !adjusted && Root_hash.equal desired_root (Ledger.merkle_root mt)
+        | `Result (`Target_changed _) ->
+            false
+        | `Timeout ->
+            false )
 end
 
 (* A malicious peer can answer a [Num_accounts] sync query with a count whose
@@ -928,4 +974,158 @@ module Stale_answers = struct
           Ledger.Addr.depth addr = 0
       | _ ->
           false )
+end
+
+(* The progress a sync reports as it is given targets and reaches them. *)
+module Progress_reporting = struct
+  open Db.DB16_subtree_depths86
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  (* Answer each query from whichever of [targets] has the query's root,
+     passing each answer through [tamper] first. *)
+  let serve ?(tamper = fun _query answer -> answer) lsync targets =
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let responders =
+      List.map targets ~f:(fun target ->
+          ( Ledger.merkle_root target
+          , Sync_responder.create target ignore
+              ~context:(module Context)
+              ~trust_system ) )
+    in
+    don't_wait_for
+      (Linear_pipe.iter qr ~f:(fun (root_hash, query) ->
+           match
+             List.Assoc.find responders root_hash ~equal:Root_hash.equal
+           with
+           | None ->
+               Deferred.unit
+           | Some responder ->
+               let%bind answer =
+                 Sync_responder.answer_query responder
+                   (Envelope.Incoming.local query)
+               in
+               Linear_pipe.write aw
+                 ( root_hash
+                 , query
+                 , Envelope.Incoming.local
+                     (tamper query (Or_error.ok_exn answer)) ) ) )
+
+  let sync_to lsync root =
+    match
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.fetch lsync root ~data:() ~equal:(fun () () -> true)) )
+    with
+    | `Result (`Ok _) ->
+        ()
+    | `Result (`Target_changed _) | `Timeout ->
+        failwith "the sync did not reach its target"
+
+  let check_progress ?num_accounts:expect_num_accounts lsync ~targets
+      ~synced:expect_synced =
+    let { Syncable_ledger.Progress.targets = actual_targets
+        ; target_set_at
+        ; pending_child_hashes
+        ; pending_contents
+        ; synced
+        ; num_accounts
+        ; accounts_settled
+        ; _
+        } =
+      Sync_ledger.progress lsync
+    in
+    [%test_eq: int] targets actual_targets ;
+    [%test_eq: bool] (targets > 0) (Option.is_some target_set_at) ;
+    [%test_eq: bool] expect_synced synced ;
+    [%test_eq: int option] expect_num_accounts num_accounts ;
+    if synced then (
+      [%test_eq: int] 0 pending_child_hashes ;
+      [%test_eq: int] 0 pending_contents ;
+      [%test_eq: int option] num_accounts (Some accounts_settled) )
+    else if Option.is_none num_accounts then [%test_eq: int] 0 accounts_settled
+
+  let%test_unit "a sync reports its targets and when it reaches them" =
+    let local, _ = Ledger.load_ledger 1 1 in
+    let target_a, _ = Ledger.load_ledger 130 2 in
+    let target_b, _ = Ledger.load_ledger 130 3 in
+    let root_a = Ledger.merkle_root target_a in
+    let root_b = Ledger.merkle_root target_b in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    check_progress lsync ~targets:0 ~synced:false ;
+    serve lsync [ target_a; target_b ] ;
+    sync_to lsync root_a ;
+    check_progress lsync ~targets:1 ~synced:true ~num_accounts:130 ;
+    ignore
+      ( Sync_ledger.new_goal lsync root_b ~data:() ~equal:(fun () () -> true)
+        : [ `New | `Repeat | `Update_data ] ) ;
+    check_progress lsync ~targets:2 ~synced:false ;
+    sync_to lsync root_b ;
+    check_progress lsync ~targets:2 ~synced:true ~num_accounts:130
+
+  let%test_unit "a sync counts the answers it accepts and rejects" =
+    let local, _ = Ledger.load_ledger 1 1 in
+    let target, _ = Ledger.load_ledger 130 2 in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    let { Syncable_ledger.Progress.answers_accepted
+        ; last_accepted_answer_at
+        ; _
+        } =
+      Sync_ledger.progress lsync
+    in
+    [%test_eq: int] 0 answers_accepted ;
+    assert (Option.is_none last_accepted_answer_at) ;
+    let tampered = ref false in
+    let tamper (query : Ledger.addr Syncable_ledger.Query.t) answer =
+      match (query, answer) with
+      | ( What_contents _
+        , Syncable_ledger.Answer.Contents_are (_ :: _ :: _ as accounts) )
+        when not !tampered ->
+          tampered := true ;
+          Syncable_ledger.Answer.Contents_are (List.drop_last_exn accounts)
+      | _ ->
+          answer
+    in
+    serve ~tamper lsync [ target ] ;
+    sync_to lsync (Ledger.merkle_root target) ;
+    assert !tampered ;
+    let { Syncable_ledger.Progress.answers_accepted
+        ; answers_ignored
+        ; answers_rejected
+        ; last_accepted_answer_at
+        ; _
+        } =
+      Sync_ledger.progress lsync
+    in
+    assert (answers_accepted > 0) ;
+    [%test_eq: int] 0 answers_ignored ;
+    [%test_eq: int] 1 answers_rejected ;
+    assert (Option.is_some last_accepted_answer_at)
+
+  let%test_unit "a sync counts the accounts it already holds as settled" =
+    let T = Merkle_ledger_tests.Test_stubs.Account_id.eq2 in
+    let local = Diverged.build Diverged.shared in
+    let target = Diverged.build (Diverged.shared @ Diverged.extra) in
+    let num_accounts =
+      List.length Diverged.shared + List.length Diverged.extra
+    in
+    let lsync =
+      Sync_ledger.create local ~context:(module Context) ~trust_system
+    in
+    serve lsync [ target ] ;
+    sync_to lsync (Ledger.merkle_root target) ;
+    check_progress lsync ~targets:1 ~synced:true ~num_accounts ;
+    let { Syncable_ledger.Progress.accounts_received; _ } =
+      Sync_ledger.progress lsync
+    in
+    (* Subtrees holding only shared accounts are not sent again, while every
+       account the target added is. *)
+    assert (accounts_received < num_accounts) ;
+    assert (accounts_received >= List.length Diverged.extra)
 end

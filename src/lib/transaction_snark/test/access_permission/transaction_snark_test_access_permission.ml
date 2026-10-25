@@ -8,8 +8,13 @@ module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
-let%test_module "Access permission tests" =
-  ( module struct
+let suite () =
+  Transaction_snark_test_suite.make ~name:"access_permission"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
+    let proof_cache = Transaction_snark_test_suite.proof_cache
+
     let () = Backtrace.elide := false
 
     let sk = Quickcheck.random_value Private_key.gen
@@ -21,7 +26,7 @@ let%test_module "Access permission tests" =
     let account_id = Account_id.create pk_compressed Token_id.default
 
     let tag, _, p_module, Pickles.Provers.[ prover ] =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~cache:Cache_dir.cache ~proof_cache
         ~auxiliary_typ:Impl.Typ.unit
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
@@ -186,42 +191,55 @@ let%test_module "Access permission tests" =
           check_zkapp_command_with_merges_exn ?expected_failure ledger
             [ zkapp_command ] )
 
-    let%test_unit "None_given with None" = run_test None_given None
+    let () = test "None_given with None" @@ fun () -> run_test None_given None
 
-    let%test_unit "Proof with None" = run_test (Proof vk_hash) None
+    let () = test "Proof with None" @@ fun () -> run_test (Proof vk_hash) None
 
-    let%test_unit "Signature with None" = run_test Signature None
+    let () = test "Signature with None" @@ fun () -> run_test Signature None
 
-    let%test_unit "None_given with Either" =
+    let () =
+      test "None_given with Either"
+      @@ fun () ->
       run_test
         ~expected_failure:(Update_not_permitted_access, Pass_2)
         None_given Either
 
-    let%test_unit "Proof with Either" = run_test (Proof vk_hash) Either
+    let () =
+      test "Proof with Either" @@ fun () -> run_test (Proof vk_hash) Either
 
-    let%test_unit "Signature with Either" = run_test Signature Either
+    let () = test "Signature with Either" @@ fun () -> run_test Signature Either
 
-    let%test_unit "None_given with Proof" =
+    let () =
+      test "None_given with Proof"
+      @@ fun () ->
       run_test
         ~expected_failure:(Update_not_permitted_access, Pass_2)
         None_given Proof
 
-    let%test_unit "Proof with Proof" = run_test (Proof vk_hash) Proof
+    let () = test "Proof with Proof" @@ fun () -> run_test (Proof vk_hash) Proof
 
-    let%test_unit "Signature with Proof" =
+    let () =
+      test "Signature with Proof"
+      @@ fun () ->
       run_test
         ~expected_failure:(Update_not_permitted_access, Pass_2)
         Signature Proof
 
-    let%test_unit "None_given with Signature" =
+    let () =
+      test "None_given with Signature"
+      @@ fun () ->
       run_test
         ~expected_failure:(Update_not_permitted_access, Pass_2)
         None_given Signature
 
-    let%test_unit "Proof with Signature" =
+    let () =
+      test "Proof with Signature"
+      @@ fun () ->
       run_test
         ~expected_failure:(Update_not_permitted_access, Pass_2)
         (Proof vk_hash) Signature
 
-    let%test_unit "Signature with Signature" = run_test Signature Signature
-  end )
+    let () =
+      test "Signature with Signature" @@ fun () -> run_test Signature Signature
+  end in
+  ()

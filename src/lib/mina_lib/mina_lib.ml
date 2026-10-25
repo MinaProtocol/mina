@@ -123,6 +123,7 @@ type t =
   ; commit_id : string
   ; proof_cache_db : Proof_cache_tag.cache_db
   ; signature_kind : Mina_signature_kind.t
+  ; bootstrap_status : Bootstrap_status.t
   }
 [@@deriving fields]
 
@@ -2229,6 +2230,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
+          let bootstrap_status = Bootstrap_status.create () in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2246,7 +2248,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ~transaction_pool_proxy
-              ~ledger_backing:config.ledger_backing ()
+              ~ledger_backing:config.ledger_backing ~bootstrap_status ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2627,6 +2629,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; commit_id
           ; proof_cache_db
           ; signature_kind
+          ; bootstrap_status
           } ) )
 
 let net { components = { net; _ }; _ } = net

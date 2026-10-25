@@ -296,13 +296,27 @@ resolve_transitive_deps() {
 # Uses global variable MAINLINE_BRANCHES (array of branch names)
 # Returns: name of the closest ancestor branch
 #
+# A PR whose base is a mainline branch is judged as that branch, whatever the
+# commit distances: a merge-back into develop is mostly compatible's commits, so
+# it is closer to compatible, but it is going into develop.
+#
 # Ties are common: after a forward merge master's tip is also on compatible and
 # develop, so all three are 0 commits away. The branch this build is for wins a
 # tie (the PR's base branch, else the built branch), so a master nightly is
 # judged as master. Otherwise later branches in MAINLINE_BRANCHES win.
 find_closest_ancestor() {
   CURRENT_COMMIT=$(git rev-parse HEAD)
-  local preferred="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-${BUILDKITE_BRANCH:-}}"
+  local base="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}"
+  local branch
+  for branch in "${MAINLINE_BRANCHES[@]}"; do
+    if [[ -n "$base" && "$branch" == "$base" ]] &&
+       git merge-base "$CURRENT_COMMIT" "origin/$branch" >/dev/null 2>&1; then
+      echo "Branch $branch: the PR's base branch" >&2
+      echo "$branch"
+      return
+    fi
+  done
+  local preferred="${base:-${BUILDKITE_BRANCH:-}}"
   closest_branch=""
   min_distance=""
   for branch in "${MAINLINE_BRANCHES[@]}"; do

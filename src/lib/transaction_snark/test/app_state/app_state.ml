@@ -1,3 +1,4 @@
+open Core_kernel
 open Mina_base
 open Pickles_types
 
@@ -19,7 +20,16 @@ struct
   let is_non_zkapp_update = false
 end
 
-let%test_module "Update account app_state" =
-  ( module struct
-    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
-  end )
+let suite () =
+  Transaction_snark_test_suite.make ~name:"app_state"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
+    include
+      Transaction_snark_tests.Test_zkapp_update.Make
+        (Test_input)
+        (struct
+          let test = test
+        end)
+  end in
+  ()
