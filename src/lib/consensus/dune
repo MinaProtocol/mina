@@ -26,6 +26,7 @@
   async_rpc_kernel
   sexp_diff_kernel
   ;; local libraries
+  bootstrap_status
   mina_wire_types
   mina_base.util
   unsigned_extended
