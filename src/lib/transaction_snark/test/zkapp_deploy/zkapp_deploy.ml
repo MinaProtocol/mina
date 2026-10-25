@@ -4,19 +4,18 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Deploy_snapp_spec
 open Mina_base
 
-let%test_module "zkApp deploy tests" =
-  ( module struct
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
+let suite () =
+  Transaction_snark_test_suite.make ~name:"zkapp_deploy"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
     let memo = Signed_command_memo.create_from_string_exn "zkApp deploy tests"
 
     let constraint_constants = U.constraint_constants
 
-    let%test_unit "create a new zkAapp account/deploy a smart contract" =
+    let () =
+      test "create a new zkAapp account/deploy a smart contract"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -48,7 +47,9 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "deploy multiple ZkApps" =
+    let () =
+      test "deploy multiple ZkApps"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -87,8 +88,9 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-snapp account to zkApp account/deploy a smart \
-                   contract" =
+    let () =
+      test "change a non-snapp account to zkApp account/deploy a smart contract"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
@@ -120,8 +122,11 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "change a non-zkApp account to zkApp account/deploy a smart \
-                   contract- different fee payer" =
+    let () =
+      test
+        "change a non-zkApp account to zkApp account/deploy a smart contract- \
+         different fee payer"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
@@ -154,8 +159,11 @@ let%test_module "zkApp deploy tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "Fails to deploy if the account is not present and amount is \
-                   insufficient" =
+    let () =
+      test
+        "Fails to deploy if the account is not present and amount is \
+         insufficient"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -189,11 +197,5 @@ let%test_module "zkApp deploy tests" =
                   U.check_zkapp_command_with_merges_exn ledger
                     ~expected_failure:(Invalid_fee_excess, Pass_2)
                     [ zkapp_command ] ) ) )
-
-    let () =
-      match Sys.getenv "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  end )
+  end in
+  ()

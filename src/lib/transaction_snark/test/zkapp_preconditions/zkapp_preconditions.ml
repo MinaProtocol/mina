@@ -5,17 +5,11 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
-let proof_cache =
-  lazy
-    ( Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-    @@ Yojson.Safe.from_file "proof_cache.json" )
-
-let%test_module "Valid_while precondition tests" =
-  ( module struct
-    let proof_cache = Lazy.force proof_cache
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
+let suite () =
+  Transaction_snark_test_suite.make ~name:"zkapp_preconditions"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
     let constraint_constants = U.constraint_constants
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -58,7 +52,9 @@ let%test_module "Valid_while precondition tests" =
             }
       }
 
-    let%test_unit "exact valid_while precondition" =
+    let () =
+      test "exact valid_while precondition"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -81,7 +77,9 @@ let%test_module "Valid_while precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~global_slot ledger
                     [ zkapp_command ] ) ) )
 
-    let%test_unit "invalid valid_while precondition" =
+    let () =
+      test "invalid valid_while precondition"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -106,14 +104,8 @@ let%test_module "Valid_while precondition tests" =
                       (Valid_while_precondition_unsatisfied, U.Pass_2)
                     ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
                     ledger [ zkapp_command ] ) ) )
-  end )
-
-let%test_module "Protocol state precondition tests" =
-  ( module struct
-    let proof_cache = Lazy.force proof_cache
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
+  end in
+  let module _ = struct
     let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -161,7 +153,9 @@ let%test_module "Protocol state precondition tests" =
       ; next_epoch_data = epoch_data protocol_state.next_epoch_data
       }
 
-    let%test_unit "exact protocol state predicate" =
+    let () =
+      test "exact protocol state predicate"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let state_body = U.genesis_state_body in
@@ -196,7 +190,9 @@ let%test_module "Protocol state precondition tests" =
             ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "generated protocol state predicate" =
+    let () =
+      test "generated protocol state predicate"
+      @@ fun () ->
       let state_body = U.genesis_state_body in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -238,7 +234,9 @@ let%test_module "Protocol state precondition tests" =
             ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "invalid protocol state predicate in other zkapp_command" =
+    let () =
+      test "invalid protocol state predicate in other zkapp_command"
+      @@ fun () ->
       let signature_kind = U.signature_kind in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
@@ -418,14 +416,8 @@ let%test_module "Protocol state precondition tests" =
                       , U.Pass_2 )
                     ~state_body ledger
                     [ zkapp_command_with_valid_fee_payer ] ) ) )
-  end )
-
-let%test_module "Account precondition tests" =
-  ( module struct
-    let proof_cache = Lazy.force proof_cache
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
+  end in
+  let module _ = struct
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
@@ -513,7 +505,9 @@ let%test_module "Account precondition tests" =
       in
       predicate_account
 
-    let%test_unit "exact account predicate" =
+    let () =
+      test "exact account predicate"
+      @@ fun () ->
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -565,7 +559,9 @@ let%test_module "Account precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
-    let%test_unit "generated account precondition" =
+    let () =
+      test "generated account precondition"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ((_, new_kp) as l) = U.gen_snapp_ledger in
@@ -656,7 +652,9 @@ let%test_module "Account precondition tests" =
             }
           else update )
 
-    let%test_unit "delegate precondition on new account" =
+    let () =
+      test "delegate precondition on new account"
+      @@ fun () ->
       let signature_kind = U.signature_kind in
       let gen = U.gen_snapp_ledger in
       Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
@@ -719,7 +717,9 @@ let%test_module "Account precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
-    let%test_unit "unsatisfied delegate precondition, custom token" =
+    let () =
+      test "unsatisfied delegate precondition, custom token"
+      @@ fun () ->
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
       let signature_kind = U.signature_kind in
@@ -796,7 +796,9 @@ let%test_module "Account precondition tests" =
                     ledger
                     [ mint_token_zkapp_command ] ) ) )
 
-    let%test_unit "invalid account predicate in other zkapp_command" =
+    let () =
+      test "invalid account predicate in other zkapp_command"
+      @@ fun () ->
       let state_body = U.genesis_state_body in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -864,7 +866,9 @@ let%test_module "Account precondition tests" =
                       , U.Pass_2 )
                     ~state_body ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "invalid account predicate in fee payer" =
+    let () =
+      test "invalid account predicate in fee payer"
+      @@ fun () ->
       let signature_kind = U.signature_kind in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
@@ -1028,11 +1032,5 @@ let%test_module "Account precondition tests" =
                   failwith
                     "Expected transaction to fail due to invalid account \
                      precondition in the fee payer" ) )
-
-    let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  end )
+  end in
+  ()

@@ -130,10 +130,10 @@ val merkle_path_at_addr_exn : t -> addr -> path
       [addr] doesn't point to a hash. *)
 val get_inner_hash_at_addr_exn : t -> addr -> hash
 
-(** Set the accounts at the leaves underneath [addr] in the ledger to the
-      accounts in the given list. Throws an exception if the [addr] is not in
-      the ledger, or if there are not exactly enough accounts in the list to set
-      the values at the leaves. *)
+(** Replace the accounts at the leaves underneath [addr] in the ledger: the
+      given accounts fill the leftmost leaves, and any accounts in the leaves
+      after them are removed. Throws an exception if the [addr] is not in the
+      ledger, or if there are more accounts than leaves. *)
 val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
 (** For each addr-account pair, replace the account in the root with the given

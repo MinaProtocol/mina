@@ -92,7 +92,42 @@ module type CONTEXT = sig
   val ledger_sync_config : daemon_config
 end
 
-module type Inputs_intf = sig
+(** A snapshot of how far a ledger sync has progressed, for reporting. *)
+module Progress = struct
+  type t =
+    { targets : int
+          (** How many times the sync has been given a new root to reach. *)
+    ; target_set_at : Core.Time.t option
+          (** When the current target was set. *)
+    ; pending_child_hashes : int
+          (** How many inner nodes the sync is waiting for the children of. *)
+    ; pending_contents : int
+          (** How many account subtrees the sync is waiting for the accounts
+              of. *)
+    ; synced : bool  (** Whether the ledger has reached the current target. *)
+    ; answers_accepted : int
+          (** How many answers have added to the ledger or confirmed part of
+              it. *)
+    ; answers_ignored : int
+          (** How many answers have arrived for queries the sync no longer
+              needed, such as those for an earlier target. *)
+    ; answers_rejected : int
+          (** How many answers have been invalid, and their queries asked
+              again. *)
+    ; last_accepted_answer_at : Core.Time.t option
+          (** When an answer was last accepted. *)
+    ; num_accounts : int option
+          (** How many accounts the current target holds, once a peer has
+              said. *)
+    ; accounts_settled : int
+          (** How many of the current target's accounts the ledger is known
+              to hold, whether received or already present. *)
+    ; accounts_received : int
+          (** How many accounts peers have sent, over all targets. *)
+    }
+end
+
+module type Inputs_base_intf = sig
   module Addr : module type of Merkle_address
 
   module Account : sig
@@ -107,14 +142,51 @@ module type Inputs_intf = sig
     val to_hash : t -> Hash.t
   end
 
+  val account_subtree_height : int
+end
+
+module type Responder_inputs_intf = sig
+  include Inputs_base_intf
+
   module MT :
-    Merkle_ledger.Intf.SYNCABLE
+    Merkle_ledger.Intf.SYNC_CANDIDATE
       with type hash := Hash.t
        and type root_hash := Root_hash.t
        and type addr := Addr.t
        and type account := Account.t
+end
 
-  val account_subtree_height : int
+module type Inputs_intf = sig
+  include Inputs_base_intf
+
+  module MT :
+    Merkle_ledger.Intf.SYNC_RECIPIENT
+      with type hash := Hash.t
+       and type root_hash := Root_hash.t
+       and type addr := Addr.t
+       and type account := Account.t
+end
+
+module type RESPONDER = sig
+  type merkle_tree
+
+  type query
+
+  type answer
+
+  module Responder : sig
+    type t
+
+    val create :
+         merkle_tree
+      -> (query -> unit)
+      -> context:(module CONTEXT)
+      -> trust_system:Trust_system.t
+      -> t
+
+    val answer_query :
+      t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t
+  end
 end
 
 module type S = sig
@@ -140,19 +212,11 @@ module type S = sig
 
   type answer
 
-  module Responder : sig
-    type t
-
-    val create :
-         merkle_tree
-      -> (query -> unit)
-      -> context:(module CONTEXT)
-      -> trust_system:Trust_system.t
-      -> t
-
-    val answer_query :
-      t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t
-  end
+  include
+    RESPONDER
+      with type merkle_tree := merkle_tree
+       and type query := query
+       and type answer := answer
 
   val create :
        merkle_tree
@@ -204,6 +268,11 @@ module type S = sig
 
   val get_account_at_addr : 'a t -> addr -> account Or_error.t
 
+  (** How far the sync has progressed towards its current target. Until the
+      new target's account count arrives, the pending work counted is that of
+      the previous target. *)
+  val progress : 'a t -> Progress.t
+
   val handle_num_accounts :
        'a t
     -> int
@@ -215,64 +284,20 @@ module type S = sig
   end
 end
 
-(*
-
-Every node of the merkle tree is always in one of three states:
-
-- Fresh.
-  The current contents for this node in the MT match what we
-  expect.
-- Stale
-  The current contents for this node in the MT do _not_ match
-  what we expect.
-- Unknown.
-  We don't know what to expect yet.
-
-
-Although every node conceptually has one of these states, and can
-make a transition at any time, the syncer operates only along a
-"frontier" of the tree, which consists of the deepest Stale nodes.
-
-The goal of the ledger syncer is to make the root node be fresh,
-starting from it being stale.
-
-The syncer usually operates exclusively on these frontier nodes
-and their direct children. However, the goal hash can change
-while the syncer is running, and at that point every non-root node
-conceptually becomes Unknown, and we need to restart. However, we
-don't need to restart completely: in practice, only small portions
-of the merkle tree change between goals, and we can re-use the "Stale"
-nodes we already have if the expected hash doesn't change.
-
-*)
-(*
-Note: while syncing, the underlying ledger is in an
-indeterminate state. We're mutating hashes at internal
-nodes without updating their children. In fact, we
-don't even set all the hashes for the internal nodes!
-(When we hit a height=N subtree, we don't do anything
-with the hashes in the bottomost N-1 internal nodes).
-*)
-
-module Make (Inputs : Inputs_intf) : sig
+module Make_responder (Inputs : Responder_inputs_intf) : sig
   open Inputs
 
   include
-    S
+    RESPONDER
       with type merkle_tree := MT.t
-       and type hash := Hash.t
-       and type root_hash := Root_hash.t
-       and type addr := Addr.t
-       and type merkle_path := MT.path
-       and type account := Account.t
        and type query := Addr.t Query.t
        and type answer := (Hash.t, Account.t) Answer.t
+
+  val intermediate_range : int -> Addr.t -> int -> Addr.t array
+
+  val num_accounts_answer : MT.t -> int * Hash.t
 end = struct
   open Inputs
-
-  type diff = unit
-
-  type index = int
 
   type answer = (Hash.t, Account.t) Answer.t
 
@@ -434,6 +459,72 @@ end = struct
           in
           Or_error.error_string err
   end
+end
+
+(*
+
+Every node of the merkle tree is always in one of three states:
+
+- Fresh.
+  The current contents for this node in the MT match what we
+  expect.
+- Stale
+  The current contents for this node in the MT do _not_ match
+  what we expect.
+- Unknown.
+  We don't know what to expect yet.
+
+
+Although every node conceptually has one of these states, and can
+make a transition at any time, the syncer operates only along a
+"frontier" of the tree, which consists of the deepest Stale nodes.
+
+The goal of the ledger syncer is to make the root node be fresh,
+starting from it being stale.
+
+The syncer usually operates exclusively on these frontier nodes
+and their direct children. However, the goal hash can change
+while the syncer is running, and at that point every non-root node
+conceptually becomes Unknown, and we need to restart. However, we
+don't need to restart completely: in practice, only small portions
+of the merkle tree change between goals, and we can re-use the "Stale"
+nodes we already have if the expected hash doesn't change.
+
+*)
+(*
+Note: while syncing, the underlying ledger is in an
+indeterminate state. We're mutating hashes at internal
+nodes without updating their children. In fact, we
+don't even set all the hashes for the internal nodes!
+(When we hit a height=N subtree, we don't do anything
+with the hashes in the bottomost N-1 internal nodes).
+*)
+
+module Make (Inputs : Inputs_intf) : sig
+  open Inputs
+
+  include
+    S
+      with type merkle_tree := MT.t
+       and type hash := Hash.t
+       and type root_hash := Root_hash.t
+       and type addr := Addr.t
+       and type merkle_path := MT.path
+       and type account := Account.t
+       and type query := Addr.t Query.t
+       and type answer := (Hash.t, Account.t) Answer.t
+end = struct
+  open Inputs
+
+  type diff = unit
+
+  type index = int
+
+  type answer = (Hash.t, Account.t) Answer.t
+
+  type query = Addr.t Query.t
+
+  include Make_responder (Inputs)
 
   type 'a t =
     { mutable desired_root : Root_hash.t option
@@ -455,6 +546,15 @@ end = struct
     ; mutable validity_listener :
         [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
     ; context : (module CONTEXT)
+    ; mutable targets : int
+    ; mutable target_set_at : Core.Time.t option
+    ; mutable answers_accepted : int
+    ; mutable answers_ignored : int
+    ; mutable answers_rejected : int
+    ; mutable last_accepted_answer_at : Core.Time.t option
+    ; mutable num_accounts : int option
+    ; mutable accounts_settled : int
+    ; mutable accounts_received : int
     }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
@@ -484,7 +584,7 @@ end = struct
         ; ("hash", Hash.to_yojson expected)
         ]
       "Expecting children parent $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
+    Addr.Table.set t.waiting_parents ~key:parent_addr ~data:expected
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
@@ -493,41 +593,16 @@ end = struct
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
+    Addr.Table.set t.waiting_content ~key:addr ~data:expected
 
-  (** Given an address and the accounts below that address, fill in the tree
-      with them. *)
-  let add_content :
-         'a t
-      -> Addr.t
-      -> Account.t list
-      -> [ `Success
-         | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *)
-         | `Content_length_mismatch of int * int  (** received, capacity *) ] =
-   fun t addr content ->
-    let open (val t.context) in
-    let expected = Addr.Table.find_exn t.waiting_content addr in
-    let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
-    if List.length content > capacity then
-      (* Content longer than the subtree under [addr] is rejected and requeued;
-         [addr] stays in [waiting_content] so the retry is accepted. *)
-      `Content_length_mismatch (List.length content, capacity)
-    else (
-      (* TODO #444 should we batch all the updates and do them at the end? *)
-      (* We might write the wrong data to the underlying ledger here, but if so
-         we'll requeue the address and it'll be overwritten. *)
-      MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-      Addr.Table.remove t.waiting_content addr ;
-      [%log trace]
-        ~metadata:
-          [ ("address", Addr.to_yojson addr)
-          ; ("hash", Hash.to_yojson expected)
-          ]
-        "Found content addr $address, with hash $hash, removing from waiting \
-         content" ;
-      let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-      if Hash.equal actual expected then `Success
-      else `Hash_mismatch (expected, actual) )
+  (** Count the accounts under [addr] as held, once they match the target. *)
+  let settle : 'a t -> Addr.t -> unit =
+   fun t addr ->
+    Option.iter t.num_accounts ~f:(fun num_accounts ->
+        let height = Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+        let first = Addr.to_int addr lsl height in
+        let last = Int.min num_accounts (first + (1 lsl height)) in
+        t.accounts_settled <- t.accounts_settled + Int.max 0 (last - first) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
   let merge_siblings : Hash.t array -> index -> Hash.t array =
@@ -555,17 +630,70 @@ end = struct
     let hash = merge_many nodes bottom_height in
     hash
 
+  (** The hash [addr] would have if [content] were written to the leaves under
+      it. As with [MT.set_all_accounts_rooted_at_exn], leaves past the end of
+      [content] are empty. *)
+  let hash_of_content : 'a t -> Addr.t -> Account.t list -> Hash.t =
+   fun t addr content ->
+    let height = Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+    let content_hashes = Array.of_list_map content ~f:Hash.hash_account in
+    let leaf_hashes =
+      Array.init (1 lsl height) ~f:(fun i ->
+          if i < Array.length content_hashes then content_hashes.(i)
+          else Hash.empty_account )
+    in
+    merge_many leaf_hashes height height
+
+  (** Given an address and the accounts below that address, fill in the tree
+      with them. *)
+  let add_content :
+         'a t
+      -> Addr.t
+      -> expected:Hash.t
+      -> Account.t list
+      -> [ `Success
+         | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *)
+         | `Content_length_mismatch of int * int  (** received, capacity *) ] =
+   fun t addr ~expected content ->
+    let open (val t.context) in
+    let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+    if List.length content > capacity then
+      (* Content longer than the subtree under [addr] is rejected and requeued;
+         [addr] stays in [waiting_content] so the retry is accepted. *)
+      `Content_length_mismatch (List.length content, capacity)
+    else
+      let actual = hash_of_content t addr content in
+      if Hash.equal actual expected then (
+        (* TODO #444 should we batch all the updates and do them at the end? *)
+        MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+        Addr.Table.remove t.waiting_content addr ;
+        settle t addr ;
+        t.accounts_received <- t.accounts_received + List.length content ;
+        [%log trace]
+          ~metadata:
+            [ ("address", Addr.to_yojson addr)
+            ; ("hash", Hash.to_yojson expected)
+            ]
+          "Found content addr $address, with hash $hash, removing from waiting \
+           content" ;
+        `Success )
+      else
+        (* Content with the wrong hash is rejected and requeued; [addr] stays
+           in [waiting_content] so the retry is accepted. *)
+        `Hash_mismatch (expected, actual)
+
   (* Adds the subtree given as the 2^k subtree leaves with the given prefix address *)
   (* Returns next nodes to be checked *)
   let add_subtree :
          'a t
       -> Addr.t
+      -> expected:Hash.t
       -> Hash.t array
       -> int
       -> [ `Good of (Addr.t * Hash.t) array
          | `Hash_mismatch of Hash.t * Hash.t
          | `Invalid_length ] =
-   fun t addr nodes requested_depth ->
+   fun t addr ~expected nodes requested_depth ->
     let open (val t.context) in
     let len = Array.length nodes in
     let is_power = Int.is_pow2 len in
@@ -575,10 +703,6 @@ end = struct
     let valid_length = is_power && is_more_than_two && less_than_requested in
     if valid_length then
       let ledger_depth = MT.depth t.tree in
-      let expected =
-        Option.value_exn ~message:"Forgot to wait for a node"
-          (Addr.Table.find t.waiting_parents addr)
-      in
       let merged =
         merge_many nodes (ledger_depth - Addr.depth addr) subtree_depth
       in
@@ -591,13 +715,40 @@ end = struct
         let should_fetch_children addr hash =
           not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
         in
-        let subtrees_to_fetch =
+        let subtrees_to_fetch, subtrees_held =
           addresses_and_hashes
-          |> Array.filter ~f:(Tuple2.uncurry should_fetch_children)
+          |> Array.partition_tf ~f:(Tuple2.uncurry should_fetch_children)
         in
+        Array.iter subtrees_held ~f:(fun (addr, _) -> settle t addr) ;
         `Good subtrees_to_fetch )
       else `Hash_mismatch (expected, merged)
     else `Invalid_length
+
+  (** [add_content], for the expected hash of [addr], or [`Not_expected] if
+      the syncer is not waiting for its content. *)
+  let add_content_if_expected t addr content =
+    match Addr.Table.find t.waiting_content addr with
+    | None ->
+        `Not_expected
+    | Some expected ->
+        ( add_content t addr ~expected content
+          :> [ `Success
+             | `Hash_mismatch of Hash.t * Hash.t
+             | `Content_length_mismatch of int * int
+             | `Not_expected ] )
+
+  (** [add_subtree], for the expected hash of [addr], or [`Not_expected] if
+      the syncer is not waiting for its children. *)
+  let add_subtree_if_expected t addr nodes requested_depth =
+    match Addr.Table.find t.waiting_parents addr with
+    | None ->
+        `Not_expected
+    | Some expected ->
+        ( add_subtree t addr ~expected nodes requested_depth
+          :> [ `Good of (Addr.t * Hash.t) array
+             | `Hash_mismatch of Hash.t * Hash.t
+             | `Invalid_length
+             | `Not_expected ] )
 
   let all_done t =
     let open (val t.context) in
@@ -609,13 +760,17 @@ end = struct
       Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
-  let empty_hash_at_height h =
-    assert (
-      h >= 0 || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
-    let rec go prev ctr =
-      if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
+  let empty_hash_at_height =
+    let cache =
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
     in
-    go Hash.empty_account 0
+    fun h ->
+      assert (
+        h >= 0
+        || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
+      cache h
 
   (** Given the hash of the smallest subtree that contains all accounts, the
       height of that hash in the tree and the height of the whole tree, compute
@@ -636,11 +791,18 @@ end = struct
     go (empty_hash_at_height start_height) hash start_height
 
   (** Given an address and the hash of the corresponding subtree, start getting
-      the children.
+      the children. If the subtree is empty, its accounts are removed instead.
   *)
   let handle_node t addr exp_hash =
     let open (val t.context) in
-    if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
+    let ledger_depth = MT.depth t.tree in
+    if
+      Hash.equal exp_hash
+        (empty_hash_at_height (Addr.height ~ledger_depth addr))
+    then (
+      MT.set_all_accounts_rooted_at_exn t.tree addr [] ;
+      settle t addr )
+    else if Addr.depth addr >= ledger_depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
@@ -670,6 +832,8 @@ end = struct
       (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
       let actual = complete_with_empties content_hash height ledger_depth in
       if Hash.equal actual rh then (
+        t.num_accounts <- Some n ;
+        t.accounts_settled <- 0 ;
         Addr.Table.clear t.waiting_parents ;
         (* We should use this information to set the empty account slots empty and
            start syncing at the content root. See #1972. *)
@@ -711,24 +875,39 @@ end = struct
             ; ("ignored_hash", Root_hash.to_yojson root_hash)
             ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
+        t.answers_ignored <- t.answers_ignored + 1 ;
         Deferred.unit )
       else if already_done then (
         (* This can happen if we asked for hashes that turn out to be equal in
            underlying ledger and the target. *)
         [%log debug] "Got sync response when we're already finished syncing" ;
+        t.answers_ignored <- t.answers_ignored + 1 ;
         Deferred.unit )
       else
         let open Trust_system in
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
+          t.answers_rejected <- t.answers_rejected + 1 ;
           (* The target may have changed while the answer was being handled,
              and a query for a root we no longer want must not be reissued. *)
           if Root_hash.equal root_hash (desired_root_exn t) then
             Linear_pipe.write_without_pushback_if_open t.queries
               (root_hash, query)
         in
+        (* After the target changes, answers can arrive for queries the syncer
+           no longer expects. They are not the sender's fault. *)
+        let ignore_answer () =
+          [%log debug]
+            ~metadata:[ ("query", Query.to_yojson Addr.to_yojson query) ]
+            "Ignoring the answer to sync ledger query $query, which is no \
+             longer expected" ;
+          t.answers_ignored <- t.answers_ignored + 1 ;
+          Deferred.unit
+        in
         let credit_fulfilled_request () =
+          t.answers_accepted <- t.answers_accepted + 1 ;
+          t.last_accepted_answer_at <- Some (Core.Time.now ()) ;
           record_envelope_sender t.trust_system logger sender
             ( Actions.Fulfilled_request
             , Some
@@ -738,9 +917,11 @@ end = struct
         let%bind _ =
           match (query, answer) with
           | Query.What_contents addr, Answer.Contents_are leaves -> (
-              match add_content t addr leaves with
+              match add_content_if_expected t addr leaves with
               | `Success ->
                   credit_fulfilled_request ()
+              | `Not_expected ->
+                  ignore_answer ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
                     record_envelope_sender t.trust_system logger sender
@@ -802,7 +983,11 @@ end = struct
                   requeue_query () )
           | ( Query.What_child_hashes (address, requested_depth)
             , Answer.Child_hashes_are hashes ) -> (
-              match add_subtree t address hashes requested_depth with
+              match
+                add_subtree_if_expected t address hashes requested_depth
+              with
+              | `Not_expected ->
+                  ignore_answer ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
                     record_envelope_sender t.trust_system logger sender
@@ -878,6 +1063,10 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
+      t.targets <- t.targets + 1 ;
+      t.num_accounts <- None ;
+      t.accounts_settled <- 0 ;
+      t.target_set_at <- Some (Core.Time.now ()) ;
       ( try don't_wait_for (Broadcast_pipe.Writer.write t.target_writer (Some h))
         with Broadcast_pipe.Already_closed _ -> () ) ;
       t.auxiliary_data <- Some data ;
@@ -906,6 +1095,21 @@ end = struct
           Some t.tree
       | `Target_changed _ ->
           None )
+
+  let progress t : Progress.t =
+    { targets = t.targets
+    ; target_set_at = t.target_set_at
+    ; pending_child_hashes = Addr.Table.length t.waiting_parents
+    ; pending_contents = Addr.Table.length t.waiting_content
+    ; synced = Option.is_some (peek_valid_tree t)
+    ; answers_accepted = t.answers_accepted
+    ; answers_ignored = t.answers_ignored
+    ; answers_rejected = t.answers_rejected
+    ; last_accepted_answer_at = t.last_accepted_answer_at
+    ; num_accounts = t.num_accounts
+    ; accounts_settled = t.accounts_settled
+    ; accounts_received = t.accounts_received
+    }
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
@@ -940,6 +1144,15 @@ end = struct
       ; waiting_content = Addr.Table.create ()
       ; validity_listener = Ivar.create ()
       ; context
+      ; targets = 0
+      ; target_set_at = None
+      ; answers_accepted = 0
+      ; answers_ignored = 0
+      ; answers_rejected = 0
+      ; last_accepted_answer_at = None
+      ; num_accounts = None
+      ; accounts_settled = 0
+      ; accounts_received = 0
       }
     in
     don't_wait_for (main_loop t) ;

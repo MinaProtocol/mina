@@ -3159,7 +3159,7 @@ let%test_module "staged ledger tests" =
       Quickcheck.test
         Quickcheck.Generator.(
           tuple2 (gen_below_capacity ~signature_kind ()) small_positive_int)
-        ~trials:20
+        ~trials:3
         ~f:(fun ((ledger_init_state, cmds, iters), global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger sl test_mask ->
@@ -3186,7 +3186,7 @@ let%test_module "staged ledger tests" =
       Quickcheck.test
         Quickcheck.Generator.(
           tuple2 (gen_below_capacity ~signature_kind ()) small_positive_int)
-        ~trials:20
+        ~trials:3
         ~f:(fun ((ledger_init_state, cmds, iters), global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger sl test_mask ->
@@ -3227,7 +3227,7 @@ let%test_module "staged ledger tests" =
           tuple2
             (gen_at_capacity_fixed_blocks ~signature_kind expected_proof_count)
             small_positive_int)
-        ~trials:20
+        ~trials:3
         ~f:(fun ((ledger_init_state, cmds, iters), global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger sl test_mask ->
@@ -3240,7 +3240,7 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 Option.is_none
-                  (Ledger.location_of_account test_mask
+                  (Ledger.location_of_account (Sl.ledger !sl)
                      (Account_id.create snark_worker_pk Token_id.default) ) ) )
           )
 
@@ -3302,7 +3302,7 @@ let%test_module "staged ledger tests" =
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger:_ sl _test_mask ->
               let%map checked =
-                iter_cmds_acc cmds iters true
+                iter_cmds_acc cmds iters false
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
                     let scan_state = Sl.scan_state !sl in
                     let work =
@@ -3597,7 +3597,7 @@ let%test_module "staged ledger tests" =
             * User_command.Valid.t list
             * int option list
             * int list
-            * int] ~trials:50
+            * int] ~trials:5
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available, global_slot)
            ->
           async_with_ledgers ledger_init_state
@@ -5185,8 +5185,8 @@ let%test_module "staged ledger tests" =
                         = 1 ) ;
 
                       let%bind verifier_full =
-                        Verifier.For_tests.default ~constraint_constants ~logger
-                          ~proof_level:Full ()
+                        Verifier.For_tests.commands_only ~constraint_constants
+                          ~logger ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

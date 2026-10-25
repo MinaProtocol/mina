@@ -182,6 +182,8 @@ end
 
 let empty () = ref Yojson_map.empty
 
+let replace_contents t ~by = t := !by
+
 let get_proof t ~verification_key ~public_input =
   let open Option.Let_syntax in
   let%bind for_vk = Map.find !t verification_key in

@@ -6,15 +6,12 @@ module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger
 module U = Transaction_snark_tests.Util
 
-let%test_module "Zkapp tokens tests" =
-  ( module struct
+let suite () =
+  Transaction_snark_test_suite.make ~name:"zkapp_tokens"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
     (* code patterned after "tokens test" unit test in Mina_ledger.Ledger *)
-
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
     let constraint_constants = U.constraint_constants
 
@@ -56,7 +53,9 @@ let%test_module "Zkapp tokens tests" =
       | `Existed, acct, _ ->
           acct
 
-    let%test_unit "token operations" =
+    let () =
+      test "token operations"
+      @@ fun () ->
       Test_util.with_randomness 987654321 (fun () ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let check_token_balance (keypair : Keypair.t) token_id balance =
@@ -259,11 +258,5 @@ let%test_module "Zkapp tokens tests" =
                   check_token_balance token_accounts.(2) custom_token_id2 290 ;
                   check_token_balance token_accounts.(3) custom_token_id2 210 ;
                   Async.Deferred.unit ) ) )
-
-    let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  end )
+  end in
+  ()

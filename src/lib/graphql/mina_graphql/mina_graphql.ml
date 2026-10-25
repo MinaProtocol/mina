@@ -977,6 +977,42 @@ module Mutations = struct
         in
         () )
 
+  let archive_versioned_precomputed_block =
+    io_field "archiveVersionedPrecomputedBlock"
+      ~doc:
+        "Send a precomputed block of any version the archive reads to the \
+         archive, which reads it by the rules of its own version. The block is \
+         forwarded as given."
+      ~args:
+        Arg.
+          [ arg "block"
+              ~doc:"Block encoded in precomputed block format, with its version"
+              ~typ:(non_null Types.Input.VersionedPrecomputedBlock.arg_typ)
+          ]
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true)
+                ] ) ) )
+      ~resolve:(fun { ctx = mina; _ } () block ->
+        let open Deferred.Result.Let_syntax in
+        let%bind archive_location =
+          match (Mina_lib.config mina).archive_process_location with
+          | Some archive_location ->
+              return archive_location
+          | None ->
+              Deferred.Result.fail
+                "Could not find an archive process to connect to"
+        in
+        let%map () =
+          Mina_lib.Archive_client.dispatch_versioned_precomputed_block
+            archive_location block
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        () )
+
   let archive_extensional_block =
     io_field "archiveExtensionalBlock"
       ~args:
@@ -1035,6 +1071,7 @@ module Mutations = struct
     ; set_connection_gating_config
     ; add_peer
     ; archive_precomputed_block
+    ; archive_versioned_precomputed_block
     ; archive_extensional_block
     ; send_rosetta_transaction
     ; add_snark_work
@@ -2135,6 +2172,18 @@ module Queries = struct
                   ; data = { cmd_with_hash with data = zkapp_cmd }
                   } ) )
 
+  let transaction_pool_status =
+    field "transactionPoolStatus"
+      ~doc:
+        "Occupancy of this daemon's transaction pool, and the fee a new \
+         command must beat once the pool is full. Cheap enough to poll before \
+         each submission, as a back-pressure signal"
+      ~typ:(non_null Types.transaction_pool_status)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        Mina_lib.transaction_pool mina
+        |> Network_pool.Transaction_pool.resource_pool )
+
   let sync_status =
     io_field "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun { ctx = mina; _ } () ->
@@ -3182,6 +3231,7 @@ module Queries = struct
     ; get_peers
     ; pooled_user_commands
     ; pooled_zkapp_commands
+    ; transaction_pool_status
     ; transaction_status
     ; trust_status
     ; trust_status_all

@@ -2,6 +2,7 @@
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
 -- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + genesis_accounts: the accounts of each era's genesis ledger
+-- + token_symbols.value, zkapp_uris.value: text -> bytea
 -- + record status in migration_history
 --
 -- Add further 5.0.0 schema changes here as they land, and bump
@@ -99,7 +100,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea.',
             'starting'::migration_status
         );
     ELSIF
@@ -116,7 +117,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea.',
             'starting'::migration_status
         );
     ELSIF
@@ -247,7 +248,39 @@ CREATE TABLE IF NOT EXISTS genesis_accounts (
     PRIMARY KEY (public_key, token, genesis_height)
 );
 
--- 4. Update schema_history
+-- 4. token_symbols.value and zkapp_uris.value: text -> bytea
+--
+-- On chain both are arbitrary bytes (a token symbol is at most 6 bytes, with
+-- no encoding check). A UTF8 database rejects a value such as 0xff, and the
+-- archive cannot store any block that touches that account.
+--
+-- The archive wrote each value in its client encoding: the database encoding,
+-- or LATIN1 where PGCLIENTENCODING=LATIN1 was the workaround for this fault
+-- (LATIN1 maps each byte to one character, so it is lossless). Give that
+-- encoding to this script, e.g.
+--   PGOPTIONS='-c archive.value_encoding=LATIN1' psql -f upgrade.sql
+-- Both tables have tens of rows, so the ACCESS EXCLUSIVE lock of the rewrite
+-- is short.
+DO $$
+DECLARE
+    tbl text;
+    enc text := COALESCE(NULLIF(current_setting('archive.value_encoding', true), ''),
+                         getdatabaseencoding());
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['token_symbols', 'zkapp_uris'] LOOP
+        IF (SELECT data_type FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = tbl
+              AND column_name = 'value') = 'text'
+        THEN
+            EXECUTE format(
+              'ALTER TABLE public.%I ALTER COLUMN value TYPE bytea'
+              ' USING convert_to(value, %L)', tbl, enc);
+        END IF;
+    END LOOP;
+END $$;
+
+-- 5. Update schema_history
 
 DO $$
 BEGIN

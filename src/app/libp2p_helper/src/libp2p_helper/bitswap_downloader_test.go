@@ -1004,3 +1004,58 @@ func TestBitswapDownloadPrepopulated(t *testing.T) {
 		}
 	}
 }
+
+// TestBitswapDownloadMalformedRootWithChildren checks a root that is found
+// to be malformed while processing a block that is valid at one of its
+// positions in the tree (and hence yields children) but not at another.
+func TestBitswapDownloadMalformedRootWithChildren(t *testing.T) {
+	// Two links per block, five blocks in total: nodes 0 and 1 are full
+	// branch blocks and node 2 is a leaf
+	maxBlockSize := 80
+	dataLen := 236
+	schema := MkBitswapBlockSchemaLengthPrefixed(maxBlockSize, dataLen)
+	require.Equal(t, 2, schema.maxLinksPerBlock)
+	require.Equal(t, 5, schema.numTotalBlocks)
+	require.Equal(t, 2, schema.numFullBranchBlocks)
+	mkBlock := func(links []BitswapBlockLink, data []byte) []byte {
+		b := make([]byte, maxBlockSize)
+		binary.LittleEndian.PutUint16(b, uint16(len(links)))
+		for i, l := range links {
+			copy(b[2+i*BITSWAP_BLOCK_LINK_SIZE:], l[:])
+		}
+		copy(b[2+len(links)*BITSWAP_BLOCK_LINK_SIZE:], data)
+		return b
+	}
+	// The same branch block is linked twice from the root, so it is valid
+	// as node 1 but not as node 2
+	branch := mkBlock([]BitswapBlockLink{badHash([]byte{1}), badHash([]byte{2})}, nil)
+	branchLink := badHash(branch)
+	rootData := make([]byte, 5)
+	binary.LittleEndian.PutUint32(rootData, uint32(dataLen))
+	rootBlock := mkBlock([]BitswapBlockLink{branchLink, branchLink}, rootData)
+	root_ := badHash(rootBlock)
+
+	r := rand.New(rand.NewSource(0))
+	bs := &testBitswapState{
+		r:        r,
+		statuses: map[BitswapBlockLink]codanet.RootBlockStatus{},
+		refs:     map[BitswapBlockLink]map[root]struct{}{},
+		blocks: map[cid.Cid][]byte{
+			codanet.BlockHashToCid(root_):      rootBlock,
+			codanet.BlockHashToCid(branchLink): branch,
+		},
+		nodeDownloadParams: map[cid.Cid]map[root][]NodeIndex{},
+		rootDownloadStates: map[root]*RootDownloadState{},
+		awaitingBlocks:     map[cid.Cid]interface{}{},
+		awaitingBlocksQ:    map[uint64]cid.Cid{},
+		maxBlockSize:       maxBlockSize,
+		resourceUpdates:    map[root]ipc.ResourceUpdateType{},
+		checkInvariantsNow: func() bool { return true },
+	}
+	kickStartRootDownload(root_, 0, bs)
+	bs.CheckInvariants()
+	require.Equal(t, ipc.ResourceUpdateType_broken, bs.resourceUpdates[root_])
+	require.Empty(t, bs.rootDownloadStates)
+	require.Empty(t, bs.nodeDownloadParams)
+	require.Empty(t, bs.awaitingBlocks)
+}

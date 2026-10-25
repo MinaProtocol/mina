@@ -53,7 +53,7 @@ let gen_application_state : Application_state.t Quickcheck.Generator.t =
   }
 
 let apply_against_non_empty_scan_state () =
-  Quickcheck.test
+  Quickcheck.test ~trials:500
     (Quickcheck.Generator.tuple2 gen_apply_and_txn gen_application_state)
     ~f:(fun ((apply, txn), state) ->
       match Application_state.try_applying_txn ~apply state txn with
