@@ -92,6 +92,41 @@ module type CONTEXT = sig
   val ledger_sync_config : daemon_config
 end
 
+(** A snapshot of how far a ledger sync has progressed, for reporting. *)
+module Progress = struct
+  type t =
+    { targets : int
+          (** How many times the sync has been given a new root to reach. *)
+    ; target_set_at : Core.Time.t option
+          (** When the current target was set. *)
+    ; pending_child_hashes : int
+          (** How many inner nodes the sync is waiting for the children of. *)
+    ; pending_contents : int
+          (** How many account subtrees the sync is waiting for the accounts
+              of. *)
+    ; synced : bool  (** Whether the ledger has reached the current target. *)
+    ; answers_accepted : int
+          (** How many answers have added to the ledger or confirmed part of
+              it. *)
+    ; answers_ignored : int
+          (** How many answers have arrived for queries the sync no longer
+              needed, such as those for an earlier target. *)
+    ; answers_rejected : int
+          (** How many answers have been invalid, and their queries asked
+              again. *)
+    ; last_accepted_answer_at : Core.Time.t option
+          (** When an answer was last accepted. *)
+    ; num_accounts : int option
+          (** How many accounts the current target holds, once a peer has
+              said. *)
+    ; accounts_settled : int
+          (** How many of the current target's accounts the ledger is known
+              to hold, whether received or already present. *)
+    ; accounts_received : int
+          (** How many accounts peers have sent, over all targets. *)
+    }
+end
+
 module type Inputs_base_intf = sig
   module Addr : module type of Merkle_address
 
@@ -232,6 +267,11 @@ module type S = sig
   val merkle_path_at_addr : 'a t -> addr -> merkle_path Or_error.t
 
   val get_account_at_addr : 'a t -> addr -> account Or_error.t
+
+  (** How far the sync has progressed towards its current target. Until the
+      new target's account count arrives, the pending work counted is that of
+      the previous target. *)
+  val progress : 'a t -> Progress.t
 
   val handle_num_accounts :
        'a t
@@ -506,6 +546,15 @@ end = struct
     ; mutable validity_listener :
         [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
     ; context : (module CONTEXT)
+    ; mutable targets : int
+    ; mutable target_set_at : Core.Time.t option
+    ; mutable answers_accepted : int
+    ; mutable answers_ignored : int
+    ; mutable answers_rejected : int
+    ; mutable last_accepted_answer_at : Core.Time.t option
+    ; mutable num_accounts : int option
+    ; mutable accounts_settled : int
+    ; mutable accounts_received : int
     }
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
@@ -545,6 +594,15 @@ end = struct
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.set t.waiting_content ~key:addr ~data:expected
+
+  (** Count the accounts under [addr] as held, once they match the target. *)
+  let settle : 'a t -> Addr.t -> unit =
+   fun t addr ->
+    Option.iter t.num_accounts ~f:(fun num_accounts ->
+        let height = Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+        let first = Addr.to_int addr lsl height in
+        let last = Int.min num_accounts (first + (1 lsl height)) in
+        t.accounts_settled <- t.accounts_settled + Int.max 0 (last - first) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
   let merge_siblings : Hash.t array -> index -> Hash.t array =
@@ -609,6 +667,8 @@ end = struct
         (* TODO #444 should we batch all the updates and do them at the end? *)
         MT.set_all_accounts_rooted_at_exn t.tree addr content ;
         Addr.Table.remove t.waiting_content addr ;
+        settle t addr ;
+        t.accounts_received <- t.accounts_received + List.length content ;
         [%log trace]
           ~metadata:
             [ ("address", Addr.to_yojson addr)
@@ -655,10 +715,11 @@ end = struct
         let should_fetch_children addr hash =
           not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
         in
-        let subtrees_to_fetch =
+        let subtrees_to_fetch, subtrees_held =
           addresses_and_hashes
-          |> Array.filter ~f:(Tuple2.uncurry should_fetch_children)
+          |> Array.partition_tf ~f:(Tuple2.uncurry should_fetch_children)
         in
+        Array.iter subtrees_held ~f:(fun (addr, _) -> settle t addr) ;
         `Good subtrees_to_fetch )
       else `Hash_mismatch (expected, merged)
     else `Invalid_length
@@ -738,7 +799,9 @@ end = struct
     if
       Hash.equal exp_hash
         (empty_hash_at_height (Addr.height ~ledger_depth addr))
-    then MT.set_all_accounts_rooted_at_exn t.tree addr []
+    then (
+      MT.set_all_accounts_rooted_at_exn t.tree addr [] ;
+      settle t addr )
     else if Addr.depth addr >= ledger_depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
@@ -769,6 +832,8 @@ end = struct
       (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
       let actual = complete_with_empties content_hash height ledger_depth in
       if Hash.equal actual rh then (
+        t.num_accounts <- Some n ;
+        t.accounts_settled <- 0 ;
         Addr.Table.clear t.waiting_parents ;
         (* We should use this information to set the empty account slots empty and
            start syncing at the content root. See #1972. *)
@@ -810,17 +875,20 @@ end = struct
             ; ("ignored_hash", Root_hash.to_yojson root_hash)
             ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
+        t.answers_ignored <- t.answers_ignored + 1 ;
         Deferred.unit )
       else if already_done then (
         (* This can happen if we asked for hashes that turn out to be equal in
            underlying ledger and the target. *)
         [%log debug] "Got sync response when we're already finished syncing" ;
+        t.answers_ignored <- t.answers_ignored + 1 ;
         Deferred.unit )
       else
         let open Trust_system in
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
+          t.answers_rejected <- t.answers_rejected + 1 ;
           (* The target may have changed while the answer was being handled,
              and a query for a root we no longer want must not be reissued. *)
           if Root_hash.equal root_hash (desired_root_exn t) then
@@ -834,9 +902,12 @@ end = struct
             ~metadata:[ ("query", Query.to_yojson Addr.to_yojson query) ]
             "Ignoring the answer to sync ledger query $query, which is no \
              longer expected" ;
+          t.answers_ignored <- t.answers_ignored + 1 ;
           Deferred.unit
         in
         let credit_fulfilled_request () =
+          t.answers_accepted <- t.answers_accepted + 1 ;
+          t.last_accepted_answer_at <- Some (Core.Time.now ()) ;
           record_envelope_sender t.trust_system logger sender
             ( Actions.Fulfilled_request
             , Some
@@ -992,6 +1063,10 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
+      t.targets <- t.targets + 1 ;
+      t.num_accounts <- None ;
+      t.accounts_settled <- 0 ;
+      t.target_set_at <- Some (Core.Time.now ()) ;
       ( try don't_wait_for (Broadcast_pipe.Writer.write t.target_writer (Some h))
         with Broadcast_pipe.Already_closed _ -> () ) ;
       t.auxiliary_data <- Some data ;
@@ -1020,6 +1095,21 @@ end = struct
           Some t.tree
       | `Target_changed _ ->
           None )
+
+  let progress t : Progress.t =
+    { targets = t.targets
+    ; target_set_at = t.target_set_at
+    ; pending_child_hashes = Addr.Table.length t.waiting_parents
+    ; pending_contents = Addr.Table.length t.waiting_content
+    ; synced = Option.is_some (peek_valid_tree t)
+    ; answers_accepted = t.answers_accepted
+    ; answers_ignored = t.answers_ignored
+    ; answers_rejected = t.answers_rejected
+    ; last_accepted_answer_at = t.last_accepted_answer_at
+    ; num_accounts = t.num_accounts
+    ; accounts_settled = t.accounts_settled
+    ; accounts_received = t.accounts_received
+    }
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
@@ -1054,6 +1144,15 @@ end = struct
       ; waiting_content = Addr.Table.create ()
       ; validity_listener = Ivar.create ()
       ; context
+      ; targets = 0
+      ; target_set_at = None
+      ; answers_accepted = 0
+      ; answers_ignored = 0
+      ; answers_rejected = 0
+      ; last_accepted_answer_at = None
+      ; num_accounts = None
+      ; accounts_settled = 0
+      ; accounts_received = 0
       }
     in
     don't_wait_for (main_loop t) ;
