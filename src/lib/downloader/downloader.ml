@@ -813,14 +813,13 @@ end = struct
               | Error _ ->
                   ([], keys)
               | Ok rs ->
-                  let all = Key.Hash_set.of_list keys in
+                  let all = Key.Set.of_list keys in
                   let succ =
                     List.filter_map rs ~f:(fun r ->
                         let k = Result.key r in
-                        if Hash_set.mem all k then Some k else None )
+                        if Set.mem all k then Some k else None )
                   in
-                  List.iter succ ~f:(Hash_set.remove all) ;
-                  (succ, Hash_set.to_list all)
+                  (succ, Set.to_list (Set.diff all (Key.Set.of_list succ)))
             in
             (* A job cancelled while it was being downloaded is no evidence
                against the peer, which may well have stopped serving it for
@@ -829,9 +828,9 @@ end = struct
               let cancelled =
                 List.filter_map xs ~f:(fun x ->
                     Option.some_if (Ivar.is_full x.J.res) x.key )
-                |> Key.Hash_set.of_list
+                |> Key.Set.of_list
               in
-              List.filter unsuccs ~f:(Fn.non (Hash_set.mem cancelled))
+              List.filter unsuccs ~f:(Fn.non (Set.mem cancelled))
             in
             Useful_peers.update t.useful_peers
               (Download_finished (peer, `Successful succs, `Unsuccessful unsuccs)
@@ -863,10 +862,12 @@ end = struct
                     ] ;
                 let received_at = Time.now () in
                 let jobs =
-                  Key.Table.of_alist_exn (List.map xs ~f:(fun x -> (x.key, x)))
+                  ref
+                    (Key.Map.of_alist_exn
+                       (List.map xs ~f:(fun x -> (x.key, x))) )
                 in
                 List.iter rs ~f:(fun r ->
-                    match Hashtbl.find jobs (Result.key r) with
+                    match Map.find !jobs (Result.key r) with
                     | None ->
                         (* Got something we didn't ask for. *)
                         Trust_system.(
@@ -874,7 +875,7 @@ end = struct
                             Actions.(Violated_protocol, None))
                         |> don't_wait_for
                     | Some j ->
-                        Hashtbl.remove jobs j.key ;
+                        jobs := Map.remove !jobs j.key ;
                         job_finished t j
                           (Ok
                              ( { Envelope.Incoming.data = r
@@ -883,7 +884,7 @@ end = struct
                                }
                              , j.attempts ) ) ) ;
                 (* Anything left in jobs, we did not get results for :( *)
-                Hashtbl.iter jobs ~f:(fun x ->
+                Map.iter !jobs ~f:(fun x ->
                     t.downloading <- Map.remove t.downloading x.J.key ;
                     (* A job cancelled while its download was in progress
                        already has its result, and must not be resurrected. *)
