@@ -139,57 +139,32 @@ end = struct
     let result = Job.result
   end
 
-  module Make_hash_queue (Key : Hashable.S) = struct
-    module Key_value = struct
-      type 'a t = { key : Key.t; mutable value : 'a } [@@deriving fields]
-    end
-
-    (* Hash_queue would be perfect, but it doesn't expose enough for
-         us to make sure the underlying queue is sorted by blockchain_length. *)
-    type 'a t =
-      { queue : 'a Key_value.t Doubly_linked.t
-      ; table : 'a Key_value.t Doubly_linked.Elt.t Key.Table.t
-      }
+  module Make_hash_queue (Key : Comparable.S) = struct
+    (* Jobs are dequeued in the order of their keys. Keys are compared rather
+       than hashed, since comparing a ledger or state hash is much cheaper
+       than hashing it. *)
+    type 'a t = { mutable jobs : 'a Key.Map.t }
 
     let dequeue t =
-      Option.map (Doubly_linked.remove_first t.queue) ~f:(fun { key; value } ->
-          Hashtbl.remove t.table key ; value )
+      Option.map (Map.min_elt t.jobs) ~f:(fun (key, value) ->
+          t.jobs <- Map.remove t.jobs key ;
+          value )
 
     let enqueue t (e : _ J.t) =
-      if Hashtbl.mem t.table e.key then `Key_already_present
-      else
-        let kv = { Key_value.key = e.key; value = e } in
-        let elt =
-          match
-            Doubly_linked.find_elt t.queue ~f:(fun { value; _ } ->
-                Key.compare e.key value.J.key < 0 )
-          with
-          | None ->
-              (* e is >= everything. Put it at the back. *)
-              Doubly_linked.insert_last t.queue kv
-          | Some pred ->
-              Doubly_linked.insert_before t.queue pred kv
-        in
-        Hashtbl.set t.table ~key:e.key ~data:elt ;
-        `Ok
+      if Map.mem t.jobs e.key then `Key_already_present
+      else (
+        t.jobs <- Map.set t.jobs ~key:e.key ~data:e ;
+        `Ok )
 
-    let lookup t k =
-      Option.map (Hashtbl.find t.table k) ~f:(fun x ->
-          (Doubly_linked.Elt.value x).value )
+    let lookup t k = Map.find t.jobs k
 
-    let remove t k =
-      match Hashtbl.find_and_remove t.table k with
-      | None ->
-          ()
-      | Some elt ->
-          Doubly_linked.remove t.queue elt
+    let remove t k = t.jobs <- Map.remove t.jobs k
 
-    let length t = Doubly_linked.length t.queue
+    let length t = Map.length t.jobs
 
-    let to_list t = List.map (Doubly_linked.to_list t.queue) ~f:Key_value.value
+    let to_list t = Map.data t.jobs
 
-    let create () =
-      { table = Key.Table.create (); queue = Doubly_linked.create () }
+    let create () = { jobs = Key.Map.empty }
   end
 
   module Q = Make_hash_queue (Key)
