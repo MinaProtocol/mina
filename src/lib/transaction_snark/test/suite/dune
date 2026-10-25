@@ -1,0 +1,15 @@
+(library
+ (name transaction_snark_test_suite)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_kernel
+  yojson
+  ;; local libraries
+  pickles
+  transaction_snark)
+ (preprocess
+  (pps mina_ppx))
+ (instrumentation
+  (backend bisect_ppx)))

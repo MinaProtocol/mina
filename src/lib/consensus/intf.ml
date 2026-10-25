@@ -820,6 +820,7 @@ module type S = sig
                  Network_peer.Envelope.Incoming.t )
                Pipe.Writer.t
             -> unit )
+      -> bootstrap_status:Bootstrap_status.t
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

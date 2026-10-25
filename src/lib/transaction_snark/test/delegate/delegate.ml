@@ -1,3 +1,4 @@
+open Core_kernel
 open Mina_base
 module U = Transaction_snark_tests.Util
 
@@ -20,7 +21,16 @@ struct
   let is_non_zkapp_update = true
 end
 
-let%test_module "Update account delegate" =
-  ( module struct
-    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
-  end )
+let suite () =
+  Transaction_snark_test_suite.make ~name:"delegate"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
+    include
+      Transaction_snark_tests.Test_zkapp_update.Make
+        (Test_input)
+        (struct
+          let test = test
+        end)
+  end in
+  ()

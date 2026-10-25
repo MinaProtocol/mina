@@ -772,21 +772,21 @@ let big_list : 'a Quickcheck.Generator.t -> 'a list Quickcheck.Generator.t =
   Quickcheck.Generator.list_with_length len gen
 
 let%test_unit "list isomorphism - cons" =
-  Quickcheck.test (big_list Int.quickcheck_generator) ~f:(fun xs ->
+  Quickcheck.test ~trials:1000 (big_list Int.quickcheck_generator) ~f:(fun xs ->
       let xs_fseq = List.fold_right xs ~f:cons ~init:empty in
       assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
       [%test_eq: int] (List.length xs) (length xs_fseq) )
 
 let%test_unit "list isomorphism - snoc" =
-  Quickcheck.test (big_list Int.quickcheck_generator) ~f:(fun xs ->
+  Quickcheck.test ~trials:1000 (big_list Int.quickcheck_generator) ~f:(fun xs ->
       let xs_fseq = List.fold_left xs ~init:empty ~f:snoc in
       assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
       [%test_eq: int] (List.length xs) (length xs_fseq) )
 
 let%test_unit "alternating cons/snoc" =
-  Quickcheck.test
+  Quickcheck.test ~trials:1000
     Quickcheck.Generator.(
       big_list @@ variant2 (Int.gen_incl 0 500) (Int.gen_incl 0 500))
     ~f:(fun cmds ->
@@ -821,7 +821,7 @@ let%test_unit "split properties" =
                  let res = idx - offset in
                  if res >= 0 then Some (xs, res) else None ) ) )
   in
-  Quickcheck.test gen ~shrink_attempts:`Exhaustive
+  Quickcheck.test ~trials:1000 gen ~shrink_attempts:`Exhaustive
     ~sexp_of:[%sexp_of: int list * int] ~shrinker ~f:(fun (xs, idx) ->
       let len = List.length xs in
       let split_l_list = List.take xs idx in

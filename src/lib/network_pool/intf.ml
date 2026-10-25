@@ -412,6 +412,18 @@ module type Transaction_resource_pool_intf = sig
 
   val member : t -> Transaction_hash.t -> bool
 
+  (** The number of commands currently in the pool. *)
+  val size : t -> int
+
+  (** The number of commands the pool holds before it starts evicting the
+      lowest-fee ones. *)
+  val max_size : t -> int
+
+  (** The lowest fee per weight unit of any command in the pool, or [None] if
+      the pool is empty. Once the pool is full, a new command must pay strictly
+      more than this to be admitted. *)
+  val min_fee : t -> Currency.Fee_rate.t option
+
   val transactions :
     t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 

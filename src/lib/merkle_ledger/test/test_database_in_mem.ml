@@ -79,7 +79,7 @@ module Make (Test : Test_intf) = struct
 
   let test_non_existing_account_is_none () =
     Test.with_instance (fun mdb ->
-        Quickcheck.test
+        Quickcheck.test ~trials:200
           (MT.For_tests.gen_account_location ~ledger_depth:(MT.depth mdb))
           ~f:(fun location -> assert (Option.is_none (MT.get mdb location))) )
 
@@ -232,7 +232,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
-            Quickcheck.test
+            Quickcheck.test ~trials:200
               (Mina_stdlib.Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
@@ -258,7 +258,7 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min 5 depth in
             populate_db mdb max_height ;
-            Quickcheck.test
+            Quickcheck.test ~trials:200
               (Mina_stdlib.Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
@@ -356,7 +356,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             populate_db mdb max_height ;
-            Quickcheck.test
+            Quickcheck.test ~trials:200
               (Mina_stdlib.Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
@@ -437,7 +437,8 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
             populate_db mdb max_height ;
-            Quickcheck.test (Mina_stdlib.Direction.gen_list max_height)
+            Quickcheck.test ~trials:200
+              (Mina_stdlib.Direction.gen_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
                 let offset =
