@@ -25,6 +25,8 @@
   splittable_random
   stdio
   ;; local libraries
+  syncable_ledger
+  bootstrap_status
   mina_stdlib
   mina_wire_types
   network_pool

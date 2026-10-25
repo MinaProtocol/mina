@@ -2201,6 +2201,16 @@ module Queries = struct
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
         Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
 
+  let bootstrap_status =
+    field "bootstrapStatus"
+      ~doc:
+        "What the node is doing to reach the network's chain: its step of \
+         initialisation or bootstrap, and its ledger syncs"
+      ~args:Arg.[]
+      ~typ:(non_null Types.BootstrapStatus.t)
+      ~resolve:(fun { ctx = mina; _ } () ->
+        Bootstrap_status.snapshot (Mina_lib.bootstrap_status mina) )
+
   let trust_status =
     field "trustStatus"
       ~typ:(list (non_null Types.Payload.trust_status))
@@ -3213,6 +3223,7 @@ module Queries = struct
   let commands =
     [ sync_status
     ; daemon_status
+    ; bootstrap_status
     ; version
     ; get_filtered_log_entries
     ; owned_wallets (* deprecated *)

@@ -47,6 +47,8 @@ let length = Scalars.Length.typ ()
 
 let span = Scalars.Span.typ ()
 
+let time = Scalars.Time.typ ()
+
 let ledger_hash = Scalars.LedgerHash.typ ()
 
 let state_hash = Scalars.StateHash.typ ()
@@ -339,6 +341,193 @@ module DaemonStatus = struct
              ~highest_block_length_received:nn_int
              ~highest_unvalidated_block_length_received:nn_int
              ~metrics:(id ~typ:(non_null metrics)) )
+end
+
+module BootstrapStatus = struct
+  (** The GraphQL name of a constructor: [Syncing_root_ledger] is
+      [SYNCING_ROOT_LEDGER]. *)
+  let enum_name sexp_of_t value =
+    String.uppercase (Sexp.to_string (sexp_of_t value))
+
+  let phase : (Mina_lib.t, Bootstrap_status.Phase.t option) typ =
+    let doc : Bootstrap_status.Phase.t -> string = function
+      | Starting ->
+          "Initialisation has not begun"
+      | Waiting_for_genesis ->
+          "The chain has not started yet"
+      | Waiting_for_peers ->
+          "Connecting to enough peers to begin"
+      | Fetching_best_tip ->
+          "Asking peers for their best tip, while loading the transition \
+           frontier from disk"
+      | Syncing_root_ledger ->
+          "Bootstrap: syncing the root's snarked ledger"
+      | Downloading_scan_state ->
+          "Bootstrap: downloading the root's scan state and pending coinbases"
+      | Building_staged_ledger ->
+          "Bootstrap: building the root's staged ledger, which checks the scan \
+           state against the snarked ledger"
+      | Syncing_epoch_ledgers ->
+          "Syncing the staking and next epoch ledgers"
+      | Loading_frontier ->
+          "Bootstrap: loading a transition frontier at the new root"
+      | Participating ->
+          "The transition frontier is running"
+    in
+    enum "BootstrapPhase"
+      ~doc:"The step a node is in on its way to reaching the network's chain"
+      ~values:
+        (List.map Bootstrap_status.Phase.all ~f:(fun phase ->
+             enum_value
+               (enum_name Bootstrap_status.Phase.sexp_of_t phase)
+               ~doc:(doc phase) ~value:phase ) )
+
+  let ledger : (Mina_lib.t, Bootstrap_status.Ledger.t option) typ =
+    let doc : Bootstrap_status.Ledger.t -> string = function
+      | Root_snarked ->
+          "The snarked ledger at the root of the transition frontier"
+      | Staking_epoch ->
+          "The staking epoch ledger"
+      | Next_epoch ->
+          "The next epoch ledger"
+    in
+    enum "SyncedLedger" ~doc:"A ledger that a node syncs from its peers"
+      ~values:
+        (List.map Bootstrap_status.Ledger.all ~f:(fun ledger ->
+             enum_value
+               (enum_name Bootstrap_status.Ledger.sexp_of_t ledger)
+               ~doc:(doc ledger) ~value:ledger ) )
+
+  let progress : (Mina_lib.t, Syncable_ledger.Progress.t option) typ =
+    obj "LedgerSyncProgress" ~doc:"How far a ledger sync has progressed"
+      ~fields:(fun _ ->
+        [ field "targets" ~typ:(non_null int)
+            ~doc:"How many times the sync has been given a new root to reach"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.targets)
+        ; field "targetSetAt" ~typ:time ~doc:"When the current target was set"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.target_set_at)
+        ; field "pendingChildHashes" ~typ:(non_null int)
+            ~doc:"How many inner nodes the sync is waiting for the children of"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.pending_child_hashes )
+        ; field "pendingContents" ~typ:(non_null int)
+            ~doc:
+              "How many account subtrees the sync is waiting for the accounts \
+               of"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.pending_contents )
+        ; field "synced" ~typ:(non_null bool)
+            ~doc:"Whether the ledger has reached the current target"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.synced)
+        ; field "answersAccepted" ~typ:(non_null int)
+            ~doc:
+              "How many answers from peers have added to the ledger or \
+               confirmed part of it"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.answers_accepted )
+        ; field "answersIgnored" ~typ:(non_null int)
+            ~doc:
+              "How many answers have arrived for queries the sync no longer \
+               needed, such as those for an earlier target"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.answers_ignored )
+        ; field "answersRejected" ~typ:(non_null int)
+            ~doc:
+              "How many answers have been invalid, and their queries asked \
+               again"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.answers_rejected )
+        ; field "lastAcceptedAnswerAt" ~typ:time
+            ~doc:"When an answer was last accepted"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.last_accepted_answer_at )
+        ; field "numAccounts" ~typ:int
+            ~doc:
+              "How many accounts the current target holds, once a peer has said"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.num_accounts)
+        ; field "accountsSettled" ~typ:(non_null int)
+            ~doc:
+              "How many of the current target's accounts the ledger is known \
+               to hold, whether received or already present. A sync whose \
+               ledger already matched its target can finish before any are \
+               counted, so a synced ledger should be read as complete."
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.accounts_settled )
+        ; field "accountsReceived" ~typ:(non_null int)
+            ~doc:"How many accounts peers have sent, over all targets"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.accounts_received )
+        ] )
+
+  let ledger_sync :
+      (Mina_lib.t, Bootstrap_status.Snapshot.ledger_sync option) typ =
+    obj "LedgerSync" ~doc:"The most recent sync of a ledger from peers"
+      ~fields:(fun _ ->
+        [ field "ledger" ~typ:(non_null ledger)
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.ledger )
+        ; field "target" ~typ:ledger_hash ~doc:"The root the sync is reaching"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.target )
+        ; field "active" ~typ:(non_null bool)
+            ~doc:"Whether the sync is still running"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.active )
+        ; field "progress" ~typ:(non_null progress)
+            ~doc:"For a sync that has ended, its progress when it ended"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.progress )
+        ] )
+
+  let t : (Mina_lib.t, Bootstrap_status.Snapshot.t option) typ =
+    obj "BootstrapStatus"
+      ~doc:"What a node is doing to reach the network's chain" ~fields:(fun _ ->
+        [ field "phase" ~typ:(non_null phase)
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) -> s.phase)
+        ; field "phaseStartedAt" ~typ:(non_null time)
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.phase_started_at )
+        ; field "bootstrapStartedAt" ~typ:time
+            ~doc:"When the current or most recent bootstrap started"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.bootstrap_started_at )
+        ; field "bootstrapAttempts" ~typ:(non_null int)
+            ~doc:
+              "How many attempts the current or most recent bootstrap has \
+               started"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.bootstrap_attempts )
+        ; field "lastAttemptFailure" ~typ:string
+            ~doc:"Why that bootstrap's last failed attempt failed"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.last_attempt_failure )
+        ; field "ledgerSyncs"
+            ~typ:(non_null (list (non_null ledger_sync)))
+            ~doc:"The most recent sync of each ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) -> s.ledger_syncs)
+        ] )
 end
 
 module Itn = struct
