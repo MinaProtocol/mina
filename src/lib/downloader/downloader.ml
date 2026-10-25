@@ -164,6 +164,8 @@ end = struct
 
     let to_list t = Map.data t.jobs
 
+    let key_set t = Map.key_set t.jobs
+
     let create () = { jobs = Key.Map.empty }
   end
 
@@ -640,13 +642,7 @@ end = struct
 
   (* Checks disjointness *)
   let check_invariant (t : t) =
-    Set.length
-      (Key.Set.union_list
-         [ Q.to_list t.pending
-           |> List.map ~f:(fun j -> j.key)
-           |> Key.Set.of_list
-         ; Key.Set.of_map_keys t.downloading
-         ] )
+    Set.length (Set.union (Q.key_set t.pending) (Map.key_set t.downloading))
     |> [%test_eq: int] (total_jobs t)
 
   let check_invariant_r = ref check_invariant
