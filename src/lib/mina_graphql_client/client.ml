@@ -1059,6 +1059,82 @@ let get_daemon_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri =
     ; peers
     }
 
+(** Get what the node is doing to reach the network's chain. *)
+let get_bootstrap_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri
+    =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting bootstrap status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Bootstrap_status.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ?num_tries ?retry_delay_sec ?deadline ~logger ~node_uri
+      ~query_name:"bootstrap_status" query_obj
+  in
+  let bs = result.bootstrapStatus in
+  let phase : Bootstrap_status.Phase.t =
+    match bs.phase with
+    | `STARTING ->
+        Starting
+    | `WAITING_FOR_GENESIS ->
+        Waiting_for_genesis
+    | `WAITING_FOR_PEERS ->
+        Waiting_for_peers
+    | `FETCHING_BEST_TIP ->
+        Fetching_best_tip
+    | `SYNCING_ROOT_LEDGER ->
+        Syncing_root_ledger
+    | `DOWNLOADING_SCAN_STATE ->
+        Downloading_scan_state
+    | `BUILDING_STAGED_LEDGER ->
+        Building_staged_ledger
+    | `SYNCING_EPOCH_LEDGERS ->
+        Syncing_epoch_ledgers
+    | `LOADING_FRONTIER ->
+        Loading_frontier
+    | `PARTICIPATING ->
+        Participating
+  in
+  let ledger_syncs =
+    bs.ledgerSyncs |> Array.to_list
+    |> List.map
+         ~f:(fun (s : Queries.Bootstrap_status.t_bootstrapStatus_ledgerSyncs) ->
+           let ledger : Bootstrap_status.Ledger.t =
+             match s.ledger with
+             | `ROOT_SNARKED ->
+                 Root_snarked
+             | `STAKING_EPOCH ->
+                 Staking_epoch
+             | `NEXT_EPOCH ->
+                 Next_epoch
+           in
+           let p = s.progress in
+           { Bootstrap_status.Snapshot.ledger
+           ; target = s.target
+           ; active = s.active
+           ; progress =
+               { targets = p.targets
+               ; target_set_at = p.targetSetAt
+               ; pending_child_hashes = p.pendingChildHashes
+               ; pending_contents = p.pendingContents
+               ; synced = p.synced
+               ; answers_accepted = p.answersAccepted
+               ; answers_ignored = p.answersIgnored
+               ; answers_rejected = p.answersRejected
+               ; last_accepted_answer_at = p.lastAcceptedAnswerAt
+               ; num_accounts = p.numAccounts
+               ; accounts_settled = p.accountsSettled
+               ; accounts_received = p.accountsReceived
+               }
+           } )
+  in
+  { Bootstrap_status.Snapshot.phase
+  ; phase_started_at = bs.phaseStartedAt
+  ; bootstrap_started_at = bs.bootstrapStartedAt
+  ; bootstrap_attempts = bs.bootstrapAttempts
+  ; last_attempt_failure = bs.lastAttemptFailure
+  ; ledger_syncs
+  }
+
 (** Check readiness: synced, peer count above threshold, chain caught up. *)
 let get_readiness ?num_tries ?retry_delay_sec ?deadline ~logger node_uri
     ~min_peers =

@@ -323,6 +323,39 @@ module Daemon_status =
   }
 |}]
 
+module Bootstrap_status =
+[%graphql
+{|
+  query {
+    bootstrapStatus {
+      phase
+      phaseStartedAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+      bootstrapStartedAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+      bootstrapAttempts
+      lastAttemptFailure
+      ledgerSyncs {
+        ledger
+        target
+        active
+        progress {
+          targets
+          targetSetAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+          pendingChildHashes
+          pendingContents
+          synced
+          answersAccepted
+          answersIgnored
+          answersRejected
+          lastAcceptedAnswerAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+          numAccounts
+          accountsSettled
+          accountsReceived
+        }
+      }
+    }
+  }
+|}]
+
 module Daemon_readiness =
 [%graphql
 {|
