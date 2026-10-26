@@ -46,7 +46,7 @@ module Config = struct
 end
 
 module Paths = struct
-  let dune_name = "scripts/archive/missing-blocks-guardian.sh"
+  let dune_name = "src/app/missing_blocks_guardian/missing_blocks_guardian.exe"
 
   let official_name = "mina-missing-blocks-guardian"
 end

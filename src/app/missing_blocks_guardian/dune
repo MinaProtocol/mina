@@ -1,0 +1,21 @@
+(executable
+ (package missing_blocks_guardian)
+ (name missing_blocks_guardian)
+ (public_name missing_blocks_guardian)
+ (libraries
+  ;; opam libraries
+  async
+  async_ssl
+  caqti
+  caqti-driver-postgresql
+  cohttp-async
+  conduit-async
+  core
+  uri
+  yojson
+  ;; local libraries
+  mina_caqti)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx)))
