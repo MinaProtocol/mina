@@ -236,6 +236,26 @@ echo "  Payments:         $NUM_PAYMENTS"
 echo "=========================================="
 echo ""
 
+# Fork the generated chain off the dump's tip, so its blocks are the newest in
+# the archive. The fixture's own proof.fork/genesis only fit the dump it was
+# made against.
+read -r FORK_STATE_HASH FORK_HEIGHT FORK_SLOT FORK_TIMESTAMP_MS < <(
+    psql "$POSTGRES_URI" -At -F ' ' -v ON_ERROR_STOP=1 -c \
+        "SELECT state_hash, height, global_slot_since_genesis, timestamp FROM blocks ORDER BY height DESC, id LIMIT 1")
+if [[ -z "${FORK_STATE_HASH:-}" ]]; then
+    echo "Error: no blocks in $POSTGRES_URI to fork from"
+    exit 1
+fi
+RUNTIME_CONFIG="$(mktemp)"
+jq --arg state_hash "$FORK_STATE_HASH" \
+   --argjson height "$FORK_HEIGHT" \
+   --argjson slot "$FORK_SLOT" \
+   --arg timestamp "$(date -u -d "@$((FORK_TIMESTAMP_MS / 1000))" +%Y-%m-%dT%H:%M:%SZ)" \
+   '.proof.fork = { state_hash: $state_hash, blockchain_length: $height, global_slot_since_genesis: $slot }
+    | .genesis.genesis_state_timestamp = $timestamp' \
+   "$LEDGER_DIR/runtime_config.json" > "$RUNTIME_CONFIG"
+echo "Forking at $FORK_STATE_HASH (height $FORK_HEIGHT, slot $FORK_SLOT)"
+
 # Start Archive
 echo "[1/3] Starting Archive service..."
 "$ARCHIVE_EXE" run \
@@ -291,7 +311,7 @@ mkdir -p tmp
 echo "Running warmup mina advanced test submit-to-archive (1 block, 1 payment, 0 zkapp)..."
 MINA_PRIVKEY_PASS="" "$MINA_EXE" advanced test submit-to-archive \
     --archive-node-port "$ARCHIVE_PORT" \
-    --config-file "$LEDGER_DIR/runtime_config.json" \
+    --config-file "$RUNTIME_CONFIG" \
     --privkey-path "$LEDGER_DIR/plain1" \
     --num-zkapp-txs 0 \
     --num-payments 1 \
@@ -322,7 +342,7 @@ echo "[Main Test] Submitting blocks to archive..."
 echo "Running mina advanced test submit-to-archive..."
 MINA_PRIVKEY_PASS="" "$MINA_EXE" advanced test submit-to-archive \
     --archive-node-port "$ARCHIVE_PORT" \
-    --config-file "$LEDGER_DIR/runtime_config.json" \
+    --config-file "$RUNTIME_CONFIG" \
     --privkey-path "$LEDGER_DIR/plain1" \
     --num-zkapp-txs "$NUM_ZKAPP_TXS" \
     --num-payments "$NUM_PAYMENTS" \
