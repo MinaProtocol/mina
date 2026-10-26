@@ -2785,6 +2785,23 @@ let%test_module "staged ledger tests" =
                       .state_body_hash |> Option.value_exn )
                 ~signature_kind sl cmds_this_iter stmt_to_work
             in
+            let () =
+              (* REVIEW: print the diff geometry per block *)
+              let p1, p2 = diff.diff in
+              let cb = function
+                | Staged_ledger_diff.At_most_one.Zero ->
+                    "-"
+                | One _ ->
+                    "CB"
+              in
+              eprintf "[geom] slot=%d p1: %d cmds %s | p2: %s | proof=%b\n%!"
+                (Mina_numbers.Global_slot_since_genesis.to_int global_slot)
+                (List.length p1.commands) (cb p1.coinbase)
+                (Option.value_map p2 ~default:"none" ~f:(fun d ->
+                     sprintf "%d cmds %s" (List.length d.commands)
+                       (cb d.coinbase) ) )
+                (Option.is_some ledger_proof)
+            in
             List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
                 match With_status.status c with
                 | Applied ->
@@ -3421,6 +3438,516 @@ let%test_module "staged ledger tests" =
               in
               (*Note: if this fails, try increasing the number of trials to get a diff that does fail*)
               assert checked ) )
+
+    let%test_unit "REVIEW2 consecutive split blocks with zkApps on both sides" =
+      let signature_kind = Mina_signature_kind.Testnet in
+      (* capacity 8. B1 = 5 zkApps + cb (6 slots). B2 = 4 zkApps + cb, split
+         2 | 3. B3 = 6 zkApps + cb, split 5 | 2. Then 1-zkApp blocks until
+         proofs are emitted for trees 1..3. *)
+      let iters =
+        [ Some 5; Some 4; Some 6 ] @ List.init 60 ~f:(fun _ -> Some 1)
+      in
+      let num_zkapps =
+        List.fold iters ~init:0 ~f:(fun acc x -> acc + Option.value_exn x)
+      in
+      Quickcheck.test ~trials:1 (gen_zkapps ~num_zkapps iters)
+        ~f:(fun (ledger, zkapps, iters) ->
+          async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
+              let account_ids = ledger_account_ids ledger in
+              test_simple ~global_slot:1 ~signature_kind account_ids zkapps
+                iters sl ~check_snarked_ledger_transition:true test_mask
+                ~snarked_ledger `One_prover
+                (stmt_to_work_zero_fee ~prover:snark_worker_pk) ) )
+
+    let%test_unit "REVIEW3 block with transactions and no coinbase" =
+      let signature_kind = Mina_signature_kind.Testnet in
+      Quickcheck.test ~trials:1
+        (gen_at_capacity_fixed_blocks ~signature_kind 5)
+        ~f:(fun (ledger_init_state, cmds, _iters) ->
+          async_with_ledgers ledger_init_state
+            (fun ~snarked_ledger:_ sl _test_mask ->
+              let open Deferred.Let_syntax in
+              let state_for slot =
+                let global_slot =
+                  Mina_numbers.Global_slot_since_genesis.of_int slot
+                in
+                let current_state, current_view =
+                  dummy_state_and_view ~global_slot ()
+                in
+                let h = Mina_state.Protocol_state.hashes current_state in
+                ( global_slot
+                , current_view
+                , (h.state_hash, Option.value_exn h.state_body_hash) )
+              in
+              (* ordinary blocks until the scan state has work to include *)
+              let rec warm_up slot cmds =
+                let scan_state = Sl.scan_state !sl in
+                let partitions =
+                  Sl.Scan_state.partition_if_overflowing scan_state
+                in
+                let slots, job_count = partitions.first in
+                if job_count >= 1 && slots >= 3 && Option.is_none partitions.second
+                then return (slot, cmds)
+                else if slot > 60 then failwith "warm_up: no work available"
+                else
+                  let global_slot, view, sbh = state_for slot in
+                  let%bind _proof, diff =
+                    create_and_apply ~global_slot ~protocol_state_view:view
+                      ~state_and_body_hash:sbh ~signature_kind sl
+                      (Sequence.of_list (List.take cmds 1))
+                      stmt_to_work_random_prover
+                  in
+                  let applied = List.length (Staged_ledger_diff.commands diff) in
+                  warm_up (slot + 1) (List.drop cmds applied)
+              in
+              let%bind slot, cmds = warm_up 1 cmds in
+              let scan_state = Sl.scan_state !sl in
+              let work = Sl.Scan_state.work_statements_for_new_diff scan_state in
+              let slots, job_count =
+                (Sl.Scan_state.partition_if_overflowing scan_state).first
+              in
+              eprintf "[review3] slot=%d free slots=%d jobs=%d\n%!" slot slots
+                job_count ;
+              let txns = List.take cmds 2 in
+              let total_fee =
+                List.fold txns ~init:Fee.zero ~f:(fun acc c ->
+                    Option.value_exn
+                      (Fee.add acc (User_command.fee (User_command.forget_check c))) )
+              in
+              let prover = snark_worker_pk in
+              let work_done =
+                List.mapi (List.take work job_count) ~f:(fun i stmts ->
+                    let fee = if i = 0 then total_fee else Fee.zero in
+                    Transaction_snark_work.Checked.create_unsafe
+                      { fee; proofs = proofs ~fee ~prover stmts; prover } )
+              in
+              let global_slot, view, sbh = state_for slot in
+              let diff =
+                compute_statuses ~ledger:(Sl.ledger !sl)
+                  ~coinbase_amount:constraint_constants.coinbase_amount
+                  ~global_slot
+                  ( { completed_works = work_done
+                    ; commands = txns
+                    ; coinbase = Zero
+                    ; internal_command_statuses = []
+                    }
+                  , None )
+              in
+              match%map
+                Sl.apply ~constraint_constants ~global_slot !sl diff ~logger
+                  ~verifier ~get_completed_work:(Fn.const None)
+                  ~current_state_view:view ~state_and_body_hash:sbh
+                  ~coinbase_receiver ~supercharge_coinbase:false
+                  ~zkapp_cmd_limit_hardcap ~signature_kind
+              with
+              | Ok
+                  ( `Ledger_proof _
+                  , `Staged_ledger sl'
+                  , `Accounts_created _
+                  , `Pending_coinbase_update _ ) ->
+                  let n = List.length (Staged_ledger_diff.commands diff) in
+                  eprintf
+                    "[review3] ACCEPTED: %d commands, %d coinbases, fee paid \
+                     to prover %s\n\
+                     %!"
+                    n (coinbase_count diff) (Fee.to_string total_fee) ;
+                  sl := sl' ;
+                  assert (n = 2 && coinbase_count diff = 0)
+              | Error e ->
+                  failwith
+                  @@ sprintf
+                       !"[review3] REJECTED: %{sexp: Sl.Staged_ledger_error.t}"
+                       e ) )
+
+    let%test_unit "REVIEW1 blockchain snark step: which txn_snark source \
+                   registers are pinned" =
+      let signature_kind = Mina_signature_kind.Testnet in
+      let module Context = struct
+        let logger = logger
+
+        let constraint_constants = constraint_constants
+
+        let consensus_constants =
+          Consensus.Constants.create ~constraint_constants
+            ~protocol_constants:genesis_constants.protocol
+      end in
+      let genesis_state, _ = dummy_state_and_view () in
+      let genesis_consensus =
+        Mina_state.Protocol_state.consensus_state genesis_state
+      in
+      let genesis_bc = Mina_state.Protocol_state.blockchain_state genesis_state in
+      let packed = Genesis_ledger.for_unit_tests in
+      let epoch_ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
+      let genesis_ledger_hash =
+        Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root epoch_ledger)
+      in
+      [%test_eq: Frozen_ledger_hash.t] genesis_ledger_hash
+        (Mina_state.Blockchain_state.genesis_ledger_hash genesis_bc) ;
+      (* staker: largest account of the genesis ledger, which is also the
+         staking epoch ledger of the genesis consensus state *)
+      let producer_sk, (producer_account : Account.t) =
+        Genesis_ledger.Packed.largest_account_exn packed
+      in
+      let producer_sk = Option.value_exn producer_sk in
+      let producer_keypair = Keypair.of_private_key_exn producer_sk in
+      let producer_pk = Public_key.compress producer_keypair.public_key in
+      let producer_index =
+        Ledger.location_of_account epoch_ledger
+          (Account_id.create producer_pk Token_id.default)
+        |> Option.value_exn |> Ledger.Location.to_path_exn |> Ledger.Addr.to_int
+      in
+      let staking =
+        Consensus.Data.Consensus_state.staking_epoch_data genesis_consensus
+      in
+      let seed = staking.Mina_base.Epoch_data.Poly.seed in
+      let total_stake = staking.ledger.Mina_base.Epoch_ledger.Poly.total_currency in
+      let delegators =
+        Account.Index.Table.of_alist_exn [ (producer_index, producer_account) ]
+      in
+      let get_delegators pk =
+        if Public_key.Compressed.equal pk producer_pk then Some delegators
+        else None
+      in
+      let rec winning_slot_after after =
+        let open Deferred.Let_syntax in
+        let slot = after + 1 in
+        if slot > after + 1000 then failwith "no winning slot in 1000 slots"
+        else
+          let global_slot =
+            Mina_numbers.Global_slot_since_hard_fork.of_int slot
+          in
+          match%bind
+            Interruptible.force
+              (Consensus.Data.Vrf.check
+                 ~context:(module Context)
+                 ~global_slot ~seed ~producer_private_key:producer_sk
+                 ~producer_public_key:producer_pk ~total_stake ~get_delegators )
+          with
+          | Ok (Some (`Vrf_eval _, `Vrf_output vrf_result, `Delegator delegator))
+            ->
+              return
+                ( slot
+                , { Consensus.Data.Slot_won.delegator
+                  ; producer = producer_keypair
+                  ; global_slot
+                  ; global_slot_since_genesis =
+                      Mina_numbers.Global_slot_since_genesis.of_int slot
+                  ; vrf_result
+                  } )
+          | Ok None ->
+              winning_slot_after slot
+          | Error () ->
+              failwith "vrf check interrupted"
+      in
+      (* payments between genesis accounts, applied to a copy of the genesis
+         ledger, so the staged ledger starts exactly where genesis does *)
+      let init_state : Ledger.init_state =
+        Lazy.force (Genesis_ledger.Packed.accounts packed)
+        |> List.filter ~f:(fun (_, (a : Account.t)) ->
+               Currency.Balance.(
+                 a.balance >= of_nanomina_int_exn 1_000_000_000_000_000)
+               && Account.Timing.equal a.timing Account.Timing.Untimed )
+        |> List.filter_map ~f:(fun (sk, (a : Account.t)) ->
+               Option.map sk ~f:(fun sk ->
+                   ( Keypair.of_private_key_exn sk
+                   , Currency.Balance.to_amount a.balance
+                   , a.nonce
+                   , a.timing ) ) )
+        |> Array.of_list
+      in
+      let iters = max_blocks_for_coverage 1 in
+      let cmds =
+        Quickcheck.random_value ~seed:(`Deterministic "review1")
+          (User_command.Valid.Gen.sequence
+             ~length:(transaction_capacity * iters)
+             ~sign_type:(`Real signature_kind) init_state )
+      in
+      let random_hash () = Quickcheck.random_value Frozen_ledger_hash.gen in
+      let now_ms () =
+        Core_kernel.Time.now () |> Core_kernel.Time.to_span_since_epoch
+        |> Core_kernel.Time.Span.to_ms |> Int64.of_float
+      in
+      async_with_given_ledger (Ledger.copy epoch_ledger)
+        (fun ~snarked_ledger:_ sl _test_mask ->
+          let open Deferred.Let_syntax in
+          let prev_state_for ~ledger_proof_statement =
+            let bc =
+              Mina_state.Blockchain_state.create_value
+                ~staged_ledger_hash:(Sl.hash !sl) ~genesis_ledger_hash
+                ~timestamp:(Mina_state.Blockchain_state.timestamp genesis_bc)
+                ~body_reference:
+                  (Mina_state.Blockchain_state.body_reference genesis_bc)
+                ~ledger_proof_statement
+            in
+            Mina_state.Protocol_state.create_value
+              ~previous_state_hash:
+                (Mina_state.Protocol_state.previous_state_hash genesis_state)
+              ~genesis_state_hash:
+                (Mina_state.Protocol_state.genesis_state_hash genesis_state)
+              ~blockchain_state:bc ~consensus_state:genesis_consensus
+              ~constants:(Mina_state.Protocol_state.constants genesis_state)
+          in
+          let run_check ~label ~prev_state ~proof ~pending_coinbase ~pc_update
+              ~slot_won ~supercharge_coinbase ~consensus_total ~mutate =
+            let txn_snark : Transaction_snark.Statement.With_sok.t =
+              mutate
+                (Ledger_proof.statement_with_sok
+                   (Ledger_proof.Cached.read_proof_from_disk proof) )
+            in
+            let stmt : Transaction_snark.Statement.t =
+              { txn_snark with sok_digest = () }
+            in
+            let total_currency =
+              match consensus_total with
+              | `After_coinbase ->
+                  stmt.target.total_supply_after_coinbase
+              | `Range_end ->
+                  stmt.target.total_currency
+            in
+            let new_bc =
+              Mina_state.Blockchain_state.create_value
+                ~staged_ledger_hash:(Sl.hash !sl) ~genesis_ledger_hash
+                ~timestamp:(Mina_state.Blockchain_state.timestamp genesis_bc)
+                ~body_reference:
+                  (Mina_state.Blockchain_state.body_reference genesis_bc)
+                ~ledger_proof_statement:stmt
+            in
+            let block_data =
+              Consensus.Hooks.get_block_data ~slot_won
+                ~ledger_snapshot:
+                  (Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+                   .Genesis_epoch_ledger packed )
+                ~coinbase_receiver:`Producer
+            in
+            let next_state, consensus_transition =
+              Mina_state.Consensus_state_hooks.generate_transition
+                ~previous_protocol_state:prev_state ~blockchain_state:new_bc
+                ~current_time:(now_ms ()) ~block_data ~supercharge_coinbase
+                ~snarked_ledger_hash:
+                  (Mina_state.Snarked_ledger_state.snarked_ledger_hash stmt)
+                ~genesis_ledger_hash ~total_currency ~logger
+                ~constraint_constants
+            in
+            let transition =
+              Mina_state.Snark_transition.create_value ~blockchain_state:new_bc
+                ~consensus_transition ~pending_coinbase_update:pc_update ()
+            in
+            let witness =
+              { Blockchain_snark.Blockchain_snark_state.Witness.prev_state
+              ; prev_state_proof = Lazy.force Mina_base.Proof.blockchain_dummy
+              ; transition
+              ; txn_snark
+              ; txn_snark_proof = Lazy.force Mina_base.Proof.transaction_dummy
+              }
+            in
+            let res =
+              Blockchain_snark.Blockchain_snark_state.check witness
+                ~handler:
+                  (Consensus.Data.Prover_state.handler
+                     (Consensus.Data.Block_data.prover_state block_data)
+                     ~constraint_constants ~pending_coinbase )
+                ~proof_level:Genesis_constants.Proof_level.Check
+                ~constraint_constants next_state
+            in
+            eprintf "[review1] %-66s %s\n%!" label
+              ( match res with
+              | Ok () ->
+                  "ACCEPTED"
+              | Error e ->
+                  "REJECTED (" ^ String.prefix (Error.to_string_hum e) 110 ^ ")"
+              ) ;
+            Result.is_ok res
+          in
+          let d = Currency.Amount.of_nanomina_int_exn 1 in
+          let add a = Option.value_exn (Currency.Amount.add a d) in
+          let m_id (s : Transaction_snark.Statement.With_sok.t) = s in
+          let m_total_currency (s : Transaction_snark.Statement.With_sok.t) =
+            { s with
+              source = { s.source with total_currency = add s.source.total_currency }
+            ; target =
+                { s.target with
+                  total_currency = add s.target.total_currency
+                ; total_supply_after_coinbase =
+                    add s.target.total_supply_after_coinbase
+                }
+            }
+          in
+          let m_source_lac (s : Transaction_snark.Statement.With_sok.t) =
+            { s with
+              source = { s.source with ledger_after_coinbase = random_hash () }
+            }
+          in
+          let m_both_lac (s : Transaction_snark.Statement.With_sok.t) =
+            let r = random_hash () in
+            { s with
+              source = { s.source with ledger_after_coinbase = r }
+            ; target = { s.target with ledger_after_coinbase = r }
+            }
+          in
+          let c_fee_excess (s : Transaction_snark.Statement.With_sok.t) =
+            { s with
+              source =
+                { s.source with
+                  fee_excess =
+                    Currency.Fee.Signed.of_unsigned
+                      (Currency.Fee.of_nanomina_int_exn 1)
+                }
+            }
+          in
+          let c_tsac (s : Transaction_snark.Statement.With_sok.t) =
+            { s with
+              source =
+                { s.source with
+                  total_supply_after_coinbase =
+                    add s.source.total_supply_after_coinbase
+                }
+            }
+          in
+          let c_first_pass (s : Transaction_snark.Statement.With_sok.t) =
+            { s with
+              source = { s.source with first_pass_ledger = random_hash () }
+            }
+          in
+          let rec go ~slot ~ledger_proof_statement cmds blocks_left =
+            if blocks_left = 0 then (
+              eprintf "[review1] no ledger proof emitted in %d blocks\n%!" iters ;
+              assert false )
+            else
+              let%bind slot, slot_won = winning_slot_after slot in
+              let prev_state = prev_state_for ~ledger_proof_statement in
+              let view =
+                Mina_state.Protocol_state.Body.view
+                  (Mina_state.Protocol_state.body prev_state)
+              in
+              let hashes = Mina_state.Protocol_state.hashes prev_state in
+              let global_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int slot
+              in
+              let supercharge_coinbase =
+                not (Account.has_locked_tokens ~global_slot producer_account)
+              in
+              let pending_coinbases = Sl.pending_coinbase_collection !sl in
+              let txns = Sequence.of_list (List.take cmds transaction_capacity) in
+              let diff =
+                match
+                  Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
+                    ~current_state_view:view ~transactions_by_fee:txns
+                    ~get_completed_work:stmt_to_work_random_prover
+                    ~supercharge_coinbase ~coinbase_receiver:producer_pk
+                    ~zkapp_cmd_limit:None
+                with
+                | Ok (d, _) ->
+                    Staged_ledger_diff.forget d
+                | Error e ->
+                    Error.raise (Pre_diff_info.Error.to_error e)
+              in
+              let%bind proof_opt, is_new_stack, pc_update =
+                match%map
+                  Sl.apply ~constraint_constants ~global_slot !sl diff ~logger
+                    ~verifier ~get_completed_work:(Fn.const None)
+                    ~current_state_view:view
+                    ~state_and_body_hash:
+                      (hashes.state_hash, Option.value_exn hashes.state_body_hash)
+                    ~coinbase_receiver:producer_pk ~supercharge_coinbase
+                    ~zkapp_cmd_limit_hardcap ~signature_kind
+                with
+                | Error e ->
+                    Error.raise (Sl.Staged_ledger_error.to_error e)
+                | Ok
+                    ( `Ledger_proof p
+                    , `Staged_ledger sl'
+                    , `Accounts_created _
+                    , `Pending_coinbase_update (is_new_stack, pc_update) ) ->
+                    sl := sl' ;
+                    (p, is_new_stack, pc_update)
+              in
+              let cmds =
+                List.drop cmds (List.length (Staged_ledger_diff.commands diff))
+              in
+              let pending_coinbase =
+                { Mina_base.Pending_coinbase_witness.pending_coinbases
+                ; is_new_stack
+                }
+              in
+              eprintf "[review1] block at slot %d applied, proof=%b\n%!" slot
+                (Option.is_some proof_opt) ;
+              match proof_opt with
+              | None ->
+                  go ~slot ~ledger_proof_statement cmds (blocks_left - 1)
+              | Some proof ->
+                  let stmt : Transaction_snark.Statement.t =
+                    Ledger_proof.Cached.statement proof
+                  in
+                  eprintf
+                    "[review1] range has a coinbase: %b; target.total_currency \
+                     = target.total_supply_after_coinbase: %b\n\
+                     %!"
+                    (not
+                       (Frozen_ledger_hash.equal stmt.source.ledger_after_coinbase
+                          stmt.target.ledger_after_coinbase ) )
+                    (Currency.Amount.equal stmt.target.total_currency
+                       stmt.target.total_supply_after_coinbase ) ;
+                  let check ~label ~consensus_total ~mutate =
+                    run_check ~label ~prev_state ~proof ~pending_coinbase
+                      ~pc_update ~slot_won ~supercharge_coinbase
+                      ~consensus_total ~mutate
+                  in
+                  let r0 =
+                    check ~label:"baseline: genuine statement"
+                      ~consensus_total:`After_coinbase ~mutate:m_id
+                  in
+                  let r0b =
+                    check
+                      ~label:
+                        "baseline, consensus total := target.total_currency \
+                         (block_producer.ml)"
+                      ~consensus_total:`Range_end ~mutate:m_id
+                  in
+                  let r1 =
+                    check
+                      ~label:
+                        "CLAIM 1a: source.total_currency+1, target.total_currency+1, \
+                         target.tsac+1"
+                      ~consensus_total:`After_coinbase ~mutate:m_total_currency
+                  in
+                  let r2 =
+                    check ~label:"CLAIM 1b: source.ledger_after_coinbase := random"
+                      ~consensus_total:`After_coinbase ~mutate:m_source_lac
+                  in
+                  let r2b =
+                    check
+                      ~label:
+                        "CLAIM 1b: source and target ledger_after_coinbase := random"
+                      ~consensus_total:`After_coinbase ~mutate:m_both_lac
+                  in
+                  let c1 =
+                    check ~label:"control: source.fee_excess := +1"
+                      ~consensus_total:`After_coinbase ~mutate:c_fee_excess
+                  in
+                  let c2 =
+                    check
+                      ~label:"control: source.total_supply_after_coinbase +1"
+                      ~consensus_total:`After_coinbase ~mutate:c_tsac
+                  in
+                  let c3 =
+                    check ~label:"control: source.first_pass_ledger := random"
+                      ~consensus_total:`After_coinbase ~mutate:c_first_pass
+                  in
+                  eprintf
+                    "[review1] SUMMARY baseline=%b producer_total=%b | \
+                     mutated total_currency accepted=%b source.lac accepted=%b \
+                     both.lac accepted=%b | controls rejected: fee_excess=%b \
+                     tsac=%b first_pass=%b\n\
+                     %!"
+                    r0 r0b r1 r2 r2b (not c1) (not c2) (not c3) ;
+                  assert r0 ;
+                  assert ((not c1) && (not c2) && not c3) ;
+                  return ()
+          in
+          go ~slot:0
+            ~ledger_proof_statement:
+              (Mina_state.Blockchain_state.ledger_proof_statement genesis_bc)
+            cmds iters )
 
     let%test_unit "Provers can't pay the account creation fee" =
       let signature_kind = Mina_signature_kind.Testnet in

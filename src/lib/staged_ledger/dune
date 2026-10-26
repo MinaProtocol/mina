@@ -13,6 +13,8 @@
   lens
   ppx_hash.runtime-lib
   ;; local libraries
+  blockchain_snark
+  interruptible
   mina_stdlib
   cache_dir
   child_processes
