@@ -340,9 +340,9 @@ function load_accounts_from_db() {
 
 # Load payment transaction hashes from the database for testing
 #
-# Retrieves the first 100 payment transaction hashes from the user_commands
-# table to use in payment transaction API tests. These represent real
-# payment transactions that can be queried during load testing.
+# Retrieves up to 100 hashes of user commands included in a canonical block.
+# /search/transactions skips orphaned blocks, so a command found only in
+# orphaned blocks would be reported as missing.
 #
 # Globals:
 #   load (associative array) - Modified to store payment transaction hashes
@@ -354,14 +354,13 @@ function load_accounts_from_db() {
 #   None (modifies global load array with 'payment_transactions' key)
 function load_payment_transactions_from_db() {
     echo "Loading payment transactions from database..."
-    load_from_db "$1" "SELECT hash FROM user_commands LIMIT $MAX_TEST_DATA_ITEMS;" "payment_transactions"
+    load_from_db "$1" "SELECT u.hash FROM user_commands u WHERE EXISTS (SELECT 1 FROM blocks_user_commands bu JOIN blocks b ON b.id = bu.block_id WHERE bu.user_command_id = u.id AND b.chain_status = 'canonical') LIMIT $MAX_TEST_DATA_ITEMS;" "payment_transactions"
 }
 
 # Load zkApp transaction hashes from the database for testing
 #
-# Retrieves the first 100 zkApp transaction hashes from the zkapp_commands
-# table to use in zkApp transaction API tests. These represent real
-# zkApp transactions that can be queried during load testing.
+# Retrieves up to 100 hashes of zkApp commands included in a canonical block,
+# for the same reason as load_payment_transactions_from_db.
 #
 # Globals:
 #   load (associative array) - Modified to store zkApp transaction hashes
@@ -373,7 +372,7 @@ function load_payment_transactions_from_db() {
 #   None (modifies global load array with 'zkapp_transactions' key)
 function load_zkapp_transactions_from_db() {
     echo "Loading zkapp transactions from database..."
-    load_from_db "$1" "SELECT hash FROM zkapp_commands LIMIT $MAX_TEST_DATA_ITEMS;" "zkapp_transactions"
+    load_from_db "$1" "SELECT z.hash FROM zkapp_commands z WHERE EXISTS (SELECT 1 FROM blocks_zkapp_commands bz JOIN blocks b ON b.id = bz.block_id WHERE bz.zkapp_command_id = z.id AND b.chain_status = 'canonical') LIMIT $MAX_TEST_DATA_ITEMS;" "zkapp_transactions"
 }
 
 
