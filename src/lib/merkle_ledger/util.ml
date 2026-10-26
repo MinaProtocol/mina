@@ -1,6 +1,6 @@
 open Core_kernel
 
-module type Inputs_intf = sig
+module type Common_inputs_intf = sig
   module Location : Location_intf.S
 
   module Location_binable : Hashable.S_binable with type t := Location.t
@@ -40,18 +40,28 @@ module type Inputs_intf = sig
 
   val set_raw_hash_batch : Base.t -> (Location.t * Hash.t) list -> unit
 
+  val set_location_batch :
+       last_location:Location.t
+    -> Base.t
+    -> (Account_id.t * Location.t) Mina_stdlib.Nonempty_list.t
+    -> unit
+end
+
+module type Inputs_intf = sig
+  include Common_inputs_intf
+
+  val set_raw_account_batch : Base.t -> (Location.t * Account.t) list -> unit
+end
+
+module type Reindexing_inputs_intf = sig
+  include Common_inputs_intf
+
   (** Write the accounts at their locations, and update the indexes kept for
       the accounts that [reindex] selects. *)
   val set_raw_account_batch :
        reindex:(Location.t * Account.t -> bool)
     -> Base.t
     -> (Location.t * Account.t) list
-    -> unit
-
-  val set_location_batch :
-       last_location:Location.t
-    -> Base.t
-    -> (Account_id.t * Location.t) Mina_stdlib.Nonempty_list.t
     -> unit
 end
 
@@ -75,29 +85,31 @@ module type S = sig
   val set_batch :
     ?hash_cache:hash_cache -> base -> (location * account) list -> unit
 
-  (** [set_batch], updating the indexes kept for an account only if [reindex]
-      selects it: an account replacing one with the same identifier keeps the
-      entries of the one it replaces. *)
-  val set_batch_reindexing :
-       ?hash_cache:hash_cache
-    -> reindex:(location * account -> bool)
-    -> base
-    -> (location * account) list
-    -> unit
-
   val set_batch_accounts : base -> (addr * account) list -> unit
 
   val set_all_accounts_rooted_at_exn : base -> addr -> account list -> unit
 end
 
-module Make (Inputs : Inputs_intf) :
-  S
-    with type base := Inputs.Base.t
-     and type location := Inputs.Location.t
-     and type addr := Inputs.Location.Addr.t
-     and type account := Inputs.Account.t
-     and type hash := Inputs.Hash.t
-     and type hash_cache := Inputs.Hash.t Inputs.Location.Addr.Map.t = struct
+module Make_reindexing (Inputs : Reindexing_inputs_intf) : sig
+  include
+    S
+      with type base := Inputs.Base.t
+       and type location := Inputs.Location.t
+       and type addr := Inputs.Location.Addr.t
+       and type account := Inputs.Account.t
+       and type hash := Inputs.Hash.t
+       and type hash_cache := Inputs.Hash.t Inputs.Location.Addr.Map.t
+
+  (** [set_batch], updating the indexes kept for an account only if [reindex]
+      selects it: an account replacing one with the same identifier keeps the
+      entries of the one it replaces. *)
+  val set_batch_reindexing :
+       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+    -> reindex:(Inputs.Location.t * Inputs.Account.t -> bool)
+    -> Inputs.Base.t
+    -> (Inputs.Location.t * Inputs.Account.t) list
+    -> unit
+end = struct
   let get_all_accounts_rooted_at_exn t address =
     let open Inputs in
     let result =
@@ -270,3 +282,18 @@ module Make (Inputs : Inputs_intf) :
 
   let set_hash_batch = set_hash_batch ?hash_cache:None
 end
+
+(* [Make] only exposes [set_batch], which reindexes every account. *)
+module Make (Inputs : Inputs_intf) :
+  S
+    with type base := Inputs.Base.t
+     and type location := Inputs.Location.t
+     and type addr := Inputs.Location.Addr.t
+     and type account := Inputs.Account.t
+     and type hash := Inputs.Hash.t
+     and type hash_cache := Inputs.Hash.t Inputs.Location.Addr.Map.t =
+Make_reindexing (struct
+  include Inputs
+
+  let set_raw_account_batch ~reindex:_ = Inputs.set_raw_account_batch
+end)

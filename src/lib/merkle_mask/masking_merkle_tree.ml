@@ -721,9 +721,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         Mina_stdlib.Nonempty_list.iter account_to_location_list
           ~f:(fun (key, data) -> self_set_location t key data)
 
-      (* The mask keeps no index that writing an account could leave stale, so
-         it updates them for every account. *)
-      let set_raw_account_batch ~reindex:_ t locations_and_accounts =
+      let set_raw_account_batch t locations_and_accounts =
         assert_is_attached t ;
         List.iter locations_and_accounts ~f:(fun (location, account) ->
             let account_id = Account.identifier account in

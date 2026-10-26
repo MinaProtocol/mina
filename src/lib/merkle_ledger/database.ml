@@ -440,7 +440,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let tokens = Tokens.get
 
-  include Util.Make (struct
+  include Util.Make_reindexing (struct
     module Key = Key
     module Token_id = Token_id
     module Account_id = Account_id
