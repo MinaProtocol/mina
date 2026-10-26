@@ -652,6 +652,37 @@ module Make (Test : Test_intf) = struct
                   (Some account_id) ) ) )
 
   let () =
+    add_test
+      "set_all_accounts_rooted_at_exn restores the entries of an account whose \
+       stale copy it overwrites with the same identifier" (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let x = List.nth_exn accounts 2 in
+            let x_id = Account.identifier x in
+            (* Account 2 moves to leaf 8; leaf 2 keeps a stale copy of it. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 1)
+              (x :: List.drop accounts 9) ;
+            (* Leaf 8 gets account 8 back: account 2 is displaced and loses
+               its entries. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 1)
+              (List.drop accounts 8) ;
+            (* Leaf 2 is rewritten with account 2, whose stale copy has the
+               same identifier. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 0)
+              (List.take accounts 8) ;
+            check_holds_exactly mdb ~expected:(indexed accounts) ~removed:[] ;
+            [%test_eq: MT.Location.t option]
+              (MT.location_of_account mdb x_id)
+              (Some
+                 (MT.Location.Account
+                    (MT.Addr.of_int_exn ~ledger_depth:(MT.depth mdb) 2) ) ) ;
+            [%test_eq: Account_id.t option]
+              (MT.token_owner mdb (Account_id.derive_token_id ~owner:x_id))
+              (Some x_id) ) )
+
+  let () =
     add_test "set_all_accounts_rooted_at_exn with no accounts empties a subtree"
       (fun () ->
         with_fourteen_accounts (fun mdb accounts ->
