@@ -13,6 +13,10 @@ curl -L "$LEDGER_URL" | tar -x -C "$LEDGER_DIR"
 
 chmod 700 "$LEDGER_DIR"
 
+# The pinned mainnet dump predates the current schema; bring it up to what
+# this commit's archive writes, as an operator would after upgrading.
+psql "${PG_CONN}" -v ON_ERROR_STOP=1 -f ./src/app/archive/upgrade.sql
+
 ./buildkite/scripts/debian/update.sh
 
 sudo apt-get install -y python3
