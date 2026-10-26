@@ -55,37 +55,49 @@ module type Inputs_intf = sig
     -> unit
 end
 
-module Make (Inputs : Inputs_intf) : sig
-  val get_all_accounts_rooted_at_exn :
-       Inputs.Base.t
-    -> Inputs.Location.Addr.t
-    -> (Inputs.Location.Addr.t * Inputs.Account.t) list
+module type S = sig
+  type base
 
-  val set_hash_batch :
-    Inputs.Base.t -> (Inputs.Location.t * Inputs.Hash.t) list -> unit
+  type location
+
+  type addr
+
+  type account
+
+  type hash
+
+  type hash_cache
+
+  val get_all_accounts_rooted_at_exn : base -> addr -> (addr * account) list
+
+  val set_hash_batch : base -> (location * hash) list -> unit
 
   val set_batch :
-       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
-    -> Inputs.Base.t
-    -> (Inputs.Location.t * Inputs.Account.t) list
-    -> unit
+    ?hash_cache:hash_cache -> base -> (location * account) list -> unit
 
   (** [set_batch], updating the indexes kept for an account only if [reindex]
       selects it: an account replacing one with the same identifier keeps the
       entries of the one it replaces. *)
   val set_batch_reindexing :
-       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
-    -> reindex:(Inputs.Location.t * Inputs.Account.t -> bool)
-    -> Inputs.Base.t
-    -> (Inputs.Location.t * Inputs.Account.t) list
+       ?hash_cache:hash_cache
+    -> reindex:(location * account -> bool)
+    -> base
+    -> (location * account) list
     -> unit
 
-  val set_batch_accounts :
-    Inputs.Base.t -> (Inputs.Location.Addr.t * Inputs.Account.t) list -> unit
+  val set_batch_accounts : base -> (addr * account) list -> unit
 
-  val set_all_accounts_rooted_at_exn :
-    Inputs.Base.t -> Inputs.Location.Addr.t -> Inputs.Account.t list -> unit
-end = struct
+  val set_all_accounts_rooted_at_exn : base -> addr -> account list -> unit
+end
+
+module Make (Inputs : Inputs_intf) :
+  S
+    with type base := Inputs.Base.t
+     and type location := Inputs.Location.t
+     and type addr := Inputs.Location.Addr.t
+     and type account := Inputs.Account.t
+     and type hash := Inputs.Hash.t
+     and type hash_cache := Inputs.Hash.t Inputs.Location.Addr.Map.t = struct
   let get_all_accounts_rooted_at_exn t address =
     let open Inputs in
     let result =
