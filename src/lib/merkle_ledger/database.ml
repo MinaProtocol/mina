@@ -619,7 +619,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       removed. An account overwritten by one with a different identifier is
       removed first, so that it keeps no location or token entries for the
       overwritten leaf. An account overwritten by one with the same identifier
-      keeps its location and token entries, which are already right. *)
+      keeps its location and token entries, which are already right, if its
+      location entry points at the overwritten leaf; otherwise the leaf held a
+      stale copy, and the entries are written again. *)
   let set_all_accounts_rooted_at_exn mdb address accounts =
     let ledger_depth = mdb.depth in
     let first, last = Addr.Range.subtree_range ~ledger_depth address in
@@ -654,14 +656,21 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
             (Option.is_some occupant && not (has_occupant_identifier entry))
             location )
     in
-    let unchanged_identifiers =
-      List.filter_map occupants ~f:(fun (((location, _), _) as entry) ->
-          Option.some_if (has_occupant_identifier entry) location )
+    let recorded_locations =
+      Account_location.get_batch mdb (List.map accounts ~f:Account.identifier)
+    in
+    let already_indexed =
+      List.fold2_exn occupants recorded_locations ~init:Location.Set.empty
+        ~f:(fun set (((location, _), _) as entry) recorded ->
+          if
+            has_occupant_identifier entry
+            && Option.equal Location.equal recorded (Some location)
+          then Set.add set location
+          else set )
     in
     remove_accounts_at_locations mdb displaced ;
     set_batch_reindexing
-      ~reindex:(fun (location, _) ->
-        not (List.mem unchanged_identifiers location ~equal:Location.equal) )
+      ~reindex:(fun (location, _) -> not (Set.mem already_indexed location))
       mdb
       (List.map addresses_and_accounts ~f:(fun (addr, account) ->
            (Location.Account addr, account) ) ) ;
