@@ -20,6 +20,7 @@
   result
   ;; local libraries
   graphql_wrapper
+  hex
   (re_export mina_numbers_graphql)
   mina_numbers
   (re_export currency_graphql)
