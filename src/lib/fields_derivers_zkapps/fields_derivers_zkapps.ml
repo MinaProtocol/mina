@@ -426,6 +426,24 @@ module Make (Schema : Graphql_intf.Schema) = struct
             failwith "Unexpected response" )
 
     module Loop = struct
+      (* graphql_parser has no \u escape, so emit all other bytes raw *)
+      let string_gql s =
+        let buf = Buffer.create (String.length s + 2) in
+        Buffer.add_char buf '"' ;
+        String.iter s ~f:(function
+          | '"' ->
+              Buffer.add_string buf "\\\""
+          | '\\' ->
+              Buffer.add_string buf "\\\\"
+          | '\n' ->
+              Buffer.add_string buf "\\n"
+          | '\r' ->
+              Buffer.add_string buf "\\r"
+          | c ->
+              Buffer.add_char buf c ) ;
+        Buffer.add_char buf '"' ;
+        Buffer.contents buf
+
       let rec json_to_string_gql : Yojson.Safe.t -> string = function
         | `Assoc kv ->
             sprintf "{\n%s\n}"
@@ -437,6 +455,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
         | `List xs ->
             sprintf "[\n%s\n]"
               (List.map xs ~f:json_to_string_gql |> String.concat ~sep:",\n")
+        | `String s ->
+            string_gql s
         | x ->
             Yojson.Safe.to_string x
 
