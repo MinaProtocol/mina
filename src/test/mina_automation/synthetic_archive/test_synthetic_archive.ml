@@ -42,6 +42,10 @@ let db_tests server_uri =
       (run Account_states.test)
   ; Alcotest.test_case "schema scripts on a built database" `Quick
       (run Account_states.test_run_script)
+  ; Alcotest.test_case "downgrade and upgrade keep every row" `Quick
+      (run Migration_round_trip.test_utf8)
+  ; Alcotest.test_case "downgrade stops on a symbol that is not UTF-8" `Quick
+      (run Migration_round_trip.test_not_utf8)
   ]
 
 let () =
