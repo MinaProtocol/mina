@@ -1,5 +1,6 @@
 -- ============================================================================
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
+-- restores: 4.0.2
 -- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
 -- + token_symbols.value, zkapp_uris.value: bytea -> text
 -- + record status in migration_history
