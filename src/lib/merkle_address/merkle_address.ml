@@ -226,7 +226,10 @@ let serialize ~ledger_depth path =
   Bigstring.of_string @@ string_of_bitstring
   @@ concat [ path; zeroes_bitstring required_padding ]
 
-let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
+let is_parent_of parent ~maybe_child =
+  (* [Bitstring.is_prefix] is false when either bitstring is empty, but the
+     root is the parent of every address. *)
+  Int.equal (depth parent) 0 || Bitstring.is_prefix maybe_child parent
 
 let same_height_ancestors x y =
   let depth_x = depth x in
@@ -323,6 +326,25 @@ struct
       ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
+
+  let%test_unit "is_parent_of(addr, extension of addr)" =
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list * int]
+      (let open Quickcheck.Generator.Let_syntax in
+      let%bind directions = Mina_stdlib.Direction.gen_list Input.depth in
+      let%map prefix_length = Int.gen_incl 0 Input.depth in
+      (directions, prefix_length))
+      ~f:(fun (directions, prefix_length) ->
+        assert (
+          is_parent_of
+            (of_directions (List.take directions prefix_length))
+            ~maybe_child:(of_directions directions) ) )
+
+  let%test_unit "nonempty(addr): not (is_parent_of(addr, sibling(addr)))" =
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_var_length_list ~start:1 Input.depth)
+      ~f:(fun directions ->
+        let address = of_directions directions in
+        assert (not (is_parent_of address ~maybe_child:(sibling address))) )
 
   let%test_unit "prev(next(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
