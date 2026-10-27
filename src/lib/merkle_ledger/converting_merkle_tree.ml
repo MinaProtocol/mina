@@ -259,8 +259,9 @@ struct
   include Make (Inputs) (Primary_db) (Converting_db)
   module Config = With_database_config
 
-  let set_all_accounts_rooted_at_exn t addr accounts =
-    Primary_db.set_all_accounts_rooted_at_exn (primary_ledger t) addr accounts ;
+  let set_all_accounts_rooted_at_exn ?subtree_hashes t addr accounts =
+    Primary_db.set_all_accounts_rooted_at_exn ?subtree_hashes (primary_ledger t)
+      addr accounts ;
     Converting_db.set_all_accounts_rooted_at_exn (converting_ledger t) addr
       (List.map ~f:convert accounts)
 
