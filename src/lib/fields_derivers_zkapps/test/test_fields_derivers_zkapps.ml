@@ -106,6 +106,18 @@ module V3 = struct
     |> finish "V3" ~t_toplevel_annots
 end
 
+module V4 = struct
+  type t = { text : string } [@@deriving annot, compare, sexp, equal, fields]
+
+  (* Every byte, including those Yojson writes as \u00XX *)
+  let v = { text = String.init 256 ~f:Char.of_int_exn }
+
+  let derivers obj =
+    let open Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~text:!.string |> finish "V4" ~t_toplevel_annots
+end
+
 (* Test functions *)
 let test_verification_key_with_hash () =
   let open Pickles.Side_loaded.Verification_key in
@@ -152,6 +164,11 @@ let test_v3_roundtrip_json () =
   let roundtrip = Derivers.of_json v3 (Derivers.to_json v3 V3.v) in
   Alcotest.(check bool) "v3 roundtrip json" true (V3.equal roundtrip V3.v)
 
+let test_any_byte_string_roundtrip () =
+  let v4 = V4.derivers @@ Derivers.o () in
+  Derivers.Test.Loop.run v4 V4.v ;
+  Alcotest.(check pass) "any-byte string roundtrip" () ()
+
 let () =
   Alcotest.run "Fields_derivers_zkapps"
     [ ( "verification_key_with_hash"
@@ -164,5 +181,7 @@ let () =
         ; Alcotest.test_case "v2 roundtrip json" `Quick test_v2_roundtrip_json
         ; Alcotest.test_case "v3 to_json" `Quick test_v3_to_json
         ; Alcotest.test_case "v3 roundtrip json" `Quick test_v3_roundtrip_json
+        ; Alcotest.test_case "any-byte string roundtrip" `Quick
+            test_any_byte_string_roundtrip
         ] )
     ]
