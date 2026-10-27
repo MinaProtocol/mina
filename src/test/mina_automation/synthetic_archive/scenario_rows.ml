@@ -18,8 +18,17 @@ type scenario =
   ; deleg : B.user_command
   ; zk_dup : B.zkapp_command
   ; zk_failed : B.zkapp_command
+  ; zk_meta : B.zkapp_command
   ; cb2 : B.coinbase
   }
+
+(* a token symbol and a zkApp URI, and a symbol that is not UTF-8 and holds a
+   zero byte *)
+let symbol = "MINA"
+
+let uri = "https://example.com/zkapp"
+
+let binary_symbol = "\xff\x00z"
 
 let scenario () =
   let s = B.create () in
@@ -55,9 +64,31 @@ let scenario () =
         [ B.account_update ~implicit_account_creation_fee:true alice ]
       ~in_:[ (p3, Failed "Cancelled") ]
   in
+  let zk_meta =
+    B.zkapp_command s ~name:"zk_meta" ~fee_payer:alice
+      ~account_updates:
+        [ B.account_update ~token_symbol:symbol ~zkapp_uri:uri alice
+        ; B.account_update ~token_symbol:binary_symbol bob
+        ]
+      ~in_:[ (b1, Applied) ]
+  in
   let cb2 = B.coinbase s ~name:"cb2" ~receiver:bob b2 in
   B.account_created s b2 bob ;
-  { s; alice; bob; b1; b2; o2; p3; pay; failed; deleg; zk_dup; zk_failed; cb2 }
+  { s
+  ; alice
+  ; bob
+  ; b1
+  ; b2
+  ; o2
+  ; p3
+  ; pay
+  ; failed
+  ; deleg
+  ; zk_dup
+  ; zk_failed
+  ; zk_meta
+  ; cb2
+  }
 
 let check_block conn built ?parent b ~status ~transaction =
   let name = B.state_hash b in
@@ -226,6 +257,38 @@ let check_zk_failed conn built sc =
     command.zkapp_account_updates_ids.(0)
     ~account:sc.alice ~balance_change:"0" ~implicit_fee:true
 
+(* token symbols and zkApp URIs come back byte for byte; an update that sets
+   neither has none *)
+let check_zk_meta conn built sc =
+  let%bind command =
+    Read.zkapp_command conn (B.zkapp_command_id built sc.zk_meta)
+  in
+  let check id ~name ~token_symbol ~zkapp_uri =
+    let%map got_symbol, got_uri = Read.token_symbol_and_zkapp_uri conn id in
+    Alcotest.(check (option string))
+      (name ^ ": token symbol") token_symbol got_symbol ;
+    Alcotest.(check (option string)) (name ^ ": zkapp uri") zkapp_uri got_uri
+  in
+  match command.zkapp_account_updates_ids with
+  | [| first; second |] ->
+      let%bind () =
+        check first ~name:"zk_meta UTF-8" ~token_symbol:(Some symbol)
+          ~zkapp_uri:(Some uri)
+      in
+      let%bind () =
+        check second ~name:"zk_meta binary" ~token_symbol:(Some binary_symbol)
+          ~zkapp_uri:None
+      in
+      let%bind dup =
+        Read.zkapp_command conn (B.zkapp_command_id built sc.zk_dup)
+      in
+      check
+        dup.zkapp_account_updates_ids.(0)
+        ~name:"zk_dup" ~token_symbol:None ~zkapp_uri:None
+  | ids ->
+      Alcotest.failf "zk_meta: expected 2 account updates, got %d"
+        (Array.length ids)
+
 let test server_uri () =
   let sc = scenario () in
   B.Db.with_fresh ~server_uri ~name:"test_synthetic_archive" (fun db ->
@@ -236,5 +299,6 @@ let test server_uri () =
           let%bind () = check_coinbase conn built sc in
           let%bind () = check_accounts_created conn built sc in
           let%bind () = check_zk_dup conn built sc in
-          let%map () = check_zk_failed conn built sc in
+          let%bind () = check_zk_failed conn built sc in
+          let%map () = check_zk_meta conn built sc in
           Ok () ) )
