@@ -1947,11 +1947,19 @@ module AccountObj = struct
            ; field "zkappUri" ~typ:string
                ~doc:
                  "The URI associated with this account, usually pointing to \
-                  the zkApp source code"
+                  the zkApp source code. A byte that is not valid UTF-8 is \
+                  returned as the character U+00XX; zkappUriHex has the exact \
+                  bytes"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
-                 Option.value_map account.zkapp ~default:None ~f:(fun zkapp ->
-                     Some zkapp.zkapp_uri ) )
+                 Option.map account.zkapp ~f:(fun zkapp ->
+                     Graphql_lib.Arbitrary_bytes.to_utf8 zkapp.zkapp_uri ) )
+           ; field "zkappUriHex" ~typ:string
+               ~doc:"The bytes of zkappUri, hex-encoded"
+               ~args:Arg.[]
+               ~resolve:(fun _ { account; _ } ->
+                 Option.map account.zkapp ~f:(fun zkapp ->
+                     Graphql_lib.Arbitrary_bytes.to_hex zkapp.zkapp_uri ) )
            ; field "zkappState"
                ~typ:
                  ( list @@ non_null
@@ -1981,10 +1989,18 @@ module AccountObj = struct
            ; field "tokenSymbol" ~typ:string
                ~doc:
                  "The symbol for the token owned by this account, if there is \
-                  one"
+                  one. A byte that is not valid UTF-8 is returned as the \
+                  character U+00XX; tokenSymbolHex has the exact bytes"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
-                 account.Account.Poly.token_symbol )
+                 Option.map account.Account.Poly.token_symbol
+                   ~f:Graphql_lib.Arbitrary_bytes.to_utf8 )
+           ; field "tokenSymbolHex" ~typ:string
+               ~doc:"The bytes of tokenSymbol, hex-encoded"
+               ~args:Arg.[]
+               ~resolve:(fun _ { account; _ } ->
+                 Option.map account.Account.Poly.token_symbol
+                   ~f:Graphql_lib.Arbitrary_bytes.to_hex )
            ; field "verificationKey" ~typ:account_vk
                ~doc:"Verification key associated with this account"
                ~args:Arg.[]
