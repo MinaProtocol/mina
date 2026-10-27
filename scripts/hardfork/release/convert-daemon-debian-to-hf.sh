@@ -71,6 +71,11 @@ if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
     exit 1
 fi
 
+command -v deb-toolkit &> /dev/null || {
+    echo "ERROR: deb-toolkit not found on PATH. Install it from https://github.com/MinaProtocol/mina-release-toolkit/releases" >&2
+    exit 1
+}
+
 # Create temporary session directory
 SESSION_DIR=$(mktemp -d)
 trap 'rm -rf "$SESSION_DIR"' EXIT
@@ -84,26 +89,26 @@ echo ""
 
 # Open the debian package for modifications
 echo "=== Step 1: Opening Debian Package for modification ==="
-./scripts/debian/session/deb-session-open.sh "$DEB_FILE_ABS" "$SESSION_DIR"
+deb-toolkit session open "$DEB_FILE_ABS" "$SESSION_DIR"
 
 # Insert new runtime config as the network config
 echo ""
 echo "=== Step 2: Inserting new runtime config as ${NETWORK_NAME}.json ==="
-./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
+deb-toolkit session insert "$SESSION_DIR" \
     "/var/lib/coda/${NETWORK_NAME}.json" \
     "$RUNTIME_CONFIG_JSON_ABS"
 
 # Replace config_*.json with runtime config
 echo ""
 echo "=== Step 3: Replacing config_*.json with new runtime config ==="
-./scripts/debian/session/deb-session-replace.sh "$SESSION_DIR" \
+deb-toolkit session replace "$SESSION_DIR" \
     "/var/lib/coda/config_*.json" \
     "$RUNTIME_CONFIG_JSON_ABS"
 
 # Remove existing ledger tarballs before adding new ones
 echo ""
 echo "=== Step 4: Removing existing ledger tarballs ==="
-./scripts/debian/session/deb-session-remove.sh "$SESSION_DIR" \
+deb-toolkit session remove "$SESSION_DIR" \
     "/var/lib/coda/*.tar.gz" || echo "No existing ledger tarballs to remove"
 
 # Insert ledger tarballs
@@ -144,19 +149,19 @@ fi
 
 # Use the actual matched filenames for genesis_ledger and epoch tarballs
 TARBALL_FILES=("${GENESIS_MATCHES[0]}" "${EPOCH_MATCHES[@]}")
-./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" "/var/lib/coda/" "${TARBALL_FILES[@]}"
+deb-toolkit session insert -d "$SESSION_DIR" "/var/lib/coda" "${TARBALL_FILES[@]}"
 
 # Rename package to add -hardfork suffix
 echo ""
 echo "=== Step 6: Renaming package to add -hardfork suffix ==="
 NEW_PACKAGE_NAME="${FILE_BASE_NAME}-hardfork"
 
-./scripts/debian/session/deb-session-rename-package.sh "$SESSION_DIR" "$NEW_PACKAGE_NAME"
+deb-toolkit session rename-package "$SESSION_DIR" "$NEW_PACKAGE_NAME"
 
 # Save the modified package
 echo ""
 echo "=== Step 7: Saving modified package ==="
-./scripts/debian/session/deb-session-save.sh "$SESSION_DIR" "$OUTPUT_DEB_FILE" --verify
+deb-toolkit session save "$SESSION_DIR" "$OUTPUT_DEB_FILE" --verify
 
 if [ $VERIFY -ne 0 ]; then
     # Verify the final package contents

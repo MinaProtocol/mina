@@ -101,12 +101,6 @@ function check_app() {
 mkdir -p $DEBIAN_CACHE_FOLDER
 
 ################################################################################
-# imports
-################################################################################
-
-SESSION_SCRIPTS=$SCRIPTPATH/../../../scripts/debian/session
-
-################################################################################
 # functions
 ################################################################################
 
@@ -545,18 +539,19 @@ function publish_debian() {
 
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
+        check_app "deb-toolkit"
         local __session_dir
         __session_dir=$(mktemp -d -t deb-session-XXXXXX)
         local __input_deb="${__deb}_${__source_version}_${__arch}.deb"
         local __output_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb"
 
-        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-open.sh" "$__input_deb" "$__session_dir"
-        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-reversion.sh" "$__session_dir" "$__target_version"
-        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-replace-suite.sh" "$__session_dir" "$__channel"
+        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session open "$__input_deb" "$__session_dir"
+        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session reversion "$__session_dir" "$__target_version"
+        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session replace-suite "$__session_dir" "$__channel"
         if [[ "$__new_artifact_name" != "$__artifact_full_name" ]]; then
-            prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-rename-package.sh" "$__session_dir" "$__new_artifact_name"
+            prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session rename-package "$__session_dir" "$__new_artifact_name"
         fi
-        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-save.sh" "$__session_dir" "$__output_deb"
+        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session save "$__session_dir" "$__output_deb"
         rm -rf "$__session_dir"
     fi
 

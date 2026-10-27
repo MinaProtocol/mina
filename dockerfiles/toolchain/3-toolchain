@@ -47,7 +47,7 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
     && gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
-# --- mina-release-toolkit CLIs (buildkite-cache-manager, release-manager, mina-bench-upload)
+# --- mina-release-toolkit CLIs (buildkite-cache-manager, deb-toolkit, release-manager, mina-bench-upload)
 # The .deb bundles these Rust CLIs and declares the union of their runtime deps
 # (debsigs, debsig-verify, openssh-client), so a plain `dpkg -i` aborts on unmet
 # dependencies. The binaries are static musl builds, so extract them instead of
@@ -55,7 +55,7 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
 RUN case "${TARGETARCH}" in amd64 | arm64) ;; *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1 ;; esac \
     && curl -fsSLO "https://github.com/MinaProtocol/mina-release-toolkit/releases/download/v${MINA_RELEASE_TOOLKIT_VERSION}/mina-release-toolkit_${MINA_RELEASE_TOOLKIT_VERSION}_${TARGETARCH}.deb" \
     && dpkg-deb -x "mina-release-toolkit_${MINA_RELEASE_TOOLKIT_VERSION}_${TARGETARCH}.deb" /tmp/mrt \
-    && for bin in buildkite-cache-manager release-manager mina-bench-upload; do \
+    && for bin in buildkite-cache-manager deb-toolkit release-manager mina-bench-upload; do \
          install -m 0755 "/tmp/mrt/usr/bin/${bin}" "/usr/local/bin/${bin}"; \
        done \
     && rm -rf /tmp/mrt "mina-release-toolkit_${MINA_RELEASE_TOOLKIT_VERSION}_${TARGETARCH}.deb"

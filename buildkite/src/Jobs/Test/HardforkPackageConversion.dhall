@@ -32,7 +32,6 @@ in  Pipeline.build
               ( S.contains
                   "scripts/hardfork/release/convert-daemon-debian-to-hf.sh"
               )
-          , S.strictlyStart (S.contains "scripts/debian/session")
           ]
         , path = "Test"
         , name = "HardforkPackageConversion"

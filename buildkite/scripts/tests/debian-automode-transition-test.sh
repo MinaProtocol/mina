@@ -37,7 +37,6 @@ source buildkite/scripts/export-git-env-vars.sh
 # shellcheck source=buildkite/scripts/debian/fetch_debs.sh
 source ./buildkite/scripts/debian/fetch_debs.sh
 
-SESSION_DIR="./scripts/debian/session"
 
 ################################################################################
 # Logging
@@ -154,7 +153,7 @@ log_info "Downloaded debs:"
 ls -la "${DEB_DIR}"/*.deb
 
 ################################################################################
-# Step 2: Create versioned variants using deb-session
+# Step 2: Create versioned variants using deb-toolkit session
 ################################################################################
 
 log_info "=== Step 2: Create versioned package variants ==="
@@ -176,9 +175,9 @@ reversion_deb() {
     local session_dir="${WORKDIR}/session_tmp"
 
     rm -rf "${session_dir}"
-    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
-    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
-    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    deb-toolkit session open "${input_deb}" "${session_dir}"
+    deb-toolkit session reversion "${session_dir}" "${new_version}"
+    deb-toolkit session save "${session_dir}" "${output_deb}"
     rm -rf "${session_dir}"
 }
 
@@ -201,15 +200,15 @@ reversion_legacy_daemon_deb() {
     local session_dir="${WORKDIR}/session_tmp"
 
     rm -rf "${session_dir}"
-    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
-    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
+    deb-toolkit session open "${input_deb}" "${session_dir}"
+    deb-toolkit session reversion "${session_dir}" "${new_version}"
     sed -i -E "s/, ${PKG_PROFILE} \\([^)]*\\)//" "${session_dir}/control/control"
     if grep -q "^Depends:.*${PKG_PROFILE}" "${session_dir}/control/control"; then
         log_error "Legacy ${PKG_DAEMON} package should not depend on ${PKG_PROFILE}"
         grep -E "^(Package|Version|Depends):" "${session_dir}/control/control" || true
         exit 1
     fi
-    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    deb-toolkit session save "${session_dir}" "${output_deb}"
     rm -rf "${session_dir}"
 }
 
@@ -226,7 +225,7 @@ reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd6
 
 # The automode metapackage pins prefork to an EXACT version — the legacy
 # PREFORK_LEGACY_VERSION baked in at build time, which is NOT rewritten when the
-# metapackage is reversioned (deb-session-reversion only rewrites deps that
+# metapackage is reversioned (deb-toolkit session reversion only rewrites deps that
 # reference the package's own old version, i.e. postfork). The prefork deb in
 # the legacy cache may carry a different (newer) version, so we reversion it to
 # exactly the version the metapackage depends on, otherwise the '=' pin can't be
