@@ -159,10 +159,12 @@ main() {
     create_db "archive_current"
     create_db "archive_migrated"
 
+    # create_schema.sql does not stop on its own error, and an error in the
+    # base schema would hit the reference and migrated databases alike.
     echo "Applying ${base_ref}'s create_schema.sql to reference database..."
-    run_psql "archive_base" -f "/tmp/base_schema.sql"
+    run_psql "archive_base" -v ON_ERROR_STOP=1 -f "/tmp/base_schema.sql"
     echo "Applying create_schema.sql to reference database..."
-    run_psql "archive_current" -f "/workdir/src/app/archive/create_schema.sql"
+    run_psql "archive_current" -v ON_ERROR_STOP=1 -f "/workdir/src/app/archive/create_schema.sql"
 
     local schema_base="/tmp/schema_base_$$.sql"
     local schema_current="/tmp/schema_current_$$.sql"
@@ -171,7 +173,7 @@ main() {
     dump_and_normalize "archive_current" "$schema_current"
 
     echo "Applying ${base_ref}'s create_schema.sql to migrated database..."
-    run_psql "archive_migrated" -f "/tmp/base_schema.sql"
+    run_psql "archive_migrated" -v ON_ERROR_STOP=1 -f "/tmp/base_schema.sql"
 
     # --- Test 1: upgrade.sql gives create_schema.sql ---
     echo ""
