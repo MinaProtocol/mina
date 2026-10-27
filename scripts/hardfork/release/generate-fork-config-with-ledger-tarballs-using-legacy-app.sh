@@ -66,12 +66,13 @@ HASH_PATH="$WORKDIR/$HASH_NAME"
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-# make sure files does not have genesis key
-jq 'del(.genesis)' "$FORK_CONFIG" > "$TMP/fork_config_no_genesis.json"
+# The legacy app rejects .genesis. Not jq: it would replace non-UTF-8 token
+# symbol bytes with U+FFFD.
+"$(dirname "$0")/remove-genesis-field.py" "$FORK_CONFIG" "$TMP/fork_config_no_genesis.json"
 
 PREFORK_GENESIS_CONFIG_ARG=""
 if [[ -n "$PREFORK_GENESIS_CONFIG" ]]; then
-  jq 'del(.genesis)' "$PREFORK_GENESIS_CONFIG" > "$TMP/config_no_genesis.json"
+  "$(dirname "$0")/remove-genesis-field.py" "$PREFORK_GENESIS_CONFIG" "$TMP/config_no_genesis.json"
   PREFORK_GENESIS_CONFIG_ARG="--prefork-genesis-config $TMP/config_no_genesis.json"
 fi
 
