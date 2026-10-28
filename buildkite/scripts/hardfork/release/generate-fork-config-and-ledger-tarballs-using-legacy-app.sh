@@ -54,7 +54,12 @@ MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildki
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" --prefork-genesis-config "genesis_ledgers/${NETWORK}.json"
+# Since 4.0.x the binaries resolve their profile at run time, from MINA_PROFILE
+# or from /etc/coda/build_config/PROFILE. Only the create-prefork-genesis
+# package is installed here, and it ships no PROFILE file (that comes with
+# mina-<network>-profile), so name the profile explicitly. The network's
+# profile has the same name as the network.
+MINA_PROFILE="$NETWORK" ./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" --prefork-genesis-config "genesis_ledgers/${NETWORK}.json"
 
 echo "--- Caching legacy ledger tarballs and hashes"
 
