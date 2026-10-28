@@ -59,6 +59,7 @@ function usage() {
   PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
   USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
+  PREFORK_LEGACY_VERSION             (Optional) Version of the prefork packages in the legacy/debians cache (e.g. 4.0.3-73134bf); defaults to the entrypoint's value
 EOF
   exit 1
 }
@@ -136,6 +137,12 @@ fi
 
 
 # Format PRECOMPUTED_FORK_BLOCK_PREFIX as Optional Text for Dhall
+if [[ -z "${PREFORK_LEGACY_VERSION:-}" ]]; then
+  PREFORK_LEGACY_VERSION="(None Text)"
+else
+  PREFORK_LEGACY_VERSION="(Some \"${PREFORK_LEGACY_VERSION}\")"
+fi
+
 if [[ -z "${PRECOMPUTED_FORK_BLOCK_PREFIX:-}" ]]; then
   PRECOMPUTED_FORK_BLOCK_PREFIX="(None Text)"
 else
@@ -162,7 +169,7 @@ else
 fi
 
 # shellcheck disable=SC2089
-printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s\n' \
   "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
   "$DHALL_CODENAMES" \
   "$NETWORK_DHALL_DEF" \
@@ -174,4 +181,5 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
   "$PRECOMPUTED_FORK_BLOCK_PREFIX" \
   "$USE_ARTIFACTS_FROM_BUILDKITE_BUILD" \
   "$USE_GENERIC_DOCKERS_FROM_VERSION" \
+  "$PREFORK_LEGACY_VERSION" \
    | dhall-to-yaml --quoted
