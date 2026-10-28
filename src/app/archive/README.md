@@ -242,3 +242,46 @@ $ archive_blocks \
     --precomputed \
     block.json
 ```
+
+Schema migrations
+-----------------
+
+`create_schema.sql` makes a new database for this version.
+`upgrade.sql` changes a database of the previous release to the same
+schema. `downgrade.sql` changes it back.
+
+Each script names that previous release (a git tag) in its header:
+
+- `upgrade.sql`: `-- upgrades: <tag>`, the release that the script
+  starts from.
+- `downgrade.sql`: `-- restores: <tag>`, the release that the script
+  gives back.
+
+The tag is a git release tag, not a protocol version. The version
+check inside each script uses `archive.current_protocol_version`,
+`archive.target_protocol_version` and `archive.migration_version`.
+
+The two lines must name the same tag. CI
+(`buildkite/scripts/archive/verify-schema-upgrade.sh`) makes a database
+with the `create_schema.sql` of `<tag>` and then checks that:
+
+1. after `upgrade.sql`, the schema is the same as `create_schema.sql`;
+2. after `downgrade.sql`, the schema is the same as the
+   `create_schema.sql` of `<tag>`.
+
+When you change the schema:
+
+- Make the change in `create_schema.sql`, make the same change in
+  `upgrade.sql`, and reverse it in `downgrade.sql`.
+- Keep each step idempotent and its transaction small. The scripts run
+  on live databases.
+- If this is the first schema change after a release, set both headers
+  to that release. Remove the steps that the release already contains:
+  `downgrade.sql` must not reverse them. The scripts of an older release
+  stay available at its tag. Also set the three version values above in
+  both scripts, so that the version check accepts a database of that
+  release.
+
+After a release, the headers keep their tag until the next schema
+change: the scripts on the branch are still the ones that the release
+ships.
