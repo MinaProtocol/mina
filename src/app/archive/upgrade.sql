@@ -1,5 +1,6 @@
 -- =============================================================================
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
+-- upgrades: 4.0.2
 -- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + token_symbols.value, zkapp_uris.value: text -> bytea
 -- + record status in migration_history
