@@ -61,5 +61,5 @@
 , postgres = "docker.io/library/postgres:17-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "docker.io/minaprotocol/nixos:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.8"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.9"
 }
