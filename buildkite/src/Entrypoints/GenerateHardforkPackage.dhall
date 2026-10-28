@@ -219,12 +219,12 @@ let generateDockerForCodename =
                 ]
 
           let persistArtifacts =
-                "mina-logproc mina-${Profiles.lowerName
-                                       profile}-profile mina-${Profiles.lowerName
-                                                                 profile}-generic mina-${Network.lowerName
-                                                                                           spec.network} mina-archive-${Network.lowerName
-                                                                                                                          spec.network} mina-rosetta-${Network.lowerName
-                                                                                                                                                         spec.network} mina-tx-tools mina-daemon-storage-toolbox"
+                "mina-logproc mina-generic mina-archive-generic mina-rosetta-generic mina-${Profiles.lowerName
+                                                                                              profile}-profile mina-${Profiles.lowerName
+                                                                                                                        profile}-generic mina-${Network.lowerName
+                                                                                                                                                  spec.network} mina-archive-${Network.lowerName
+                                                                                                                                                                                 spec.network} mina-rosetta-${Network.lowerName
+                                                                                                                                                                                                                spec.network} mina-tx-tools mina-daemon-storage-toolbox"
 
           let buildOrGetArtifacts =
                 merge
@@ -256,6 +256,9 @@ let generateDockerForCodename =
                         MinaArtifact.PackagingSpec::{
                         , artifacts =
                           [ Artifact.Type.LogProc
+                          , Artifact.Type.DaemonGeneric
+                          , Artifact.Type.ArchiveGeneric
+                          , Artifact.Type.RosettaGeneric
                           , Artifact.Type.Daemon { network = spec.network }
                           , Artifact.Type.DaemonProfiled { profile = profile }
                           , Artifact.Type.Archive { network = spec.network }
