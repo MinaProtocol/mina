@@ -22,7 +22,7 @@
 #
 # FILES MONITORED:
 #   - src/app/archive/create_schema.sql
-#   - src/app/archive/drop_table.sql
+#   - src/app/archive/drop_tables.sql
 #   - src/app/archive/upgrade.sql (required when above files change)
 
 set -euo pipefail
@@ -137,7 +137,7 @@ main() {
 
     local monitored_scripts=(
         "src/app/archive/create_schema.sql"
-        "src/app/archive/drop_table.sql"
+        "src/app/archive/drop_tables.sql"
     )
 
     local scripts=(
