@@ -14,6 +14,8 @@
   uri
   yojson
   ;; local libraries
+  interpolator_lib
+  logger
   mina_caqti)
  (instrumentation
   (backend bisect_ppx))

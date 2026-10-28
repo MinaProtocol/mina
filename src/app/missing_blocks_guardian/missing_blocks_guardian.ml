@@ -1,498 +1,443 @@
 (* missing_blocks_guardian.ml -- populate an archive database with missing
    blocks, fetched one by one from a bucket of precomputed or extensional
-   blocks. *)
+   blocks *)
 
 open Core
 open Async
 
+module Block_format = struct
+  type t = Precomputed | Extensional
+
+  let to_string = function
+    | Precomputed ->
+        "precomputed"
+    | Extensional ->
+        "extensional"
+
+  let of_string = function
+    | "precomputed" ->
+        Precomputed
+    | "extensional" ->
+        Extensional
+    | other ->
+        failwithf "unknown block format %s, expected precomputed or extensional"
+          other ()
+
+  let arg_type = Command.Arg_type.create of_string
+end
+
+(* The archive database and the program that audits it. *)
+type archive = { uri : Uri.t; auditor : string }
+
+(* Where the missing blocks come from and the program that writes them. *)
+type blocks =
+  { url : string
+  ; network : string
+  ; format : Block_format.t
+  ; archive_blocks : string
+  }
+
 module Default = struct
-  let missing_blocks_auditor = "mina-missing-blocks-auditor"
+  let auditor = "mina-missing-blocks-auditor"
 
   let archive_blocks = "mina-archive-blocks"
 
-  let blocks_format = "precomputed"
-
-  let timeout = 600
+  let interval = 600
 end
 
-(* After a recovery, the daemon waits this many times [TIMEOUT]. *)
+(* After a recovery, the daemon waits this many intervals. *)
 let recovery_sleep_factor = 6
 
-let synced_message =
-  "[RESOLUTION] This Archive node is synced with no missing blocks back to \
-   genesis!"
+let top_blocks_count = 10
 
-let usage name =
-  print_string
-    (sprintf
-       {|Usage: %s <subcommand> [options]
-Subcommands:
-  audit           Check database health
-  single-run      Check database health and recover it if broken
-  daemon          Run as a daemon checking health every 10 minutes
-
-Options:
-  --help          Show this help message
-
-Environment variables:
-  Required:
-    DB_USERNAME             Database username
-    DB_HOST                 Database connection endpoint
-    DB_PORT                 Database connection port
-    DB_NAME                 Database name
-    PGPASSWORD              Postgresql password
-    PRECOMPUTED_BLOCKS_URL  Url of the bucket with the precomputed blocks
-    MINA_NETWORK            Mina network (used for precomputed blocks prefix)
-
-  Optional:
-    MISSING_BLOCKS_AUDITOR  Path to the missing-blocks-auditor exe (default: %s)
-    ARCHIVE_BLOCKS          Path to the archive blocks exe (default: %s)
-    BLOCKS_FORMAT           Block format type. Possible values: [precomputed/extensional] (default: %s)
-    TIMEOUT                 Time to sleep in seconds when in daemon mode. After recovery it will sleep six times more (default: %d)
-
-Example:
-  %s audit
-  %s single-run
-  %s daemon
-|}
-       name Default.missing_blocks_auditor Default.archive_blocks
-       Default.blocks_format Default.timeout name name name )
-
-let fail message = print_endline message ; exit 1
-
-let log_error err = eprintf "%s\n" (Error.to_string_hum err)
-
-type config =
-  { pg_conn : string
-  ; precomputed_blocks_url : string
-  ; mina_network : string
-  ; missing_blocks_auditor : string
-  ; archive_blocks : string
-  ; blocks_format : string
-  ; timeout : int
-  }
-
-let getenv_non_empty name =
-  match Sys.getenv name with Some "" | None -> None | value -> value
-
-let config_of_env () =
-  let required name =
-    match getenv_non_empty name with
-    | Some value ->
-        return value
-    | None ->
-        fail
-          (sprintf
-             "[ERROR] The %s environment variable is not set or is empty. \
-              Exiting the script"
-             name )
-  in
-  let optional ?shown_default name ~default =
-    match getenv_non_empty name with
-    | Some value ->
-        value
-    | None ->
-        print_endline
-          (sprintf
-             "[INFO] The %s environment variable is not set or is empty. \
-              Defaulting to \027[31m%s\027[m."
-             name
-             (Option.value shown_default ~default) ) ;
-        default
-  in
-  let%bind db_username = required "DB_USERNAME" in
-  let%bind pgpassword = required "PGPASSWORD" in
-  let%bind db_host = required "DB_HOST" in
-  let%bind db_port = required "DB_PORT" in
-  let%bind db_name = required "DB_NAME" in
-  let%bind precomputed_blocks_url = required "PRECOMPUTED_BLOCKS_URL" in
-  let%bind mina_network = required "MINA_NETWORK" in
-  let missing_blocks_auditor =
-    optional "MISSING_BLOCKS_AUDITOR"
-      ~shown_default:"mina-missing-block-auditor"
-      ~default:Default.missing_blocks_auditor
-  in
-  let blocks_format = optional "BLOCKS_FORMAT" ~default:Default.blocks_format in
-  let archive_blocks =
-    optional "ARCHIVE_BLOCKS" ~default:Default.archive_blocks
-  in
-  let timeout = optional "TIMEOUT" ~default:(Int.to_string Default.timeout) in
-  let%map timeout =
-    match Option.try_with (fun () -> Int.of_string timeout) with
-    | Some timeout ->
-        return timeout
-    | None ->
-        fail (sprintf "[ERROR] TIMEOUT is not a number: %s" timeout)
-  in
-  print_endline
-    (sprintf
-       "[INFO] Using connection string postgres://%s:<your_password>@%s:%s/%s"
-       db_username db_host db_port db_name ) ;
-  { pg_conn =
-      sprintf "postgres://%s:%s@%s:%s/%s" db_username pgpassword db_host db_port
-        db_name
-  ; precomputed_blocks_url
-  ; mina_network
-  ; missing_blocks_auditor
-  ; archive_blocks
-  ; blocks_format
-  ; timeout
-  }
-
-(* Runs [prog], passes its stderr through and returns its stdout. If [prog]
-   cannot be started, writes [<prog>: <error>] to stderr and returns no output
-   and exit code 127. *)
-let run_capture ~prog ~args =
-  match%bind Process.create ~prog ~args () with
+let connect ~logger archive =
+  match Mina_caqti.connect_pool archive.uri with
+  | Ok pool ->
+      pool
   | Error err ->
-      eprintf "%s: %s\n" prog (Error.to_string_hum err) ;
-      return ("", Error (`Exit_non_zero 127))
-  | Ok process ->
-      let stderr = Lazy.force Writer.stderr in
-      let%bind () =
-        Pipe.iter_without_pushback
-          (Reader.pipe (Process.stderr process))
-          ~f:(Writer.write stderr)
-      and stdout = Reader.contents (Process.stdout process)
-      and status = Process.wait process in
-      return (stdout, status)
+      [%log fatal] "Could not connect to the archive database: $error"
+        ~metadata:[ ("error", `String (Caqti_error.show err)) ] ;
+      Core.exit 1
 
-(* One JSON value on each line; blank lines are ignored. *)
-let parse_log_lines output =
-  Or_error.try_with (fun () ->
-      String.split_lines output
-      |> List.filter ~f:(fun line -> not (String.is_empty (String.strip line)))
-      |> List.map ~f:Yojson.Safe.from_string )
-
-(* A string as is, any other value as JSON. *)
-let json_to_text = function
-  | `String s ->
-      s
-  | json ->
-      Yojson.Safe.to_string json
-
-let field name = function
-  | `Assoc fields ->
-      List.Assoc.find fields ~equal:String.equal name
-      |> Option.value ~default:`Null
-  | _ ->
-      `Null
-
-let messages lines =
-  List.map lines ~f:(fun line -> json_to_text (field "message" line))
-  |> String.concat ~sep:"\n"
-
-(* The parent of the first logged block whose parent is missing:
-   [(parent_hash, parent_height)]. *)
-let first_missing_parent lines =
-  List.find_map lines ~f:(fun line ->
-      let metadata = field "metadata" line in
-      match (field "parent_hash" metadata, field "parent_height" metadata) with
-      | `Null, _ | _, `Null ->
-          None
-      | parent_hash, parent_height ->
-          Some (json_to_text parent_hash, json_to_text parent_height) )
-
-(* The exit code of the auditor is ignored; only its log is read. *)
-let run_auditor config =
-  let%bind output, _status =
-    run_capture ~prog:config.missing_blocks_auditor
-      ~args:[ "--archive-uri"; config.pg_conn ]
-  in
-  match parse_log_lines output with
-  | Ok lines ->
-      return lines
+let log_top_blocks ~logger ~pool ~when_ =
+  match%map
+    Mina_caqti.Pool.use (fun db -> Sql.Top_blocks.run db top_blocks_count) pool
+  with
+  | Ok blocks ->
+      [%log info] "Top %d blocks %s: $blocks" top_blocks_count when_
+        ~metadata:
+          [ ( "blocks"
+            , `List
+                (List.map blocks ~f:(fun (state_hash, height) ->
+                     `Assoc
+                       [ ("state_hash", `String state_hash)
+                       ; ("height", `Int height)
+                       ] ) ) )
+          ]
   | Error err ->
-      log_error err ;
-      fail
-        "[ERROR] mina-missing-blocks-auditor failed. The database remains \
-         unhealthy.\n\
-         For more information about the error try running \
-         mina-missing-blocks-auditor separately."
+      [%log error] "Could not query the top blocks: $error"
+        ~metadata:[ ("error", `String (Caqti_error.show err)) ]
 
-(* Runs the auditor, prints its messages after [prefix] and returns the first
-   missing parent. *)
-let check config ~prefix =
-  let%map lines = run_auditor config in
-  print_endline (prefix ^ messages lines) ;
-  first_missing_parent lines
+let check ~logger archive =
+  Auditor.check ~logger ~prog:archive.auditor ~archive_uri:archive.uri
 
-let top_blocks_sql =
-  "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
-
-let top_blocks_query =
-  Mina_caqti.collect_req Caqti_type.unit
-    Caqti_type.(t2 string int)
-    top_blocks_sql
-
-let query_top_blocks config =
-  let open Deferred.Result.Let_syntax in
-  let%bind (module Conn : Mina_caqti.CONNECTION) =
-    Mina_caqti.connect (Uri.of_string config.pg_conn)
-  in
-  let%bind rows = Conn.collect_list top_blocks_query () in
-  let%map () = Conn.disconnect () |> Deferred.ok in
-  rows
-
-let align_left text ~width = text ^ String.make (width - String.length text) ' '
-
-let align_right text ~width =
-  String.make (width - String.length text) ' ' ^ text
-
-let center text ~width =
-  let padding = width - String.length text in
-  let left = padding / 2 in
-  String.make left ' ' ^ text ^ String.make (padding - left) ' '
-
-(* Prints the query, then an aligned table with a row count. *)
-let print_top_blocks config =
-  match%map query_top_blocks config with
-  | Error err ->
-      Error (Error.of_string (Caqti_error.show err))
-  | Ok rows ->
-      let rows =
-        List.map rows ~f:(fun (state_hash, height) ->
-            (state_hash, Int.to_string height) )
-      in
-      let width header column =
-        List.fold rows ~init:(String.length header) ~f:(fun width row ->
-            Int.max width (String.length (column row)) )
-      in
-      let hash_width = width "state_hash" fst in
-      let height_width = width "height" snd in
-      print_endline top_blocks_sql ;
-      print_endline
-        (sprintf " %s | %s "
-           (center "state_hash" ~width:hash_width)
-           (center "height" ~width:height_width) ) ;
-      print_endline
-        (sprintf "%s+%s"
-           (String.make (hash_width + 2) '-')
-           (String.make (height_width + 2) '-') ) ;
-      List.iter rows ~f:(fun (state_hash, height) ->
-          print_endline
-            (sprintf " %s | %s"
-               (align_left state_hash ~width:hash_width)
-               (align_right height ~width:height_width) ) ) ;
-      print_endline
-        ( match List.length rows with
-        | 1 ->
-            "(1 row)\n"
-        | count ->
-            sprintf "(%d rows)\n" count ) ;
-      Ok ()
-
-(* RFC 6125 name matching: a leading "*" stands for one whole label. *)
-let host_matches ~host name =
-  let host = String.lowercase host and name = String.lowercase name in
-  match String.chop_prefix name ~prefix:"*." with
-  | None ->
-      String.equal host name
-  | Some suffix -> (
-      match String.lsplit2 host ~on:'.' with
-      | Some (label, rest) ->
-          (not (String.is_empty label)) && String.equal rest suffix
-      | None ->
-          false )
-
-(* The default TLS client checks only the certificate chain. This also checks
-   that the certificate SAN (subject alternative name) list contains [host]. *)
-let ssl_config url =
-  Option.map (Uri.host url) ~f:(fun host ->
-      Conduit_async.V2.Ssl.Config.create ~hostname:host
-        ~verify:(fun connection ->
-          return
-            ( match Async_ssl.Ssl.Connection.peer_certificate connection with
-            | Some (Ok certificate) ->
-                List.exists
-                  (Async_ssl.Ssl.Certificate.subject_alt_names certificate)
-                  ~f:(host_matches ~host)
-            | Some (Error _) | None ->
-                false ) )
-        () )
-
-let download_block config file =
-  print_endline (sprintf "[BOOTSTRAP] Downloading %s block" file) ;
-  let url = Uri.of_string (config.precomputed_blocks_url ^ "/" ^ file) in
-  (* The body is saved for all HTTP statuses. *)
-  let%bind result =
-    Monitor.try_with_or_error (fun () ->
-        match Uri.scheme url with
-        | Some ("http" | "https") ->
-            let%bind _response, body =
-              Cohttp_async.Client.get ?ssl_config:(ssl_config url) url
-            in
-            let%bind body = Cohttp_async.Body.to_string body in
-            Writer.save file ~contents:body
-        | Some "file" ->
-            let%bind contents = Reader.file_contents (Uri.path url) in
-            Writer.save file ~contents
-        | _ ->
-            failwith "Protocol not supported" )
-  in
-  match result with
+let download ~logger blocks file =
+  let url = blocks.url ^ "/" ^ file in
+  [%log info] "Downloading block $file from $url"
+    ~metadata:[ ("file", `String file); ("url", `String url) ] ;
+  match%bind Download.fetch ~url ~file with
   | Ok () ->
       return ()
   | Error err ->
-      log_error err ;
-      fail
-        "[ERROR] Curl failed to download block. The database remains unhealthy.\n\
-        \ Make sure your PRECOMPUTED_BLOCKS_URL environment variable is set \
-         correctly."
+      [%log fatal]
+        "Could not download $file: $error. Check --precomputed-blocks-url."
+        ~metadata:
+          [ ("file", `String file)
+          ; ("error", `String (Error.to_string_hum err))
+          ] ;
+      exit 1
 
-let remove_file file = Monitor.try_with_or_error (fun () -> Unix.unlink file)
-
-(* Prints the message of the last line of the mina-archive-blocks log. *)
-let print_populated output =
-  match parse_log_lines output with
-  | Ok lines ->
-      let last = Option.value (List.last lines) ~default:`Null in
-      print_endline
-        (sprintf "[BOOTSTRAP] Populated database with block: %s"
-           (json_to_text (field "message" last)) )
+let remove ~logger file =
+  match%bind Monitor.try_with_or_error (fun () -> Unix.unlink file) with
+  | Ok () ->
+      return ()
   | Error err ->
-      log_error err
+      [%log fatal] "Could not remove $file: $error"
+        ~metadata:
+          [ ("file", `String file)
+          ; ("error", `String (Error.to_string_hum err))
+          ] ;
+      exit 1
 
-let populate_db config file =
-  print_endline
-    (sprintf "%s --%s --archive-uri %s %s" config.archive_blocks
-       config.blocks_format config.pg_conn file ) ;
-  let%bind output, status =
-    run_capture ~prog:config.archive_blocks
+(* Writes [file] to the archive with mina-archive-blocks and removes it. The
+   log of mina-archive-blocks is relayed; its exit code is 0 even when the
+   block was not added. *)
+let populate ~logger archive blocks file =
+  let uri = Uri.to_string archive.uri in
+  let prog = blocks.archive_blocks in
+  match%bind
+    Subprocess.run ~logger ~secrets:[ uri ] ~prog
       ~args:
-        [ "--" ^ config.blocks_format; "--archive-uri"; config.pg_conn; file ]
-  in
-  match status with
-  | Error _ ->
-      let%bind (_ : unit Or_error.t) = remove_file file in
-      fail
-        "[ERROR] mina-archive-blocks failed. The database remains unhealthy.\n\
-        \ Make sure the environment variables are set correctly and the \
-         database is accessible."
-  | Ok () -> (
-      print_populated output ;
-      match%bind remove_file file with
-      | Ok () ->
-          return ()
+        [ "--" ^ Block_format.to_string blocks.format
+        ; "--archive-uri"
+        ; uri
+        ; file
+        ]
+      ()
+  with
+  | Error err ->
+      [%log fatal] "Could not run $prog: $error"
+        ~metadata:
+          [ ("prog", `String prog)
+          ; ("error", `String (Error.to_string_hum err))
+          ] ;
+      exit 1
+  | Ok output -> (
+      ( match App_log.parse output.stdout with
+      | Ok messages ->
+          App_log.relay ~logger messages
+      | Error err ->
+          [%log warn] "Could not read the log of $prog: $error"
+            ~metadata:
+              [ ("prog", `String prog)
+              ; ("error", `String (Error.to_string_hum err))
+              ] ) ;
+      match output.exit_status with
       | Error _ ->
-          fail
-            "[ERROR] Failed to remove block file. The database remains \
-             unhealthy.\n\
-            \ Make sure the environment variables PRECOMPUTED_BLOCKS_URL and \
-             MINA_NETWORK are set correctly." )
+          let%bind () = remove ~logger file in
+          [%log fatal] "$prog failed. The database remains unhealthy."
+            ~metadata:[ ("prog", `String prog) ] ;
+          exit 1
+      | Ok () ->
+          [%log info] "Populated the database with $file"
+            ~metadata:[ ("file", `String file) ] ;
+          remove ~logger file )
 
 (* Imports [parent] from the bucket, then each next missing parent that the
    auditor reports, until it reports none. *)
-let bootstrap config ~parent =
-  print_endline
-    "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." ;
-  print_endline "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:" ;
-  let%bind () =
-    match%bind print_top_blocks config with
-    | Ok () ->
-        return ()
-    | Error err ->
-        log_error err ;
-        fail
-          "[ERROR] Psql failed to connect. The database remains unhealthy.\n\
-          \ Make sure you can connect to the database with psql nad that the \
-           connection string is correct."
-  in
-  print_endline
-    (sprintf "[BOOTSTRAP] Restoring blocks individually from %s..."
-       config.precomputed_blocks_url ) ;
+let bootstrap ~logger ~pool archive blocks (parent : Auditor.missing_parent) =
+  [%log info] "Some blocks are missing, moving to recovery" ;
+  let%bind () = log_top_blocks ~logger ~pool ~when_:"before the recovery" in
+  [%log info] "Restoring blocks one by one from $url"
+    ~metadata:[ ("url", `String blocks.url) ] ;
   let rec loop = function
     | None ->
         return ()
-    | Some (parent_hash, parent_height) ->
-        let file =
-          sprintf "%s-%s-%s.json" config.mina_network parent_height parent_hash
-        in
-        let%bind () = download_block config file in
-        let%bind () = populate_db config file in
-        let%bind lines = run_auditor config in
-        loop (first_missing_parent lines)
+    | Some { Auditor.hash; height } ->
+        let file = sprintf "%s-%d-%s.json" blocks.network height hash in
+        let%bind () = download ~logger blocks file in
+        let%bind () = populate ~logger archive blocks file in
+        let%bind parent = check ~logger archive in
+        loop parent
   in
   let%bind () = loop (Some parent) in
-  print_endline "[BOOTSTRAP] Top 10 blocks in bootstrapped archiveDB:" ;
-  let%map () =
-    match%map print_top_blocks config with
-    | Ok () ->
-        ()
-    | Error err ->
-        log_error err
-  in
-  print_endline synced_message
+  log_top_blocks ~logger ~pool ~when_:"after the recovery"
 
-let audit config =
-  print_endline "[INFO] Running in audit mode" ;
-  let%bind parent = check config ~prefix:"[INFO] " in
-  print_endline
-    ( if Option.is_some parent then "[RESOLUTION] Some blocks are missing"
-    else synced_message ) ;
-  exit 0
+let audit ~logger archive =
+  let%map parent = check ~logger archive in
+  match parent with
+  | Some _ ->
+      [%log info] "Some blocks are missing"
+  | None ->
+      [%log info] "The archive has no missing blocks back to genesis"
 
-let single_run config =
-  print_endline "[INFO] Running in single-run mode" ;
-  let%bind () =
-    match%bind check config ~prefix:"[BOOTSTRAP] " with
-    | Some parent ->
-        bootstrap config ~parent
-    | None ->
-        return ()
-  in
-  print_endline
-    "[RESOLUTION] The bootstrap process finished successfully, the Archive \
-     node is synced with no missing blocks to genesis!" ;
-  exit 0
+let recover ~logger ~pool archive blocks =
+  match%bind check ~logger archive with
+  | Some parent ->
+      let%map () = bootstrap ~logger ~pool archive blocks parent in
+      [%log info]
+        "The recovery finished, the archive has no missing blocks back to \
+         genesis" ;
+      true
+  | None ->
+      [%log info] "The archive has no missing blocks back to genesis" ;
+      return false
 
-(* Checks every [TIMEOUT] seconds forever; after a recovery, waits
+let single_run ~logger archive blocks =
+  let pool = connect ~logger archive in
+  Deferred.ignore_m (recover ~logger ~pool archive blocks)
+
+(* Checks every [interval] seconds forever; after a recovery, waits
    [recovery_sleep_factor] times longer. *)
-let daemon config =
-  print_endline "[INFO] Running in daemon mode" ;
+let daemon ~logger ~interval archive blocks =
+  let pool = connect ~logger archive in
   let rec loop () =
-    let%bind () =
-      match%bind check config ~prefix:"[BOOTSTRAP] " with
-      | Some parent ->
-          let%bind () = bootstrap config ~parent in
-          let sleep = recovery_sleep_factor * config.timeout in
-          print_endline
-            (sprintf "[INFO] Checking again in %d minutes..." (sleep / 60)) ;
-          after (Time.Span.of_int_sec sleep)
-      | None ->
-          print_endline
-            (sprintf
-               "[RESOLUTION] Database has no missing blocks to genesis for the \
-                moment! Waiting for %d minutes."
-               (config.timeout / 60) ) ;
-          after (Time.Span.of_int_sec config.timeout)
+    let%bind recovered = recover ~logger ~pool archive blocks in
+    let sleep =
+      if recovered then recovery_sleep_factor * interval else interval
     in
+    [%log info] "Checking again in %d seconds" sleep ;
+    let%bind () = after (Time.Span.of_int_sec sleep) in
     loop ()
   in
   loop ()
 
-let main ~name args =
-  Signal.handle [ Signal.hup; Signal.int; Signal.quit ] ~f:(fun _ ->
-      print_endline "\nRecieved termination signal. Exiting the script\n" ;
-      don't_wait_for (exit 1) ) ;
-  match args with
-  | [] ->
-      usage name ; exit 1
-  | "--help" :: _ ->
-      usage name ; exit 0
-  | subcommand :: _ -> (
-      let%bind config = config_of_env () in
-      match subcommand with
-      | "audit" ->
-          audit config
-      | "single-run" ->
-          single_run config
-      | "daemon" ->
-          daemon config
-      | _ ->
-          usage name ; exit 1 )
+(* The environment variables of the bash script this program replaces. Each
+   flag falls back to its variable, so the program is configured the same way
+   as before. *)
+module Env = struct
+  let get name =
+    match Sys.getenv name with
+    | Some value when not (String.is_empty value) ->
+        Some value
+    | _ ->
+        None
+
+  (* The value of the flag, else of the environment variable, else the
+     default. Fails when there is none. *)
+  let or_default ?default ~flag ~env ~of_string value =
+    match (value, get env, default) with
+    | Some value, _, _ ->
+        value
+    | None, Some text, _ -> (
+        try of_string text
+        with exn ->
+          let reason =
+            match exn with Failure msg -> msg | exn -> Exn.to_string exn
+          in
+          failwithf "invalid value of the environment variable %s: %s" env
+            reason () )
+    | None, None, Some default ->
+        default
+    | None, None, None ->
+        failwithf "missing %s: pass the flag or set the environment variable %s"
+          flag env ()
+
+  let archive_uri_vars =
+    [ "DB_USERNAME"; "PGPASSWORD"; "DB_HOST"; "DB_PORT"; "DB_NAME" ]
+
+  (* The archive URI, from --archive-uri or from the five variables the bash
+     script built its connection string from. *)
+  let archive_uri = function
+    | Some uri ->
+        Uri.of_string uri
+    | None -> (
+        let values = List.map archive_uri_vars ~f:get in
+        match values with
+        | [ Some user; Some password; Some host; Some port; Some database ] ->
+            let port =
+              try Int.of_string port
+              with _ ->
+                failwithf
+                  "invalid value of the environment variable DB_PORT: %s" port
+                  ()
+            in
+            Uri.make ~scheme:"postgres"
+              ~userinfo:(user ^ ":" ^ password)
+              ~host ~port ~path:("/" ^ database) ()
+        | _ ->
+            let missing =
+              List.filter_map (List.zip_exn archive_uri_vars values)
+                ~f:(fun (name, value) ->
+                  Option.some_if (Option.is_none value) name )
+            in
+            let not_set =
+              if List.length missing = List.length archive_uri_vars then ""
+              else sprintf " (not set: %s)" (String.concat ~sep:", " missing)
+            in
+            failwithf
+              "missing --archive-uri: pass the flag or set the environment \
+               variables %s%s"
+              (String.concat ~sep:", " archive_uri_vars)
+              not_set () )
+end
+
+module Flags = struct
+  open Command.Let_syntax
+
+  let log_level =
+    Command.Arg_type.map Command.Param.string ~f:(fun name ->
+        match Logger.Level.of_string (String.lowercase name) with
+        | Ok level ->
+            level
+        | Error _ ->
+            failwithf "unknown log level %s, expected one of: %s" name
+              (String.concat ~sep:", "
+                 (List.map Logger.Level.all ~f:Logger.Level.show) )
+              () )
+
+  (* Sets up the log on stdout, as --log-json and --log-level do in the other
+     Mina programs. *)
+  let log =
+    let%map_open json =
+      flag "--log-json" ~aliases:[ "log-json" ] no_arg
+        ~doc:"Print log output as JSON (default: plain text)"
+    and level =
+      flag "--log-level" ~aliases:[ "log-level" ]
+        ~doc:"LEVEL Set log level (default: Info)"
+        (optional_with_default Logger.Level.Info log_level)
+    in
+    fun () ->
+      let processor =
+        if json then Logger.Processor.raw ~log_level:level ()
+        else
+          Logger.Processor.pretty ~log_level:level
+            ~config:
+              { Interpolator_lib.Interpolator.mode = Inline
+              ; max_interpolation_length = 50
+              ; pretty_print = true
+              }
+      in
+      Logger.Consumer_registry.register ~id:"default" ~processor
+        ~transport:(Logger.Transport.stdout ())
+        ()
+
+  let archive =
+    let%map_open uri =
+      flag "--archive-uri" ~aliases:[ "archive-uri" ]
+        ~doc:
+          "URI Archive database to check and repair, for example \
+           postgres://user:password@localhost:5432/archive (or DB_USERNAME, \
+           PGPASSWORD, DB_HOST, DB_PORT and DB_NAME)"
+        (optional string)
+    and auditor =
+      flag "--missing-blocks-auditor"
+        ~aliases:[ "missing-blocks-auditor" ]
+        ~doc:
+          (sprintf
+             "PATH mina-missing-blocks-auditor program (or \
+              MISSING_BLOCKS_AUDITOR; default: %s)"
+             Default.auditor )
+        (optional string)
+    in
+    { uri = Env.archive_uri uri
+    ; auditor =
+        Env.or_default auditor ~flag:"--missing-blocks-auditor"
+          ~env:"MISSING_BLOCKS_AUDITOR" ~default:Default.auditor
+          ~of_string:Fn.id
+    }
+
+  let blocks =
+    let%map_open url =
+      flag "--precomputed-blocks-url"
+        ~aliases:[ "precomputed-blocks-url" ]
+        ~doc:
+          "URL Bucket with the block files, as an http, https or file URL (or \
+           PRECOMPUTED_BLOCKS_URL)"
+        (optional string)
+    and network =
+      flag "--network" ~aliases:[ "network" ]
+        ~doc:
+          "NAME Network name, the prefix of the block file names (or \
+           MINA_NETWORK)"
+        (optional string)
+    and format =
+      flag "--block-format" ~aliases:[ "block-format" ]
+        ~doc:
+          "precomputed|extensional Format of the block files (or \
+           BLOCKS_FORMAT; default: precomputed)"
+        (optional Block_format.arg_type)
+    and archive_blocks =
+      flag "--archive-blocks" ~aliases:[ "archive-blocks" ]
+        ~doc:
+          (sprintf
+             "PATH mina-archive-blocks program (or ARCHIVE_BLOCKS; default: %s)"
+             Default.archive_blocks )
+        (optional string)
+    in
+    { url =
+        Env.or_default url ~flag:"--precomputed-blocks-url"
+          ~env:"PRECOMPUTED_BLOCKS_URL" ~of_string:Fn.id
+    ; network =
+        Env.or_default network ~flag:"--network" ~env:"MINA_NETWORK"
+          ~of_string:Fn.id
+    ; format =
+        Env.or_default format ~flag:"--block-format" ~env:"BLOCKS_FORMAT"
+          ~default:Block_format.Precomputed ~of_string:Block_format.of_string
+    ; archive_blocks =
+        Env.or_default archive_blocks ~flag:"--archive-blocks"
+          ~env:"ARCHIVE_BLOCKS" ~default:Default.archive_blocks ~of_string:Fn.id
+    }
+
+  let interval =
+    let%map_open interval =
+      flag "--interval" ~aliases:[ "interval" ]
+        ~doc:
+          (sprintf
+             "SECONDS Time between two checks; after a recovery, %d times \
+              longer (or TIMEOUT; default: %d)"
+             recovery_sleep_factor Default.interval )
+        (optional int)
+    in
+    Env.or_default interval ~flag:"--interval" ~env:"TIMEOUT"
+      ~default:Default.interval ~of_string:Int.of_string
+end
+
+let audit_command =
+  Command.async ~summary:"Check whether the archive has missing blocks"
+    (let%map_open.Command setup_log = Flags.log and archive = Flags.archive in
+     fun () ->
+       setup_log () ;
+       let logger = Logger.create () in
+       audit ~logger archive )
+
+let single_run_command =
+  Command.async ~summary:"Check the archive and restore its missing blocks"
+    (let%map_open.Command setup_log = Flags.log
+     and archive = Flags.archive
+     and blocks = Flags.blocks in
+     fun () ->
+       setup_log () ;
+       let logger = Logger.create () in
+       single_run ~logger archive blocks )
+
+let daemon_command =
+  Command.async
+    ~summary:"Check the archive and restore its missing blocks, repeatedly"
+    (let%map_open.Command setup_log = Flags.log
+     and archive = Flags.archive
+     and blocks = Flags.blocks
+     and interval = Flags.interval in
+     fun () ->
+       setup_log () ;
+       let logger = Logger.create () in
+       daemon ~logger ~interval archive blocks )
 
 let () =
-  let argv = Sys.get_argv () in
-  don't_wait_for (main ~name:argv.(0) (List.tl_exn (Array.to_list argv))) ;
-  never_returns (Scheduler.go ())
+  Command.run
+    (Command.group
+       ~summary:"Find and restore the blocks missing from an archive database"
+       [ ("audit", audit_command)
+       ; ("single-run", single_run_command)
+       ; ("daemon", daemon_command)
+       ] )
