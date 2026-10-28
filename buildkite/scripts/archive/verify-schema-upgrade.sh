@@ -2,28 +2,19 @@
 
 # Archive Schema Upgrade Verification Test
 #
-# This script verifies that applying upgrade.sql to the source
-# (Berkeley/compatible) schema produces the same schema as the target
-# (Mesa/develop) branch's create_schema.sql, and that downgrade.sql
-# reverses the upgrade correctly.
-#
-# The upgrade/downgrade scripts are always taken from the current working tree.
-# The source schema is fetched from the remote source branch. The target schema
-# is taken from the working tree when the working tree is on the target branch
-# line (e.g. a PR into develop that changes create_schema.sql together with
-# upgrade.sql); otherwise it is fetched from the remote target branch.
+# upgrade.sql names the release it starts from (`-- upgrades: <tag>`) and
+# downgrade.sql the release it gives back (`-- restores: <tag>`); both must
+# name the same tag. On one database made from <tag>'s create_schema.sql:
+#   + upgrade.sql   == working-tree create_schema.sql
+#   + downgrade.sql == <tag>'s create_schema.sql
+# See src/app/archive/README.md, "Schema migrations".
 #
 # USAGE:
-#   verify-schema-upgrade.sh [OPTIONS]
-#
-# OPTIONS:
-#   -s, --source-branch BRANCH   Source (pre-upgrade) branch (default: compatible)
-#   -t, --target-branch BRANCH   Target (post-upgrade) branch (default: develop)
-#   -h, --help                   Show this help message
+#   verify-schema-upgrade.sh
 #
 # REQUIRES:
 #   - Docker daemon running
-#   - Git repository with access to source and target branches
+#   - Git repository that has <tag>, or can fetch it from origin
 #
 # EXIT CODES:
 #   0: All schema comparisons pass
@@ -37,33 +28,20 @@ POSTGRES_IMAGE="postgres:17-alpine"
 PG_USER="postgres"
 PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+ARCHIVE_DIR="${REPO_ROOT}/src/app/archive"
 
-SOURCE_BRANCH="compatible"
-TARGET_BRANCH="develop"
-
-# --- Argument Parsing ---
-parse_args() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -s|--source-branch)
-                SOURCE_BRANCH="$2"
-                shift 2
-                ;;
-            -t|--target-branch)
-                TARGET_BRANCH="$2"
-                shift 2
-                ;;
-            -h|--help)
-                grep '^#' "$0" | sed 's/^# //' | sed 's/^#//'
-                exit 0
-                ;;
-            *)
-                echo "Error: Unknown option $1" >&2
-                echo "Use --help for usage information" >&2
-                exit 1
-                ;;
-        esac
-    done
+# --- Read the release named by a script header ---
+# header_tag FILE KEY prints the tag of the "-- KEY: <tag>" line in FILE.
+header_tag() {
+    local file="$1"
+    local key="$2"
+    local tag
+    tag=$(sed -n -E "s/^-- ${key}: ([^[:space:]]+)[[:space:]]*$/\1/p" "$file")
+    if [[ -z "$tag" || "$(wc -l <<< "$tag")" -ne 1 ]]; then
+        echo "ERROR: $file must have exactly one '-- ${key}: <tag>' line" >&2
+        exit 1
+    fi
+    echo "$tag"
 }
 
 # --- Cleanup trap ---
@@ -71,7 +49,7 @@ cleanup() {
     echo "Cleaning up..."
     docker stop "$POSTGRES_CONTAINER" 2>/dev/null || true
     docker rm "$POSTGRES_CONTAINER" 2>/dev/null || true
-    rm -f /tmp/source_schema_$$.sql /tmp/target_schema_$$.sql /tmp/schema_*_$$.sql 2>/dev/null || true
+    rm -f /tmp/base_schema_$$.sql /tmp/schema_*_$$.sql 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -139,181 +117,95 @@ dump_and_normalize() {
     > "$output_file"
 }
 
-# --- Normalize documented Berkeley/Mesa schema deltas ---
-# A btree key over the unbounded zkapp_{events,field_array}.element_ids int[]
-# overflows Postgres' 2704-byte limit for max-cost zkApps, so Mesa drops those
-# UNIQUE constraints/indexes and makes events_id/actions_id nullable. On the
-# compatible branch this delta shows up in two places and is intentionally
-# tolerated here rather than by retroactively editing the released migration
-# scripts:
-#   * upgrade:   compatible's create_schema + upgrade still carries Berkeley's
-#                element_ids UNIQUE/index + NOT NULL that develop's create_schema
-#                has dropped.
-#   * downgrade: the downgrade does not restore them (lossy) — post-Mesa data may
-#                hold duplicates, oversized arrays, or NULLs Berkeley rejected.
-# Strip that documented delta from both sides before comparing.
-#
-# TODO: the upgrade arm of this tolerance is only needed because compatible's
-# released upgrade.sql never dropped the element_ids UNIQUE/index and the
-# events_id/actions_id NOT NULL, while develop's does. Once compatible's migration
-# carries those DROPs, stop normalizing the upgrade comparison (Test 1) and let it
-# assert the constraints are gone; the downgrade arm (Test 2) stays either way,
-# since the downgrade is deliberately lossy.
-normalize_known_schema_deltas() {
-    local schema_file="$1"
-    local tmp_file="${schema_file}.known_downgrade_deltas"
-
-    awk '
-        /^ALTER TABLE ONLY public\.zkapp_(events|field_array)$/ {
-            alter_line = $0
-            if ((getline constraint_line) <= 0) {
-                print alter_line
-                next
-            }
-            if (constraint_line ~ /^    ADD CONSTRAINT zkapp_(events|field_array)_element_ids_key UNIQUE \(element_ids\);$/) {
-                next
-            }
-            print alter_line
-            print constraint_line
-            next
-        }
-        /^CREATE INDEX idx_zkapp_(events|field_array)_element_ids ON public\.zkapp_(events|field_array) USING btree \(element_ids\);$/ {
-            next
-        }
-        {
-            sub(/^    events_id integer NOT NULL,/, "    events_id integer,")
-            sub(/^    actions_id integer NOT NULL,/, "    actions_id integer,")
-            print
-        }
-    ' "$schema_file" > "$tmp_file"
-
-    mv "$tmp_file" "$schema_file"
-}
-
-# --- Target schema source ---
-# The working tree is on the target line when its merge-base with the target
-# branch holds commits that the source branch lacks.
-working_tree_on_target() {
-    local merge_base
-    merge_base="$(git merge-base HEAD "origin/${TARGET_BRANCH}")"
-    [[ "$(git rev-list --count "origin/${SOURCE_BRANCH}..${merge_base}")" -gt 0 ]]
-}
-
 # --- Main ---
 main() {
-    parse_args "$@"
-
-    echo "=== Archive Schema Upgrade Verification ==="
-    echo "Source branch (pre-upgrade):  $SOURCE_BRANCH"
-    echo "Target branch (post-upgrade): $TARGET_BRANCH"
-    echo "Upgrade/downgrade scripts:    current working tree"
-
-    # Fetch both branches
-    git fetch origin "$SOURCE_BRANCH" "$TARGET_BRANCH"
-
-    local target_schema_ref="origin/${TARGET_BRANCH}"
-    if working_tree_on_target; then
-        target_schema_ref="working tree"
-    fi
-    echo "Target create_schema.sql:     ${target_schema_ref}"
-    echo ""
-
-    start_postgres
-
-    local source_schema_file="/tmp/source_schema_$$.sql"
-    local target_schema_file="/tmp/target_schema_$$.sql"
-    git show "origin/${SOURCE_BRANCH}:src/app/archive/create_schema.sql" > "$source_schema_file"
-    if [[ "$target_schema_ref" == "working tree" ]]; then
-        cp "${REPO_ROOT}/src/app/archive/create_schema.sql" "$target_schema_file"
-    else
-        git show "${target_schema_ref}:src/app/archive/create_schema.sql" > "$target_schema_file"
-    fi
-
-    local upgrade_script="${REPO_ROOT}/src/app/archive/upgrade.sql"
-    local downgrade_script="${REPO_ROOT}/src/app/archive/downgrade.sql"
-
-    # Verify upgrade/downgrade scripts exist in working tree
-    for f in "$upgrade_script" "$downgrade_script"; do
-        if [[ ! -f "$f" ]]; then
-            echo "ERROR: Required file not found: $f"
+    case "${1:-}" in
+        "") ;;
+        -h|--help)
+            grep '^#' "$0" | sed 's/^# //' | sed 's/^#//'
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option $1" >&2
             exit 1
-        fi
-    done
+            ;;
+    esac
 
-    # Copy schemas into the container
-    docker cp "$source_schema_file" "${POSTGRES_CONTAINER}:/tmp/source_schema.sql"
-    docker cp "$target_schema_file" "${POSTGRES_CONTAINER}:/tmp/target_schema.sql"
-
-    # --- Test 1: Upgrade path produces correct schema ---
-    echo ""
-    echo "=== Test 1: Upgrade path verification ==="
-    echo "  Expected: ${SOURCE_BRANCH} schema + upgrade.sql == ${TARGET_BRANCH} schema"
-    echo "            except documented Berkeley/Mesa element_ids constraint deltas"
-
-    create_db "archive_fresh"
-    create_db "archive_upgraded"
-
-    echo "Applying ${TARGET_BRANCH}'s create_schema.sql to fresh database..."
-    run_psql "archive_fresh" -f "/tmp/target_schema.sql"
-
-    echo "Applying ${SOURCE_BRANCH}'s create_schema.sql to upgrade database..."
-    run_psql "archive_upgraded" -f "/tmp/source_schema.sql"
-
-    echo "Applying upgrade.sql..."
-    run_psql "archive_upgraded" -f "/workdir/src/app/archive/upgrade.sql"
-
-    local schema_fresh="/tmp/schema_fresh_$$.sql"
-    local schema_upgraded="/tmp/schema_upgraded_$$.sql"
-
-    dump_and_normalize "archive_fresh" "$schema_fresh"
-    dump_and_normalize "archive_upgraded" "$schema_upgraded"
-    normalize_known_schema_deltas "$schema_fresh"
-    normalize_known_schema_deltas "$schema_upgraded"
-
-    echo "Comparing schemas..."
-    if diff -u "$schema_fresh" "$schema_upgraded"; then
-        echo "PASS: Upgraded schema matches ${TARGET_BRANCH}'s fresh schema"
-    else
-        echo ""
-        echo "FAIL: Schema mismatch between upgrade path and fresh create"
-        echo "  Left:  ${TARGET_BRANCH}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_BRANCH}'s create_schema.sql + upgrade.sql"
+    local base_ref restores
+    base_ref=$(header_tag "${ARCHIVE_DIR}/upgrade.sql" upgrades)
+    restores=$(header_tag "${ARCHIVE_DIR}/downgrade.sql" restores)
+    if [[ "$base_ref" != "$restores" ]]; then
+        echo "ERROR: upgrade.sql upgrades ${base_ref}, but downgrade.sql restores ${restores}" >&2
         exit 1
     fi
 
-    # --- Test 2: Downgrade path restores source schema ---
+    echo "=== Archive Schema Upgrade Verification ==="
+    echo "Base release: $base_ref"
     echo ""
-    echo "=== Test 2: Downgrade path verification ==="
-    echo "  Expected: ${SOURCE_BRANCH} schema + upgrade + downgrade == ${SOURCE_BRANCH} schema"
-    echo "            except documented lossy Berkeley constraint restorations"
 
-    create_db "archive_downgraded"
-    create_db "archive_source_ref"
+    # CI checkouts do not always carry tags.
+    if ! git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
+        git fetch origin "refs/tags/${base_ref}:refs/tags/${base_ref}"
+    fi
 
-    echo "Applying ${SOURCE_BRANCH}'s create_schema.sql to reference database..."
-    run_psql "archive_source_ref" -f "/tmp/source_schema.sql"
+    local base_schema_file="/tmp/base_schema_$$.sql"
+    git show "${base_ref}:src/app/archive/create_schema.sql" > "$base_schema_file"
 
-    echo "Applying ${SOURCE_BRANCH}'s create_schema.sql + upgrade + downgrade..."
-    run_psql "archive_downgraded" -f "/tmp/source_schema.sql"
-    run_psql "archive_downgraded" -f "/workdir/src/app/archive/upgrade.sql"
-    run_psql "archive_downgraded" -f "/workdir/src/app/archive/downgrade.sql"
+    start_postgres
 
-    local schema_source_ref="/tmp/schema_source_ref_$$.sql"
-    local schema_downgraded="/tmp/schema_downgraded_$$.sql"
+    docker cp "$base_schema_file" "${POSTGRES_CONTAINER}:/tmp/base_schema.sql"
 
-    dump_and_normalize "archive_source_ref" "$schema_source_ref"
-    dump_and_normalize "archive_downgraded" "$schema_downgraded"
-    normalize_known_schema_deltas "$schema_source_ref"
-    normalize_known_schema_deltas "$schema_downgraded"
+    create_db "archive_base"
+    create_db "archive_current"
+    create_db "archive_migrated"
 
-    echo "Comparing schemas..."
-    if diff -u "$schema_source_ref" "$schema_downgraded"; then
-        echo "PASS: Downgraded schema matches ${SOURCE_BRANCH}'s fresh schema"
+    # create_schema.sql does not stop on its own error, and an error in the
+    # base schema would hit the reference and migrated databases alike.
+    echo "Applying ${base_ref}'s create_schema.sql to reference database..."
+    run_psql "archive_base" -v ON_ERROR_STOP=1 -f "/tmp/base_schema.sql"
+    echo "Applying create_schema.sql to reference database..."
+    run_psql "archive_current" -v ON_ERROR_STOP=1 -f "/workdir/src/app/archive/create_schema.sql"
+
+    local schema_base="/tmp/schema_base_$$.sql"
+    local schema_current="/tmp/schema_current_$$.sql"
+    local schema_migrated="/tmp/schema_migrated_$$.sql"
+    dump_and_normalize "archive_base" "$schema_base"
+    dump_and_normalize "archive_current" "$schema_current"
+
+    echo "Applying ${base_ref}'s create_schema.sql to migrated database..."
+    run_psql "archive_migrated" -v ON_ERROR_STOP=1 -f "/tmp/base_schema.sql"
+
+    # --- Test 1: upgrade.sql gives create_schema.sql ---
+    echo ""
+    echo "=== Test 1: Upgrade path verification ==="
+    echo "  Expected: ${base_ref} schema + upgrade.sql == create_schema.sql"
+    run_psql "archive_migrated" -f "/workdir/src/app/archive/upgrade.sql"
+    dump_and_normalize "archive_migrated" "$schema_migrated"
+
+    if diff -u "$schema_current" "$schema_migrated"; then
+        echo "PASS: Upgraded schema matches create_schema.sql"
     else
         echo ""
-        echo "FAIL: Schema mismatch between downgrade path and fresh source schema"
-        echo "  Left:  ${SOURCE_BRANCH}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_BRANCH}'s create_schema.sql + upgrade + downgrade"
+        echo "FAIL: Schema mismatch between upgrade path and fresh create"
+        echo "  Left:  create_schema.sql applied directly"
+        echo "  Right: ${base_ref}'s create_schema.sql + upgrade.sql"
+        exit 1
+    fi
+
+    # --- Test 2: downgrade.sql gives the base schema back ---
+    echo ""
+    echo "=== Test 2: Downgrade path verification ==="
+    echo "  Expected: upgraded database + downgrade.sql == ${base_ref} schema"
+    run_psql "archive_migrated" -f "/workdir/src/app/archive/downgrade.sql"
+    dump_and_normalize "archive_migrated" "$schema_migrated"
+
+    if diff -u "$schema_base" "$schema_migrated"; then
+        echo "PASS: Downgraded schema matches ${base_ref}'s schema"
+    else
+        echo ""
+        echo "FAIL: Schema mismatch between downgrade path and base schema"
+        echo "  Left:  ${base_ref}'s create_schema.sql applied directly"
+        echo "  Right: ${base_ref}'s create_schema.sql + upgrade.sql + downgrade.sql"
         exit 1
     fi
 
