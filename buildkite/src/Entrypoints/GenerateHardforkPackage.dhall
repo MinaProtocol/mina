@@ -47,17 +47,6 @@ let DebianArchPair =
 
 let defaultMinaArtifactSpec = MinaArtifact.PackagingSpec::{=}
 
-let defaultLegacyVersion =
-    -- The version of the PREFORK packages this pipeline installs from the
-    -- legacy/debians cache: mina-create-<network>-prefork-genesis-ledger
-    -- (the reference ledger tarballs and the prefork-genesis docker stage)
-    -- and mina-<network>-prefork-<codename>. It is the release the network
-    -- runs BEFORE the fork, so it moves with every fork and is deliberately
-    -- not the main pipeline's default (MinaArtifact.PackagingSpec), which
-    -- the automode packages of the previous fork still depend on.
-    -- A build overrides it with PREFORK_LEGACY_VERSION.
-      "4.0.3-73134bf"
-
 let Spec =
       { Type =
           { codenames : List DebianArchPair
@@ -89,7 +78,7 @@ let Spec =
           , use_artifacts_from_buildkite_build = None Text
           , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
-          , deb_legacy_version = defaultLegacyVersion
+          , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
           , deb_legacy_githash_config =
               defaultMinaArtifactSpec.deb_legacy_githash_config
           }
@@ -279,7 +268,6 @@ let generateDockerForCodename =
                         , debVersion = codename.DebVersion
                         , prefix = pipelineName
                         , suffix = Some "-${lowerNameCodename}"
-                        , deb_legacy_version = spec.deb_legacy_version
                         , deb_legacy_githash_config =
                             spec.deb_legacy_githash_config
                         }
@@ -721,14 +709,9 @@ let generate_hardfork_package =
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
       ->  \(use_generic_dockers_from_version : Optional Text)
-      ->  \(deb_legacy_version : Optional Text)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
-              , deb_legacy_version =
-                  merge
-                    { Some = \(v : Text) -> v, None = defaultLegacyVersion }
-                    deb_legacy_version
               , network = network
               , version =
                   merge
