@@ -872,10 +872,10 @@ let%test_unit "tokens test" =
                   { Zkapp_account.default with
                     verification_key =
                       Some
-                        With_hash.
-                          { data = Side_loaded_verification_key.dummy
-                          ; hash = Zkapp_account.dummy_vk_hash ()
-                          }
+                        (Verification_key_wire.of_hashed
+                           { With_hash.data = Side_loaded_verification_key.dummy
+                           ; hash = Zkapp_account.dummy_vk_hash ()
+                           } )
                   }
             }
           in

@@ -1788,7 +1788,10 @@ let%test_module _ =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
-            Some { Zkapp_account.default with verification_key = Some vk }
+            Some
+              { Zkapp_account.default with
+                verification_key = Some (Verification_key_wire.of_hashed vk)
+              }
           in
           { account with
             zkapp
@@ -2191,7 +2194,8 @@ let%test_module _ =
                 ~fee_payer_keypair ~ledger:best_tip_ledger ~constraint_constants
                 ~genesis_constants
                 ~map_account_update:(fun p ->
-                  Zkapp_command.For_tests.replace_vk vk
+                  Zkapp_command.For_tests.replace_vk
+                    (Verification_key_wire.of_hashed vk)
                     { p with
                       body =
                         { p.body with

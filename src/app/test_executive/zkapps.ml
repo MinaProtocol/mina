@@ -277,9 +277,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
       in
       let new_verification_key =
-        let data = Pickles.Side_loaded.Verification_key.dummy in
-        let hash = Zkapp_account.digest_vk data in
-        ({ data; hash } : _ With_hash.t)
+        Verification_key_wire.of_data Pickles.Side_loaded.Verification_key.dummy
       in
       let new_permissions =
         Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
