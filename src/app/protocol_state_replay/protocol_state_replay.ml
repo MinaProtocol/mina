@@ -102,8 +102,10 @@ let path_to_string path =
 
 (* A different but well-formed value for a leaf: numbers are incremented,
    booleans flipped, and other strings (hashes, keys) replaced by the value
-   at the same path in another block. *)
-let perturb ~others ~path (leaf : Yojson.Safe.t) =
+   at the same path in another block or, for fields that are constant along
+   the chain, by another leaf of [state] with the same Base58 version prefix
+   (so the same type). *)
+let perturb ~others ~state ~path (leaf : Yojson.Safe.t) =
   match leaf with
   | `Bool b ->
       Some (`Bool (not b))
@@ -117,13 +119,31 @@ let perturb ~others ~path (leaf : Yojson.Safe.t) =
       with
       | Some n ->
           Some (`String (Int64.to_string (Int64.succ n)))
-      | None ->
-          List.find_map others ~f:(fun other ->
-              match get other path with
-              | Some (`String s') when not (String.equal s s') ->
-                  Some (`String s')
-              | _ ->
-                  None ) )
+      | None -> (
+          let differing = function
+            | `String s' when not (String.equal s s') ->
+                Some (`String s')
+            | _ ->
+                None
+          in
+          let same_type (_, v) =
+            match v with
+            | `String s' ->
+                String.length s' = String.length s
+                && String.equal (String.prefix s' 2) (String.prefix s 2)
+            | _ ->
+                false
+          in
+          match
+            List.find_map others ~f:(fun other ->
+                Option.bind (get other path) ~f:differing )
+          with
+          | Some v ->
+              Some v
+          | None ->
+              List.find_map
+                (List.filter (leaves ~path:[] state) ~f:same_type)
+                ~f:(fun (_, v) -> differing v) ) )
   | `Int n ->
       Some (`Int (n + 1))
   | _ ->
@@ -270,7 +290,7 @@ let main ~dir ~mutation_sample ~repeats () =
       let state_path = [ `K "data"; `K "protocol_state" ] in
       let state_json = Option.value_exn (get child_json state_path) in
       List.iter (leaves ~path:[] state_json) ~f:(fun (path, leaf) ->
-          match perturb ~others ~path leaf with
+          match perturb ~others ~state:state_json ~path leaf with
           | None ->
               ()
           | Some v -> (
