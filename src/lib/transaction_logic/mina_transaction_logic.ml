@@ -1071,6 +1071,8 @@ module Make (L : Ledger_intf.S) :
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
       let if_ = value_if
+
+      let is_some = Option.is_some
     end
 
     module Verification_key_hash = struct
@@ -1216,15 +1218,15 @@ module Make (L : Ledger_intf.S) :
       let verification_key (a : t) =
         Zkapp_account.verification_key_wire (get_zkapp a)
 
-      let set_verification_key verification_key (a : t) =
+      let verification_key_txn_version (a : t) =
+        match (get_zkapp a).verification_key with
+        | Some { txn_version; _ } ->
+            txn_version
+        | None ->
+            Mina_numbers.Txn_version.zero
+
+      let set_verification_key verification_key txn_version (a : t) =
         set_zkapp a ~f:(fun zkapp ->
-            let txn_version =
-              match zkapp.verification_key with
-              | Some { txn_version; _ } ->
-                  txn_version
-              | None ->
-                  Mina_numbers.Txn_version.zero
-            in
             { zkapp with
               verification_key =
                 Option.map verification_key ~f:(fun vk ->

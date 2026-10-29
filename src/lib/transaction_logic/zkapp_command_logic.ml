@@ -554,6 +554,12 @@ module type Controller_intf = sig
   val access_perm_fallback_to_signature_with_older_version : t -> t
 end
 
+module type Verification_key_intf = sig
+  include Iffable
+
+  val is_some : t -> bool
+end
+
 module type Txn_version_intf = sig
   include Iffable
 
@@ -656,11 +662,21 @@ module type Account_intf = sig
 
   val register_verification_key : t -> unit
 
+  type txn_version
+
   type verification_key
 
   val verification_key : t -> verification_key
 
-  val set_verification_key : verification_key -> t -> t
+  (** The transaction version stored with the verification key; zero when
+      there is no verification key.
+  *)
+  val verification_key_txn_version : t -> txn_version
+
+  (** Set the verification key and its transaction version. The version is
+      dropped when the key is absent.
+  *)
+  val set_verification_key : verification_key -> txn_version -> t -> t
 
   type verification_key_hash
 
@@ -709,8 +725,6 @@ module type Account_intf = sig
   val permissions : t -> Permissions.t
 
   val set_permissions : Permissions.t -> t -> t
-
-  type txn_version
 
   val txn_version : t -> txn_version
 end
@@ -820,7 +834,7 @@ module type Inputs_intf = sig
        and type transaction_commitment := Transaction_commitment.t
        and type index := Index.t)
 
-  and Verification_key : (Iffable with type bool := Bool.t)
+  and Verification_key : (Verification_key_intf with type bool := Bool.t)
   and Verification_key_hash :
     (Verification_key_hash_intf with type bool := Bool.t)
 
@@ -1641,7 +1655,11 @@ module Make (Inputs : Inputs_intf) = struct
         Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
           (Account.verification_key a)
       in
-      let a = Account.set_verification_key verification_key a in
+      let a =
+        Account.set_verification_key verification_key
+          (Account.verification_key_txn_version a)
+          a
+      in
       (a, local_state)
     in
     (* Update action state. *)

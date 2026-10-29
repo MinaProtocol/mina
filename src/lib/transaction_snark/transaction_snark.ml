@@ -871,6 +871,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let if_ b ~(then_ : t) ~(else_ : t) : t =
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+
+          let is_some = Zkapp_basic.Flagged_option.is_some
         end
 
         module Verification_key_hash = struct
@@ -1020,13 +1022,17 @@ module Make_str (A : Wire_types.Concrete) = struct
           let verification_key (a : t) : Verification_key.t =
             a.data.zkapp.verification_key.vk
 
+          let verification_key_txn_version (a : t) =
+            a.data.zkapp.verification_key.txn_version
+
           let set_verification_key (vk : Verification_key.t)
+              (txn_version : Mina_numbers.Txn_version.Checked.t)
               ({ data = a; hash } : t) : t =
             let txn_version =
               run_checked
               @@ Mina_numbers.Txn_version.Checked.if_
                    (Zkapp_basic.Flagged_option.is_some vk)
-                   ~then_:a.zkapp.verification_key.txn_version
+                   ~then_:txn_version
                    ~else_:Mina_numbers.Txn_version.(Checked.constant zero)
             in
             let verification_key =
