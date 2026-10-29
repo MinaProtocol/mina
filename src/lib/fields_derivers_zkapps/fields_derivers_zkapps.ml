@@ -566,10 +566,13 @@ let verification_key_with_hash obj =
       iso_string obj ~name:"VerificationKey" ~js_type:String
         ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format")
   in
+  let hash obj =
+    iso ~map:Lazy.from_val ~contramap:Lazy.force (field @@ o ()) obj
+  in
   let ( !. ) =
     ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
   in
   With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
-    ~hash:!.field obj
+    ~hash:!.hash obj
   |> finish "VerificationKeyWithHash"
        ~t_toplevel_annots:With_hash.Stable.Latest.t_toplevel_annots

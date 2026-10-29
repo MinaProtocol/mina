@@ -111,7 +111,7 @@ let test_verification_key_with_hash () =
   let open Pickles.Side_loaded.Verification_key in
   (* we do this because the dummy doesn't have a wrap_vk on it *)
   let data = dummy |> to_base58_check |> of_base58_check_exn in
-  let v = { With_hash.data; hash = Field.one } in
+  let v = { With_hash.data; hash = Lazy.from_val Field.one } in
   let o =
     Fields_derivers_zkapps.verification_key_with_hash
     @@ Fields_derivers_zkapps.o ()
@@ -121,7 +121,9 @@ let test_verification_key_with_hash () =
   in
   Alcotest.(check bool)
     "verification key with hash roundtrip" true
-    (With_hash.equal equal Field.equal v roundtrip)
+    (With_hash.equal equal
+       (fun h1 h2 -> Field.equal (Lazy.force h1) (Lazy.force h2))
+       v roundtrip )
 
 let test_full_roundtrips () =
   let v1 = V.derivers @@ Derivers.o () in
