@@ -1213,17 +1213,32 @@ module Make (L : Ledger_intf.S) :
 
       let register_verification_key (_ : t) = ()
 
-      let verification_key (a : t) = (get_zkapp a).verification_key
+      let verification_key (a : t) =
+        Zkapp_account.verification_key_wire (get_zkapp a)
 
       let set_verification_key verification_key (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
+        set_zkapp a ~f:(fun zkapp ->
+            let txn_version =
+              match zkapp.verification_key with
+              | Some { txn_version; _ } ->
+                  txn_version
+              | None ->
+                  Mina_numbers.Txn_version.zero
+            in
+            { zkapp with
+              verification_key =
+                Option.map verification_key ~f:(fun vk ->
+                    { Zkapp_account.Vk_with_version.Poly.vk; txn_version } )
+            } )
 
       let verification_key_hash (a : t) =
         match a.zkapp with
         | None ->
             None
         | Some zkapp ->
-            Option.map zkapp.verification_key ~f:With_hash.hash
+            Option.map
+              (Zkapp_account.verification_key_wire zkapp)
+              ~f:With_hash.hash
 
       let last_action_slot (a : t) = (get_zkapp a).last_action_slot
 
@@ -2306,9 +2321,10 @@ module For_tests = struct
                 { Zkapp_account.default with
                   verification_key =
                     Some
-                      { With_hash.hash = Zkapp_basic.F.zero
-                      ; data = Side_loaded_verification_key.dummy
-                      }
+                      (Zkapp_account.Vk_with_version.stamp_current
+                         { With_hash.hash = Zkapp_basic.F.zero
+                         ; data = Side_loaded_verification_key.dummy
+                         } )
                 }
             else None
           in

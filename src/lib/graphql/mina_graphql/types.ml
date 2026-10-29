@@ -1965,7 +1965,7 @@ module AccountObj = struct
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
                  Option.value_map account.Account.Poly.zkapp ~default:None
-                   ~f:(fun zkapp_account -> zkapp_account.verification_key) )
+                   ~f:Zkapp_account.verification_key_wire )
            ; field "actionState"
                ~doc:"Action state associated with this account"
                ~typ:

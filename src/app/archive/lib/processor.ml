@@ -2839,7 +2839,6 @@ module Zkapp_account = struct
       let open Deferred.Result.Let_syntax in
       let ({ app_state
            ; verification_key
-           ; zkapp_version
            ; action_state
            ; last_action_slot
            ; proved_state
@@ -2847,6 +2846,9 @@ module Zkapp_account = struct
            }
             : Mina_base.Zkapp_account.t ) =
         zkapp_account
+      in
+      let verification_key, zkapp_version =
+        Mina_base.Zkapp_account.Vk_with_version.to_flat verification_key
       in
       let%bind app_state_id =
         Zkapp_states.add_if_doesn't_exist (module Conn) app_state

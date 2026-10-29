@@ -6,6 +6,31 @@ open Core_kernel
 module Public_key = Signature_lib.Public_key
 
 module Zkapp_account = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V3 = struct
+        type ( 'app_state
+             , 'vk
+             , 'zkapp_version
+             , 'field
+             , 'slot
+             , 'bool
+             , 'zkapp_uri )
+             t =
+          { app_state : 'app_state
+          ; verification_key : 'vk
+          ; zkapp_version : 'zkapp_version
+          ; action_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
+          ; last_action_slot : 'slot
+          ; proved_state : 'bool
+          ; zkapp_uri : 'zkapp_uri
+          }
+        [@@deriving equal, sexp, yojson]
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -17,7 +42,7 @@ module Zkapp_account = struct
         , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         , bool
         , Mina_base.Zkapp_account.Zkapp_uri.Stable.V1.t )
-        Mina_base.Zkapp_account.Poly.Stable.V3.t
+        Poly.Stable.V3.t
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
@@ -35,8 +60,10 @@ module Zkapp_account = struct
        } :
         Stable.V2.t ) : Mina_base.Zkapp_account.Stable.Latest.t =
     { app_state = Zkapp_state.Value.to_mesa app_state
-    ; verification_key
-    ; zkapp_version
+    ; verification_key =
+        Mina_base.Zkapp_account.Vk_with_version.of_flat ~zkapp_version
+          verification_key
+        |> Or_error.ok_exn
     ; action_state
     ; last_action_slot
     ; proved_state
