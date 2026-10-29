@@ -1651,15 +1651,20 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_verification_key
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
+      (* Setting the key, even to its current value, stamps it with the current
+         transaction version: an authorized party has vouched for the key under
+         the current protocol. *)
+      let txn_version =
+        Txn_version.if_
+          (Set_or_keep.is_set verification_key)
+          ~then_:Txn_version.current
+          ~else_:(Account.verification_key_txn_version a)
+      in
       let verification_key =
         Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
           (Account.verification_key a)
       in
-      let a =
-        Account.set_verification_key verification_key
-          (Account.verification_key_txn_version a)
-          a
-      in
+      let a = Account.set_verification_key verification_key txn_version a in
       (a, local_state)
     in
     (* Update action state. *)
