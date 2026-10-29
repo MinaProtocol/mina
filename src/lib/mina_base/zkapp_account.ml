@@ -251,6 +251,43 @@ module Vk_with_version = struct
         (Mina_numbers.Txn_version.Checked.to_input txn_version)
   end
 
+  (** The key [vk], stamped with the current transaction version. *)
+  let stamp_current vk : t =
+    { vk; txn_version = Mina_numbers.Txn_version.current }
+
+  (** The optional key from its flat encoding, used by runtime configs and the
+      archive, where the version is a separate [zkapp_version] that is zero
+      when there is no key.
+  *)
+  let of_flat ~(zkapp_version : Mina_numbers.Zkapp_version.t)
+      (vk : Verification_key_wire.t option) : t option Or_error.t =
+    match vk with
+    | None ->
+        if Mina_numbers.Zkapp_version.(equal zkapp_version zero) then Ok None
+        else
+          Or_error.errorf
+            "zkApp account has zkapp_version %s but no verification key"
+            (Mina_numbers.Zkapp_version.to_string zkapp_version)
+    | Some vk ->
+        Ok
+          (Some
+             { vk
+             ; txn_version =
+                 Mina_numbers.Txn_version.of_uint32
+                 @@ Mina_numbers.Zkapp_version.to_uint32 zkapp_version
+             } )
+
+  (** The flat encoding of an optional key; the inverse of {!of_flat}. *)
+  let to_flat (t : t option) :
+      Verification_key_wire.t option * Mina_numbers.Zkapp_version.t =
+    match t with
+    | None ->
+        (None, Mina_numbers.Zkapp_version.zero)
+    | Some { vk; txn_version } ->
+        ( Some vk
+        , Mina_numbers.Zkapp_version.of_uint32
+          @@ Mina_numbers.Txn_version.to_uint32 txn_version )
+
   (** The hash input of an optional key: the key's hash followed by its
       version, or the dummy key hash followed by a zero version when there is
       no key.
