@@ -46,3 +46,13 @@ module Stable = struct
         (M)
   end
 end]
+
+(** The key's hash. *)
+let hash (t : t) = t.hash
+
+(** A key whose hash is that of [data]. *)
+let of_data data : t = { data; hash = digest_vk data }
+
+let to_hashed (t : t) : (Side_loaded_verification_key.t, F.t) With_hash.t = t
+
+let of_hashed (t : (Side_loaded_verification_key.t, F.t) With_hash.t) : t = t
