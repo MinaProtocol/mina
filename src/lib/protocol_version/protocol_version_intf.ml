@@ -21,7 +21,7 @@ module type Full = sig
   val current : t
 
   (** the proposed version built into this daemon, signalled unless one is
-      given on the command line or in the config directory *)
+      given on the command line *)
   val default_proposed_opt : t option
 
   val get_proposed_opt : unit -> t option

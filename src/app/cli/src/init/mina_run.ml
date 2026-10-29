@@ -141,85 +141,30 @@ let start_auto_hardfork_config_generation ~logger mina =
           (* Config not complete for auto-generation *)
           Deferred.unit )
 
-(* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
-let make_conf_dir_item_io ~conf_dir ~filename =
-  let item_file = conf_dir ^/ filename in
-  let read_item () =
-    let open Stdlib in
-    let inp = open_in item_file in
-    let res = input_line inp in
-    close_in inp ; res
-  in
-  let write_item item =
-    let open Stdlib in
-    let outp = open_out item_file in
-    output_string outp (item ^ "\n") ;
-    close_out outp
-  in
-  (read_item, write_item)
-
-let get_proposed_protocol_version_opt ~conf_dir ~logger =
-  let read_protocol_version, write_protocol_version =
-    make_conf_dir_item_io ~conf_dir ~filename:"proposed_protocol_version"
-  in
-  function
-  | None -> (
-      try
-        (* not provided on command line, try to read from config dir *)
-        let protocol_version = read_protocol_version () in
-        [%log info]
-          "Setting proposed protocol version to $protocol_version from config"
-          ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-        Some (Protocol_version.of_string_exn protocol_version)
-      with Sys_error _ ->
-        (* not on command-line, not in config dir, use the built-in default *)
-        Option.iter Protocol_version.default_proposed_opt ~f:(fun version ->
-            [%log info]
-              "Using built-in proposed protocol version $protocol_version"
-              ~metadata:
-                [ ( "protocol_version"
-                  , `String (Protocol_version.to_string version) )
-                ] ) ;
-        Protocol_version.default_proposed_opt )
+let get_proposed_protocol_version_opt ~logger = function
+  | None ->
+      Option.iter Protocol_version.default_proposed_opt ~f:(fun version ->
+          [%log info]
+            "Using built-in proposed protocol version $protocol_version"
+            ~metadata:
+              [ ( "protocol_version"
+                , `String (Protocol_version.to_string version) )
+              ] ) ;
+      Protocol_version.default_proposed_opt
   | Some protocol_version -> (
-      let validate_cli_protocol_version protocol_version =
-        if Option.is_none (Protocol_version.of_string_opt protocol_version) then (
+      match Protocol_version.of_string_opt protocol_version with
+      | None ->
           [%log fatal]
             "Proposed protocol version provided on command line is invalid"
             ~metadata:
               [ ("proposed_protocol_version", `String protocol_version) ] ;
-          failwith "Proposed protocol version from command line is invalid" )
-      in
-      try
-        (* overwrite if the command line value disagrees with the value in the config *)
-        let config_protocol_version = read_protocol_version () in
-        if String.equal config_protocol_version protocol_version then (
+          failwith "Proposed protocol version from command line is invalid"
+      | Some version ->
           [%log info]
             "Using proposed protocol version $protocol_version from command \
-             line, which matches the one in the config"
+             line"
             ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-          Some (Protocol_version.of_string_exn config_protocol_version) )
-        else (
-          validate_cli_protocol_version protocol_version ;
-          write_protocol_version protocol_version ;
-          [%log info]
-            "Overwriting Mina config proposed protocol version \
-             $config_proposed_protocol_version with proposed protocol version \
-             $protocol_version from the command line"
-            ~metadata:
-              [ ( "config_proposed_protocol_version"
-                , `String config_protocol_version )
-              ; ("proposed_protocol_version", `String protocol_version)
-              ] ;
-          Some (Protocol_version.of_string_exn protocol_version) )
-      with Sys_error _ ->
-        (* use value provided on command line, write to config dir *)
-        validate_cli_protocol_version protocol_version ;
-        write_protocol_version protocol_version ;
-        [%log info]
-          "Using proposed protocol version from command line, writing to config"
-          ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-        Some (Protocol_version.of_string_exn protocol_version) )
+          Some version )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
