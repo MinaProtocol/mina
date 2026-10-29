@@ -199,6 +199,102 @@ module Zkapp_uri = struct
     (sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson, max_length, check)]
 end
 
+(** A verification key held by a zkApp account, together with the transaction
+    version that was current when the key was set.
+
+    A key set under an older transaction version may be incompatible with the
+    current proof system, so the [access] and [set_verification_key]
+    permissions fall back to signatures while the key's version is older than
+    the current one. A version only exists alongside a key: an account without
+    a verification key never gets the fallback.
+*)
+module Vk_with_version = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('vk, 'txn_version) t = { vk : 'vk; txn_version : 'txn_version }
+        [@@deriving sexp, equal, compare, hash, yojson, hlist, fields, annot]
+      end
+    end]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Verification_key_wire.Stable.V1.t
+        , Mina_numbers.Txn_version.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  (** In a circuit, the key is a flagged option, so the version is present
+      even when the key is not. It is zero whenever the flag is unset, so that
+      an account without a key hashes the same as in the unchecked encoding.
+  *)
+  module Checked = struct
+    type t =
+      ( ( Boolean.var
+        , (Side_loaded_verification_key.t option, Field.t) With_hash.t
+          Data_as_hash.t )
+        Flagged_option.t
+      , Mina_numbers.Txn_version.Checked.t )
+      Poly.t
+
+    let to_input ({ vk; txn_version } : t) =
+      Random_oracle.Input.Chunked.append
+        (Random_oracle.Input.Chunked.field (Data_as_hash.hash vk.data))
+        (Mina_numbers.Txn_version.Checked.to_input txn_version)
+  end
+
+  (** The hash input of an optional key: the key's hash followed by its
+      version, or the dummy key hash followed by a zero version when there is
+      no key.
+  *)
+  let to_input_opt (t : t option) =
+    let vk_hash, txn_version =
+      match t with
+      | None ->
+          (Verification_key_wire.dummy_vk_hash (), Mina_numbers.Txn_version.zero)
+      | Some { vk; txn_version } ->
+          (With_hash.hash vk, txn_version)
+    in
+    Random_oracle.Input.Chunked.append
+      (Random_oracle.Input.Chunked.field vk_hash)
+      (Mina_numbers.Txn_version.to_input txn_version)
+
+  let typ : (Checked.t, t option) Typ.t =
+    let vk_typ =
+      Flagged_option.lazy_option_typ
+        ~default:
+          ( lazy
+            { With_hash.data = None
+            ; hash = Verification_key_wire.dummy_vk_hash ()
+            } )
+        (Data_as_hash.typ ~hash:With_hash.hash)
+      |> Typ.transport
+           ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
+           ~back:
+             (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
+    in
+    Typ.of_hlistable
+      [ vk_typ; Mina_numbers.Txn_version.typ ]
+      ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+      ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
+    |> Typ.transport
+         ~there:(function
+           | None ->
+               { Poly.vk = None; txn_version = Mina_numbers.Txn_version.zero }
+           | Some { Poly.vk; txn_version } ->
+               { vk = Some vk; txn_version } )
+         ~back:(fun { Poly.vk; txn_version } ->
+           Option.map vk ~f:(fun vk -> { Poly.vk; txn_version }) )
+end
+
 module Poly = struct
   [%%versioned
   module Stable = struct
