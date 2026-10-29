@@ -162,7 +162,9 @@ let of_precomputed_v4 ~constraint_constants ~proof_cache_db
   of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
-    ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
+    ~protocol_state:
+      (Protocol_state.Value.Stable.V3.to_latest
+         (t.protocol_state : Protocol_state.Value.Stable.V3.t) )
     ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
       Staged_ledger.Pre_diff_info.get_transactions_stable_v3
         ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
@@ -214,7 +216,9 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
         (Transaction_hash.hash_command_with_hashes command) )
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
-    ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
+    ~protocol_state:
+      (Protocol_state.Value.Stable.V3.to_latest
+         (t.protocol_state : Protocol_state.Value.Stable.V3.t) )
     ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
       Staged_ledger.Pre_diff_info.get_transactions_stable_v3
         ~constraint_constants:
