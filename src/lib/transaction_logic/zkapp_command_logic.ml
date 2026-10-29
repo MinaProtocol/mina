@@ -725,8 +725,6 @@ module type Account_intf = sig
   val permissions : t -> Permissions.t
 
   val set_permissions : Permissions.t -> t -> t
-
-  val txn_version : t -> txn_version
 end
 
 module Eff = struct
@@ -1564,9 +1562,19 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    (* A verification key set under an older transaction version may not work
+       with the current proof system, so the permissions that would need a
+       proof from it fall back to signatures. An account without a key has no
+       version and never falls back. *)
+    let verification_key_is_stale =
+      Bool.(
+        Verification_key.is_some (Account.verification_key a)
+        &&& Txn_version.older_than_current
+              (Account.verification_key_txn_version a))
+    in
     let auth_with_fallback ~fallback_logic auth =
-      Account.txn_version a |> Txn_version.older_than_current
-      |> Controller.if_ ~then_:(fallback_logic auth) ~else_:auth
+      Controller.if_ verification_key_is_stale ~then_:(fallback_logic auth)
+        ~else_:auth
     in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =

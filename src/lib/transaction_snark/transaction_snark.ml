@@ -1091,9 +1091,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           type txn_version = Mina_numbers.Txn_version.Checked.t
 
-          let txn_version ({ data = a; _ } : t) =
-            snd a.permissions.set_verification_key
-
           let permissions (a : t) = a.data.permissions
 
           let set_permissions (permissions : Permissions.t)

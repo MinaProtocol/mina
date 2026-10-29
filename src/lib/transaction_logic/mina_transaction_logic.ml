@@ -1288,9 +1288,6 @@ module Make (L : Ledger_intf.S) :
 
       type txn_version = Txn_version.t
 
-      let txn_version (a : t) : txn_version =
-        snd a.permissions.set_verification_key
-
       let permissions (a : t) = a.permissions
 
       let set_permissions permissions (a : t) = { a with permissions }
