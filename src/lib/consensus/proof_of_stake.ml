@@ -3250,20 +3250,50 @@ module Make_str (A : Wire_types.Concrete) = struct
                (Global_slot.of_slot_number ~constants block_data.global_slot) )
             (Global_slot.to_epoch_and_slot global_slot)
 
+      let constants_of_protocol_state ~constraint_constants
+          (protocol_state : Protocol_state.Value.t) =
+        Constants.create ~constraint_constants
+          ~protocol_constants:
+            ( Protocol_state.constants protocol_state
+            |> Mina_base.Protocol_constants_checked.t_of_value )
+
+      let next_protocol_state ~constants
+          ~(previous_protocol_state : Protocol_state.Value.t)
+          ~previous_protocol_state_hash ~blockchain_state ~consensus_transition
+          ~producer_vrf_result ~block_stake_winner ~block_creator
+          ~coinbase_receiver ~supercharge_coinbase ~snarked_ledger_hash
+          ~genesis_ledger_hash ~supply_increase ~logger =
+        let open Or_error.Let_syntax in
+        [%log internal] "Consensus_state_update" ;
+        let%map consensus_state =
+          Consensus_state.update ~constants
+            ~previous_consensus_state:
+              (Protocol_state.consensus_state previous_protocol_state)
+            ~consensus_transition ~producer_vrf_result
+            ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
+            ~genesis_ledger_hash ~block_stake_winner ~block_creator
+            ~coinbase_receiver ~supercharge_coinbase
+        in
+        [%log internal] "Consensus_state_update_done" ;
+        let genesis_state_hash =
+          Protocol_state.genesis_state_hash
+            ~state_hash:(Some previous_protocol_state_hash)
+            previous_protocol_state
+        in
+        Protocol_state.create_value ~genesis_state_hash
+          ~previous_state_hash:previous_protocol_state_hash ~blockchain_state
+          ~consensus_state
+          ~constants:(Protocol_state.constants previous_protocol_state)
+
       let generate_transition
           ~(previous_protocol_state : Protocol_state.Value.t) ~blockchain_state
           ~current_time ~(block_data : Block_data.t) ~supercharge_coinbase
           ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase ~logger
           ~constraint_constants =
         [%log internal] "Generate_transition" ;
-        let previous_consensus_state =
-          Protocol_state.consensus_state previous_protocol_state
-        in
         let constants =
-          Constants.create ~constraint_constants
-            ~protocol_constants:
-              ( Protocol_state.constants previous_protocol_state
-              |> Mina_base.Protocol_constants_checked.t_of_value )
+          constants_of_protocol_state ~constraint_constants
+            previous_protocol_state
         in
         (let actual_global_slot =
            let time = Time.of_span_since_epoch (Time.Span.of_ms current_time) in
@@ -3278,30 +3308,17 @@ module Make_str (A : Wire_types.Concrete) = struct
         let block_creator =
           block_data.stake_proof.producer_public_key |> Public_key.compress
         in
-        [%log internal] "Consensus_state_update" ;
-        let consensus_state =
+        let protocol_state =
           Or_error.ok_exn
-            (Consensus_state.update ~constants ~previous_consensus_state
+            (next_protocol_state ~constants ~previous_protocol_state
+               ~previous_protocol_state_hash ~blockchain_state
                ~consensus_transition
                ~producer_vrf_result:block_data.Block_data.vrf_result
-               ~previous_protocol_state_hash ~supply_increase
-               ~snarked_ledger_hash ~genesis_ledger_hash
                ~block_stake_winner:block_data.stake_proof.delegator_pk
                ~block_creator
                ~coinbase_receiver:block_data.stake_proof.coinbase_receiver_pk
-               ~supercharge_coinbase )
-        in
-        [%log internal] "Consensus_state_update_done" ;
-        let genesis_state_hash =
-          Protocol_state.genesis_state_hash
-            ~state_hash:(Some previous_protocol_state_hash)
-            previous_protocol_state
-        in
-        let protocol_state =
-          Protocol_state.create_value ~genesis_state_hash
-            ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
-            ~blockchain_state ~consensus_state
-            ~constants:(Protocol_state.constants previous_protocol_state)
+               ~supercharge_coinbase ~snarked_ledger_hash ~genesis_ledger_hash
+               ~supply_increase ~logger )
         in
         [%log internal] "Generate_transition_done" ;
         (protocol_state, consensus_transition)
