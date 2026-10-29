@@ -4,6 +4,10 @@ module type Version = sig
   val protocol_version_network : int
 
   val protocol_version_patch : int
+
+  (** [(transaction, network, patch)] signalled as the proposed protocol
+      version when no other is configured, or [None] for no proposal. *)
+  val proposed_protocol_version : (int * int * int) option
 end
 
 (* It's stupid that this exists. TODO: Remove and make configurable. *)

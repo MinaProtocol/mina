@@ -172,8 +172,15 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
           ~metadata:[ ("protocol_version", `String protocol_version) ] ;
         Some (Protocol_version.of_string_exn protocol_version)
       with Sys_error _ ->
-        (* not on command-line, not in config dir, there's no proposed protocol version *)
-        None )
+        (* not on command-line, not in config dir, use the built-in default *)
+        Option.iter Protocol_version.default_proposed_opt ~f:(fun version ->
+            [%log info]
+              "Using built-in proposed protocol version $protocol_version"
+              ~metadata:
+                [ ( "protocol_version"
+                  , `String (Protocol_version.to_string version) )
+                ] ) ;
+        Protocol_version.default_proposed_opt )
   | Some protocol_version -> (
       let validate_cli_protocol_version protocol_version =
         if Option.is_none (Protocol_version.of_string_opt protocol_version) then (
