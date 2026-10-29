@@ -385,7 +385,7 @@ end
 module Verifiable : sig
   type t =
     ( Account_update.t
-    , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
+    , Verification_key_wire.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
   [@@deriving sexp_of]
@@ -460,10 +460,7 @@ module Verifiable : sig
 end = struct
   type t =
     ( Account_update.t
-    , ( Side_loaded_verification_key.Stable.Latest.t
-      , Zkapp_basic.F.Stable.Latest.t )
-      With_hash.Stable.Latest.t
-      option )
+    , Verification_key_wire.t option )
     Call_forest.With_hashes_and_data.Stable.Latest.t
     Poly.Stable.Latest.t
   [@@deriving sexp_of]
@@ -488,8 +485,9 @@ end = struct
       Serializable.t =
     { fee_payer
     ; account_updates =
-        Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            (Account_update.read_all_proofs_from_disk upd, aux) )
+        Call_forest.map account_updates ~f:(fun (upd, vk) ->
+            ( Account_update.read_all_proofs_from_disk upd
+            , Option.map vk ~f:Verification_key_wire.to_hashed ) )
     ; memo
     }
 
@@ -497,8 +495,9 @@ end = struct
       ({ fee_payer; account_updates; memo } : Serializable.t) : t =
     { fee_payer
     ; account_updates =
-        Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            (Account_update.write_all_proofs_to_disk ~proof_cache_db upd, aux) )
+        Call_forest.map account_updates ~f:(fun (upd, vk) ->
+            ( Account_update.write_all_proofs_to_disk ~proof_cache_db upd
+            , Option.map vk ~f:Verification_key_wire.of_hashed ) )
     ; memo
     }
 
