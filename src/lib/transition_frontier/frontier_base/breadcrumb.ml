@@ -164,7 +164,9 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash" ) )
+                    "snarked ledger hash"
+                | `Incorrect_protocol_state e ->
+                    "protocol state (" ^ Error.to_string_hum e ^ ")" ) )
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =

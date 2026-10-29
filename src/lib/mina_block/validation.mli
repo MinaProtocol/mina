@@ -349,6 +349,26 @@ val reset_frontier_dependencies_validation :
        , 'f )
        t
 
+(** Rebuild the protocol state of a block from its parent and the result of
+    applying its staged ledger diff, and check that the block's protocol
+    state matches it. [ledger_proof_statement] is the statement of the ledger
+    proof emitted by applying the diff, if any. Only the inputs private to the
+    block producer are taken from the block (see
+    [Consensus.Hooks.expected_protocol_state]). On a mismatch, the error lists
+    the paths of the differing fields.
+*)
+val check_protocol_state :
+     logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
+  -> parent_protocol_state:Protocol_state.Value.t
+  -> parent_state_hash:State_hash.t
+  -> ledger_proof_statement:Mina_state.Snarked_ledger_state.t option
+  -> staged_ledger_hash:Staged_ledger_hash.t
+  -> body_reference:Consensus.Body_reference.t
+  -> Protocol_state.Value.t
+  -> unit Or_error.t
+
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> logger:Logger.t
@@ -385,7 +405,8 @@ val validate_staged_ledger_diff :
        | `Invalid_body_reference
        | `Invalid_staged_ledger_diff of
          [ `Incorrect_target_staged_ledger_hash
-         | `Incorrect_target_snarked_ledger_hash ]
+         | `Incorrect_target_snarked_ledger_hash
+         | `Incorrect_protocol_state of Error.t ]
          list ] )
      Deferred.Result.t
 
