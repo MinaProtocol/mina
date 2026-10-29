@@ -353,14 +353,13 @@ val reset_frontier_dependencies_validation :
     applying its staged ledger diff, and check that the block's protocol
     state matches it. [ledger_proof_statement] is the statement of the ledger
     proof emitted by applying the diff, if any. Only the inputs private to the
-    block producer are taken from the block (see
+    block producer, and the timestamp, are taken from the block (see
     [Consensus.Hooks.expected_protocol_state]). On a mismatch, the error lists
     the paths of the differing fields.
 *)
 val check_protocol_state :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> consensus_constants:Consensus.Constants.t
   -> parent_protocol_state:Protocol_state.Value.t
   -> parent_state_hash:State_hash.t
   -> ledger_proof_statement:Mina_state.Snarked_ledger_state.t option

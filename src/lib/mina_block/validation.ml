@@ -490,13 +490,16 @@ let rec json_diff_paths ~path (expected : Yojson.Safe.t) (actual : Yojson.Safe.t
 
     The blockchain SNARK already constrains most of these fields, so this
     check is redundant while the proof system is sound; it guards the chain
-    if that assumption fails. The timestamp and genesis ledger hash are not
-    constrained by the SNARK; they are checked against the values that
-    [Block_producer.generate_next_state] sets.
+    if that assumption fails. The genesis ledger hash is not constrained by
+    the SNARK; it is checked against the parent's, which is what
+    [Block_producer.generate_next_state] sets. The timestamp is not
+    constrained either, and is taken from the block: block producers usually
+    set it to the start of the block's slot, but canonical mainnet blocks
+    exist that do not.
 *)
-let check_protocol_state ~logger ~constraint_constants ~consensus_constants
-    ~parent_protocol_state ~parent_state_hash ~ledger_proof_statement
-    ~staged_ledger_hash ~body_reference protocol_state =
+let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
+    ~parent_state_hash ~ledger_proof_statement ~staged_ledger_hash
+    ~body_reference protocol_state =
   let parent_blockchain_state =
     Protocol_state.blockchain_state parent_protocol_state
   in
@@ -508,18 +511,14 @@ let check_protocol_state ~logger ~constraint_constants ~consensus_constants
         ( Blockchain_state.ledger_proof_statement parent_blockchain_state
         , Currency.Amount.Signed.zero )
   in
-  let timestamp =
-    Consensus_time.(
-      start_time ~constants:consensus_constants
-        (of_global_slot ~constants:consensus_constants
-           (Consensus_state.curr_global_slot
-              (Protocol_state.consensus_state protocol_state) ) ))
-  in
   let blockchain_state =
     Blockchain_state.create_value ~staged_ledger_hash
       ~genesis_ledger_hash:
         (Blockchain_state.genesis_ledger_hash parent_blockchain_state)
-      ~timestamp ~body_reference ~ledger_proof_statement
+      ~timestamp:
+        (Blockchain_state.timestamp
+           (Protocol_state.blockchain_state protocol_state) )
+      ~body_reference ~ledger_proof_statement
   in
   match
     Consensus_state_hooks.expected_protocol_state ~constraint_constants
@@ -650,7 +649,6 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       check_protocol_state ~logger
         ~constraint_constants:
           precomputed_values.Precomputed_values.constraint_constants
-        ~consensus_constants:precomputed_values.consensus_constants
         ~parent_protocol_state ~parent_state_hash
         ~ledger_proof_statement:
           (Option.map proof_opt ~f:Ledger_proof.Cached.statement)
