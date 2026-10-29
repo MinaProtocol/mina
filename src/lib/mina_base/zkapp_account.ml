@@ -415,7 +415,8 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     ~verification_key:
       (f
          (Fn.compose field
-            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+            (Option.value_map ~default:(dummy_vk_hash ())
+               ~f:Verification_key_wire.hash ) ) )
     ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~action_state:(f app_state)
     ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
@@ -512,7 +513,8 @@ module Hardfork = struct
       ~verification_key:
         (f
            (Fn.compose field
-              (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+              (Option.value_map ~default:(dummy_vk_hash ())
+                 ~f:Verification_key_wire.hash ) ) )
       ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
       ~action_state:(f app_state)
       ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)

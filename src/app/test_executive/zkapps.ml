@@ -634,12 +634,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let verification_keys_compat =
         compatible requested_update.verification_key
-          ledger_update.verification_key
-          ~equal:
-            [%equal:
-              ( Pickles.Side_loaded.Verification_key.t
-              , Pickles.Backend.Tick.Field.t )
-              With_hash.t]
+          ledger_update.verification_key ~equal:Verification_key_wire.equal
       in
       let permissions_compat =
         compatible requested_update.permissions ledger_update.permissions

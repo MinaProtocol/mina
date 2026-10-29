@@ -888,7 +888,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
     | Signature ->
         Signature
     | Proof ->
-        Proof (With_hash.hash verification_key)
+        Proof (Verification_key_wire.hash verification_key)
   in
   (* update account state table with all the changes*)
   (let add_balance_and_balance_change balance
@@ -1663,7 +1663,7 @@ let mk_account_update_body ~pk ~vk : Account_update.Body.Simple.t =
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false
   ; may_use_token = Account_update.May_use_token.No
-  ; authorization_kind = Proof (With_hash.hash vk)
+  ; authorization_kind = Proof (Verification_key_wire.hash vk)
   }
 
 let mk_account_update ~pk ~vk : Account_update.Simple.t =

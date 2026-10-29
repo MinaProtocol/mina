@@ -370,14 +370,18 @@ struct
             | Some count ->
                 count + 1 )
         in
-        Hashtbl.update t.verification_keys vk.hash ~f:(function
+        Hashtbl.update t.verification_keys (Verification_key_wire.hash vk)
+          ~f:(function
           | None ->
               (1, Zkapp_vk_cache_tag.write_key_to_disk t.vk_cache_db vk)
           | Some (count, vk) ->
               (count + 1, vk) ) ;
         Hashtbl.update t.account_id_to_vks account_id
-          ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
-        Hashtbl.update t.vk_to_account_ids vk.hash
+          ~f:
+            (inc_map ~default_map:Zkapp_basic.F_map.Map.empty
+               (Verification_key_wire.hash vk) ) ;
+        Hashtbl.update t.vk_to_account_ids
+          (Verification_key_wire.hash vk)
           ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
@@ -558,7 +562,8 @@ struct
       *)
       let vk_table_inc = Vk_refcount_table.inc in
       let vk_table_dec t ~account_id ~(vk : Verification_key_wire.t) =
-        Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash
+        Vk_refcount_table.dec t ~account_id
+          ~vk_hash:(Verification_key_wire.hash vk)
       in
       let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
       let vk_table_lift_hashed =
@@ -905,7 +910,7 @@ struct
                    Vk_refcount_table.lift_hashed t.verification_key_table
                      (fun vk_table ~account_id ~vk ->
                        Vk_refcount_table.dec vk_table ~account_id
-                         ~vk_hash:vk.hash )
+                         ~vk_hash:(Verification_key_wire.hash vk) )
                  in
                  Sequence.iter dropped ~f:dec_vk_refcounts ;
                  let dropped_locally_generated =
@@ -1115,7 +1120,7 @@ struct
         in
         let ledger_vks =
           Map.map ledger_vks ~f:(fun vk ->
-              Zkapp_basic.F_map.Map.singleton vk.hash vk )
+              Zkapp_basic.F_map.Map.singleton (Verification_key_wire.hash vk) vk )
         in
         let mempool_vks =
           List.map account_ids ~f:(fun account_id ->
@@ -1129,7 +1134,7 @@ struct
                        let vk =
                          Zkapp_vk_cache_tag.read_key_from_disk vk_cached
                        in
-                       (vk.hash, vk) )
+                       (Verification_key_wire.hash vk, vk) )
                 |> Zkapp_basic.F_map.Map.of_alist_exn
               in
               (account_id, vks) )
@@ -1396,7 +1401,8 @@ struct
           List.iter all_dropped_cmds
             ~f:
               (lift (fun t ~account_id ~vk ->
-                   Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash ) )
+                   Vk_refcount_table.dec t ~account_id
+                     ~vk_hash:(Verification_key_wire.hash vk) ) )
         in
         let dropped_for_add_hashes =
           List.map dropped_for_add
@@ -1909,7 +1915,9 @@ let%test_module _ =
                  ~location_of_account_batch:
                    (Mina_ledger.Ledger.location_of_account_batch ledger)
             |> Map.map ~f:(fun vk ->
-                   Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
+                   Zkapp_basic.F_map.Map.singleton
+                     (Verification_key_wire.hash vk)
+                     vk ) )
         |> Or_error.bind ~f:(fun xs ->
                List.map xs
                  ~f:(User_command.For_tests.check_verifiable ~signature_kind)

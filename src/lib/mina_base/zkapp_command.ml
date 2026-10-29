@@ -503,11 +503,11 @@ end = struct
     }
 
   let ok_if_vk_hash_expected ~got ~expected =
-    if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
+    if not @@ Zkapp_basic.F.equal (Verification_key_wire.hash got) expected then
       Error
         (Error.create "Expected vk hash doesn't match hash in vk we received"
            [ ("expected_vk_hash", expected)
-           ; ("got_vk_hash", With_hash.hash got)
+           ; ("got_vk_hash", Verification_key_wire.hash got)
            ]
            [%sexp_of: (string * Zkapp_basic.F.t) list] )
     else Ok got
@@ -720,7 +720,7 @@ end = struct
             let vks =
               Option.value vks_opt ~default:Zkapp_basic.F_map.Map.empty
             in
-            Map.set vks ~key:vk.hash ~data:vk )
+            Map.set vks ~key:(Verification_key_wire.hash vk) ~data:vk )
     end
 
     module Command_wrapper : Command_wrapper_intf with type 'a t = 'a = struct
@@ -742,7 +742,9 @@ end = struct
 
       let find (t : t) ~account_id ~vk_hash =
         let%bind.Option vk = Map.find t account_id in
-        Option.some_if (Zkapp_basic.F.equal vk_hash vk.hash) vk
+        Option.some_if
+          (Zkapp_basic.F.equal vk_hash (Verification_key_wire.hash vk))
+          vk
 
       let add (t : t) ~account_id ~vk = Map.set t ~key:account_id ~data:vk
     end
@@ -1488,7 +1490,7 @@ module For_tests = struct
             (* replace dummy vk hashes in authorization kind *)
             ( match p.body.authorization_kind with
             | Proof _vk_hash ->
-                Proof (With_hash.hash vk)
+                Proof (Verification_key_wire.hash vk)
             | ak ->
                 ak )
         }

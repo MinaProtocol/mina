@@ -848,7 +848,7 @@ module Update = struct
           ~dummy:(Zkapp_precondition.Eq_data.Tc.public_key ()).default
           ~f:Public_key.Compressed.to_input
       ; Set_or_keep.to_input
-          (Set_or_keep.map verification_key ~f:With_hash.hash)
+          (Set_or_keep.map verification_key ~f:Verification_key_wire.hash)
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions
           ~dummy:Permissions.dummy_value_for_set_or_keep_placeholder_only
