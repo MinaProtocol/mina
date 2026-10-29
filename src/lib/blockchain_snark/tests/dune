@@ -12,6 +12,7 @@
   mina_ledger
   mina_state
   node_config
+  protocol_version
   snark_params
   staged_ledger_diff
   transaction_snark)
