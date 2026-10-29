@@ -11,6 +11,15 @@
 #   MINA_READ_CACHE_ROOT (else BUILDKITE_BUILD_ID)  the packaging build
 #   MINA_GENERIC_CACHE_ROOT                         the generic stage, if separate
 #
+# Only the release images are pushed, as select_release_packages.sh keeps only
+# the release packages. An archive is <service>/<tag>.tar.zst, and it is
+# published when its service is in MINA_RELEASE_DOCKERS (comma separated, by
+# default the daemon, the archive and rosetta) and its tag matches one of the
+# patterns in MINA_RELEASE_DOCKER_TAGS (comma separated globs, by default every
+# tag). The rest is listed and left in the cache: the auto-hardfork image, the
+# delegation verifier, or with MINA_RELEASE_DOCKER_TAGS="*-noble-devnet" every
+# other codename and variant.
+#
 # One archive at a time: load, check its tags against the registry, push, then
 # drop it from the local store. A tag already in the registry is skipped when it
 # holds this very image (a retried step), and refused otherwise unless
@@ -50,6 +59,44 @@ if [[ ${#ARCHIVES[@]} -eq 0 ]]; then
   exit 1
 fi
 
+IFS=',' read -ra SERVICES <<< "${MINA_RELEASE_DOCKERS:-mina-daemon,mina-archive,mina-rosetta}"
+IFS=',' read -ra TAG_PATTERNS <<< "${MINA_RELEASE_DOCKER_TAGS:-*}"
+
+# is_release_image <service> <tag>
+is_release_image () {
+  local service="$1" tag="$2" s p
+  for s in "${SERVICES[@]}"; do
+    [[ "$service" == "${s// /}" ]] || continue
+    for p in "${TAG_PATTERNS[@]}"; do
+      # shellcheck disable=SC2053 # the pattern is meant to glob
+      [[ "$tag" == ${p// /} ]] && return 0
+    done
+  done
+  return 1
+}
+
+SELECTED=()
+SKIPPED=()
+for archive in "${ARCHIVES[@]}"; do
+  service="$(basename "$(dirname "$archive")")"
+  tag="$(basename "$archive" .tar.zst)"
+  if is_release_image "$service" "$tag"; then
+    SELECTED+=("$archive")
+  else
+    SKIPPED+=("${service}/${tag}")
+  fi
+done
+
+if [[ ${#SKIPPED[@]} -gt 0 ]]; then
+  echo "--- Not release images (MINA_RELEASE_DOCKERS=${SERVICES[*]}, MINA_RELEASE_DOCKER_TAGS=${TAG_PATTERNS[*]}), left in the cache:"
+  printf '  - %s\n' "${SKIPPED[@]}"
+fi
+
+if [[ ${#SELECTED[@]} -eq 0 ]]; then
+  echo "❌ None of the ${#ARCHIVES[@]} image(s) under ${ROOTS[*]} is a release image." >&2
+  exit 1
+fi
+
 publish_tag () {
   # publish_tag <tag> <primary> <image id>: push, or alias registry-side.
   local tag="$1" primary="$2" id="$3" published
@@ -80,7 +127,7 @@ publish_tag () {
 }
 
 PUSHED=0
-for archive in "${ARCHIVES[@]}"; do
+for archive in "${SELECTED[@]}"; do
   echo "--- Loading ${archive}"
   mapfile -t tags < <(zstd -dc "$archive" | docker load | sed -n 's/^Loaded image: //p')
   if [[ ${#tags[@]} -eq 0 ]]; then
@@ -97,4 +144,4 @@ for archive in "${ARCHIVES[@]}"; do
   docker image rm --no-prune "${tags[@]}" > /dev/null 2>&1 || true
 done
 
-echo "✅ ${PUSHED} tag(s) $([[ "$DRY_RUN" == "1" ]] && echo "would be " )published from ${#ARCHIVES[@]} image(s)."
+echo "✅ ${PUSHED} tag(s) $([[ "$DRY_RUN" == "1" ]] && echo "would be " )published from ${#SELECTED[@]} image(s), ${#SKIPPED[@]} left in the cache."
