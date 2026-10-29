@@ -72,3 +72,67 @@ let checked_pop_reverses_push (module E : Events_list_intf) () =
           ()
       | Error err ->
           failwithf "Error from run_and_check: %s" (Error.to_string_hum err) () )
+
+let gen_with_verification_key =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind t = Zkapp_account.gen in
+  let%bind has_vk = Bool.quickcheck_generator in
+  if has_vk then
+    let%map hash = Field.gen and txn_version = Mina_numbers.Txn_version.gen in
+    { t with
+      verification_key =
+        Some
+          { Vk_with_version.Poly.vk =
+              { With_hash.data = Side_loaded_verification_key.dummy; hash }
+          ; txn_version
+          }
+    }
+  else return t
+
+(* The digest of a zkApp account in the layout that kept the verification key
+   and a [zkapp_version] as separate fields. As there, the inputs are folded in
+   reverse field order. *)
+let flat_layout_digest (t : Zkapp_account.t) =
+  let vk, zkapp_version = Vk_with_version.to_flat t.verification_key in
+  let open Random_oracle.Input.Chunked in
+  List.rev
+    [ field_elements (Pickles_types.Vector.to_array t.app_state)
+    ; field (Option.value_map vk ~default:(dummy_vk_hash ()) ~f:With_hash.hash)
+    ; Mina_numbers.Zkapp_version.to_input zkapp_version
+    ; field_elements (Pickles_types.Vector.to_array t.action_state)
+    ; Mina_numbers.Global_slot_since_genesis.to_input t.last_action_slot
+    ; packed (Zkapp_basic.field_of_bool t.proved_state, 1)
+    ; field (hash_zkapp_uri t.zkapp_uri)
+    ]
+  |> List.reduce_exn ~f:append |> Random_oracle.pack_input
+  |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_account
+
+let digest_matches_flat_layout () =
+  Quickcheck.test gen_with_verification_key ~trials:50 ~f:(fun t ->
+      [%test_eq: Field.t] (flat_layout_digest t) (digest t) )
+
+let checked_digest_matches_unchecked () =
+  Quickcheck.test gen_with_verification_key ~trials:10 ~f:(fun t ->
+      let f () () =
+        let var = Run.exists typ ~compute:(fun () -> t) in
+        let digest_var = Checked.digest var in
+        Run.as_prover (fun () ->
+            [%test_eq: Field.t] (digest t) (Run.As_prover.read_var digest_var) )
+      in
+      match Snark_params.Tick.Run.run_and_check f with
+      | Ok () ->
+          ()
+      | Error err ->
+          failwithf "Error from run_and_check: %s" (Error.to_string_hum err) () )
+
+let flat_round_trip () =
+  Quickcheck.test gen_with_verification_key ~trials:50 ~f:(fun t ->
+      let vk, zkapp_version = Vk_with_version.to_flat t.verification_key in
+      [%test_eq: Vk_with_version.t option] t.verification_key
+        (Or_error.ok_exn (Vk_with_version.of_flat ~zkapp_version vk)) )
+
+let flat_version_without_key_is_rejected () =
+  [%test_pred: Vk_with_version.t option Or_error.t] Result.is_error
+    (Vk_with_version.of_flat
+       ~zkapp_version:(Mina_numbers.Zkapp_version.of_int 1)
+       None )
