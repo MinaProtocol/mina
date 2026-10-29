@@ -116,7 +116,7 @@ module Block = struct
   module Stable = struct
     [@@@with_versioned_json]
 
-    module V3 = struct
+    module V4 = struct
       (* in accounts_accessed, the int is the ledger index
          in tokens_used, the account id is the token owner
       *)

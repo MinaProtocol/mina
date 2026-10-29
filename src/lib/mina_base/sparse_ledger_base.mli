@@ -3,7 +3,7 @@ open Snark_params.Tick
 
 [%%versioned:
 module Stable : sig
-  module V3 : sig
+  module V4 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
       , Account_id.Stable.V2.t

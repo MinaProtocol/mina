@@ -57,7 +57,7 @@ module Zkapp_command_applied = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         { accounts : (Account_id.Stable.V2.t * Account.Stable.V4.t option) list
         ; command : Zkapp_command.Stable.V2.t With_status.Stable.V2.t
@@ -101,10 +101,10 @@ module Command_applied = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
         | Signed_command of Signed_command_applied.Stable.V2.t
-        | Zkapp_command of Zkapp_command_applied.Stable.V2.t
+        | Zkapp_command of Zkapp_command_applied.Stable.V3.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -168,7 +168,7 @@ module Varying : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
+    module V4 : sig
       type t [@@deriving sexp, to_yojson]
     end
   end]
@@ -190,9 +190,9 @@ end = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
-        | Command of Command_applied.Stable.V3.t
+        | Command of Command_applied.Stable.V4.t
         | Fee_transfer of Fee_transfer_applied.Stable.V2.t
         | Coinbase of Coinbase_applied.Stable.V2.t
       [@@deriving sexp, to_yojson]
@@ -230,9 +230,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V3.t }
+      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V4.t }
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id

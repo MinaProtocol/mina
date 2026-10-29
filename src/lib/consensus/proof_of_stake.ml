@@ -194,7 +194,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V3 = struct
+        module V4 = struct
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
