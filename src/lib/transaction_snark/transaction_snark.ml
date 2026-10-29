@@ -4117,7 +4117,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; hash = Verification_key_wire.dummy_vk_hash ()
             }
         | Some s ->
-            s
+            Verification_key_wire.to_hashed s
       in
       (pi, vk)
 
@@ -4724,7 +4724,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         if no_auth then update
         else
           { update with
-            verification_key = Zkapp_basic.Set_or_keep.Set vk
+            verification_key =
+              Zkapp_basic.Set_or_keep.Set (Verification_key_wire.of_hashed vk)
           ; permissions =
               Zkapp_basic.Set_or_keep.Set
                 (Option.value permissions
@@ -5236,7 +5237,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let id = Account_id.create pk Token_id.default in
       { (Account.create id Balance.(of_mina_int_exn 1_000_000)) with
         permissions
-      ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
+      ; zkapp =
+          Some
+            { Zkapp_account.default with
+              verification_key = Some (Verification_key_wire.of_hashed vk)
+            }
       }
 
     let create_trivial_zkapp_account ?(permissions = Permissions.user_default)

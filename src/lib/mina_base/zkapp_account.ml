@@ -390,9 +390,14 @@ let typ : (Checked.t, t) Typ.t =
         ~default:(lazy { With_hash.data = None; hash = dummy_vk_hash () })
         (Data_as_hash.typ ~hash:With_hash.hash)
       |> Typ.transport
-           ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
+           ~there:
+             (Option.map ~f:(fun vk ->
+                  With_hash.map ~f:Option.some
+                    (Verification_key_wire.to_hashed vk) ) )
            ~back:
-             (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
+             (Option.map ~f:(fun vk ->
+                  Verification_key_wire.of_hashed
+                    (With_hash.map ~f:(fun x -> Option.value_exn x) vk) ) )
     ; Mina_numbers.Zkapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
     ; Mina_numbers.Global_slot_since_genesis.typ

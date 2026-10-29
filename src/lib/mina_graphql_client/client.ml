@@ -385,7 +385,7 @@ let get_account_update ~logger t ~account_id =
         | Some vk_obj ->
             let data = vk_obj.verificationKey in
             let hash = vk_obj.hash in
-            return (Set ({ data; hash } : _ With_hash.t))
+            return (Set (Verification_key_wire.of_hashed { data; hash }))
         | None ->
             fail
               (Error.of_string

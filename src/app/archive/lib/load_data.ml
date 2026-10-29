@@ -161,7 +161,8 @@ let update_of_id pool update_id =
               in
               Pickles.Backend.Tick.Field.of_string hash_str
             in
-            return @@ Set_or_keep.Set { With_hash.data; hash }
+            return
+            @@ Set_or_keep.Set (Verification_key_wire.of_hashed { data; hash })
         | Error err ->
             failwithf "Could not Base64-decode verification key: %s"
               (Error.to_string_hum err) () )
@@ -794,7 +795,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                 in
                 Zkapp_basic.F.of_string hash_str
               in
-              Some ({ data; hash } : _ With_hash.t) )
+              Some (Verification_key_wire.of_hashed { data; hash }) )
         in
         let zkapp_version =
           zkapp_version |> Unsigned.UInt32.of_int64

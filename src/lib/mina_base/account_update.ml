@@ -714,9 +714,8 @@ module Update = struct
           (Quickcheck.Generator.return
              ( match vk with
              | None ->
-                 let data = Pickles.Side_loaded.Verification_key.dummy in
-                 let hash = Zkapp_account.digest_vk data in
-                 { With_hash.data; hash }
+                 Verification_key_wire.of_data
+                   Pickles.Side_loaded.Verification_key.dummy
              | Some vk ->
                  vk ) )
       else return Set_or_keep.Keep
@@ -875,12 +874,15 @@ module Update = struct
           (Data_as_hash.typ ~hash:With_hash.hash)
           ~to_option:(function
             | { With_hash.data = Some data; hash } ->
-                Some { With_hash.data; hash }
+                Some (Verification_key_wire.of_hashed { data; hash })
             | { With_hash.data = None; _ } ->
                 None )
           ~of_option:(function
-            | Some { With_hash.data; hash } ->
-                { With_hash.data = Some data; hash }
+            | Some vk ->
+                let { With_hash.data; hash } =
+                  Verification_key_wire.to_hashed vk
+                in
+                { data = Some data; hash }
             | None ->
                 { With_hash.data = None; hash = Field.Constant.zero } )
         |> Typ.transport_var

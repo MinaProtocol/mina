@@ -750,13 +750,13 @@ module Accounts = struct
           , bool
           , string )
           Mina_base.Zkapp_account.Poly.t =
-        let hash_data = Mina_base.Verification_key_wire.digest_vk in
         Zkapp_account.
           { app_state =
               Mina_base.Zkapp_state.V.of_list_exn
               @@ pad_app_state_do app.app_state
           ; verification_key =
-              Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
+              Option.map app.verification_key
+                ~f:Mina_base.Verification_key_wire.of_data
           ; zkapp_version = app.zkapp_version
           ; action_state =
               Pickles_types.Vector.Vector_5.of_list_exn app.action_state

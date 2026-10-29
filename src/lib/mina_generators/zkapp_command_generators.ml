@@ -686,20 +686,22 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   let%bind update =
     match update with
     | None ->
-        Account_update.Update.gen ?permissions_auth ?vk ~zkapp_account
-          ~token_account ()
+        Account_update.Update.gen ?permissions_auth
+          ?vk:(Option.map vk ~f:Verification_key_wire.of_hashed)
+          ~zkapp_account ~token_account ()
     | Some update ->
         return update
   in
   (* account_update_increment_nonce for fee payer is unit and increment_nonce is true *)
   let account_update_increment_nonce, increment_nonce = increment_nonce in
   let verification_key =
-    Option.value vk
-      ~default:
-        With_hash.
-          { data = Pickles.Side_loaded.Verification_key.dummy
-          ; hash = Zkapp_account.dummy_vk_hash ()
-          }
+    Verification_key_wire.of_hashed
+      (Option.value vk
+         ~default:
+           With_hash.
+             { data = Pickles.Side_loaded.Verification_key.dummy
+             ; hash = Zkapp_account.dummy_vk_hash ()
+             } )
   in
   let%bind account =
     if new_account then (
@@ -1385,10 +1387,10 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                       in
                       { Account_update.Update.dummy with app_state }
                   | `Verification_key ->
-                      let data = Pickles.Side_loaded.Verification_key.dummy in
-                      let hash = Zkapp_account.digest_vk data in
                       let verification_key =
-                        Set_or_keep.Set { With_hash.data; hash }
+                        Set_or_keep.Set
+                          (Verification_key_wire.of_data
+                             Pickles.Side_loaded.Verification_key.dummy )
                       in
                       return
                         { Account_update.Update.dummy with verification_key }
@@ -1706,7 +1708,8 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range ?pk ?(n_updates : int = 15)
         Quickcheck.Generator.(of_list zkapp_pks |> list_with_length n_updates)
   in
   let[@warning "-8"] (head :: tail) =
-    List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
+    List.map pks ~f:(fun pk ->
+        mk_account_update ~pk ~vk:(Verification_key_wire.of_hashed vk) )
   in
   let events =
     List.init genesis_constants.max_event_elements ~f:(fun i ->
@@ -1848,7 +1851,7 @@ let%test_module _ =
       let zkapp_accounts =
         List.map zkapp_account_ids ~f:(fun id ->
             let account = Account.create id balance in
-            let verification_key = Some vk in
+            let verification_key = Some (Verification_key_wire.of_hashed vk) in
             let zkapp = Some { Zkapp_account.default with verification_key } in
             { account with zkapp } )
       in
