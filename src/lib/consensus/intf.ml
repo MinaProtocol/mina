@@ -229,6 +229,27 @@ module type State_hooks = sig
     -> protocol_state * consensus_transition
 
   (**
+   * Recompute the protocol state that [generate_transition] would produce
+   * for [candidate], a block extending [previous_protocol_state] whose
+   * blockchain state should be [blockchain_state].
+   *
+   * Inputs known only to the block producer are taken from [candidate]: the
+   * global slot, the truncated VRF output, the block stake winner, block
+   * creator and coinbase receiver, whether the coinbase is supercharged, and
+   * the next epoch seed while it absorbs the VRF output (in the seed update
+   * range). Every other field is derived locally.
+  *)
+  val expected_protocol_state :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> previous_protocol_state:protocol_state
+    -> previous_protocol_state_hash:Mina_base.State_hash.t
+    -> blockchain_state:blockchain_state
+    -> supply_increase:Currency.Amount.Signed.t
+    -> candidate:protocol_state
+    -> logger:Logger.t
+    -> protocol_state Or_error.t
+
+  (**
    * Create a constrained, checked var for the next consensus state of
    * a given consensus state and snark transition.
   *)

@@ -3262,7 +3262,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~previous_protocol_state_hash ~blockchain_state ~consensus_transition
           ~producer_vrf_result ~block_stake_winner ~block_creator
           ~coinbase_receiver ~supercharge_coinbase ~snarked_ledger_hash
-          ~genesis_ledger_hash ~supply_increase ~logger =
+          ~genesis_ledger_hash ~supply_increase
+          ?(adjust_consensus_state = Fn.id) ~logger () =
         let open Or_error.Let_syntax in
         [%log internal] "Consensus_state_update" ;
         let%map consensus_state =
@@ -3273,6 +3274,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
             ~genesis_ledger_hash ~block_stake_winner ~block_creator
             ~coinbase_receiver ~supercharge_coinbase
+          >>| adjust_consensus_state
         in
         [%log internal] "Consensus_state_update_done" ;
         let genesis_state_hash =
@@ -3318,10 +3320,59 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~block_creator
                ~coinbase_receiver:block_data.stake_proof.coinbase_receiver_pk
                ~supercharge_coinbase ~snarked_ledger_hash ~genesis_ledger_hash
-               ~supply_increase ~logger )
+               ~supply_increase ~logger () )
         in
         [%log internal] "Generate_transition_done" ;
         (protocol_state, consensus_transition)
+
+      let expected_protocol_state ~constraint_constants
+          ~(previous_protocol_state : Protocol_state.Value.t)
+          ~previous_protocol_state_hash ~blockchain_state ~supply_increase
+          ~(candidate : Protocol_state.Value.t) ~logger =
+        let constants =
+          constants_of_protocol_state ~constraint_constants
+            previous_protocol_state
+        in
+        let candidate_consensus_state =
+          Protocol_state.consensus_state candidate
+        in
+        let previous_blockchain_state =
+          Protocol_state.blockchain_state previous_protocol_state
+        in
+        let candidate_global_slot =
+          candidate_consensus_state.curr_global_slot_since_hard_fork
+        in
+        let consensus_transition =
+          Global_slot.slot_number candidate_global_slot
+        in
+        let adjust_consensus_state (consensus_state : Consensus_state.Value.t) =
+          let _epoch, next_slot =
+            Global_slot.to_epoch_and_slot candidate_global_slot
+          in
+          let next_epoch_data =
+            if Slot.in_seed_update_range next_slot ~constants then
+              { consensus_state.next_epoch_data with
+                seed = candidate_consensus_state.next_epoch_data.seed
+              }
+            else consensus_state.next_epoch_data
+          in
+          { consensus_state with
+            last_vrf_output = candidate_consensus_state.last_vrf_output
+          ; next_epoch_data
+          }
+        in
+        next_protocol_state ~constants ~previous_protocol_state
+          ~previous_protocol_state_hash ~blockchain_state ~consensus_transition
+          ~producer_vrf_result:Snark_params.Tick.Field.zero
+          ~block_stake_winner:candidate_consensus_state.block_stake_winner
+          ~block_creator:candidate_consensus_state.block_creator
+          ~coinbase_receiver:candidate_consensus_state.coinbase_receiver
+          ~supercharge_coinbase:candidate_consensus_state.supercharge_coinbase
+          ~snarked_ledger_hash:
+            (Blockchain_state.snarked_ledger_hash previous_blockchain_state)
+          ~genesis_ledger_hash:
+            (Blockchain_state.genesis_ledger_hash previous_blockchain_state)
+          ~supply_increase ~adjust_consensus_state ~logger ()
 
       include struct
         let%snarkydef.Tick next_state_checked ~constraint_constants
