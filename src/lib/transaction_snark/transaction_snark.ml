@@ -1083,15 +1083,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           let set_permissions (permissions : Permissions.t)
               ({ data = a; hash } : t) : t =
             { data = { a with permissions }; hash }
-
-          let set_txn_version_to_current ({ data = a; hash } : t) : t =
-            let set_verification_key =
-              ( fst a.permissions.set_verification_key
-              , Mina_numbers.Txn_version.current_checked )
-            in
-            let permissions = { a.permissions with set_verification_key } in
-            let data = { a with permissions } in
-            { data; hash }
         end
 
         module Opt = struct

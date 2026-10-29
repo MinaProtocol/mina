@@ -713,8 +713,6 @@ module type Account_intf = sig
   type txn_version
 
   val txn_version : t -> txn_version
-
-  val set_txn_version_to_current : t -> t
 end
 
 module Eff = struct
@@ -1644,7 +1642,6 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.verification_key a)
       in
       let a = Account.set_verification_key verification_key a in
-      let a = Account.set_txn_version_to_current a in
       (a, local_state)
     in
     (* Update action state. *)

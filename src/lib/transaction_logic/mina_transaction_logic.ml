@@ -1277,14 +1277,6 @@ module Make (L : Ledger_intf.S) :
       let permissions (a : t) = a.permissions
 
       let set_permissions permissions (a : t) = { a with permissions }
-
-      let set_txn_version_to_current (a : t) =
-        let set_verification_key =
-          ( fst a.permissions.set_verification_key
-          , Mina_numbers.Txn_version.current )
-        in
-        let permissions = { a.permissions with set_verification_key } in
-        { a with permissions }
     end
 
     module Amount = struct
