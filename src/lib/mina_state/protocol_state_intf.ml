@@ -170,6 +170,9 @@ module type Full = sig
 
   val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
 
+  (** Replace the protocol versions recorded in the blockchain state. *)
+  val with_protocol_versions : Value.t -> Protocol_versions.Value.t -> Value.t
+
   val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
   val negative_one :
