@@ -999,6 +999,8 @@ module Make (L : Ledger_intf.S) :
 
       let if_ = value_if
 
+      let current = Mina_numbers.Txn_version.current
+
       let equal_to_current = Mina_numbers.Txn_version.equal_to_current
 
       let older_than_current = Mina_numbers.Txn_version.older_than_current

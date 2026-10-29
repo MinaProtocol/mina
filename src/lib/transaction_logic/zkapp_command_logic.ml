@@ -557,6 +557,8 @@ end
 module type Txn_version_intf = sig
   include Iffable
 
+  val current : t
+
   val equal_to_current : t -> bool
 
   val older_than_current : t -> bool

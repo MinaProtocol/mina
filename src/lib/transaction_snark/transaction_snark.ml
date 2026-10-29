@@ -1510,6 +1510,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               run_checked
               @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
 
+            let current = Mina_numbers.Txn_version.current_checked
+
             let equal_to_current t =
               run_checked @@ Mina_numbers.Txn_version.equal_to_current_checked t
 
