@@ -50,23 +50,25 @@ let ledger_proof_statement ~parent ~child =
   if Snarked_ledger_state.equal (stmt parent) child_stmt then None
   else Some child_stmt
 
-let check ~(parent : block) ~parent_state_hash (child : Mina_block.Precomputed.t)
-    =
-  let parent_state = parent.precomputed.protocol_state in
+let body_reference (block : Mina_block.Precomputed.t) =
+  Staged_ledger_diff.Body.compute_reference
+    ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+    (Staged_ledger_diff.Body.Stable.Latest.create block.staged_ledger_diff)
+
+(* The protocol state mutations leave the body alone, so the caller computes
+   the body reference once per block; the daemon has it already computed by
+   the time it runs the check. *)
+let check ~(parent : block) ~parent_state_hash ~body_reference
+    ~ledger_proof_statement (child : Mina_block.Precomputed.t) =
   let child_state = child.protocol_state in
   Mina_block.Validation.check_protocol_state ~logger
     ~constraint_constants:(Lazy.force constraint_constants)
-    ~parent_protocol_state:parent_state ~parent_state_hash
-    ~ledger_proof_statement:
-      (ledger_proof_statement ~parent:parent_state ~child:child_state)
+    ~parent_protocol_state:parent.precomputed.protocol_state ~parent_state_hash
+    ~ledger_proof_statement
     ~staged_ledger_hash:
       (Blockchain_state.staged_ledger_hash
          (Protocol_state.blockchain_state child_state) )
-    ~body_reference:
-      (Staged_ledger_diff.Body.compute_reference
-         ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-         (Staged_ledger_diff.Body.Stable.Latest.create child.staged_ledger_diff) )
-    child_state
+    ~body_reference child_state
 
 (* Leaves of a JSON value, with their paths. *)
 let rec leaves ~path (json : Yojson.Safe.t) =
@@ -195,18 +197,20 @@ let main ~dir ~mutation_sample ~repeats () =
   List.iter pairs ~f:(fun (parent, parent_state_hash, child) ->
       if epoch_changed ~parent ~child then incr epoch_changes ;
       if in_seed_update_range child then incr in_seed_range ;
-      if
-        Option.is_some
-          (ledger_proof_statement ~parent:parent.precomputed.protocol_state
-             ~child:child.precomputed.protocol_state )
-      then incr proofs_emitted ;
-      let result = check ~parent ~parent_state_hash child.precomputed in
+      let ledger_proof_statement =
+        ledger_proof_statement ~parent:parent.precomputed.protocol_state
+          ~child:child.precomputed.protocol_state
+      in
+      if Option.is_some ledger_proof_statement then incr proofs_emitted ;
+      let body_reference = body_reference child.precomputed in
+      let check =
+        check ~parent ~parent_state_hash ~body_reference ~ledger_proof_statement
+      in
+      let result = check child.precomputed in
       let samples =
         List.init repeats ~f:(fun _ ->
             let start = Time_ns.now () in
-            ignore
-              ( check ~parent ~parent_state_hash child.precomputed
-                : unit Or_error.t ) ;
+            ignore (check child.precomputed : unit Or_error.t) ;
             Time_ns.Span.to_us (Time_ns.diff (Time_ns.now ()) start) )
         |> List.sort ~compare:Float.compare
       in
@@ -254,6 +258,7 @@ let main ~dir ~mutation_sample ~repeats () =
   in
   let stats = String.Table.create () in
   List.iter sample ~f:(fun (parent, parent_state_hash, child) ->
+      let body_reference = body_reference child.precomputed in
       let state_path = [ `K "data"; `K "protocol_state" ] in
       let state_json = Option.value_exn (get child.json state_path) in
       List.iter (leaves ~path:[] state_json) ~f:(fun (path, leaf) ->
@@ -283,7 +288,17 @@ let main ~dir ~mutation_sample ~repeats () =
               | Error _ ->
                   record `Unparseable
               | Ok precomputed -> (
-                  match check ~parent ~parent_state_hash precomputed with
+                  (* As the daemon: the emitted proof's statement is
+                     independent of the block's claimed state. *)
+                  let ledger_proof_statement =
+                    ledger_proof_statement
+                      ~parent:parent.precomputed.protocol_state
+                      ~child:child.precomputed.protocol_state
+                  in
+                  match
+                    check ~parent ~parent_state_hash ~body_reference
+                      ~ledger_proof_statement precomputed
+                  with
                   | Ok () ->
                       record `Accepted
                   | Error _ ->
