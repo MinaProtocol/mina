@@ -1438,20 +1438,6 @@ let has_zero_vesting_period
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
-let is_incompatible_version
-    (t :
-      ( (Account_update.Body.t, 'p, 'aux) Account_update.Poly.t
-      , _
-      , _ )
-      Call_forest.t
-      Poly.t ) =
-  Call_forest.exists t.account_updates ~f:(fun p ->
-      match p.body.update.permissions with
-      | Keep ->
-          false
-      | Set { set_verification_key = _auth, txn_version; _ } ->
-          not Mina_numbers.Txn_version.(equal_to_current txn_version) )
-
 let get_transaction_commitments ~signature_kind (zkapp_command : _ Poly.t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =

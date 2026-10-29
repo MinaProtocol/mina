@@ -7,7 +7,7 @@ let () =
         ( "verification-key-permission"
         , [ test_case
               "Update verification key permission with a different version \
-               should be rejected."
+               should be accepted."
               `Quick update_vk_perm_with_different_version
           ; test_case
               "Update verification key permission with current version should \
