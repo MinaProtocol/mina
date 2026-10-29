@@ -16,26 +16,24 @@ open Mina_state
 
 let logger = Logger.null ()
 
+(* Only what the replay needs is kept, so that thousands of blocks fit in
+   memory; the JSON is re-read for the blocks that are mutation-tested. *)
 type block =
-  { json : Yojson.Safe.t
-  ; precomputed : Mina_block.Precomputed.t
+  { path : string
+  ; protocol_state : Protocol_state.Value.t
   ; state_hash : State_hash.t
+  ; body_reference : Consensus.Body_reference.t
+  ; epoch_count : int
+  ; in_seed_update_range : bool
   }
 
-let load_block path =
-  let json = Yojson.Safe.from_file path in
-  match Mina_block.Precomputed.Versioned.of_yojson json with
-  | Error e ->
-      Error (sprintf "%s: %s" path e)
-  | Ok versioned -> (
-      match Mina_block.Precomputed.Versioned.latest versioned with
-      | None ->
-          Error (sprintf "%s: not the latest version" path)
-      | Some precomputed ->
-          let state_hash =
-            (Mina_block.Precomputed.Versioned.state_hashes versioned).state_hash
-          in
-          Ok { json; precomputed; state_hash } )
+let read_json path = Yojson.Safe.from_file path
+
+let parse_latest json =
+  Result.bind (Mina_block.Precomputed.Versioned.of_yojson json) ~f:(fun v ->
+      Result.of_option ~error:"not the latest version"
+        (Option.map (Mina_block.Precomputed.Versioned.latest v) ~f:(fun p ->
+             (v, p) ) ) )
 
 let constraint_constants =
   lazy
@@ -50,25 +48,19 @@ let ledger_proof_statement ~parent ~child =
   if Snarked_ledger_state.equal (stmt parent) child_stmt then None
   else Some child_stmt
 
-let body_reference (block : Mina_block.Precomputed.t) =
-  Staged_ledger_diff.Body.compute_reference
-    ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-    (Staged_ledger_diff.Body.Stable.Latest.create block.staged_ledger_diff)
-
-(* The protocol state mutations leave the body alone, so the caller computes
-   the body reference once per block; the daemon has it already computed by
-   the time it runs the check. *)
-let check ~(parent : block) ~parent_state_hash ~body_reference
-    ~ledger_proof_statement (child : Mina_block.Precomputed.t) =
-  let child_state = child.protocol_state in
+(* The protocol state mutations leave the body alone, so the body reference
+   is computed once per block; the daemon has it already computed by the time
+   it runs the check. *)
+let check ~(parent : block) ~(child : block) ~ledger_proof_statement
+    (child_state : Protocol_state.Value.t) =
   Mina_block.Validation.check_protocol_state ~logger
     ~constraint_constants:(Lazy.force constraint_constants)
-    ~parent_protocol_state:parent.precomputed.protocol_state ~parent_state_hash
-    ~ledger_proof_statement
+    ~parent_protocol_state:parent.protocol_state
+    ~parent_state_hash:parent.state_hash ~ledger_proof_statement
     ~staged_ledger_hash:
       (Blockchain_state.staged_ledger_hash
          (Protocol_state.blockchain_state child_state) )
-    ~body_reference child_state
+    ~body_reference:child.body_reference child_state
 
 (* Leaves of a JSON value, with their paths. *)
 let rec leaves ~path (json : Yojson.Safe.t) =
@@ -137,8 +129,8 @@ let perturb ~others ~path (leaf : Yojson.Safe.t) =
   | _ ->
       None
 
-let consensus_field (b : block) name =
-  get b.json
+let consensus_field json name =
+  get json
     [ `K "data"; `K "protocol_state"; `K "body"; `K "consensus_state"; name ]
 
 let json_int = function
@@ -147,17 +139,35 @@ let json_int = function
   | _ ->
       failwith "expected a numeric string"
 
-let epoch_changed ~parent ~child =
-  json_int (consensus_field parent (`K "epoch_count"))
-  <> json_int (consensus_field child (`K "epoch_count"))
-
 (* As [Consensus.Slot.in_seed_update_range]: the first two thirds of the
    epoch. *)
-let in_seed_update_range child =
-  let slot = consensus_field child (`K "curr_global_slot_since_hard_fork") in
+let in_seed_update_range json =
+  let slot = consensus_field json (`K "curr_global_slot_since_hard_fork") in
   let field k = json_int (Option.bind slot ~f:(fun s -> get s [ `K k ])) in
   let slots_per_epoch = field "slots_per_epoch" in
   field "slot_number" % slots_per_epoch < slots_per_epoch / 3 * 2
+
+let load_block path =
+  let json = read_json path in
+  match parse_latest json with
+  | Error e ->
+      Error (sprintf "%s: %s" path e)
+  | Ok (versioned, precomputed) ->
+      Ok
+        { path
+        ; protocol_state = precomputed.protocol_state
+        ; state_hash =
+            (Mina_block.Precomputed.Versioned.state_hashes versioned).state_hash
+        ; body_reference =
+            Staged_ledger_diff.Body.compute_reference
+              ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+              (Staged_ledger_diff.Body.Stable.Latest.create
+                 precomputed.staged_ledger_diff )
+        ; epoch_count = json_int (consensus_field json (`K "epoch_count"))
+        ; in_seed_update_range = in_seed_update_range json
+        }
+
+let epoch_changed ~parent ~child = parent.epoch_count <> child.epoch_count
 
 let percentile sorted p =
   let n = Array.length sorted in
@@ -182,10 +192,10 @@ let main ~dir ~mutation_sample ~repeats () =
   let pairs =
     List.filter_map blocks ~f:(fun child ->
         let parent_hash =
-          Protocol_state.previous_state_hash child.precomputed.protocol_state
+          Protocol_state.previous_state_hash child.protocol_state
         in
         Option.map (Hashtbl.find by_hash parent_hash) ~f:(fun parent ->
-            (parent, parent_hash, child) ) )
+            (parent, child) ) )
   in
   printf "pairs with parent present %d\n%!" (List.length pairs) ;
   let n_ok = ref 0 in
@@ -194,23 +204,20 @@ let main ~dir ~mutation_sample ~repeats () =
   let in_seed_range = ref 0 in
   let proofs_emitted = ref 0 in
   let times = ref [] in
-  List.iter pairs ~f:(fun (parent, parent_state_hash, child) ->
+  List.iter pairs ~f:(fun (parent, child) ->
       if epoch_changed ~parent ~child then incr epoch_changes ;
-      if in_seed_update_range child then incr in_seed_range ;
+      if child.in_seed_update_range then incr in_seed_range ;
       let ledger_proof_statement =
-        ledger_proof_statement ~parent:parent.precomputed.protocol_state
-          ~child:child.precomputed.protocol_state
+        ledger_proof_statement ~parent:parent.protocol_state
+          ~child:child.protocol_state
       in
       if Option.is_some ledger_proof_statement then incr proofs_emitted ;
-      let body_reference = body_reference child.precomputed in
-      let check =
-        check ~parent ~parent_state_hash ~body_reference ~ledger_proof_statement
-      in
-      let result = check child.precomputed in
+      let check = check ~parent ~child ~ledger_proof_statement in
+      let result = check child.protocol_state in
       let samples =
         List.init repeats ~f:(fun _ ->
             let start = Time_ns.now () in
-            ignore (check child.precomputed : unit Or_error.t) ;
+            ignore (check child.protocol_state : unit Or_error.t) ;
             Time_ns.Span.to_us (Time_ns.diff (Time_ns.now ()) start) )
         |> List.sort ~compare:Float.compare
       in
@@ -248,25 +255,26 @@ let main ~dir ~mutation_sample ~repeats () =
   let n_pairs = List.length pairs in
   let step = Int.max 1 (n_pairs / Int.max 1 mutation_sample) in
   let sample =
-    List.filteri pairs ~f:(fun i (parent, _, child) ->
+    List.filteri pairs ~f:(fun i (parent, child) ->
         i % step = 0 || epoch_changed ~parent ~child )
   in
   let others =
     List.filter_mapi blocks ~f:(fun i b ->
-        if i % 97 = 0 then get b.json [ `K "data"; `K "protocol_state" ]
+        if i % 97 = 0 then
+          get (read_json b.path) [ `K "data"; `K "protocol_state" ]
         else None )
   in
   let stats = String.Table.create () in
-  List.iter sample ~f:(fun (parent, parent_state_hash, child) ->
-      let body_reference = body_reference child.precomputed in
+  List.iter sample ~f:(fun (parent, child) ->
+      let child_json = read_json child.path in
       let state_path = [ `K "data"; `K "protocol_state" ] in
-      let state_json = Option.value_exn (get child.json state_path) in
+      let state_json = Option.value_exn (get child_json state_path) in
       List.iter (leaves ~path:[] state_json) ~f:(fun (path, leaf) ->
           match perturb ~others ~path leaf with
           | None ->
               ()
           | Some v -> (
-              let mutated = set child.json (state_path @ path) v in
+              let mutated = set child_json (state_path @ path) v in
               let key = path_to_string path in
               let record outcome =
                 Hashtbl.update stats key ~f:(fun c ->
@@ -279,25 +287,19 @@ let main ~dir ~mutation_sample ~repeats () =
                     | `Unparseable ->
                         (r, a, u + 1) )
               in
-              match
-                Result.bind (Mina_block.Precomputed.Versioned.of_yojson mutated)
-                  ~f:(fun v ->
-                    Result.of_option ~error:"not latest"
-                      (Mina_block.Precomputed.Versioned.latest v) )
-              with
+              match parse_latest mutated with
               | Error _ ->
                   record `Unparseable
-              | Ok precomputed -> (
+              | Ok (_, precomputed) -> (
                   (* As the daemon: the emitted proof's statement is
                      independent of the block's claimed state. *)
                   let ledger_proof_statement =
-                    ledger_proof_statement
-                      ~parent:parent.precomputed.protocol_state
-                      ~child:child.precomputed.protocol_state
+                    ledger_proof_statement ~parent:parent.protocol_state
+                      ~child:child.protocol_state
                   in
                   match
-                    check ~parent ~parent_state_hash ~body_reference
-                      ~ledger_proof_statement precomputed
+                    check ~parent ~child ~ledger_proof_statement
+                      precomputed.protocol_state
                   with
                   | Ok () ->
                       record `Accepted
