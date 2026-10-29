@@ -3393,15 +3393,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
 
       module For_tests = struct
-        let gen_consensus_state
-            ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-            ~constants ~(slot_advancement : int) :
+        let gen_consensus_state ~constants ~(slot_advancement : int) :
             (   previous_protocol_state:
                   Protocol_state.Value.t
                   Mina_base.State_hash.With_state_hashes.t
              -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
              -> coinbase_receiver:Public_key.Compressed.t
              -> supercharge_coinbase:bool
+             -> supply_increase:Currency.Amount.Signed.t
              -> Consensus_state.Value.t )
             Quickcheck.Generator.t =
           let open Consensus_state in
@@ -3415,7 +3414,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
                  ) ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
-              ~coinbase_receiver ~supercharge_coinbase ->
+              ~coinbase_receiver ~supercharge_coinbase ~supply_increase ->
             let prev =
               Protocol_state.consensus_state
                 (With_hash.data previous_protocol_state)
@@ -3433,10 +3432,14 @@ module Make_str (A : Wire_types.Concrete) = struct
             let curr_epoch, curr_slot =
               Global_slot.to_epoch_and_slot curr_global_slot_since_hard_fork
             in
+            (* As in [Consensus_state.update]: the total currency only changes
+               by the supply increase of the emitted ledger proof. *)
             let total_currency =
-              Option.value_exn
-                (Amount.add prev.total_currency
-                   constraint_constants.coinbase_amount )
+              let total, `Overflow overflow =
+                Amount.add_signed_flagged prev.total_currency supply_increase
+              in
+              assert (not overflow) ;
+              total
             in
             let prev_epoch, prev_slot =
               Consensus_state.curr_epoch_and_slot prev

@@ -268,14 +268,14 @@ module type State_hooks = sig
 
   module For_tests : sig
     val gen_consensus_state :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> constants:Constants.t
+         constants:Constants.t
       -> slot_advancement:int
       -> (   previous_protocol_state:
                protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
+          -> supply_increase:Currency.Amount.Signed.t
           -> consensus_state )
          Quickcheck.Generator.t
   end
