@@ -44,7 +44,7 @@ let suite () =
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
-    let mk_update_perm_check ~current_auth ~account_perm ?txn_version
+    let mk_update_perm_check ~current_auth ~account_perm ?vk_txn_version
         ?failure_expected () =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -70,9 +70,8 @@ let suite () =
           in
           U.test_snapp_update ?expected_failure:failure_expected
             ~snapp_permissions:
-              (U.permissions_from_update snapp_update ~auth:account_perm
-                 ?txn_version )
-            test_spec ~init_ledger ~vk ~zkapp_prover
+              (U.permissions_from_update snapp_update ~auth:account_perm)
+            ?vk_txn_version test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let older_version =
@@ -85,25 +84,26 @@ let suite () =
       test "account update using Signature auth when perm is set to Proof"
       @@ fun () ->
       mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
-        ~txn_version:older_version ()
+        ~vk_txn_version:older_version ()
 
     let () =
       test "account update using Signature auth when perm is set to Impossible"
       @@ fun () ->
       mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
-        ~txn_version:older_version ()
+        ~vk_txn_version:older_version ()
 
     let () =
       test "account update using Proof auth when perm is set to Proof"
       @@ fun () ->
       mk_update_perm_check ~current_auth:Proof ~account_perm:Proof
-        ~txn_version:older_version ~failure_expected:Test_input.failure_expected
-        ()
+        ~vk_txn_version:older_version
+        ~failure_expected:Test_input.failure_expected ()
 
     let () =
       test "account update using Proof auth when perm is set to Either"
       @@ fun () ->
       mk_update_perm_check ~current_auth:Proof ~account_perm:Either
-        ~txn_version:older_version ()
+        ~vk_txn_version:older_version ()
+
   end in
   ()

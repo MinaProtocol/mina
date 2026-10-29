@@ -5222,7 +5222,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       signature_transfers ~constraint_constants
         (Multiple_transfers_spec.signature_transfers_spec_of_t spec)
 
-    let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
+    let trivial_zkapp_account ?(permissions = Permissions.user_default)
+        ?(vk_txn_version = Mina_numbers.Txn_version.current) ~vk pk =
       let id = Account_id.create pk Token_id.default in
       { (Account.create id Balance.(of_mina_int_exn 1_000_000)) with
         permissions
@@ -5230,12 +5231,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           Some
             { Zkapp_account.default with
               verification_key =
-                Some (Zkapp_account.Vk_with_version.stamp_current vk)
+                Some
+                  { Zkapp_account.Vk_with_version.Poly.vk
+                  ; txn_version = vk_txn_version
+                  }
             }
       }
 
     let create_trivial_zkapp_account ?(permissions = Permissions.user_default)
-        ~vk ~ledger pk =
+        ?vk_txn_version ~vk ~ledger pk =
       let create ledger id account =
         match Ledger.location_of_account ledger id with
         | Some _loc ->
@@ -5247,7 +5251,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ()
       in
       let id = Account_id.create pk Token_id.default in
-      let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
+      let account : Account.t =
+        trivial_zkapp_account ~permissions ?vk_txn_version ~vk pk
+      in
       create ledger id account
 
     let create_trivial_predicate_snapp
