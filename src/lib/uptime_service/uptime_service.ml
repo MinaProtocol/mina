@@ -351,7 +351,11 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                       in
                       make_interruptible
                       @@ Uptime_snark_worker.perform_partitioned snark_worker
-                           (witness, input, zkapp_command, staged_ledger_hash)
+                           ( message
+                           , witness
+                           , input
+                           , zkapp_command
+                           , staged_ledger_hash )
                   | Ok (`Transaction single_spec) ->
                       make_interruptible
                       @@ Uptime_snark_worker.perform_single snark_worker
