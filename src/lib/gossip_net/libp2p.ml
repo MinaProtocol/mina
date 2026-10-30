@@ -195,13 +195,19 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
           Pipe.transfer isn't appropriate because it will close the
           real_r when read_w is closed, precisely what we don't want.
+
+          The end of the stream is still propagated, so that the connection
+          closes as soon as the peer is finished with the stream.
       *)
       let read_r, read_w = Pipe.create () in
       let underlying_r, underlying_w = Mina_net2.Libp2p_stream.pipes stream in
       don't_wait_for
-        (Pipe.iter underlying_r ~f:(fun msg ->
-             Pipe.write_without_pushback_if_open read_w msg ;
-             Deferred.unit ) ) ;
+        (let%map () =
+           Pipe.iter underlying_r ~f:(fun msg ->
+               Pipe.write_without_pushback_if_open read_w msg ;
+               Deferred.unit )
+         in
+         Pipe.close read_w ) ;
       let transport =
         Async_rpc_kernel.Pipe_transport.(create Kind.string read_r underlying_w)
       in
