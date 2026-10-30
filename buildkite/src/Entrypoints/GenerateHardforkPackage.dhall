@@ -233,12 +233,12 @@ let generateDockerForCodename =
                                     }
                                     [ "FORCE_DOCKER_OVERWRITE" ]
                                     (     "./buildkite/scripts/release/manager.sh persist "
-                                      ++  " --backend local --artifacts mina-logproc,mina-${Profiles.lowerName
-                                                                                              profile}-profile,mina-${Profiles.lowerName
-                                                                                                                        profile}-generic,mina-${Network.lowerName
-                                                                                                                                                  spec.network},mina-archive-${Network.lowerName
-                                                                                                                                                                                 spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                                                                                spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
+                                      ++  " --backend local --artifacts mina-logproc,mina-generic,mina-archive-generic,mina-rosetta-generic,mina-${Profiles.lowerName
+                                                                                                                                                     profile}-profile,mina-${Profiles.lowerName
+                                                                                                                                                                               profile}-generic,mina-${Network.lowerName
+                                                                                                                                                                                                         spec.network},mina-archive-${Network.lowerName
+                                                                                                                                                                                                                                        spec.network},mina-rosetta-${Network.lowerName
+                                                                                                                                                                                                                                                                       spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
                                       ++  " --buildkite-build-id ${cached_build_id}"
                                       ++  " --codename ${lowerNameCodename} "
                                       ++  " --target \\\${BUILDKITE_BUILD_ID} "
@@ -255,6 +255,9 @@ let generateDockerForCodename =
                         MinaArtifact.PackagingSpec::{
                         , artifacts =
                           [ Artifact.Type.LogProc
+                          , Artifact.Type.DaemonGeneric
+                          , Artifact.Type.ArchiveGeneric
+                          , Artifact.Type.RosettaGeneric
                           , Artifact.Type.Daemon { network = spec.network }
                           , Artifact.Type.DaemonProfiled { profile = profile }
                           , Artifact.Type.Archive { network = spec.network }
