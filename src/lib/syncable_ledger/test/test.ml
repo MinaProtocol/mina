@@ -6,12 +6,18 @@ open Network_peer
 module type Ledger_intf = sig
   include Merkle_ledger.Intf.SYNC_RECIPIENT
 
+  module Addr : sig
+    val depth : addr -> int
+  end
+
   type account_id
 
   val load_ledger : int -> int -> t * account_id list
 end
 
 module type Input_intf = sig
+  val account_subtree_height : int
+
   module Root_hash : sig
     type t [@@deriving bin_io, compare, hash, sexp, compare, yojson]
 
@@ -151,6 +157,43 @@ struct
         Root_hash.equal desired_root (Ledger.merkle_root mt)
     | `Target_changed _ ->
         false
+
+  let%test_unit "content is asked for in subtrees of the account height" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let content_depths = ref [] in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3
+         (Sync_ledger.query_reader lsync) ~f:(fun (root_hash, query) ->
+           ( match query with
+           | What_contents addr ->
+               content_depths := Ledger.Addr.depth addr :: !content_depths
+           | _ ->
+               () ) ;
+           let%bind answer =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
+           Linear_pipe.write
+             (Sync_ledger.answer_writer lsync)
+             (root_hash, query, Envelope.Incoming.local (Or_error.ok_exn answer)) )
+      ) ;
+    ( match
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+                true ) )
+      with
+    | `Ok _ ->
+        ()
+    | `Target_changed _ ->
+        failwith "target changed" ) ;
+    let content_depth = Int.max 0 (Ledger.depth l1 - account_subtree_height) in
+    [%test_result: int list] ~expect:[]
+      (List.filter !content_depths ~f:(fun depth -> depth <> content_depth))
 
   let%test_unit "new_goal_soon" =
     let l1, _k1 = Ledger.load_ledger num_accts 1 in
@@ -595,6 +638,8 @@ module Db = struct
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
     module Context = Context
+
+    let account_subtree_height = Syncable_ledger_inputs.account_subtree_height
   end
 
   module DB3 =
