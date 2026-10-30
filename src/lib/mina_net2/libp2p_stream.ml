@@ -22,6 +22,7 @@ type t =
   { protocol : string
   ; id : Libp2p_ipc.stream_id
   ; mutable state : state
+  ; mutable lost : bool
   ; peer : Peer.t
   ; incoming_r : string Pipe.Reader.t
   ; incoming_w : string Pipe.Writer.t
@@ -41,14 +42,18 @@ let pipes { incoming_r; outgoing_w; _ } = (incoming_r, outgoing_w)
 let data_received { incoming_w; _ } data =
   don't_wait_for (Pipe.write_if_open incoming_w data)
 
-let reset ~helper { id; _ } =
+let mark_lost t = t.lost <- true
+
+let reset ~helper { id; lost; _ } =
   (* NOTE: do not close the pipes here. Reset_stream should end up
       notifying us that streamReadComplete. We can reset the stream (telling
       the remote peer to stop writing) and still be sending data ourselves. *)
-  Libp2p_helper.do_rpc helper
-    (module Libp2p_ipc.Rpcs.ResetStream)
-    (Libp2p_ipc.Rpcs.ResetStream.create_request ~stream_id:id)
-  |> Deferred.Or_error.ignore_m
+  if lost then Deferred.Or_error.return ()
+  else
+    Libp2p_helper.do_rpc helper
+      (module Libp2p_ipc.Rpcs.ResetStream)
+      (Libp2p_ipc.Rpcs.ResetStream.create_request ~stream_id:id)
+    |> Deferred.Or_error.ignore_m
 
 let stream_state_invariant ~logger t =
   let us_closed = Pipe.is_closed t.outgoing_w in
@@ -167,6 +172,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     { id = stream_id
     ; protocol
     ; state = FullyOpen
+    ; lost = false
     ; peer
     ; incoming_r
     ; incoming_w

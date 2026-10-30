@@ -548,6 +548,7 @@ let handle_push_message t push_message =
           let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
           ( match Hashtbl.find t.streams stream_id_str with
           | Some stream ->
+              Libp2p_stream.mark_lost stream ;
               let (`Stream_should_be_released should_release) =
                 Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
                   stream

@@ -39,6 +39,12 @@ val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
 val data_received : t -> string -> unit
 
+(** Record that the helper has reported the stream lost. The helper resets and
+    releases a stream when it reports it lost. *)
+val mark_lost : t -> unit
+
+(** Reset the stream, unless it has been lost, in which case the helper has
+    already reset it. *)
 val reset : helper:Libp2p_helper.t -> t -> unit Deferred.Or_error.t
 
 val stream_closed :
