@@ -731,19 +731,25 @@ module Update = struct
     in
     let%bind zkapp_uri =
       let uri_gen =
-        Quickcheck.Generator.of_list
-          [ "https://www.example.com"
-          ; "https://www.minaprotocol.com"
-          ; "https://www.gurgle.com"
-          ; "https://faceplant.com"
+        Quickcheck.Generator.union
+          [ Quickcheck.Generator.of_list
+              [ "https://www.example.com"
+              ; "https://www.minaprotocol.com"
+              ; "https://www.gurgle.com"
+              ; "https://faceplant.com"
+              ]
+          ; Zkapp_uri.gen
           ]
       in
       Set_or_keep.gen uri_gen
     in
     let%bind token_symbol =
       let token_gen =
-        Quickcheck.Generator.of_list
-          [ "MINA"; "TOKEN1"; "TOKEN2"; "TOKEN3"; "TOKEN4"; "TOKEN5" ]
+        Quickcheck.Generator.union
+          [ Quickcheck.Generator.of_list
+              [ "MINA"; "TOKEN1"; "TOKEN2"; "TOKEN3"; "TOKEN4"; "TOKEN5" ]
+          ; Account.Token_symbol.gen
+          ]
       in
       Set_or_keep.gen token_gen
     in
