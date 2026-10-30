@@ -467,8 +467,8 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 			if err != nil && err != io.EOF {
 				// The stream is unusable, so release it rather than holding it
 				// against the stream limits until a later write fails
-				if _, has := app.RemoveStream(idx); has {
-					if resetErr := stream.Reset(); resetErr != nil {
+				if s, has := app.RemoveStream(idx); has {
+					if resetErr := s.Reset(); resetErr != nil {
 						app.P2p.Logger.Debugf("failed to reset stream %d after read failure (%s): %s", idx, err.Error(), resetErr.Error())
 					}
 				}
