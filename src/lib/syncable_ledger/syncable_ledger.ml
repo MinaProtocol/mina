@@ -815,15 +815,22 @@ end = struct
     then (
       MT.set_all_accounts_rooted_at_exn t.tree addr [] ;
       settle t addr )
-    else if Addr.depth addr >= ledger_depth - account_subtree_height then (
-      expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
-        (desired_root_exn t, What_contents addr) )
-    else (
-      expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
-        ( desired_root_exn t
-        , What_child_hashes (addr, ledger_sync_config.default_subtree_depth) ) )
+    else
+      let content_depth = ledger_depth - account_subtree_height in
+      if Addr.depth addr >= content_depth then (
+        expect_content t addr exp_hash ;
+        Linear_pipe.write_without_pushback_if_open t.queries
+          (desired_root_exn t, What_contents addr) )
+      else (
+        expect_children t addr exp_hash ;
+        (* Stop at [content_depth], so that content is asked for in subtrees
+           of the full [account_subtree_height]. *)
+        let subtree_depth =
+          min ledger_sync_config.default_subtree_depth
+            (content_depth - Addr.depth addr)
+        in
+        Linear_pipe.write_without_pushback_if_open t.queries
+          (desired_root_exn t, What_child_hashes (addr, subtree_depth)) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
