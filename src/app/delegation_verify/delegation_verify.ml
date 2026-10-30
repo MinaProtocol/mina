@@ -13,29 +13,6 @@ let get_filenames =
 let verify_snark_work ~verify_transaction_snarks ~proof =
   verify_transaction_snarks [ proof ]
 
-(* The sok message binds the proof to the submitter and the fee only, so a
-   valid proof could be reattached to every later submission of the same
-   submitter. The uptime service picks the job whose target second-pass
-   ledger is the staged ledger of the block it reports
-   ([Uptime_service.send_block_and_transaction_snark]); require the same
-   relation here so the work has to come from the submitted block. *)
-let check_snark_work_belongs_to_block ~protocol_state ~proof =
-  let block_ledger_hash =
-    Mina_state.Protocol_state.blockchain_state protocol_state
-    |> Mina_state.Blockchain_state.staged_ledger_hash
-    |> Staged_ledger_hash.ledger_hash
-  in
-  let proof_target_ledger_hash =
-    (Ledger_proof.statement proof).target.second_pass_ledger
-  in
-  if Ledger_hash.equal proof_target_ledger_hash block_ledger_hash then Ok ()
-  else
-    Or_error.errorf
-      "proof's target ledger %s does not match the submitted block's staged \
-       ledger %s"
-      (Ledger_hash.to_base58_check proof_target_ledger_hash)
-      (Ledger_hash.to_base58_check block_ledger_hash)
-
 let config_flag =
   let open Command.Param in
   flag "--config-file" ~doc:"FILE config file" (optional string)
@@ -147,7 +124,11 @@ module Make_verifier (Source : Submission.Data_source) = struct
             in
             let%bind () =
               Deferred.return
-              @@ check_snark_work_belongs_to_block ~protocol_state ~proof
+              @@ Delegation_verify_lib.Snark_work.check_belongs_to_block
+                   ~block_staged_ledger_hash:
+                     ( Mina_state.Protocol_state.blockchain_state protocol_state
+                     |> Mina_state.Blockchain_state.staged_ledger_hash )
+                   ~proof
             in
             verify_snark_work ~verify_transaction_snarks ~proof
       else return ()
