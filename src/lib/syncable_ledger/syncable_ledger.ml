@@ -631,18 +631,31 @@ end = struct
     hash
 
   (** The hash [addr] would have if [content] were written to the leaves under
-      it. As with [MT.set_all_accounts_rooted_at_exn], leaves past the end of
+      it, and the hashes that every node in its subtree, [addr] included, would
+      have. As with [MT.set_all_accounts_rooted_at_exn], leaves past the end of
       [content] are empty. *)
-  let hash_of_content : 'a t -> Addr.t -> Account.t list -> Hash.t =
+  let hashes_of_content :
+      'a t -> Addr.t -> Account.t list -> Hash.t * (Addr.t * Hash.t) list =
    fun t addr content ->
-    let height = Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+    let ledger_depth = MT.depth t.tree in
+    let height = Addr.height ~ledger_depth addr in
     let content_hashes = Array.of_list_map content ~f:Hash.hash_account in
     let leaf_hashes =
       Array.init (1 lsl height) ~f:(fun i ->
           if i < Array.length content_hashes then content_hashes.(i)
           else Hash.empty_account )
     in
-    merge_many leaf_hashes height height
+    let rec go level hashes subtree_hashes =
+      let subtree_hashes =
+        Array.fold2_exn
+          (intermediate_range ledger_depth addr (height - level))
+          hashes ~init:subtree_hashes
+          ~f:(fun subtree_hashes addr hash -> (addr, hash) :: subtree_hashes)
+      in
+      if level = height then (hashes.(0), subtree_hashes)
+      else go (level + 1) (merge_siblings hashes level) subtree_hashes
+    in
+    go 0 leaf_hashes []
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
@@ -662,10 +675,10 @@ end = struct
          [addr] stays in [waiting_content] so the retry is accepted. *)
       `Content_length_mismatch (List.length content, capacity)
     else
-      let actual = hash_of_content t addr content in
+      let actual, subtree_hashes = hashes_of_content t addr content in
       if Hash.equal actual expected then (
         (* TODO #444 should we batch all the updates and do them at the end? *)
-        MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+        MT.set_all_accounts_rooted_at_exn ~subtree_hashes t.tree addr content ;
         Addr.Table.remove t.waiting_content addr ;
         settle t addr ;
         t.accounts_received <- t.accounts_received + List.length content ;
