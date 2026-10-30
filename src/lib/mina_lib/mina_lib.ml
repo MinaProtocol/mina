@@ -532,17 +532,35 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
               offline_shutdown := None ;
               match active_status with
               | None ->
-                  let logger = Logger.create () in
                   [%str_log info] Bootstrapping ;
                   `Bootstrap
-              | Some (_, catchup_jobs) ->
-                  let logger = Logger.create () in
-                  if catchup_jobs > 0 then (
-                    [%str_log info] Ledger_catchup ;
-                    `Catchup )
-                  else (
+              | Some ((frontier : Transition_frontier.t), catchup_jobs) ->
+                  (* HACK: this comparison is needed because sometimes daemon
+                     assume it's synced by looking at its frontier, only to
+                     realize the data it has locally is out of date. We mark a
+                     node as not-synced as long as its best tip is too old.
+                     For more see: https://o1-labs.slack.com/archives/C07EYM9GR1U/p1758639894706489
+                  *)
+                  (* TODO: make it so this age of 2 hours configurable. *)
+                  let best_tip_no_older_than_2_hours () =
+                    let best_tip_timestamp =
+                      Transition_frontier.(
+                        best_tip frontier |> Breadcrumb.protocol_state)
+                      |> Mina_state.Protocol_state.blockchain_state
+                      |> Mina_state.Blockchain_state.timestamp
+                      |> Block_time.to_time_exn
+                    in
+                    let best_tip_age =
+                      Time.(diff (now ()) best_tip_timestamp)
+                    in
+                    Time.Span.(compare best_tip_age (of_hr 2.)) < 0
+                  in
+                  if catchup_jobs = 0 && best_tip_no_older_than_2_hours () then (
                     [%str_log info] Synced ;
-                    `Synced ) ) )
+                    `Synced )
+                  else (
+                    [%str_log info] Ledger_catchup ;
+                    `Catchup ) ) )
   in
   let observer = observe incremental_status in
   (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
