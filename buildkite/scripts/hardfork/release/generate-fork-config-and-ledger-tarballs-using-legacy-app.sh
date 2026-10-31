@@ -54,6 +54,20 @@ MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildki
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
+# The create-prefork-genesis package ships no /etc/coda/build_config/PROFILE
+# file (that comes with mina-<network>-profile), so the build profile is
+# passed through MINA_PROFILE. Same mapping as Profiles.fromNetwork in
+# buildkite/src/Constants/Profiles.dhall.
+case "$NETWORK" in
+  mainnet) MINA_PROFILE="mainnet" ;;
+  devnet) MINA_PROFILE="devnet" ;;
+  *)
+    echo "No build profile known for network '$NETWORK'" >&2
+    exit 1
+    ;;
+esac
+export MINA_PROFILE
+
 ./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" --prefork-genesis-config "genesis_ledgers/${NETWORK}.json"
 
 echo "--- Caching legacy ledger tarballs and hashes"

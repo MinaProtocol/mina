@@ -86,9 +86,23 @@ else
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
       ;;
       mina-devnet|mina-mainnet)
-        # Download mina-logproc and sub debians (apps and config) too
+        # mina-<network> is an empty tent. Its dependency chain is
+        #   mina-<network> -> mina-<network>-config
+        #                  -> mina-<network>-generic -> mina-<network>-profile
+        #                                            -> mina-generic (binaries)
+        # apt resolves only from local files here, so every link of the chain
+        # has to be downloaded, plus mina-logproc.
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-generic_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-profile_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-generic_${VERSION}_*"
+      ;;
+      mina-devnet-generic|mina-mainnet-generic)
+        # The profile tent: mina-<network>-profile plus mina-generic.
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i%-generic}-profile_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-generic_${VERSION}_*"
       ;;
       mina-devnet-instrumented|mina-mainnet-instrumented)
         # Instrumented daemon depends on mina-logproc and the non-instrumented
