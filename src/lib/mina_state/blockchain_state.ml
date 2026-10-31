@@ -6,6 +6,46 @@ open Currency
 module Poly = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type ( 'staged_ledger_hash
+           , 'snarked_ledger_hash
+           , 'local_state
+           , 'time
+           , 'body_reference
+           , 'signed_amount
+           , 'pending_coinbase_stack
+           , 'fee_excess
+           , 'sok_digest
+           , 'protocol_versions )
+           t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'protocol_versions )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V3.t =
+        { staged_ledger_hash : 'staged_ledger_hash
+        ; genesis_ledger_hash : 'snarked_ledger_hash
+        ; ledger_proof_statement :
+            ( 'snarked_ledger_hash
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'local_state )
+            Snarked_ledger_state.Poly.Stable.V2.t
+        ; timestamp : 'time
+        ; body_reference : 'body_reference
+        ; protocol_versions : 'protocol_versions
+        }
+      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+    end
+
     module V2 = struct
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -52,6 +92,7 @@ Poly.
   , timestamp
   , body_reference
   , ledger_proof_statement
+  , protocol_versions
   , to_hlist
   , of_hlist )]
 
@@ -74,8 +115,9 @@ module Value = struct
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
-        , unit )
-        Poly.Stable.V2.t
+        , unit
+        , Protocol_versions.Value.Stable.V1.t )
+        Poly.Stable.V3.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
@@ -95,10 +137,21 @@ module Value = struct
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
-      let to_latest (t : t) : Latest.t =
-        { t with
-          ledger_proof_statement =
-            Snarked_ledger_state.Stable.V2.to_latest t.ledger_proof_statement
+      let to_latest
+          ({ staged_ledger_hash
+           ; genesis_ledger_hash
+           ; ledger_proof_statement
+           ; timestamp
+           ; body_reference
+           } :
+            t ) : Latest.t =
+        { staged_ledger_hash
+        ; genesis_ledger_hash
+        ; ledger_proof_statement =
+            Snarked_ledger_state.Stable.V2.to_latest ledger_proof_statement
+        ; timestamp
+        ; body_reference
+        ; protocol_versions = Protocol_versions.legacy
         }
 
       let to_input
@@ -121,6 +174,10 @@ module Value = struct
   end]
 end
 
+type protocol_versions = Protocol_versions.Value.t
+
+type protocol_versions_var = Protocol_versions.var
+
 type var =
   ( Staged_ledger_hash.var
   , Frozen_ledger_hash.var
@@ -130,16 +187,18 @@ type var =
   , Currency.Amount.Signed.var
   , Pending_coinbase.Stack.var
   , Fee_excess.var
-  , unit )
+  , unit
+  , Protocol_versions.var )
   Poly.t
 
 let create_value ~staged_ledger_hash ~genesis_ledger_hash ~timestamp
-    ~body_reference ~ledger_proof_statement =
+    ~body_reference ~ledger_proof_statement ~protocol_versions =
   { Poly.staged_ledger_hash
   ; timestamp
   ; genesis_ledger_hash
   ; body_reference
   ; ledger_proof_statement
+  ; protocol_versions
   }
 
 let typ : (var, Value.t) Typ.t =
@@ -149,6 +208,7 @@ let typ : (var, Value.t) Typ.t =
     ; Snarked_ledger_state.typ
     ; Block_time.Checked.typ
     ; Consensus.Body_reference.typ
+    ; Protocol_versions.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -161,6 +221,7 @@ let var_to_input
      ; timestamp
      ; body_reference
      ; ledger_proof_statement
+     ; protocol_versions
      } :
       var ) : Field.Var.t Random_oracle.Input.Chunked.t Checked.t =
   let open Random_oracle.Input.Chunked in
@@ -174,6 +235,7 @@ let var_to_input
     ; ledger_proof_statement
     ; Block_time.Checked.to_input timestamp
     ; Consensus.Body_reference.var_to_input body_reference
+    ; Protocol_versions.var_to_input protocol_versions
     ]
 
 let to_input
@@ -182,6 +244,7 @@ let to_input
      ; timestamp
      ; body_reference
      ; ledger_proof_statement
+     ; protocol_versions
      } :
       Value.t ) =
   let open Random_oracle.Input.Chunked in
@@ -191,6 +254,7 @@ let to_input
     ; Snarked_ledger_state.to_input ledger_proof_statement
     ; Block_time.to_input timestamp
     ; Consensus.Body_reference.to_input body_reference
+    ; Protocol_versions.to_input protocol_versions
     ]
 
 let set_timestamp t timestamp = { t with Poly.timestamp }
@@ -205,6 +269,8 @@ let negative_one
   ; ledger_proof_statement = Snarked_ledger_state.genesis ~genesis_ledger_hash
   ; timestamp = consensus_constants.genesis_state_timestamp
   ; body_reference = genesis_body_reference
+  ; protocol_versions =
+      Protocol_versions.create ~current:Protocol_version.current ~proposed:None
   }
 
 (* negative_one and genesis blockchain states are equivalent *)
@@ -219,7 +285,8 @@ type display =
   , string
   , string
   , string
-  , unit )
+  , unit
+  , string )
   Poly.t
 [@@deriving yojson]
 
@@ -229,6 +296,7 @@ let display
      ; ledger_proof_statement
      ; timestamp
      ; body_reference
+     ; protocol_versions
      } :
       Value.t ) : display =
   { Poly.staged_ledger_hash =
@@ -247,4 +315,12 @@ let display
   ; body_reference =
       Visualization.display_prefix_of_string
       @@ Consensus.Body_reference.to_hex body_reference
+  ; protocol_versions =
+      ( match protocol_versions with
+      | { Protocol_versions.Poly.current; proposed = None } ->
+          Protocol_version.to_string current
+      | { Protocol_versions.Poly.current; proposed = Some proposed } ->
+          sprintf "%s (proposes %s)"
+            (Protocol_version.to_string current)
+            (Protocol_version.to_string proposed) )
   }

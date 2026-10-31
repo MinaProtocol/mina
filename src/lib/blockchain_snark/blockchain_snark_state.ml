@@ -218,6 +218,12 @@ let%snarkydef_ step ~(logger : Logger.t)
         ~consensus_state
         ~constants:(Protocol_state.constants previous_state)
     in
+    let%bind () =
+      with_label __LOC__ (fun () ->
+          Protocol_versions.assert_current_is_this_protocol
+            (Blockchain_state.protocol_versions
+               (Protocol_state.blockchain_state t) ) )
+    in
     let%bind is_base_case =
       Protocol_state.consensus_state t
       |> Consensus.Data.Consensus_state.is_genesis_state_var
