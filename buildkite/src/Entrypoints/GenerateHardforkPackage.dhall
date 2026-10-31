@@ -24,6 +24,12 @@ let PipelineTag = ../Pipeline/Tag.dhall
 
 let DockerImage = ../Command/DockerImage.dhall
 
+let DockerLogin = ../Command/DockerLogin/Type.dhall
+
+let DockerPublish = ../Constants/Docker/Publish.dhall
+
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianChannel = ../Constants/DebianChannel.dhall
@@ -70,6 +76,8 @@ let Spec =
           , debian_channel : DebianChannel.Type
           , publish_debians_o1test : Bool
           , publish_debians_stable : Bool
+          , publish_dockers_docker_io : Bool
+          , publish_dockers_euro : Bool
           }
       , default =
           { codenames =
@@ -93,8 +101,56 @@ let Spec =
           , debian_channel = DebianChannel.Type.Stable
           , publish_debians_o1test = False
           , publish_debians_stable = False
+          , publish_dockers_docker_io = False
+          , publish_dockers_euro = False
           }
       }
+
+let dockerRepo =
+    -- The registry the images are tagged for. No image step pushes: the
+    -- images go to this build's cache and the publish steps push them after
+    -- verification. docker.io when asked for, else the internal registry,
+    -- so a run that publishes nothing tags as it always did.
+          \(spec : Spec.Type)
+      ->        if spec.publish_dockers_docker_io
+
+          then  DockerRepo.Type.Public
+
+          else  DockerRepo.Type.InternalEurope
+
+let buildCacheDir = MinaArtifact.ownBuildCacheDir
+
+let cachedDockerSpec =
+    -- Take the layered bases from the build cache, write the image there,
+    -- push nothing.
+          \(spec : Spec.Type)
+      ->  \(docker : DockerImage.ReleaseSpec.Type)
+      ->      docker
+          //  { docker_repo = dockerRepo spec
+              , docker_publish = DockerPublish.Type.Disabled
+              , build_cache_dir = Some buildCacheDir
+              , base_cache_dir = Some buildCacheDir
+              }
+
+let CodenameDockerSteps =
+      { steps : List Command.Type, keys : List Command.TaggedKey.Type }
+
+let verifyStepKeys =
+    -- The verification of the packaged artifacts runs for the first
+    -- codename only. Nothing is published before it has passed.
+          \(spec : Spec.Type)
+      ->  merge
+            { Some =
+                    \(c : DebianArchPair)
+                ->  let lower = DebianVersions.lowerName c.DebVersion
+
+                    in  [ "verify-packaged-artifacts-config-${lower}"
+                        , "verify-packaged-artifacts-ledgers-${lower}"
+                        , "verify-packaged-artifacts-tarballs-${lower}"
+                        ]
+            , None = [] : List Text
+            }
+            (Prelude.List.head DebianArchPair spec.codenames)
 
 let generateReferenceTarballsCommand =
           \(spec : Spec.Type)
@@ -440,35 +496,61 @@ let generateDockerForCodename =
                   }
                   spec.use_generic_dockers_from_version
 
-          in    buildOrGetArtifacts
-              # List/map
+          let cachedSpecs =
+                List/map
                   DockerImage.ReleaseSpec.Type
-                  Command.Type
-                  (     \(spec : DockerImage.ReleaseSpec.Type)
-                    ->  DockerImage.generateStep spec
-                  )
+                  DockerImage.ReleaseSpec.Type
+                  (cachedDockerSpec spec)
                   dockerSpecs
+
+          in  { steps =
+                    buildOrGetArtifacts
+                  # List/map
+                      DockerImage.ReleaseSpec.Type
+                      Command.Type
+                      DockerImage.generateStep
+                      cachedSpecs
+              , keys =
+                  List/map
+                    DockerImage.ReleaseSpec.Type
+                    Command.TaggedKey.Type
+                    (     \(s : DockerImage.ReleaseSpec.Type)
+                      ->  { name = pipelineName, key = DockerImage.stepKey s }
+                    )
+                    cachedSpecs
+              }
 
 let generateHfRelatedStepsForCodename =
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
       ->  \(codenames : List DebianArchPair)
       ->  \(pipelineName : Text)
-      ->  let image =
-                Docker.fullDockerTag
-                  Docker.Tag::{
-                  , remove_profile_from_name = True
-                  , network = spec.network
-                  , version =
-                      merge
-                        { Some =
-                                \(v : Text)
-                            ->  "${v}-${DebianVersions.lowerName
-                                          codename.DebVersion}"
-                        , None = "\\\${MINA_DOCKER_TAG}"
-                        }
-                        spec.use_generic_dockers_from_version
-                  }
+      ->  let imageTag =
+                Docker.Tag::{
+                , remove_profile_from_name = True
+                , network = spec.network
+                , version =
+                    merge
+                      { Some =
+                              \(v : Text)
+                          ->  "${v}-${DebianVersions.lowerName
+                                        codename.DebVersion}"
+                      , None = "\\\${MINA_DOCKER_TAG}"
+                      }
+                      spec.use_generic_dockers_from_version
+                }
+
+          let image =
+                "${DockerRepo.show
+                     (dockerRepo spec)}/${Docker.dockerName
+                                            imageTag.package}:${Docker.dockerTag
+                                                                  imageTag}"
+
+          let loadImage =
+              -- The daemon image is never pushed by its build step; the
+              -- verification takes it from this build's cache.
+                Cmd.run
+                  "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
 
           let profile = Profiles.fromNetwork spec.network
 
@@ -587,6 +669,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -607,6 +690,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -634,6 +718,7 @@ let generateHfRelatedStepsForCodename =
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                          , loadImage
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
                               "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && MINA_LOG_LEVEL=Spam FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -653,6 +738,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -682,19 +768,7 @@ let publishDebianSteps =
                   (\(c : DebianArchPair) -> c.DebVersion)
                   spec.codenames
 
-          let verifyKeys =
-                merge
-                  { Some =
-                          \(c : DebianArchPair)
-                      ->  let lower = DebianVersions.lowerName c.DebVersion
-
-                          in  [ "verify-packaged-artifacts-config-${lower}"
-                              , "verify-packaged-artifacts-ledgers-${lower}"
-                              , "verify-packaged-artifacts-tarballs-${lower}"
-                              ]
-                  , None = [] : List Text
-                  }
-                  (Prelude.List.head DebianArchPair spec.codenames)
+          let verifyKeys = verifyStepKeys spec
 
           let artifactKeys =
                 List/map
@@ -749,6 +823,71 @@ let publishDebianSteps =
 
           in  o1test # stable
 
+let publishDockerSteps =
+    -- Push the images from this build's cache once every image is built and
+    -- the first codename's packaged artifacts have passed verification.
+    -- docker.io gets every codename; the internal registry only the first
+    -- one, retagged when the images were tagged for docker.io.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  \(dockerKeys : List Command.TaggedKey.Type)
+      ->  let depends_on =
+                  dockerKeys
+                # List/map
+                    Text
+                    Command.TaggedKey.Type
+                    (\(key : Text) -> { name = pipelineName, key = key })
+                    (verifyStepKeys spec)
+
+          let publishStep =
+                    \(name : Text)
+                ->  \(label : Text)
+                ->  \(env : Text)
+                ->  Command.build
+                      Command.Config::{
+                      , commands =
+                        [ Cmd.run
+                            "${env}./buildkite/scripts/docker/publish_from_cache.sh"
+                        ]
+                      , label = label
+                      , key = "publish-dockers-${name}"
+                      , target = Size.Small
+                      , docker_login = Some DockerLogin::{=}
+                      , depends_on = depends_on
+                      }
+
+          let dockerIo =
+                      if spec.publish_dockers_docker_io
+
+                then  [ publishStep "docker-io" "Publish dockers: docker.io" ""
+                      ]
+
+                else  [] : List Command.Type
+
+          let euroRegistry = DockerRepo.show DockerRepo.Type.InternalEurope
+
+          let euro =
+                      if spec.publish_dockers_euro
+
+                then  merge
+                        { Some =
+                                \(c : DebianArchPair)
+                            ->  let lower =
+                                      DebianVersions.lowerName c.DebVersion
+
+                                in  [ publishStep
+                                        "euro"
+                                        "Publish dockers: euro (${lower})"
+                                        "MINA_PUBLISH_CODENAMES=${lower} MINA_PUBLISH_TARGET_REGISTRY=${euroRegistry} "
+                                    ]
+                        , None = [] : List Command.Type
+                        }
+                        (Prelude.List.head DebianArchPair spec.codenames)
+
+                else  [] : List Command.Type
+
+          in  dockerIo # euro
+
 let pipeline =
           \(spec : Spec.Type)
       ->  let pipelineName = "GenerateHardforkPackage"
@@ -773,6 +912,32 @@ let pipeline =
                     else  let first =
                                 Prelude.List.head DebianArchPair spec.codenames
 
+                          let perCodename =
+                                List/map
+                                  DebianArchPair
+                                  CodenameDockerSteps
+                                  (     \(codename : DebianArchPair)
+                                    ->  generateDockerForCodename
+                                          spec
+                                          codename
+                                          pipelineName
+                                  )
+                                  spec.codenames
+
+                          let dockerSteps =
+                                List/concatMap
+                                  CodenameDockerSteps
+                                  Command.Type
+                                  (\(r : CodenameDockerSteps) -> r.steps)
+                                  perCodename
+
+                          let dockerKeys =
+                                List/concatMap
+                                  CodenameDockerSteps
+                                  Command.TaggedKey.Type
+                                  (\(r : CodenameDockerSteps) -> r.keys)
+                                  perCodename
+
                           in    merge
                                   { Some =
                                           \(codename : DebianArchPair)
@@ -784,17 +949,9 @@ let pipeline =
                                   , None = [] : List Command.Type
                                   }
                                   first
-                              # List/concatMap
-                                  DebianArchPair
-                                  Command.Type
-                                  (     \(codename : DebianArchPair)
-                                    ->  generateDockerForCodename
-                                          spec
-                                          codename
-                                          pipelineName
-                                  )
-                                  spec.codenames
+                              # dockerSteps
                               # publishDebianSteps spec pipelineName
+                              # publishDockerSteps spec pipelineName dockerKeys
                 }
 
 let generate_hardfork_package =
@@ -810,6 +967,8 @@ let generate_hardfork_package =
       ->  \(debian_channel : DebianChannel.Type)
       ->  \(publish_debians_o1test : Bool)
       ->  \(publish_debians_stable : Bool)
+      ->  \(publish_dockers_docker_io : Bool)
+      ->  \(publish_dockers_euro : Bool)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
@@ -829,6 +988,8 @@ let generate_hardfork_package =
               , debian_channel = debian_channel
               , publish_debians_o1test = publish_debians_o1test
               , publish_debians_stable = publish_debians_stable
+              , publish_dockers_docker_io = publish_dockers_docker_io
+              , publish_dockers_euro = publish_dockers_euro
               }
           ).pipeline
 
