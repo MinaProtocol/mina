@@ -54,7 +54,8 @@ let deploy_account_update_body : Account_update.Body.t =
     public_key = pk_compressed
   ; update =
       { Account_update.Update.dummy with
-        verification_key = Set { data = vk; hash = vk_hash }
+        verification_key =
+          Set (Verification_key_wire.of_hashed { data = vk; hash = vk_hash })
       }
   ; preconditions =
       { Account_update.Preconditions.network =

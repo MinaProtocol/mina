@@ -45,15 +45,7 @@ let deploy_account_update_body : Account_update.Body.t =
     public_key = pk_compressed
   ; update =
       { Account_update.Update.dummy with
-        verification_key =
-          Set
-            { data = vk
-            ; hash =
-                (* TODO: This function should live in
-                   [Side_loaded_verification_key].
-                *)
-                Zkapp_account.digest_vk vk
-            }
+        verification_key = Set (Verification_key_wire.of_data vk)
       }
   ; preconditions =
       { Account_update.Preconditions.network =

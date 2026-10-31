@@ -15,7 +15,9 @@ type ledger_proof = Ledger_proof.t
 module Processor = struct
   let verify_commands ~signature_kind
       (cs : User_command.Verifiable.Serializable.t With_status.t list) =
-    let results = List.map cs ~f:(Common.check ~signature_kind) in
+    let results =
+      List.map cs ~f:(Common.check ~signature_kind ~hash_of_vk:With_hash.hash)
+    in
     let to_verify =
       List.concat_map
         ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
@@ -169,7 +171,9 @@ module Worker_state = struct
         @@ ( module struct
              let verify_commands tagged_commands =
                List.map tagged_commands
-                 ~f:(Fn.compose f (Common.check ~signature_kind))
+                 ~f:
+                   (Fn.compose f
+                      (Common.check ~signature_kind ~hash_of_vk:With_hash.hash) )
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
