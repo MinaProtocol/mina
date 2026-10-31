@@ -116,3 +116,91 @@ module Verification_status = struct
             false
     end )
 end
+
+(** Ties the attached snark work to the submitted block.
+
+    The sok message binds a proof to the submitter and the fee only, so a
+    valid proof could be reattached to every later submission of the same
+    submitter. The uptime service picks the job whose target second-pass
+    ledger is the staged ledger of the block it reports
+    ([Uptime_service.send_block_and_transaction_snark]); the verifier requires
+    the same relation, so the work has to come from the submitted block. *)
+module Snark_work = struct
+  open Mina_base
+
+  let check_belongs_to_block ~(block_staged_ledger_hash : Staged_ledger_hash.t)
+      ~(proof : Ledger_proof.t) =
+    let block_ledger_hash =
+      Staged_ledger_hash.ledger_hash block_staged_ledger_hash
+    in
+    let proof_target_ledger_hash =
+      (Ledger_proof.statement proof).target.second_pass_ledger
+    in
+    if Ledger_hash.equal proof_target_ledger_hash block_ledger_hash then Ok ()
+    else
+      Or_error.errorf
+        "proof's target ledger %s does not match the submitted block's staged \
+         ledger %s"
+        (Ledger_hash.to_base58_check proof_target_ledger_hash)
+        (Ledger_hash.to_base58_check block_ledger_hash)
+
+  let%test_module "check_belongs_to_block" =
+    ( module struct
+      let ledger_hashes =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "delegation-verify-block-binding")
+          (Quickcheck.Generator.list_with_length 2 Frozen_ledger_hash.gen)
+
+      let block_ledger_hash = List.nth_exn ledger_hashes 0
+
+      let other_ledger_hash = List.nth_exn ledger_hashes 1
+
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000
+
+      let prover =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "delegation-verify-submitter")
+          Signature_lib.Public_key.Compressed.gen
+
+      (* A proof whose statement ends on [target_ledger], as the uptime service
+         produces for a block whose staged ledger is [target_ledger]. *)
+      let proof_targeting target_ledger =
+        let statement =
+          Mina_state.Snarked_ledger_state.genesis
+            ~genesis_ledger_hash:other_ledger_hash
+        in
+        let statement =
+          { statement with
+            target =
+              { statement.target with second_pass_ledger = target_ledger }
+          }
+        in
+        Ledger_proof.For_tests.mk_dummy_proof ~statement ~fee ~prover
+
+      let staged_ledger_hash_of ledger_hash =
+        Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+          (Staged_ledger_hash.Aux_hash.of_bytes (String.make 32 '\000'))
+          ledger_hash
+          (Pending_coinbase.create ~depth:3 () |> Or_error.ok_exn)
+
+      let%test "work on the submitted block is accepted" =
+        check_belongs_to_block
+          ~block_staged_ledger_hash:(staged_ledger_hash_of block_ledger_hash)
+          ~proof:(proof_targeting block_ledger_hash)
+        |> Or_error.is_ok
+
+      (* A valid proof for a different block, with the same fee and submitter,
+         used to pass: nothing related the work to the submitted block. *)
+      let%test "work on another block is rejected" =
+        match
+          check_belongs_to_block
+            ~block_staged_ledger_hash:(staged_ledger_hash_of block_ledger_hash)
+            ~proof:(proof_targeting other_ledger_hash)
+        with
+        | Ok () ->
+            false
+        | Error e ->
+            String.is_substring (Error.to_string_hum e)
+              ~substring:"does not match the submitted block's staged ledger"
+    end )
+end
