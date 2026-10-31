@@ -50,6 +50,7 @@ let Spec =
           , verify : Bool
           , label : Text
           , key : Text
+          , depends_on : List Command.TaggedKey.Type
           }
       , default =
           { codenames = [ DebianVersions.DebVersion.Bookworm ]
@@ -58,6 +59,7 @@ let Spec =
           , verify = True
           , label = "Publish debians"
           , key = "publish-debians"
+          , depends_on = [] : List Command.TaggedKey.Type
           }
       }
 
@@ -171,6 +173,7 @@ let step
             , label = spec.label
             , key = spec.key
             , target = Size.Small
+            , depends_on = spec.depends_on
             }
 
 in  { Type = Spec.Type, Spec = Spec, step = step, debsFolder = debsFolder }

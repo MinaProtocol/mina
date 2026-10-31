@@ -26,6 +26,12 @@ let DockerImage = ../Command/DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
+let DebianChannel = ../Constants/DebianChannel.dhall
+
+let DebianRepo = ../Constants/DebianRepo.dhall
+
+let PublishDebians = ../Command/Packages/PublishDebians.dhall
+
 let Docker = ../Constants/Docker/Package.dhall
 
 let Artifact = ../Constants/Artifact/Artifacts.dhall
@@ -61,6 +67,9 @@ let Spec =
           , size : Size
           , deb_legacy_version : Text
           , deb_legacy_githash_config : Text
+          , debian_channel : DebianChannel.Type
+          , publish_debians_o1test : Bool
+          , publish_debians_stable : Bool
           }
       , default =
           { codenames =
@@ -81,6 +90,9 @@ let Spec =
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
           , deb_legacy_githash_config =
               defaultMinaArtifactSpec.deb_legacy_githash_config
+          , debian_channel = DebianChannel.Type.Stable
+          , publish_debians_o1test = False
+          , publish_debians_stable = False
           }
       }
 
@@ -269,6 +281,7 @@ let generateDockerForCodename =
                         , debVersion = codename.DebVersion
                         , prefix = pipelineName
                         , suffix = Some "-${lowerNameCodename}"
+                        , channel = spec.debian_channel
                         , deb_legacy_githash_config =
                             spec.deb_legacy_githash_config
                         }
@@ -555,6 +568,8 @@ let generateHfRelatedStepsForCodename =
                           }
                           (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
                               , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              , "MINA_DEB_RELEASE=${DebianChannel.effective
+                                                      spec.debian_channel}"
                               ]
                             # DebianVersions.overrideEnvs
                           )
@@ -653,6 +668,87 @@ let generateHfRelatedStepsForCodename =
                     }
                 ]
 
+let publishDebianSteps =
+    -- One publish step per repository asked for, after every package of
+    -- this build is in the cache and the first codename's packaged
+    -- artifacts have passed verification. Both steps read the same debs:
+    -- the channel is also their Suite, written at packaging time.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  let codenames =
+                List/map
+                  DebianArchPair
+                  DebianVersions.DebVersion
+                  (\(c : DebianArchPair) -> c.DebVersion)
+                  spec.codenames
+
+          let verifyKeys =
+                merge
+                  { Some =
+                          \(c : DebianArchPair)
+                      ->  let lower = DebianVersions.lowerName c.DebVersion
+
+                          in  [ "verify-packaged-artifacts-config-${lower}"
+                              , "verify-packaged-artifacts-ledgers-${lower}"
+                              , "verify-packaged-artifacts-tarballs-${lower}"
+                              ]
+                  , None = [] : List Text
+                  }
+                  (Prelude.List.head DebianArchPair spec.codenames)
+
+          let artifactKeys =
+                List/map
+                  DebianArchPair
+                  Text
+                  (     \(c : DebianArchPair)
+                    ->  let lower = DebianVersions.lowerName c.DebVersion
+
+                        in  merge
+                              { Some =
+                                      \(_ : Text)
+                                  ->  "download-cached-artifacts-${lower}"
+                              , None = "build-deb-pkg-${lower}"
+                              }
+                              spec.use_artifacts_from_buildkite_build
+                  )
+                  spec.codenames
+
+          let depends_on =
+                List/map
+                  Text
+                  Command.TaggedKey.Type
+                  (\(key : Text) -> { name = pipelineName, key = key })
+                  ([ "build-hf-debian" ] # artifactKeys # verifyKeys)
+
+          let step =
+                    \(repo : DebianRepo.Type)
+                ->  \(name : Text)
+                ->  PublishDebians.step
+                      PublishDebians.Spec::{
+                      , codenames = codenames
+                      , channel = spec.debian_channel
+                      , debianRepo = repo
+                      , label = "Publish debians: ${name}"
+                      , key = "publish-debians-${name}"
+                      , depends_on = depends_on
+                      }
+
+          let o1test =
+                      if spec.publish_debians_o1test
+
+                then  [ step DebianRepo.Type.O1Test "o1test" ]
+
+                else  [] : List Command.Type
+
+          let stable =
+                      if spec.publish_debians_stable
+
+                then  [ step DebianRepo.Type.Stable "stable" ]
+
+                else  [] : List Command.Type
+
+          in  o1test # stable
+
 let pipeline =
           \(spec : Spec.Type)
       ->  let pipelineName = "GenerateHardforkPackage"
@@ -698,6 +794,7 @@ let pipeline =
                                           pipelineName
                                   )
                                   spec.codenames
+                              # publishDebianSteps spec pipelineName
                 }
 
 let generate_hardfork_package =
@@ -710,6 +807,9 @@ let generate_hardfork_package =
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
       ->  \(use_generic_dockers_from_version : Optional Text)
+      ->  \(debian_channel : DebianChannel.Type)
+      ->  \(publish_debians_o1test : Bool)
+      ->  \(publish_debians_stable : Bool)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
@@ -726,6 +826,9 @@ let generate_hardfork_package =
                   use_artifacts_from_buildkite_build
               , use_generic_dockers_from_version =
                   use_generic_dockers_from_version
+              , debian_channel = debian_channel
+              , publish_debians_o1test = publish_debians_o1test
+              , publish_debians_stable = publish_debians_stable
               }
           ).pipeline
 

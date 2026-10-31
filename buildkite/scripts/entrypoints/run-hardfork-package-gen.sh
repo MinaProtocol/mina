@@ -20,6 +20,11 @@ set -euox pipefail
 #   PRECOMPUTED_FORK_BLOCK_PREFIX      - (Optional) Prefix for precomputed fork block URLs (e.g., "gs://mina_network_block_data/mainnet")
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
+#   DEBIAN_CHANNEL                     - (Optional) Debian channel the packages are built for and published to, as a
+#                                        DebianChannel.dhall alternative (e.g., "Stable", "Alpha"). Default: Stable
+#   PUSH_TO_PACKAGES                   - (Optional) "true" to publish the debian packages to packages.o1test.net. Default: false
+#   PUSH_TO_STABLE_DEBIAN_REPO         - (Optional) "true" to publish the debian packages to the signed
+#                                        stable.apt.packages.minaprotocol.com. Default: false
 #
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
@@ -44,6 +49,7 @@ CLEAR='\033[0m'
 DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
 ARCH_DHALL_DEF="(./buildkite/src/Constants/Arch.dhall)"
 NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
+DEBIAN_CHANNEL_DHALL_DEF="(./buildkite/src/Constants/DebianChannel.dhall)"
 GENERATE_HARDFORK_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/GenerateHardforkPackage.dhall)"
 
 function usage() {
@@ -59,8 +65,22 @@ function usage() {
   PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
   USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
+  DEBIAN_CHANNEL                     (Optional) Debian channel the packages are built for and published to (e.g. Stable, Alpha). Default: Stable
+  PUSH_TO_PACKAGES                   (Optional) true to publish the debian packages to packages.o1test.net. Default: false
+  PUSH_TO_STABLE_DEBIAN_REPO         (Optional) true to publish the debian packages to stable.apt.packages.minaprotocol.com. Default: false
 EOF
   exit 1
+}
+
+# Turn the "true"/"false" value of the variable named $1 into a Dhall Bool.
+# Unset or empty means false. Anything else is a typo, not a decision.
+function to_dhall_bool() {
+  local -n __var="$1"
+  case "${__var,,}" in
+    ""|false) __var="False" ;;
+    true) __var="True" ;;
+    *) usage "$1 must be 'true' or 'false', got: ${__var}" ;;
+  esac
 }
 
 function to_dhall_list() {
@@ -143,6 +163,14 @@ else
   PRECOMPUTED_FORK_BLOCK_PREFIX="(Some \"${PRECOMPUTED_FORK_BLOCK_PREFIX}\")"
 fi
 
+DEBIAN_CHANNEL="${DEBIAN_CHANNEL:-Stable}"
+
+PUSH_TO_PACKAGES="${PUSH_TO_PACKAGES:-false}"
+to_dhall_bool PUSH_TO_PACKAGES
+
+PUSH_TO_STABLE_DEBIAN_REPO="${PUSH_TO_STABLE_DEBIAN_REPO:-false}"
+to_dhall_bool PUSH_TO_STABLE_DEBIAN_REPO
+
 codenames_array=()
 for codename_config in ${CODENAMES_CONFIG//,/ }; do
   codename="${codename_config%_*}"
@@ -162,7 +190,7 @@ else
 fi
 
 # shellcheck disable=SC2089
-printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s.Type.%s %s %s\n' \
   "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
   "$DHALL_CODENAMES" \
   "$NETWORK_DHALL_DEF" \
@@ -174,4 +202,8 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
   "$PRECOMPUTED_FORK_BLOCK_PREFIX" \
   "$USE_ARTIFACTS_FROM_BUILDKITE_BUILD" \
   "$USE_GENERIC_DOCKERS_FROM_VERSION" \
+  "$DEBIAN_CHANNEL_DHALL_DEF" \
+  "$DEBIAN_CHANNEL" \
+  "$PUSH_TO_PACKAGES" \
+  "$PUSH_TO_STABLE_DEBIAN_REPO" \
    | dhall-to-yaml --quoted
