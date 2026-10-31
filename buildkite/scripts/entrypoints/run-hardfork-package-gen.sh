@@ -25,6 +25,10 @@ set -euox pipefail
 #   PUSH_TO_PACKAGES                   - (Optional) "true" to publish the debian packages to packages.o1test.net. Default: false
 #   PUSH_TO_STABLE_DEBIAN_REPO         - (Optional) "true" to publish the debian packages to the signed
 #                                        stable.apt.packages.minaprotocol.com. Default: false
+#   PUSH_TO_DOCKER_IO                  - (Optional) "true" to publish the docker images of every codename to
+#                                        docker.io/minaprotocol. Default: false
+#   PUSH_TO_EURO_REPO                  - (Optional) "true" to publish the docker images of the first codename to
+#                                        europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo. Default: false
 #
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
@@ -68,6 +72,8 @@ function usage() {
   DEBIAN_CHANNEL                     (Optional) Debian channel the packages are built for and published to (e.g. Stable, Alpha). Default: Stable
   PUSH_TO_PACKAGES                   (Optional) true to publish the debian packages to packages.o1test.net. Default: false
   PUSH_TO_STABLE_DEBIAN_REPO         (Optional) true to publish the debian packages to stable.apt.packages.minaprotocol.com. Default: false
+  PUSH_TO_DOCKER_IO                  (Optional) true to publish the docker images of every codename to docker.io. Default: false
+  PUSH_TO_EURO_REPO                  (Optional) true to publish the docker images of the first codename to the euro-docker-repo. Default: false
 EOF
   exit 1
 }
@@ -171,6 +177,12 @@ to_dhall_bool PUSH_TO_PACKAGES
 PUSH_TO_STABLE_DEBIAN_REPO="${PUSH_TO_STABLE_DEBIAN_REPO:-false}"
 to_dhall_bool PUSH_TO_STABLE_DEBIAN_REPO
 
+PUSH_TO_DOCKER_IO="${PUSH_TO_DOCKER_IO:-false}"
+to_dhall_bool PUSH_TO_DOCKER_IO
+
+PUSH_TO_EURO_REPO="${PUSH_TO_EURO_REPO:-false}"
+to_dhall_bool PUSH_TO_EURO_REPO
+
 codenames_array=()
 for codename_config in ${CODENAMES_CONFIG//,/ }; do
   codename="${codename_config%_*}"
@@ -190,7 +202,7 @@ else
 fi
 
 # shellcheck disable=SC2089
-printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s.Type.%s %s %s\n' \
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s.Type.%s %s %s %s %s\n' \
   "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
   "$DHALL_CODENAMES" \
   "$NETWORK_DHALL_DEF" \
@@ -206,4 +218,6 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s.T
   "$DEBIAN_CHANNEL" \
   "$PUSH_TO_PACKAGES" \
   "$PUSH_TO_STABLE_DEBIAN_REPO" \
+  "$PUSH_TO_DOCKER_IO" \
+  "$PUSH_TO_EURO_REPO" \
    | dhall-to-yaml --quoted

@@ -24,6 +24,14 @@
 # Holding one image for the minutes it takes to push it keeps that window small,
 # and the store small for the other jobs on the agent.
 #
+# Optional:
+#   MINA_PUBLISH_CODENAMES        comma separated; publish only the images whose
+#                                 tag names one of these codenames
+#   MINA_PUBLISH_TARGET_REGISTRY  push to this registry instead of the one the
+#                                 images are tagged for: same name, same tag,
+#                                 other registry. Unset, or the registry the
+#                                 images already carry, pushes them as tagged.
+#
 # DRY_RUN=1 lists what would be pushed.
 
 set -euo pipefail
@@ -49,6 +57,33 @@ if [[ ${#ARCHIVES[@]} -eq 0 ]]; then
   echo "❌ No images to publish under ${ROOTS[*]}: did the packaging stage run?" >&2
   exit 1
 fi
+
+if [[ -n "${MINA_PUBLISH_CODENAMES:-}" ]]; then
+  # An archive is named by its tag, and the codename is one dash-separated
+  # segment of it (<version>-<codename>-<network>..., or last).
+  IFS=',' read -ra WANTED <<< "${MINA_PUBLISH_CODENAMES// /}"
+  SELECTED=()
+  for archive in "${ARCHIVES[@]}"; do
+    tag="$(basename "$archive" .tar.zst)"
+    for codename in "${WANTED[@]}"; do
+      if [[ "-${tag}-" == *"-${codename}-"* ]]; then
+        SELECTED+=("$archive")
+        break
+      fi
+    done
+  done
+  if [[ ${#SELECTED[@]} -eq 0 ]]; then
+    echo "❌ None of the ${#ARCHIVES[@]} image(s) under ${ROOTS[*]} is tagged for ${MINA_PUBLISH_CODENAMES}" >&2
+    exit 1
+  fi
+  echo "--- ${#SELECTED[@]} of ${#ARCHIVES[@]} image(s) are tagged for ${MINA_PUBLISH_CODENAMES}"
+  ARCHIVES=("${SELECTED[@]}")
+fi
+
+# retag_for_registry <tag>: the same image name and tag in the target registry.
+retag_for_registry () {
+  echo "${MINA_PUBLISH_TARGET_REGISTRY}/${1##*/}"
+}
 
 publish_tag () {
   # publish_tag <tag> <primary> <image id>: push, or alias registry-side.
@@ -87,14 +122,31 @@ for archive in "${ARCHIVES[@]}"; do
     echo "❌ ${archive} holds no tagged image" >&2
     exit 1
   fi
+  loaded=("${tags[@]}")
+  if [[ -n "${MINA_PUBLISH_TARGET_REGISTRY:-}" ]]; then
+    # The archive holds the tags of the registry it was built for. Give the
+    # image the same tags in the target registry and publish those instead.
+    tags=()
+    for tag in "${loaded[@]}"; do
+      target="$(retag_for_registry "$tag")"
+      if [[ "$target" != "$tag" ]]; then
+        docker tag "$tag" "$target"
+      fi
+      tags+=("$target")
+    done
+  fi
   primary="${tags[0]}"
   id="$(docker image inspect --format '{{.Id}}' "$primary")"
   for tag in "${tags[@]}"; do
     publish_tag "$tag" "$primary" "$id"
   done
   # Done with it: free the store for the next archive and for the other jobs.
-  # Best effort, and only an image this run loaded.
-  docker image rm --no-prune "${tags[@]}" > /dev/null 2>&1 || true
+  # Best effort, and only an image this run loaded or tagged.
+  remove=("${loaded[@]}")
+  if [[ "${tags[*]}" != "${loaded[*]}" ]]; then
+    remove+=("${tags[@]}")
+  fi
+  docker image rm --no-prune "${remove[@]}" > /dev/null 2>&1 || true
 done
 
 echo "✅ ${PUSHED} tag(s) $([[ "$DRY_RUN" == "1" ]] && echo "would be " )published from ${#ARCHIVES[@]} image(s)."

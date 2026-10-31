@@ -154,11 +154,56 @@ t_dry_run_pushes_nothing () {
   expect "dry run pushed" not grep -qE "^(push|buildx)" "$CALLS"
 }
 
+t_codenames_select_the_images_tagged_for_them () {
+  # The codename is a dash-separated segment of the tag, in the middle or last.
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-devnet
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-bookworm-devnet
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-noble
+  archive pkg mina-archive reg/mina-archive:1.0.0-bookworm-devnet
+  run MINA_PUBLISH_CODENAMES=noble
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "noble image not pushed" called "push reg/mina-daemon:1.0.0-noble-devnet"
+  expect "noble image with the codename last not pushed" called "push reg/mina-daemon:1.0.0-noble"
+  expect "bookworm image pushed" not called "push reg/mina-daemon:1.0.0-bookworm-devnet"
+  expect "bookworm archive pushed" not called "push reg/mina-archive:1.0.0-bookworm-devnet"
+}
+
+t_codenames_matching_nothing_fail () {
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-devnet
+  run MINA_PUBLISH_CODENAMES=bookworm
+  expect "no image for the codename must be an error" test $RC -ne 0
+  expect "nothing may be pushed" not grep -q "^push" "$CALLS"
+}
+
+t_target_registry_retags_and_pushes_there () {
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet
+  run MINA_PUBLISH_TARGET_REGISTRY=other/repo
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "primary not retagged" called "tag reg/mina-daemon:1.0.0-devnet other/repo/mina-daemon:1.0.0-devnet"
+  expect "retagged primary not pushed" called "push other/repo/mina-daemon:1.0.0-devnet"
+  expect "extra tag not added in the target registry" \
+    called "buildx imagetools create --tag other/repo/mina-daemon:abc-devnet other/repo/mina-daemon:1.0.0-devnet"
+  expect "the tag it was built for must not be pushed" not called "push reg/mina-daemon:1.0.0-devnet"
+  expect "loaded and retagged images not dropped" \
+    called "image rm --no-prune reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet other/repo/mina-daemon:1.0.0-devnet other/repo/mina-daemon:abc-devnet"
+}
+
+t_target_registry_equal_to_the_tagged_one_pushes_as_tagged () {
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet
+  run MINA_PUBLISH_TARGET_REGISTRY=reg
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "must not retag onto itself" not grep -q "^tag " "$CALLS"
+  expect "not pushed as tagged" called "push reg/mina-daemon:1.0.0-devnet"
+}
+
 for t in t_pushes_primary_and_tags_the_rest t_refuses_a_tag_holding_another_image \
          t_publishes_one_archive_at_a_time \
          t_skips_a_tag_already_holding_this_image t_force_overwrites \
          t_nothing_to_publish_fails t_reads_the_generic_build_too \
-         t_read_cache_root_names_the_packaging_build t_dry_run_pushes_nothing; do
+         t_read_cache_root_names_the_packaging_build t_dry_run_pushes_nothing \
+         t_codenames_select_the_images_tagged_for_them t_codenames_matching_nothing_fail \
+         t_target_registry_retags_and_pushes_there \
+         t_target_registry_equal_to_the_tagged_one_pushes_as_tagged; do
   echo "TEST: $t"
   setup
   "$t"
