@@ -338,8 +338,6 @@ Archives artifacts from cache to long-term storage with optional version modific
 
 #### Optional Parameters
 - `--backend <BACKEND>`: Storage backend (default: hetzner)
-- `--new-version <VERSION>`: New version for repackaged artifacts
-- `--suite <SUITE>`: Debian suite (default: unstable)
 - `--arch <ARCH>`: Architecture (default: amd64)
 
 #### Examples
@@ -352,17 +350,6 @@ Archives artifacts from cache to long-term storage with optional version modific
   --target /archive/2024/releases \
   --codename bullseye \
   --artifacts mina-daemon,mina-archive
-```
-
-**Archive with version change:**
-```bash
-./manager.sh persist \
-  --buildkite-build-id 12345 \
-  --target /archive/legacy \
-  --codename bullseye \
-  --artifacts mina-daemon \
-  --new-version 1.9.9-legacy \
-  --suite stable
 ```
 
 ### 6. PULL Command
