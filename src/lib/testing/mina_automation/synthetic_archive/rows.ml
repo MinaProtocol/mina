@@ -271,7 +271,8 @@ let write_user_command w c =
 
 (* the parts of an account update the builder leaves empty, shared by all *)
 type empty_account_update_parts =
-  { update_id : int
+  { state_id : int
+  ; update_id : int
   ; call_data_id : int
   ; network_precondition_id : int
   ; account_precondition_id : int
@@ -330,7 +331,7 @@ let write_account_precondition w ~state_id =
     ; is_new = None
     }
 
-let write_update w ~app_state_id =
+let write_update ?zkapp_uri_id ?token_symbol_id w ~app_state_id =
   let module R = P.Zkapp_updates in
   insert w ~table_name:R.table_name ~cols:(R.Fields.names, R.typ)
     ~ctx:"zkapp update"
@@ -338,8 +339,8 @@ let write_update w ~app_state_id =
     ; delegate_id = None
     ; verification_key_id = None
     ; permissions_id = None
-    ; zkapp_uri_id = None
-    ; token_symbol_id = None
+    ; zkapp_uri_id
+    ; token_symbol_id
     ; timing_id = None
     ; voting_for_id = None
     }
@@ -354,12 +355,41 @@ let write_empty_account_update_parts w =
   let%bind network_precondition_id = write_network_precondition w in
   let%bind account_precondition_id = write_account_precondition w ~state_id in
   let%map update_id = write_update w ~app_state_id:state_id in
-  { update_id; call_data_id; network_precondition_id; account_precondition_id }
+  { state_id
+  ; update_id
+  ; call_data_id
+  ; network_precondition_id
+  ; account_precondition_id
+  }
 
-let account_update_body_row w parts (u : account_update) :
+(* bytea values, deduplicated as the archive does *)
+let write_optional_value w ~ctx add = function
+  | None ->
+      return None
+  | Some value ->
+      add w.conn value >>| Mina_caqti.ok_exn ~ctx >>| Option.some
+
+(* the shared empty update, unless the account update sets a token symbol or
+   a zkApp URI *)
+let update_id w parts (u : account_update) =
+  match (u.token_symbol, u.zkapp_uri) with
+  | None, None ->
+      return parts.update_id
+  | token_symbol, zkapp_uri ->
+      let%bind token_symbol_id =
+        write_optional_value w ~ctx:"token symbol"
+          P.Token_symbols.add_if_doesn't_exist token_symbol
+      in
+      let%bind zkapp_uri_id =
+        write_optional_value w ~ctx:"zkapp uri" P.Zkapp_uri.add_if_doesn't_exist
+          zkapp_uri
+      in
+      write_update ?token_symbol_id ?zkapp_uri_id w ~app_state_id:parts.state_id
+
+let account_update_body_row w parts ~update_id (u : account_update) :
     P.Zkapp_account_update_body.t =
   { account_identifier_id = account_identifier_id w u.update_account
-  ; update_id = parts.update_id
+  ; update_id
   ; balance_change = Int.to_string u.balance_change
   ; increment_nonce = false
   ; events_id = None
@@ -378,6 +408,7 @@ let account_update_body_row w parts (u : account_update) :
 
 let write_account_update w parts u =
   let module Body = P.Zkapp_account_update_body in
+  let%bind update_id = update_id w parts u in
   let%bind body_id =
     insert w ~table_name:Body.table_name
       ~cols:(Body.Fields.names, Body.typ)
@@ -389,7 +420,7 @@ let write_account_update w parts u =
         | _ ->
             None )
       ~ctx:"account update body"
-      (account_update_body_row w parts u)
+      (account_update_body_row w parts ~update_id u)
   in
   insert w ~table_name:P.Zkapp_account_update.table_name
     ~cols:(P.Zkapp_account_update.Fields.names, P.Zkapp_account_update.typ)
@@ -399,7 +430,13 @@ let write_account_update w parts u =
 let account_update_writer w parts =
   let ids = Hashtbl.Poly.create () in
   fun (u : account_update) ->
-    let key = (u.update_account.pk, u.balance_change, u.implicit_fee) in
+    let key =
+      ( u.update_account.pk
+      , u.balance_change
+      , u.implicit_fee
+      , u.token_symbol
+      , u.zkapp_uri )
+    in
     match Hashtbl.find ids key with
     | Some id ->
         return id
