@@ -23,9 +23,6 @@ let block_of_breadcrumb ?with_parent_statehash ~accounts_created:_ breadcrumb =
           ~protocol_state:{ state with previous_state_hash }
           ~protocol_state_proof:(Header.protocol_state_proof h)
           ~delta_block_chain_proof:(Header.delta_block_chain_proof h)
-          ?proposed_protocol_version_opt:
-            (Header.proposed_protocol_version_opt h)
-          ~current_protocol_version:(Header.current_protocol_version h)
           ()
       in
       Mina_block.create ~header ~body:(body block)

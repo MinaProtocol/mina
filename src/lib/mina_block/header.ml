@@ -24,8 +24,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; delta_block_chain_proof :
             (* TODO: abstract *)
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-        ; current_protocol_version : Protocol_version.Stable.V2.t
-        ; proposed_protocol_version_opt : Protocol_version.Stable.V2.t option
         }
       [@@deriving fields, sexp, to_yojson]
 
@@ -44,32 +42,17 @@ module Make_str (A : Wire_types.Concrete) = struct
              protocol_state:Protocol_state.Value.t
           -> protocol_state_proof:Proof.t
           -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
-          -> ?proposed_protocol_version_opt:Protocol_version.t
-          -> ?current_protocol_version:Protocol_version.t
           -> unit
           -> 'a
 
         let map_creator c ~f ~protocol_state ~protocol_state_proof
-            ~delta_block_chain_proof ?proposed_protocol_version_opt
-            ?current_protocol_version () =
+            ~delta_block_chain_proof () =
           f
-            (c ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
-               ?proposed_protocol_version_opt ?current_protocol_version () )
+            (c ~protocol_state ~protocol_state_proof ~delta_block_chain_proof ())
 
         let create ~protocol_state ~protocol_state_proof
-            ~delta_block_chain_proof ?proposed_protocol_version_opt
-            ?current_protocol_version () =
-          let cur_ver_fun =
-            Option.(bind current_protocol_version ~f:(Fn.compose return const))
-          in
-          let cur_ver_fallback () = Protocol_version.current in
-          { protocol_state
-          ; protocol_state_proof
-          ; delta_block_chain_proof
-          ; current_protocol_version =
-              Option.value ~default:cur_ver_fallback cur_ver_fun ()
-          ; proposed_protocol_version_opt
-          }
+            ~delta_block_chain_proof () =
+          { protocol_state; protocol_state_proof; delta_block_chain_proof }
       end
 
       include (
@@ -108,11 +91,12 @@ module Make_str (A : Wire_types.Concrete) = struct
            } :
             t ) : Latest.t =
         { protocol_state =
-            Protocol_state.Value.Stable.V3.to_latest protocol_state
+            Protocol_state.with_protocol_versions
+              (Protocol_state.Value.Stable.V3.to_latest protocol_state)
+              (Protocol_versions.create ~current:current_protocol_version
+                 ~proposed:proposed_protocol_version_opt )
         ; protocol_state_proof
         ; delta_block_chain_proof
-        ; current_protocol_version
-        ; proposed_protocol_version_opt
         }
     end
   end]
@@ -122,12 +106,18 @@ module Make_str (A : Wire_types.Concrete) = struct
     ( protocol_state
     , protocol_state_proof
     , delta_block_chain_proof
-    , current_protocol_version
-    , proposed_protocol_version_opt
     , create
     , sexp_of_t
     , t_of_sexp
     , to_yojson )]
+
+  let protocol_versions t =
+    Protocol_state.blockchain_state (protocol_state t)
+    |> Blockchain_state.protocol_versions
+
+  let current_protocol_version t = (protocol_versions t).current
+
+  let proposed_protocol_version_opt t = (protocol_versions t).proposed
 
   type protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }

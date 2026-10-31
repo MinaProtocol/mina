@@ -14,7 +14,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Stable = struct
     module V2 = struct
       type t = A.V2.t = { transaction : int; network : int; patch : int }
-      [@@deriving compare, equal, sexp, yojson, fields]
+      [@@deriving compare, equal, hash, sexp, yojson, fields]
 
       let to_latest = Fn.id
     end

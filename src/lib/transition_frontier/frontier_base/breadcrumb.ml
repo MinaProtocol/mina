@@ -463,6 +463,7 @@ module For_tests = struct
             ( Body.compute_reference ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
             @@ Body.read_all_proofs_from_disk body )
           ~ledger_proof_statement
+          ~protocol_versions:(Protocol_versions.of_daemon ())
       in
       let previous_state_hashes =
         Protocol_state.hashes previous_protocol_state

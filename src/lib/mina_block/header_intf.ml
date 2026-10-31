@@ -25,8 +25,6 @@ module type Full = sig
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
     -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
-    -> ?proposed_protocol_version_opt:Protocol_version.t
-    -> ?current_protocol_version:Protocol_version.t
     -> unit
     -> t
 
@@ -35,6 +33,9 @@ module type Full = sig
   val protocol_state_proof : t -> Proof.t
 
   val delta_block_chain_proof : t -> State_hash.t * State_body_hash.t list
+
+  (** The protocol versions recorded in the block's blockchain state. *)
+  val protocol_versions : t -> Protocol_versions.Value.t
 
   val current_protocol_version : t -> Protocol_version.t
 
