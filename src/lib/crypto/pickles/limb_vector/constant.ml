@@ -50,8 +50,6 @@ module Hex64 = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = (T.t[@version_asserted])
       [@@deriving compare, sexp, yojson, hash, equal]

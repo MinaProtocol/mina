@@ -15,6 +15,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, yojson]
+
 type sparse_ledger = t
 
 module Global_state : sig

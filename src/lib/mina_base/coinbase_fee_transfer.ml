@@ -26,6 +26,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { receiver_pk : Public_key.Compressed.t; fee : Currency.Fee.t }
+  [@@deriving sexp, compare, equal, yojson, hash]
+
   let create ~receiver_pk ~fee = { receiver_pk; fee }
 
   include Comparable.Make (Stable.Latest)

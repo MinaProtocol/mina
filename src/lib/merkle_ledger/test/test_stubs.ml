@@ -96,6 +96,8 @@ end = struct
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
+
   let to_string = Signature_lib.Public_key.Compressed.to_base58_check
 
   let gen = Mina_base.Account.key_gen
@@ -135,6 +137,8 @@ end = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

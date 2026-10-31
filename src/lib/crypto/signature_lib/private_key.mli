@@ -22,6 +22,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t [@@deriving compare, sexp]
+
 (** Generator for creating random private keys for testing *)
 val gen : t Quickcheck.Generator.t
 

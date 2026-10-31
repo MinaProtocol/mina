@@ -16,6 +16,13 @@ module Poly = struct
       let to_latest = Fn.id
     end
   end]
+
+  type 'account_updates t = 'account_updates Stable.Latest.t =
+    { fee_payer : Account_update.Fee_payer.t
+    ; account_updates : 'account_updates
+    ; memo : Signed_command_memo.t
+    }
+  [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 end
 
 module Graphql_repr = struct
@@ -28,6 +35,8 @@ module Graphql_repr = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Simple = struct
@@ -41,6 +50,8 @@ module Simple = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Call_forest = Zkapp_call_forest_base
@@ -57,8 +68,6 @@ module T = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     [@@@with_top_version_tag]
 
     (* DO NOT DELETE VERSIONS!

@@ -58,6 +58,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
+
     [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
     module Binables = struct
@@ -114,6 +116,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   let create key tid = (key, tid)
 

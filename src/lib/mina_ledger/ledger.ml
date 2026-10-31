@@ -76,6 +76,8 @@ module Ledger_inner = struct
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
+
     module Unstable = struct
       type t = Ledger_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
@@ -142,6 +144,8 @@ module Ledger_inner = struct
         let token = Account.token_id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving equal, compare, sexp]
 
     let empty = Stable.Latest.empty
 

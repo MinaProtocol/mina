@@ -8,6 +8,9 @@ module Stable = struct
   end
 end]
 
+type 'challenge t = 'challenge Stable.Latest.t = { prechallenge : 'challenge }
+[@@deriving sexp, compare, yojson, hash, equal]
+
 let pack { prechallenge } = prechallenge
 
 let unpack prechallenge = { prechallenge }
