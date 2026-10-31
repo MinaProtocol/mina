@@ -235,6 +235,97 @@ module Root_test = struct
         Deferred.unit )
 end
 
+module Sync_ledger_answer_test = struct
+  module Answer = Mina_ledger.Sync_ledger.Answer
+
+  let zkapp_account_with_vk account =
+    let vk = Side_loaded_verification_key.dummy in
+    { account with
+      Account.zkapp =
+        Some
+          { Zkapp_account.default with
+            verification_key =
+              Some { data = vk; hash = Verification_key_wire.digest_vk vk }
+          }
+    }
+
+  let gen_accounts ~random =
+    Quickcheck.Generator.(
+      list_with_length 8 Account.gen |> generate ~size:quickcheck_size ~random)
+    |> List.mapi ~f:(fun i account ->
+           if i % 2 = 0 then zkapp_account_with_vk account else account )
+
+  let test_shape () =
+    [%test_eq: string]
+      (Bin_prot.Shape.eval_to_digest_string Answer.Stable.Latest.bin_shape_t)
+      (Bin_prot.Shape.eval_to_digest_string Answer.With_raw_accounts.bin_shape_t) ;
+    Deferred.unit
+
+  let test_raw_encoding ~random () =
+    let accounts = gen_accounts ~random in
+    let answer : Answer.Stable.Latest.t = Contents_are accounts in
+    let raw : Answer.With_raw_accounts.t =
+      Contents_are
+        (List.map accounts ~f:(fun account ->
+             Answer.Raw_account.Raw
+               (Bin_prot.Utils.bin_dump Account.Stable.V3.bin_writer_t account) )
+        )
+    in
+    let expected = Binable.to_bigstring (module Answer.Stable.Latest) answer in
+    [%test_eq: Bigstring.t] expected
+      (Binable.to_bigstring (module Answer.With_raw_accounts) raw) ;
+    [%test_eq: Bigstring.t] expected
+      (Binable.to_bigstring
+         (module Answer.With_raw_accounts)
+         (Answer.With_raw_accounts.of_answer answer) ) ;
+    let decoded =
+      Binable.of_bigstring (module Answer.With_raw_accounts) expected
+    in
+    [%test_eq: Sexp.t]
+      (Answer.Stable.Latest.sexp_of_t answer)
+      (Answer.Stable.Latest.sexp_of_t
+         (Answer.With_raw_accounts.to_answer decoded) ) ;
+    Deferred.unit
+
+  let test_root_raw_accounts ~random () =
+    Mina_stdlib_unix.File_system.with_temp_dir "root_raw_accounts"
+      ~f:(fun cwd ->
+        List.iteri
+          [ Root_ledger.Config.Stable_db
+          ; Root_test.converting_config_with_random_hf_slot ()
+          ]
+          ~f:(fun i backing_type ->
+            let root =
+              Root_ledger.create ~logger
+                ~config:
+                  (Root_ledger.Config.with_directory
+                     ~directory_name:(cwd ^/ sprintf "ledger%d" i)
+                     ~backing_type )
+                ~depth:ledger_depth ()
+            in
+            let (_ : _) =
+              Root_test.populate_with_random_untimed_accounts ~num:num_accounts
+                ~root ~random
+            in
+            let address =
+              L.Addr.of_directions
+                (List.init (ledger_depth - 6) ~f:(fun _ ->
+                     Mina_stdlib.Direction.Left ) )
+            in
+            let expected =
+              List.map (Root_ledger.get_all_accounts_rooted_at_exn root address)
+                ~f:(fun (addr, account) ->
+                  ( addr
+                  , Bin_prot.Utils.bin_dump Account.Stable.V3.bin_writer_t
+                      account ) )
+            in
+            assert (not (List.is_empty expected)) ;
+            [%test_eq: (L.Addr.t * Bigstring.t) list] expected
+              (Root_ledger.get_all_raw_accounts_rooted_at_exn root address) ;
+            Root_ledger.close root ) ;
+        Deferred.unit )
+end
+
 let () =
   let random = Splittable_random.State.create Random.State.default in
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -257,5 +348,16 @@ let () =
                 ~timeout:(Core.Time.Span.of_sec 30.)
                 "make converting a root" `Quick
                 (Root_test.test_root_make_converting ~random)
+            ] )
+        ; ( "Sync ledger answer"
+          , [ Alcotest_async.test_case "raw accounts share the answer's shape"
+                `Quick Sync_ledger_answer_test.test_shape
+            ; Alcotest_async.test_case "raw accounts encode as decoded accounts"
+                `Quick
+                (Sync_ledger_answer_test.test_raw_encoding ~random)
+            ; Alcotest_async.test_case
+                ~timeout:(Core.Time.Span.of_sec 30.)
+                "root raw accounts are the stored encodings" `Quick
+                (Sync_ledger_answer_test.test_root_raw_accounts ~random)
             ] )
         ] )

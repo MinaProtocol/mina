@@ -384,6 +384,34 @@ module Make (Test : Test_intf) = struct
                 assert (List.equal Account.equal accounts result) ) ) )
 
   let () =
+    add_test
+      "get_all_raw_accounts_rooted_at_exn returns the encodings of \
+       get_all_accounts_rooted_at_exn" (fun () ->
+        Test.with_instance (fun mdb ->
+            let max_height = Int.min (MT.depth mdb) 5 in
+            populate_db mdb max_height ;
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
+                let address =
+                  let offset = MT.depth mdb - max_height in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
+                  MT.Addr.of_directions (padding @ directions)
+                in
+                let expected =
+                  List.map (MT.get_all_accounts_rooted_at_exn mdb address)
+                    ~f:(fun (addr, account) ->
+                      (addr, Binable.to_bigstring (module Account) account) )
+                in
+                let actual =
+                  MT.get_all_raw_accounts_rooted_at_exn mdb address
+                in
+                [%test_eq: (MT.Addr.t * Bigstring.t) list] expected actual ) ) )
+
+  let () =
     add_test "create_empty doesn't modify the hash" (fun () ->
         Test.with_instance (fun ledger ->
             let open MT in
