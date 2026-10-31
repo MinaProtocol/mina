@@ -12,6 +12,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.PackagingSpec::{
@@ -25,6 +27,8 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             ]
           , buildFlags = BuildFlags.Type.Instrumented
+          , scope =
+            [ PipelineScope.Type.PullRequest, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release

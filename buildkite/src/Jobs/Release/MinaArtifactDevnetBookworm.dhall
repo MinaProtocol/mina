@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profile = ../../Constants/Profiles.dhall
@@ -26,6 +28,8 @@ in  Pipeline.build
             , Artifacts.Type.Archive { network = Network.Type.Devnet }
             , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             ]
+          , scope =
+            [ PipelineScope.Type.PullRequest, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
