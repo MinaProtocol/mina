@@ -4,7 +4,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_compare))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   integers
@@ -15,6 +15,7 @@
   async
   sexplib0
   ;; local libraries
+  bootstrap_status
   best_tip_prover
   transition_handler
   o1trace

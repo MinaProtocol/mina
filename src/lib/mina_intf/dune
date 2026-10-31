@@ -8,6 +8,7 @@
   core_kernel
   sexplib0
   ;; local libraries
+  bootstrap_status
   mina_net2
   staged_ledger
   consensus
@@ -31,4 +32,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))
+  (pps mina_ppx)))

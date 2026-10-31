@@ -4,13 +4,17 @@ open Mina_base
 open Async
 module U = Transaction_snark_tests.Util
 
-let%test_module "Account update network id tests" =
-  ( module struct
+let suite () =
+  Transaction_snark_test_suite.make ~name:"account_update_network_id"
+  @@ fun ~test ->
+  let module _ = struct
     let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
-    let%test_unit "zkapps failed to apply with a different network id" =
+    let () =
+      test "zkapps failed to apply with a different network id"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 (Test_spec.mk_gen ~num_transactions:1 ())
         ~f:(fun { init_ledger; specs } ->
@@ -58,6 +62,21 @@ let%test_module "Account update network id tests" =
                       failwith
                         "check_zkapp_command_with_merges_exn should cause \
                          Constraint unsatisfied"
-                  | Error _ ->
-                      () ) ) )
-  end )
+                  | Error exn ->
+                      (* The zkApp proof was made for another network's
+                         account update digest, so verifying it in the
+                         segment circuit must fail. *)
+                      let msg = Exn.to_string exn in
+                      if
+                        not
+                          ( String.is_substring msg
+                              ~substring:"Constraint unsatisfied"
+                          && String.is_substring msg ~substring:"prevs_verified"
+                          )
+                      then
+                        failwithf
+                          "Expected the zkApp proof to fail verification, got \
+                           %s"
+                          msg () ) ) )
+  end in
+  ()

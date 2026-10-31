@@ -5,7 +5,7 @@
   -open
   Core_kernel)
  (preprocess
-  (pps ppx_jane))
+  (pps mina_ppx))
  (libraries
   ; Opam
   core_kernel

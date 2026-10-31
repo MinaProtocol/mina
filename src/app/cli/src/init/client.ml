@@ -1662,8 +1662,9 @@ let generate_libp2p_keypair_do privkey_path =
             in
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
-            [%log fatal] "failed to generate libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            (* the logger is null, so the error only reaches the user here *)
+            eprintf "Failed to generate libp2p keypair: %s\n"
+              (Error.to_string_hum e) ;
             exit 20 ))
 
 let generate_libp2p_keypair =
@@ -1692,8 +1693,9 @@ let dump_libp2p_keypair_do privkey_path =
             let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
-            [%log fatal] "failed to dump libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            (* the logger is null, so the error only reaches the user here *)
+            eprintf "Failed to dump libp2p keypair: %s\n"
+              (Error.to_string_hum e) ;
             exit 20 ))
 
 let dump_libp2p_keypair =
@@ -2071,6 +2073,14 @@ let archive_blocks =
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
          in
+         let send_versioned_precomputed_block =
+           make_send_block
+             ~graphql_make:(fun block ->
+               Graphql_queries.Archive_versioned_precomputed_block.(
+                 make @@ makeVariables ~block ()) )
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_versioned_precomputed_block
+         in
          let send_extensional_block =
            make_send_block
              ~graphql_make:(fun block ->
@@ -2093,7 +2103,7 @@ let archive_blocks =
                let open Deferred.Or_error.Let_syntax in
                if precomputed_flag then
                  let%bind precomputed_block =
-                   Mina_block.Precomputed.of_yojson block_json
+                   Mina_block.Precomputed.Versioned.of_yojson block_json
                    |> Result.map_error ~f:(fun err ->
                           Error.tag_arg (Error.of_string err)
                             "Could not parse JSON as a precomputed block from \
@@ -2101,7 +2111,13 @@ let archive_blocks =
                             path String.sexp_of_t )
                    |> Deferred.return
                  in
-                 send_precomputed_block precomputed_block
+                 match
+                   Mina_block.Precomputed.Versioned.latest precomputed_block
+                 with
+                 | Some precomputed_block ->
+                     send_precomputed_block precomputed_block
+                 | None ->
+                     send_versioned_precomputed_block block_json
                else if extensional_flag then
                  let%bind extensional_block =
                    Archive_lib.Extensional.Block.of_yojson block_json

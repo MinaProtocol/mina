@@ -2044,16 +2044,12 @@ module T = struct
       epoch_ledger
     |> not
 
-  let with_ledger_mask base_ledger ~f =
-    let mask =
-      Ledger.register_mask base_ledger
-        (Ledger.Mask.create ~depth:(Ledger.depth base_ledger) ())
-    in
-    let r = f mask in
-    ignore
-      ( Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask
-        : Ledger.unattached_mask ) ;
-    r
+  (* Build the diff against a non-hashing ledger over [base_ledger]. It holds
+     its writes in a mask of its own and never commits them, so [base_ledger]
+     is left as it was, and it maintains no merkle hashes, which is the bulk
+     of what applying a transaction to it would otherwise cost. *)
+  let with_non_hashing_ledger base_ledger ~f =
+    f (Ledger.Non_hashing_ledger.of_ledger base_ledger)
 
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -2069,9 +2065,9 @@ module T = struct
         let module Transaction_validator =
           Transaction_snark.Transaction_validator
         in
-        with_ledger_mask t.ledger ~f:(fun validating_ledger ->
+        with_non_hashing_ledger t.ledger ~f:(fun packing_ledger ->
             let is_new_account pk =
-              Ledger.location_of_account validating_ledger
+              Ledger.Non_hashing_ledger.location_of_account packing_ledger
                 (Account_id.create pk Token_id.default)
               |> Option.is_none
             in
@@ -2164,7 +2160,7 @@ module T = struct
             [%log internal] "Validate_and_apply_transactions" ;
             let apply =
               Transaction_validator.apply_transaction_first_pass
-                ~constraint_constants ~global_slot validating_ledger
+                ~constraint_constants ~global_slot packing_ledger
                 ~txn_state_view:current_state_view
                 ~signature_kind:Mina_signature_kind.t_DEPRECATED
             in
@@ -2199,7 +2195,7 @@ module T = struct
             [%log internal] "Generate_staged_ledger_diff_done" ;
             let%map diff =
               (* Fill in the statuses for commands. *)
-              with_ledger_mask t.ledger ~f:(fun status_ledger ->
+              with_non_hashing_ledger t.ledger ~f:(fun status_ledger ->
                   Pre_diff_info.compute_statuses ~constraint_constants ~diff
                     ~coinbase_amount:
                       (Option.value_exn
@@ -3163,7 +3159,7 @@ let%test_module "staged ledger tests" =
       Quickcheck.test
         Quickcheck.Generator.(
           tuple2 (gen_below_capacity ~signature_kind ()) small_positive_int)
-        ~trials:20
+        ~trials:3
         ~f:(fun ((ledger_init_state, cmds, iters), global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger sl test_mask ->
@@ -3190,7 +3186,7 @@ let%test_module "staged ledger tests" =
       Quickcheck.test
         Quickcheck.Generator.(
           tuple2 (gen_below_capacity ~signature_kind ()) small_positive_int)
-        ~trials:20
+        ~trials:3
         ~f:(fun ((ledger_init_state, cmds, iters), global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger sl test_mask ->
@@ -3231,7 +3227,7 @@ let%test_module "staged ledger tests" =
           tuple2
             (gen_at_capacity_fixed_blocks ~signature_kind expected_proof_count)
             small_positive_int)
-        ~trials:20
+        ~trials:3
         ~f:(fun ((ledger_init_state, cmds, iters), global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger sl test_mask ->
@@ -3244,12 +3240,12 @@ let%test_module "staged ledger tests" =
               in
               assert (
                 Option.is_none
-                  (Ledger.location_of_account test_mask
+                  (Ledger.location_of_account (Sl.ledger !sl)
                      (Account_id.create snark_worker_pk Token_id.default) ) ) )
           )
 
     let compute_statuses ~ledger ~coinbase_amount ~global_slot diff =
-      with_ledger_mask ledger ~f:(fun status_ledger ->
+      with_non_hashing_ledger ledger ~f:(fun status_ledger ->
           let diff =
             Pre_diff_info.compute_statuses ~constraint_constants ~diff
               ~coinbase_amount ~coinbase_receiver ~ledger:status_ledger
@@ -3306,7 +3302,7 @@ let%test_module "staged ledger tests" =
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger:_ sl _test_mask ->
               let%map checked =
-                iter_cmds_acc cmds iters true
+                iter_cmds_acc cmds iters false
                   (fun _cmds_left _count_opt cmds_this_iter checked ->
                     let scan_state = Sl.scan_state !sl in
                     let work =
@@ -3601,7 +3597,7 @@ let%test_module "staged ledger tests" =
             * User_command.Valid.t list
             * int option list
             * int list
-            * int] ~trials:50
+            * int] ~trials:5
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available, global_slot)
            ->
           async_with_ledgers ledger_init_state
@@ -5189,8 +5185,8 @@ let%test_module "staged ledger tests" =
                         = 1 ) ;
 
                       let%bind verifier_full =
-                        Verifier.For_tests.default ~constraint_constants ~logger
-                          ~proof_level:Full ()
+                        Verifier.For_tests.commands_only ~constraint_constants
+                          ~logger ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

@@ -1,0 +1,20 @@
+(executable
+ (name protocol_state_replay)
+ (libraries
+  core
+  core_kernel
+  yojson
+  logger
+  mina_base
+  mina_block
+  mina_state
+  consensus
+  currency
+  genesis_constants
+  staged_ledger_diff
+  mina_net2
+  mina_numbers)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))

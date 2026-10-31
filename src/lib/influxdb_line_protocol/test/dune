@@ -1,0 +1,11 @@
+(test
+ (name test_influxdb_line_protocol)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_kernel
+  ;; local libraries
+  influxdb_line_protocol)
+ (preprocess
+  (pps mina_ppx)))

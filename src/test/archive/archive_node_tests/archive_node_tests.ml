@@ -24,6 +24,21 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Archive_precomputed_blocks_test) ) )
         ] )
+    ; ( "v3_precomputed_blocks"
+      , [ test_case
+            "Archive precomputed blocks of version 3 sent from mock daemon"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
+                          (Archive_v3_precomputed_blocks_test) ) )
+        ; test_case
+            "Archive precomputed blocks of version 3 sent through a daemon's \
+             GraphQL API"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
+                          (Archive_v3_precomputed_blocks_through_daemon_test) ) )
+        ] )
     ; ( "non_utf8_token_symbol"
       , [ test_case
             "Archive mainnet blocks with a 0xff token symbol sent from mock \

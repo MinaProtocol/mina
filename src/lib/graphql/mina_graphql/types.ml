@@ -47,6 +47,8 @@ let length = Scalars.Length.typ ()
 
 let span = Scalars.Span.typ ()
 
+let time = Scalars.Time.typ ()
+
 let ledger_hash = Scalars.LedgerHash.typ ()
 
 let state_hash = Scalars.StateHash.typ ()
@@ -341,6 +343,193 @@ module DaemonStatus = struct
              ~metrics:(id ~typ:(non_null metrics)) )
 end
 
+module BootstrapStatus = struct
+  (** The GraphQL name of a constructor: [Syncing_root_ledger] is
+      [SYNCING_ROOT_LEDGER]. *)
+  let enum_name sexp_of_t value =
+    String.uppercase (Sexp.to_string (sexp_of_t value))
+
+  let phase : (Mina_lib.t, Bootstrap_status.Phase.t option) typ =
+    let doc : Bootstrap_status.Phase.t -> string = function
+      | Starting ->
+          "Initialisation has not begun"
+      | Waiting_for_genesis ->
+          "The chain has not started yet"
+      | Waiting_for_peers ->
+          "Connecting to enough peers to begin"
+      | Fetching_best_tip ->
+          "Asking peers for their best tip, while loading the transition \
+           frontier from disk"
+      | Syncing_root_ledger ->
+          "Bootstrap: syncing the root's snarked ledger"
+      | Downloading_scan_state ->
+          "Bootstrap: downloading the root's scan state and pending coinbases"
+      | Building_staged_ledger ->
+          "Bootstrap: building the root's staged ledger, which checks the scan \
+           state against the snarked ledger"
+      | Syncing_epoch_ledgers ->
+          "Syncing the staking and next epoch ledgers"
+      | Loading_frontier ->
+          "Bootstrap: loading a transition frontier at the new root"
+      | Participating ->
+          "The transition frontier is running"
+    in
+    enum "BootstrapPhase"
+      ~doc:"The step a node is in on its way to reaching the network's chain"
+      ~values:
+        (List.map Bootstrap_status.Phase.all ~f:(fun phase ->
+             enum_value
+               (enum_name Bootstrap_status.Phase.sexp_of_t phase)
+               ~doc:(doc phase) ~value:phase ) )
+
+  let ledger : (Mina_lib.t, Bootstrap_status.Ledger.t option) typ =
+    let doc : Bootstrap_status.Ledger.t -> string = function
+      | Root_snarked ->
+          "The snarked ledger at the root of the transition frontier"
+      | Staking_epoch ->
+          "The staking epoch ledger"
+      | Next_epoch ->
+          "The next epoch ledger"
+    in
+    enum "SyncedLedger" ~doc:"A ledger that a node syncs from its peers"
+      ~values:
+        (List.map Bootstrap_status.Ledger.all ~f:(fun ledger ->
+             enum_value
+               (enum_name Bootstrap_status.Ledger.sexp_of_t ledger)
+               ~doc:(doc ledger) ~value:ledger ) )
+
+  let progress : (Mina_lib.t, Syncable_ledger.Progress.t option) typ =
+    obj "LedgerSyncProgress" ~doc:"How far a ledger sync has progressed"
+      ~fields:(fun _ ->
+        [ field "targets" ~typ:(non_null int)
+            ~doc:"How many times the sync has been given a new root to reach"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.targets)
+        ; field "targetSetAt" ~typ:time ~doc:"When the current target was set"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.target_set_at)
+        ; field "pendingChildHashes" ~typ:(non_null int)
+            ~doc:"How many inner nodes the sync is waiting for the children of"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.pending_child_hashes )
+        ; field "pendingContents" ~typ:(non_null int)
+            ~doc:
+              "How many account subtrees the sync is waiting for the accounts \
+               of"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.pending_contents )
+        ; field "synced" ~typ:(non_null bool)
+            ~doc:"Whether the ledger has reached the current target"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.synced)
+        ; field "answersAccepted" ~typ:(non_null int)
+            ~doc:
+              "How many answers from peers have added to the ledger or \
+               confirmed part of it"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.answers_accepted )
+        ; field "answersIgnored" ~typ:(non_null int)
+            ~doc:
+              "How many answers have arrived for queries the sync no longer \
+               needed, such as those for an earlier target"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.answers_ignored )
+        ; field "answersRejected" ~typ:(non_null int)
+            ~doc:
+              "How many answers have been invalid, and their queries asked \
+               again"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.answers_rejected )
+        ; field "lastAcceptedAnswerAt" ~typ:time
+            ~doc:"When an answer was last accepted"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.last_accepted_answer_at )
+        ; field "numAccounts" ~typ:int
+            ~doc:
+              "How many accounts the current target holds, once a peer has said"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) -> p.num_accounts)
+        ; field "accountsSettled" ~typ:(non_null int)
+            ~doc:
+              "How many of the current target's accounts the ledger is known \
+               to hold, whether received or already present. A sync whose \
+               ledger already matched its target can finish before any are \
+               counted, so a synced ledger should be read as complete."
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.accounts_settled )
+        ; field "accountsReceived" ~typ:(non_null int)
+            ~doc:"How many accounts peers have sent, over all targets"
+            ~args:Arg.[]
+            ~resolve:(fun _ (p : Syncable_ledger.Progress.t) ->
+              p.accounts_received )
+        ] )
+
+  let ledger_sync :
+      (Mina_lib.t, Bootstrap_status.Snapshot.ledger_sync option) typ =
+    obj "LedgerSync" ~doc:"The most recent sync of a ledger from peers"
+      ~fields:(fun _ ->
+        [ field "ledger" ~typ:(non_null ledger)
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.ledger )
+        ; field "target" ~typ:ledger_hash ~doc:"The root the sync is reaching"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.target )
+        ; field "active" ~typ:(non_null bool)
+            ~doc:"Whether the sync is still running"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.active )
+        ; field "progress" ~typ:(non_null progress)
+            ~doc:"For a sync that has ended, its progress when it ended"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.ledger_sync) ->
+              s.progress )
+        ] )
+
+  let t : (Mina_lib.t, Bootstrap_status.Snapshot.t option) typ =
+    obj "BootstrapStatus"
+      ~doc:"What a node is doing to reach the network's chain" ~fields:(fun _ ->
+        [ field "phase" ~typ:(non_null phase)
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) -> s.phase)
+        ; field "phaseStartedAt" ~typ:(non_null time)
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.phase_started_at )
+        ; field "bootstrapStartedAt" ~typ:time
+            ~doc:"When the current or most recent bootstrap started"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.bootstrap_started_at )
+        ; field "bootstrapAttempts" ~typ:(non_null int)
+            ~doc:
+              "How many attempts the current or most recent bootstrap has \
+               started"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.bootstrap_attempts )
+        ; field "lastAttemptFailure" ~typ:string
+            ~doc:"Why that bootstrap's last failed attempt failed"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) ->
+              s.last_attempt_failure )
+        ; field "ledgerSyncs"
+            ~typ:(non_null (list (non_null ledger_sync)))
+            ~doc:"The most recent sync of each ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ (s : Bootstrap_status.Snapshot.t) -> s.ledger_syncs)
+        ] )
+end
+
 module Itn = struct
   let auth =
     obj "ItnAuth" ~fields:(fun _ ->
@@ -375,6 +564,47 @@ module Itn = struct
             ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
               let bp_keys = Mina_lib.block_production_pubkeys mina in
               not (Public_key.Compressed.Set.is_empty bp_keys) )
+        ; field "commitId"
+            ~args:Arg.[]
+            ~doc:
+              "Git commit of the daemon build, so that a client can check that \
+               it was built for this daemon"
+            ~typ:(non_null string)
+            ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
+              Mina_lib.commit_id mina )
+        ] )
+
+  let created_account : (bool * Mina_lib.t, Keypair.t option) typ =
+    obj "ItnCreatedAccount" ~fields:(fun _ ->
+        [ field "publicKey"
+            ~args:Arg.[]
+            ~doc:"Public key of the new account"
+            ~typ:(non_null (Scalars.PublicKey.typ ()))
+            ~resolve:(fun _ (kp : Keypair.t) ->
+              Public_key.compress kp.public_key )
+        ; field "privateKey"
+            ~args:Arg.[]
+            ~doc:"Private key of the new account, in base58"
+            ~typ:(non_null string)
+            ~resolve:(fun _ (kp : Keypair.t) ->
+              Private_key.to_base58_check kp.private_key )
+        ] )
+
+  let created_accounts :
+      (bool * Mina_lib.t, (string * Keypair.t list) option) typ =
+    obj "ItnCreatedAccounts" ~fields:(fun _ ->
+        [ field "handle"
+            ~args:Arg.[]
+            ~doc:
+              "Handle of the background job that funds the accounts; it is \
+               listed by scheduledTransactions until the job ends"
+            ~typ:(non_null string)
+            ~resolve:(fun _ (handle, _) -> handle)
+        ; field "accounts"
+            ~args:Arg.[]
+            ~doc:"The new accounts, funded by the background job"
+            ~typ:(non_null (list (non_null created_account)))
+            ~resolve:(fun _ (_, accounts) -> accounts)
         ] )
 
   let metadatum =
@@ -624,6 +854,38 @@ let pending_work =
           ~resolve:(fun _ w -> One_or_two.to_list w)
       ] )
 
+let transaction_pool_status :
+    (Mina_lib.t, Network_pool.Transaction_pool.Resource_pool.t option) typ =
+  let module Pool = Network_pool.Transaction_pool.Resource_pool in
+  obj "TransactionPoolStatus"
+    ~doc:
+      "Occupancy of the transaction pool. When the pool is full, admitting a \
+       new command evicts the command with the lowest fee per weight unit, \
+       together with every later-nonce command from the same fee payer"
+    ~fields:(fun _ ->
+      [ field "size" ~typ:(non_null int)
+          ~doc:"Number of commands currently in the pool"
+          ~args:Arg.[]
+          ~resolve:(fun _ pool -> Pool.size pool)
+      ; field "maxSize" ~typ:(non_null int)
+          ~doc:
+            "Number of commands the pool holds before it starts evicting \
+             commands"
+          ~args:Arg.[]
+          ~resolve:(fun _ pool -> Pool.max_size pool)
+      ; field "minimumFeePerWeightUnit" ~typ:string
+          ~doc:
+            "The lowest fee per weight unit of any command in the pool, in \
+             nanomina, as a decimal integer or a fraction 'n/d'. Null if the \
+             pool is empty. Once the pool is full, a new command must pay \
+             strictly more than this to be admitted. Payments and stake \
+             delegations have weight 1"
+          ~args:Arg.[]
+          ~resolve:(fun _ pool ->
+            Option.map (Pool.min_fee pool) ~f:(fun fee_rate ->
+                Q.to_string (Currency.Fee_rate.to_q fee_rate) ) )
+      ] )
+
 module Snark_work_bundle = struct
   type t =
     { spec : Work_selector.in_memory_work One_or_two.t
@@ -704,6 +966,46 @@ let pending_work_spec =
           ~typ:(non_null Snark_work_bundle.spec)
           ~resolve:(fun _ w -> w)
       ] )
+
+module Scan_state = struct
+  module Tree_metrics = Staged_ledger.Scan_state.Tree_metrics
+
+  type t = { state_hash : State_hash.t; trees : Tree_metrics.t list }
+
+  let tree : (Mina_lib.t, Tree_metrics.t option) typ =
+    obj "ScanStateTree"
+      ~doc:"Free space and outstanding snark work in one tree of the scan state"
+      ~fields:(fun _ ->
+        [ field "availableSpace" ~typ:(non_null int)
+            ~doc:"Number of transaction slots still free in this tree"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.available_space; _ } ->
+              available_space )
+        ; field "baseJobsTodo" ~typ:(non_null int)
+            ~doc:"Number of base jobs in this tree that are yet to be done"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.base_jobs_todo; _ } -> base_jobs_todo)
+        ; field "mergeJobsTodo" ~typ:(non_null int)
+            ~doc:"Number of merge jobs in this tree that are yet to be done"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Tree_metrics.merge_jobs_todo; _ } ->
+              merge_jobs_todo )
+        ] )
+
+  let obj : (Mina_lib.t, t option) typ =
+    obj "ScanState" ~doc:"Status of the scan state as of a block"
+      ~fields:(fun _ ->
+        [ field "stateHash" ~typ:(non_null state_hash)
+            ~doc:"State hash of the block whose scan state this is"
+            ~args:Arg.[]
+            ~resolve:(fun _ { state_hash; _ } -> state_hash)
+        ; field "trees"
+            ~typ:(non_null @@ list @@ non_null tree)
+            ~doc:"Status of each tree in the scan state, oldest first"
+            ~args:Arg.[]
+            ~resolve:(fun _ { trees; _ } -> trees)
+        ] )
+end
 
 let state_stack =
   let module M = Pending_coinbase.State_stack in
@@ -2706,6 +3008,20 @@ module Input = struct
           Yojson.Safe.to_basic (Mina_block.Precomputed.to_yojson x) )
   end
 
+  module VersionedPrecomputedBlock = struct
+    (* Kept as JSON, for the archive to read by the rules of the block's own
+       version. *)
+    type input = Yojson.Safe.t
+
+    let arg_typ =
+      scalar "VersionedPrecomputedBlock"
+        ~doc:
+          "Block encoded in precomputed block format, of any version the \
+           archive reads"
+        ~coerce:(fun json -> Ok (Utils.to_yojson json))
+        ~to_json:(fun (x : input) -> Yojson.Safe.to_basic x)
+  end
+
   module ExtensionalBlock = struct
     type input = Archive_lib.Extensional.Block.t
 
@@ -3443,6 +3759,38 @@ module Input = struct
                      will have (2*maxAccountUpdates+2) account updates \
                      (including balancing and fee payer)"
                   ~typ:int
+              ]
+    end
+
+    module CreateAccountsDetails = struct
+      type input =
+        { fee_payer : Signature_lib.Private_key.t
+        ; num_accounts : int
+        ; fee : Currency.Fee.t
+        ; amount : Currency.Amount.t
+        }
+
+      let arg_typ : ((input, string) result option, input option) arg_typ =
+        obj "CreateAccountsDetails"
+          ~doc:"Fee payer and amounts for creating and funding new accounts"
+          ~coerce:(fun fee_payer num_accounts fee amount ->
+            Result.return { fee_payer; num_accounts; fee; amount } )
+          ~split:(fun f (t : input) ->
+            f t.fee_payer t.num_accounts t.fee t.amount )
+          ~fields:
+            Arg.
+              [ arg "feePayer"
+                  ~typ:(non_null PrivateKey.arg_typ)
+                  ~doc:"Private key of the account that funds the new accounts"
+              ; arg "numAccounts" ~typ:(non_null int)
+                  ~doc:"Number of new accounts"
+              ; arg "fee" ~typ:(non_null Fee.arg_typ)
+                  ~doc:"Fee of each zkApp command that creates accounts"
+              ; arg "amount"
+                  ~typ:(non_null CurrencyAmount.arg_typ)
+                  ~doc:
+                    "Amount divided among the new accounts (each account also \
+                     pays the account creation fee out of its share)"
               ]
     end
 

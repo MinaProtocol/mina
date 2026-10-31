@@ -2,6 +2,7 @@
 -- Mina migration: from protocol version 4.0.0 to 5.0.0
 -- upgrades: 4.0.2
 -- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
+-- + genesis_accounts: the accounts of each era's genesis ledger
 -- + token_symbols.value, zkapp_uris.value: text -> bytea
 -- + record status in migration_history
 --
@@ -100,7 +101,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; token_symbols/zkapp_uris value to bytea.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea.',
             'starting'::migration_status
         );
     ELSIF
@@ -117,7 +118,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; token_symbols/zkapp_uris value to bytea.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea.',
             'starting'::migration_status
         );
     ELSIF
@@ -230,7 +231,25 @@ WHERE NOT EXISTS (
 )
 \gexec
 
--- 3. token_symbols.value and zkapp_uris.value: text -> bytea
+-- 3. `genesis_accounts`: the state of every account when an era's genesis
+-- ledger took effect (see create_schema.sql). Append only, keyed by the height
+-- the ledger takes effect at.
+
+CREATE TABLE IF NOT EXISTS genesis_accounts (
+    genesis_height           bigint  NOT NULL,
+    public_key               text    NOT NULL,
+    token                    text    NOT NULL,
+    balance                  text    NOT NULL,
+    nonce                    bigint  NOT NULL,
+    initial_minimum_balance  text,
+    cliff_time               bigint,
+    cliff_amount             text,
+    vesting_period           bigint,
+    vesting_increment        text,
+    PRIMARY KEY (public_key, token, genesis_height)
+);
+
+-- 4. token_symbols.value and zkapp_uris.value: text -> bytea
 --
 -- On chain both are arbitrary bytes (a token symbol is at most 6 bytes, with
 -- no encoding check). A UTF8 database rejects a value such as 0xff, and the
@@ -262,7 +281,7 @@ BEGIN
     END LOOP;
 END $$;
 
--- 4. Update schema_history
+-- 5. Update schema_history
 
 DO $$
 BEGIN

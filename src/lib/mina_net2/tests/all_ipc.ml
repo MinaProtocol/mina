@@ -45,7 +45,24 @@ let random_msg () =
 
 exception Timeout of string
 
-let or_timeout ?(timeout = 180) ~msg action =
+(* Upper limit, in seconds, for one step of the test.
+
+   This limit protects against a step that never completes. It is not a
+   measurement of how long a step is allowed to take: on an idle machine the
+   whole test completes in about 1.5 s.
+
+   The old limit of 180 s was too small for a loaded machine. In CI the test
+   runs under [dune runtest src/lib], which starts up to 32 test binaries at
+   the same time; the three libp2p_helper child processes then get very little
+   CPU. On nightly builds 1577, 1579 and 1652 the step "Carol: Alice connected"
+   passed the 180 s limit and the test failed. Each time the retry, which runs
+   almost alone on the machine, completed the full test in about 1.5 s.
+
+   A larger limit costs nothing when the test is healthy, because the timer is
+   cancelled as soon as the step completes. *)
+let default_timeout_sec = 900
+
+let or_timeout ?(timeout = default_timeout_sec) ~msg action =
   Deferred.(
     (* HACK yield to facilitate scheduler to switch between processes
        This shouldn't be necessary, but is required for test not to stall. *)
@@ -307,7 +324,7 @@ let%test_module "all-ipc test" =
          This message may be removed in future after implementing the proper
          stream closing. *)
       let%bind () =
-        Pipe.write stream1_out msgs.stream_1_msg_2
+        Pipe.write stream1_out (Bigstring.of_string msgs.stream_1_msg_2)
         |> or_timeout ~msg:"Send message 2 on stream 1"
       in
 
@@ -418,7 +435,7 @@ let%test_module "all-ipc test" =
       let stream1_in, stream1_out = Libp2p_stream.pipes stream1 in
       (* Send message 1 on stream 1 *)
       let%bind () =
-        Pipe.write stream1_out msgs.stream_1_msg_1
+        Pipe.write stream1_out (Bigstring.of_string msgs.stream_1_msg_1)
         |> or_timeout ~msg:"Bob: send message 1 to stream 1"
       in
 
@@ -503,7 +520,7 @@ let%test_module "all-ipc test" =
       (* Notify Alice that publishing on topic "a" is finished and
          protocol is closed *)
       let%bind () =
-        Pipe.write stream2_out msgs.stream_2_msg_1
+        Pipe.write stream2_out (Bigstring.of_string msgs.stream_2_msg_1)
         |> or_timeout ~msg:"Carol: send message 1 on stream 2"
       in
 

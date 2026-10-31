@@ -1,4 +1,4 @@
-(tests
+(executables
  (names chunks2 chunks4 chunks8)
  (libraries
   ;; opam libraries
@@ -59,4 +59,23 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:chunks2.exe})))
+
+; The 2^17 and 2^18-row circuits are too expensive to run on every
+; [dune runtest]; run them with [dune build @chunked_circuits_large].
+
+(rule
+ (alias chunked_circuits_large)
+ (action
+  (progn
+   (run %{exe:chunks4.exe})
+   (run %{exe:chunks8.exe}))))

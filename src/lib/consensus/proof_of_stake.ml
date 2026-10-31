@@ -2602,7 +2602,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    } ) )
 
     let sync_local_state ~context:(module Context : CONTEXT_WITH_LEDGER_SYNC)
-        ~trust_system ~local_state ~glue_sync_ledger requested_syncs =
+        ~trust_system ~local_state ~glue_sync_ledger ~bootstrap_status
+        requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2687,10 +2688,26 @@ module Make_str (A : Wire_types.Concrete) = struct
               let response_writer =
                 Mina_ledger.Sync_ledger.Root.answer_writer sync_ledger
               in
-              glue_sync_ledger ~preferred:[] query_reader response_writer ;
+              glue_sync_ledger ~preferred:[]
+                ~target:(Mina_ledger.Sync_ledger.Root.target sync_ledger)
+                query_reader response_writer ;
+              let ledger : Bootstrap_status.Ledger.t =
+                match snapshot_id with
+                | Staking_epoch_snapshot ->
+                    Staking_epoch
+                | Next_epoch_snapshot ->
+                    Next_epoch
+              in
               match%bind
-                Mina_ledger.Sync_ledger.Root.fetch sync_ledger
-                  target_ledger_hash ~data:() ~equal:(fun () () -> true)
+                Bootstrap_status.with_ledger_sync bootstrap_status ledger
+                  ~target:(fun () ->
+                    Pipe_lib.Broadcast_pipe.Reader.peek
+                      (Mina_ledger.Sync_ledger.Root.target sync_ledger) )
+                  ~progress:(fun () ->
+                    Mina_ledger.Sync_ledger.Root.progress sync_ledger )
+                  ~f:(fun () ->
+                    Mina_ledger.Sync_ledger.Root.fetch sync_ledger
+                      target_ledger_hash ~data:() ~equal:(fun () () -> true) )
               with
               | `Ok ledger ->
                   [%log info]
@@ -3233,20 +3250,52 @@ module Make_str (A : Wire_types.Concrete) = struct
                (Global_slot.of_slot_number ~constants block_data.global_slot) )
             (Global_slot.to_epoch_and_slot global_slot)
 
+      let constants_of_protocol_state ~constraint_constants
+          (protocol_state : Protocol_state.Value.t) =
+        Constants.create ~constraint_constants
+          ~protocol_constants:
+            ( Protocol_state.constants protocol_state
+            |> Mina_base.Protocol_constants_checked.t_of_value )
+
+      let next_protocol_state ~constants
+          ~(previous_protocol_state : Protocol_state.Value.t)
+          ~previous_protocol_state_hash ~blockchain_state ~consensus_transition
+          ~producer_vrf_result ~block_stake_winner ~block_creator
+          ~coinbase_receiver ~supercharge_coinbase ~snarked_ledger_hash
+          ~genesis_ledger_hash ~supply_increase
+          ?(adjust_consensus_state = Fn.id) ~logger () =
+        let open Or_error.Let_syntax in
+        [%log internal] "Consensus_state_update" ;
+        let%map consensus_state =
+          Consensus_state.update ~constants
+            ~previous_consensus_state:
+              (Protocol_state.consensus_state previous_protocol_state)
+            ~consensus_transition ~producer_vrf_result
+            ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
+            ~genesis_ledger_hash ~block_stake_winner ~block_creator
+            ~coinbase_receiver ~supercharge_coinbase
+          >>| adjust_consensus_state
+        in
+        [%log internal] "Consensus_state_update_done" ;
+        let genesis_state_hash =
+          Protocol_state.genesis_state_hash
+            ~state_hash:(Some previous_protocol_state_hash)
+            previous_protocol_state
+        in
+        Protocol_state.create_value ~genesis_state_hash
+          ~previous_state_hash:previous_protocol_state_hash ~blockchain_state
+          ~consensus_state
+          ~constants:(Protocol_state.constants previous_protocol_state)
+
       let generate_transition
           ~(previous_protocol_state : Protocol_state.Value.t) ~blockchain_state
           ~current_time ~(block_data : Block_data.t) ~supercharge_coinbase
           ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase ~logger
           ~constraint_constants =
         [%log internal] "Generate_transition" ;
-        let previous_consensus_state =
-          Protocol_state.consensus_state previous_protocol_state
-        in
         let constants =
-          Constants.create ~constraint_constants
-            ~protocol_constants:
-              ( Protocol_state.constants previous_protocol_state
-              |> Mina_base.Protocol_constants_checked.t_of_value )
+          constants_of_protocol_state ~constraint_constants
+            previous_protocol_state
         in
         (let actual_global_slot =
            let time = Time.of_span_since_epoch (Time.Span.of_ms current_time) in
@@ -3261,33 +3310,69 @@ module Make_str (A : Wire_types.Concrete) = struct
         let block_creator =
           block_data.stake_proof.producer_public_key |> Public_key.compress
         in
-        [%log internal] "Consensus_state_update" ;
-        let consensus_state =
+        let protocol_state =
           Or_error.ok_exn
-            (Consensus_state.update ~constants ~previous_consensus_state
+            (next_protocol_state ~constants ~previous_protocol_state
+               ~previous_protocol_state_hash ~blockchain_state
                ~consensus_transition
                ~producer_vrf_result:block_data.Block_data.vrf_result
-               ~previous_protocol_state_hash ~supply_increase
-               ~snarked_ledger_hash ~genesis_ledger_hash
                ~block_stake_winner:block_data.stake_proof.delegator_pk
                ~block_creator
                ~coinbase_receiver:block_data.stake_proof.coinbase_receiver_pk
-               ~supercharge_coinbase )
-        in
-        [%log internal] "Consensus_state_update_done" ;
-        let genesis_state_hash =
-          Protocol_state.genesis_state_hash
-            ~state_hash:(Some previous_protocol_state_hash)
-            previous_protocol_state
-        in
-        let protocol_state =
-          Protocol_state.create_value ~genesis_state_hash
-            ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
-            ~blockchain_state ~consensus_state
-            ~constants:(Protocol_state.constants previous_protocol_state)
+               ~supercharge_coinbase ~snarked_ledger_hash ~genesis_ledger_hash
+               ~supply_increase ~logger () )
         in
         [%log internal] "Generate_transition_done" ;
         (protocol_state, consensus_transition)
+
+      let expected_protocol_state ~constraint_constants
+          ~(previous_protocol_state : Protocol_state.Value.t)
+          ~previous_protocol_state_hash ~blockchain_state ~supply_increase
+          ~(candidate : Protocol_state.Value.t) ~logger =
+        let constants =
+          constants_of_protocol_state ~constraint_constants
+            previous_protocol_state
+        in
+        let candidate_consensus_state =
+          Protocol_state.consensus_state candidate
+        in
+        let previous_blockchain_state =
+          Protocol_state.blockchain_state previous_protocol_state
+        in
+        let candidate_global_slot =
+          candidate_consensus_state.curr_global_slot_since_hard_fork
+        in
+        let consensus_transition =
+          Global_slot.slot_number candidate_global_slot
+        in
+        let adjust_consensus_state (consensus_state : Consensus_state.Value.t) =
+          let _epoch, next_slot =
+            Global_slot.to_epoch_and_slot candidate_global_slot
+          in
+          let next_epoch_data =
+            if Slot.in_seed_update_range next_slot ~constants then
+              { consensus_state.next_epoch_data with
+                seed = candidate_consensus_state.next_epoch_data.seed
+              }
+            else consensus_state.next_epoch_data
+          in
+          { consensus_state with
+            last_vrf_output = candidate_consensus_state.last_vrf_output
+          ; next_epoch_data
+          }
+        in
+        next_protocol_state ~constants ~previous_protocol_state
+          ~previous_protocol_state_hash ~blockchain_state ~consensus_transition
+          ~producer_vrf_result:Snark_params.Tick.Field.zero
+          ~block_stake_winner:candidate_consensus_state.block_stake_winner
+          ~block_creator:candidate_consensus_state.block_creator
+          ~coinbase_receiver:candidate_consensus_state.coinbase_receiver
+          ~supercharge_coinbase:candidate_consensus_state.supercharge_coinbase
+          ~snarked_ledger_hash:
+            (Blockchain_state.snarked_ledger_hash previous_blockchain_state)
+          ~genesis_ledger_hash:
+            (Blockchain_state.genesis_ledger_hash previous_blockchain_state)
+          ~supply_increase ~adjust_consensus_state ~logger ()
 
       include struct
         let%snarkydef.Tick next_state_checked ~constraint_constants
@@ -3308,15 +3393,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
 
       module For_tests = struct
-        let gen_consensus_state
-            ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-            ~constants ~(slot_advancement : int) :
+        let gen_consensus_state ~constants ~(slot_advancement : int) :
             (   previous_protocol_state:
                   Protocol_state.Value.t
                   Mina_base.State_hash.With_state_hashes.t
              -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
              -> coinbase_receiver:Public_key.Compressed.t
              -> supercharge_coinbase:bool
+             -> supply_increase:Currency.Amount.Signed.t
              -> Consensus_state.Value.t )
             Quickcheck.Generator.t =
           let open Consensus_state in
@@ -3330,7 +3414,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
                  ) ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
-              ~coinbase_receiver ~supercharge_coinbase ->
+              ~coinbase_receiver ~supercharge_coinbase ~supply_increase ->
             let prev =
               Protocol_state.consensus_state
                 (With_hash.data previous_protocol_state)
@@ -3348,10 +3432,14 @@ module Make_str (A : Wire_types.Concrete) = struct
             let curr_epoch, curr_slot =
               Global_slot.to_epoch_and_slot curr_global_slot_since_hard_fork
             in
+            (* As in [Consensus_state.update]: the total currency only changes
+               by the supply increase of the emitted ledger proof. *)
             let total_currency =
-              Option.value_exn
-                (Amount.add prev.total_currency
-                   constraint_constants.coinbase_amount )
+              let total, `Overflow overflow =
+                Amount.add_signed_flagged prev.total_currency supply_increase
+              in
+              assert (not overflow) ;
+              total
             in
             let prev_epoch, prev_slot =
               Consensus_state.curr_epoch_and_slot prev
@@ -4318,7 +4406,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: equal states are always in short \
                      fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test (gen_spot ()) ~f:(fun state ->
+        Quickcheck.test ~trials:100 (gen_spot ()) ~f:(fun state ->
             assert_consensus_state_pair (state, state)
               ~assertion:"within long range" ~f:(fun (a, b) ->
                 Hooks.is_short_range a b ~constants ) )
@@ -4326,7 +4414,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: gen_spot_pair_short_aligned \
                      always generates pairs of states in short fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test (gen_spot_pair_short_aligned ()) ~f:(fun (a, b) ->
+        Quickcheck.test ~trials:100 (gen_spot_pair_short_aligned ())
+          ~f:(fun (a, b) ->
             assert_consensus_state_pair
               (With_hash.data a, With_hash.data b)
               ~assertion:"within short range"
@@ -4335,7 +4424,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: gen_spot_pair_short_misaligned \
                      always generates pairs of states in short fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test (gen_spot_pair_short_misaligned ()) ~f:(fun (a, b) ->
+        Quickcheck.test ~trials:100 (gen_spot_pair_short_misaligned ())
+          ~f:(fun (a, b) ->
             assert_consensus_state_pair
               (With_hash.data a, With_hash.data b)
               ~assertion:"within short range"
@@ -4344,14 +4434,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "generator sanity check: gen_spot_pair_long always \
                      generates pairs of states in long fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
-        Quickcheck.test gen_spot_pair_long ~f:(fun (a, b) ->
+        Quickcheck.test ~trials:100 gen_spot_pair_long ~f:(fun (a, b) ->
             assert_consensus_state_pair
               (With_hash.data a, With_hash.data b)
               ~assertion:"within long range"
               ~f:(fun (a, b) -> not (Hooks.is_short_range ~constants a b)) )
 
       let%test_unit "selection case: equal states" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (Quickcheck.Generator.tuple2 State_hash.gen (gen_spot ()))
           ~f:(fun (hash, state) ->
             let hashed_state =
@@ -4365,21 +4455,21 @@ module Make_str (A : Wire_types.Concrete) = struct
             assert_not_selected (hashed_state, hashed_state) )
 
       let%test_unit "selection case: aligned checkpoints & different lengths" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Ascending
              () )
           ~f:assert_selected
 
       let%test_unit "selection case: aligned checkpoints & equal lengths & \
                      different vrfs" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Ascending () )
           ~f:assert_selected
 
       let%test_unit "selection case: aligned checkpoints & equal lengths & \
                      equal vrfs & different hashes" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Equal () )
           ~f:(fun (a, b) ->
@@ -4391,7 +4481,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let%test_unit "selection case: misaligned checkpoints & different lengths"
           =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_misaligned
              ~blockchain_length_relativity:`Ascending () )
           ~f:assert_selected
@@ -4401,7 +4491,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        *)
       let%test_unit "selection case: misaligned checkpoints & equal lengths & \
                      different vrfs" =
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (gen_spot_pair_short_misaligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Ascending () )
           ~f:assert_selected
@@ -4436,7 +4526,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let select existing candidate =
           Hooks.select ~context:(module Context) ~existing ~candidate
         in
-        Quickcheck.test gen_spot_pair
+        Quickcheck.test ~trials:500 gen_spot_pair
           ~f:
             (assert_hashed_consensus_state_pair
                ~assertion:"chains do not trigger a selection cycle"
@@ -4486,7 +4576,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           else false
         in
         let gen = gen_with_hash (gen_spot ()) in
-        Quickcheck.test
+        Quickcheck.test ~trials:500
           (Quickcheck.Generator.tuple3 gen gen gen)
           ~f:
             (assert_hashed_consensus_state_triple

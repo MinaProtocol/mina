@@ -21,10 +21,17 @@
      time. The corpus is a chain whose zkApp-heavy blocks arrive near its end;
      against time, "heavy blocks started" is indistinguishable from a leak.
 
-   No threshold is applied: this measures, it does not gate. The result is one
-   InfluxDB line-protocol point for buildkite/scripts/bench/send.sh, with the
-   fields the Python version published. The backend RSS is read from /proc,
-   which works because RunWithPostgres runs PostgreSQL with --pid=host. *)
+   The RSS numbers are measurements only. The gate is the prepared-statement
+   count of the ingest's own database session. archive_blocks --instrumented
+   records it after each block. A request built once is prepared once, so
+   after the first blocks have used every query
+   shape the count stops growing. With --assert-bounded-statements the run fails if the
+   count grows during the second half of the replay. The count does not depend
+   on timing or on the machine, unlike RSS.
+
+   The result is one InfluxDB line-protocol point for
+   buildkite/scripts/bench/send.sh. The backend RSS is read from /proc, which
+   works because RunWithPostgres runs PostgreSQL with --pid=host. *)
 
 open Core
 open Async
@@ -48,6 +55,10 @@ let ok_exn ~ctx = function
       failwithf "%s: %s" ctx (Caqti_error.show e) ()
 
 let int_opt s = Option.try_with (fun () -> Int.of_string s)
+
+(* The exit status of a failed --assert-bounded-statements. It differs from the
+   status of every other failure, so a leak can be told apart from a broken run. *)
+let memory_gate_exit_status = 42
 
 (* VmRSS of a process in KiB, or 0 if it is gone *)
 let vm_rss_kib pid =
@@ -274,10 +285,45 @@ let compute_metrics curve =
           |> Option.value ~default:0
       }
 
-let sanitize = String.map ~f:(function ' ' | ',' | '=' -> '_' | c -> c)
+(* What archive_blocks --instrumented wrote to its statements file: the
+   session's prepared-statement count after each block, and each SQL text
+   prepared more than once. *)
+module Prepared_statements = struct
+  type t = { after_block : (int * int) list; duplicates : string list }
 
-let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
-    ~measurement ~tags () =
+  let read path =
+    let lines = try In_channel.read_lines path with _ -> [] in
+    { after_block =
+        List.filter_map lines ~f:(fun line ->
+            match String.split line ~on:' ' with
+            | [ "block"; n; total; _distinct ] -> (
+                match (int_opt n, int_opt total) with
+                | Some n, Some total ->
+                    Some (n, total)
+                | _ ->
+                    None )
+            | _ ->
+                None )
+    ; duplicates =
+        List.filter_map lines ~f:(String.chop_prefix ~prefix:"duplicate ")
+    }
+
+  let final t = List.last t.after_block |> Option.value_map ~default:0 ~f:snd
+
+  (* statements added after the middle block: zero when every request is built
+     once and the first half of the corpus has used every query shape *)
+  let second_half_growth t =
+    match t.after_block with
+    | [] ->
+        0
+    | after_block ->
+        let middle = List.nth_exn after_block (List.length after_block / 2) in
+        final t - snd middle
+end
+
+let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed
+    ~assert_bounded_statements ~max_statement_growth ~perf_file ~measurement
+    ~tags () =
   let%bind sampler = Mina_caqti.connect uri >>| ok_exn ~ctx:"connect" in
   let%bind database =
     Db.scalar sampler Caqti_type.string "SELECT current_database()"
@@ -305,6 +351,7 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
     (List.length blocks) ;
   let successful = workdir ^/ "successful" and failed = workdir ^/ "failed" in
   let log = workdir ^/ "archive_blocks.log" in
+  let statements_file = workdir ^/ "prepared_statements" in
   (* progress is read from the database, so start from what it already holds *)
   let%bind blocks_before, arrays_before, _ = Db.progress sampler in
   let%bind process =
@@ -322,6 +369,8 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
           ; failed
           ; "--log-successful"
           ; "false"
+          ; "--instrumented"
+          ; statements_file
           ]
         @ blocks )
       ~env:(`Extend pool_env) ()
@@ -357,34 +406,35 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
     failwithf "%d blocks failed to insert, more than the %d allowed"
       blocks_failed max_failed () ;
   let m = compute_metrics curve in
+  let statements = Prepared_statements.read statements_file in
+  let statements_final = Prepared_statements.final statements in
+  let statement_growth = Prepared_statements.second_half_growth statements in
   let blocks_per_sec =
     if Float.(ingest_seconds > 0.) then Float.of_int blocks_ok /. ingest_seconds
     else 0.
   in
-  let fields =
-    [ sprintf "blocks_ok=%di" blocks_ok
-    ; sprintf "blocks_failed=%di" blocks_failed
-    ; sprintf "zkapp_arrays=%di" m.arrays
-    ; sprintf "archive_rss_growth_kib=%di" m.archive_growth
-    ; sprintf "archive_rss_kib_per_1k_arrays=%.3f" m.archive_slope
-    ; sprintf "pg_backend_rss_peak_kib=%di" m.backend_peak
-    ; sprintf "pg_backend_rss_tail_avg_kib=%di" m.backend_tail_average
-    ; sprintf "pg_backend_rss_kib_per_1k_arrays=%.3f" m.backend_slope
-    ; sprintf "pg_backend_rss_slope_r2=%.3f" m.backend_slope_r2
-    ; sprintf "pg_backend_changes=%di" m.pid_changes
-    ; sprintf "pg_backends_max=%di" m.max_backends
-    ; sprintf "ingest_seconds=%di" (Float.iround_down_exn ingest_seconds)
-    ; sprintf "blocks_per_sec=%.3f" blocks_per_sec
-    ]
+  let point =
+    Influxdb_line_protocol.(
+      create ~tags ~measurement
+        [ ("blocks_ok", Int blocks_ok)
+        ; ("blocks_failed", Int blocks_failed)
+        ; ("zkapp_arrays", Int m.arrays)
+        ; ("archive_rss_growth_kib", Int m.archive_growth)
+        ; ("archive_rss_kib_per_1k_arrays", Float m.archive_slope)
+        ; ("pg_backend_rss_peak_kib", Int m.backend_peak)
+        ; ("pg_backend_rss_tail_avg_kib", Int m.backend_tail_average)
+        ; ("pg_backend_rss_kib_per_1k_arrays", Float m.backend_slope)
+        ; ("pg_backend_rss_slope_r2", Float m.backend_slope_r2)
+        ; ("pg_backend_changes", Int m.pid_changes)
+        ; ("pg_backends_max", Int m.max_backends)
+        ; ("ingest_seconds", Int (Float.iround_down_exn ingest_seconds))
+        ; ("blocks_per_sec", Float blocks_per_sec)
+        ; ("pg_prepared_statements", Int statements_final)
+        ; ("pg_prepared_statements_second_half_growth", Int statement_growth)
+        ])
   in
-  let line =
-    sprintf "%s,%s %s %d" (sanitize measurement)
-      ( List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-      |> String.concat ~sep:"," )
-      (String.concat ~sep:"," fields)
-      (Time_ns.to_int_ns_since_epoch (Time_ns.now ()))
-  in
-  Option.iter perf_file ~f:(fun path -> Out_channel.write_lines path [ line ]) ;
+  Option.iter perf_file ~f:(fun path ->
+      Influxdb_line_protocol.write_file path [ point ] ) ;
   printf "=== growth curve ===\n%s\n" Sample.header ;
   List.iter curve ~f:(fun s -> print_endline (Sample.row s)) ;
   printf "=== summary ===\n" ;
@@ -408,9 +458,30 @@ let main ~uri ~archive_blocks ~corpus ~limit ~interval ~max_failed ~perf_file
        numbers understate the leak\n" ;
   printf "  ingest time                 : %.0f s\n" ingest_seconds ;
   printf "  throughput                  : %.3f blocks/s\n" blocks_per_sec ;
-  printf "=== influxdb line protocol ===\n%s\n" line ;
+  printf
+    "  prepared statements         : %d at the end, %d added in the second half\n"
+    statements_final statement_growth ;
+  List.iter statements.duplicates ~f:(fun d ->
+      printf "  prepared more than once     : %s\n" d ) ;
+  printf "=== influxdb line protocol ===\n%s\n"
+    (Influxdb_line_protocol.to_line point) ;
   let (module Conn : Mina_caqti.CONNECTION) = sampler in
-  Conn.disconnect ()
+  let%map () = Conn.disconnect () in
+  if assert_bounded_statements then (
+    if List.is_empty statements.after_block then
+      failwith
+        "archive_blocks recorded no prepared-statement count; the gate cannot \
+         run" ;
+    if statement_growth > max_statement_growth then (
+      eprintf
+        "FAIL: the ingest session prepared %d statements during the second \
+         half of the replay (at most %d allowed): a request is built per call. \
+         See the statements prepared more than once above.\n"
+        statement_growth max_statement_growth ;
+      Shutdown.shutdown memory_gate_exit_status )
+    else
+      printf "OK: the prepared-statement count stopped growing (%d)\n"
+        statements_final )
 
 let () =
   Command.async
@@ -442,6 +513,17 @@ let () =
        flag "--max-failed-blocks"
          (optional_with_default 0 int)
          ~doc:"N blocks allowed to fail before the run is refused (default 0)"
+     and assert_bounded_statements =
+       flag "--assert-bounded-statements" no_arg
+         ~doc:
+           " fail if the ingest session's prepared-statement count grows \
+            during the second half of the replay"
+     and max_statement_growth =
+       flag "--max-statement-growth"
+         (optional_with_default 0 int)
+         ~doc:
+           "N statements the second half may add before \
+            --assert-bounded-statements fails (default 0)"
      and perf_file =
        flag "--influxdb-file" (optional string)
          ~doc:"PATH write the InfluxDB line-protocol point here"
@@ -456,7 +538,8 @@ let () =
        let tag k v = (k, Option.value v ~default:"unknown") in
        main ~uri:(Uri.of_string uri) ~archive_blocks ~corpus ~limit
          ~interval:(Time_ns.Span.of_sec interval)
-         ~max_failed ~perf_file ~measurement
+         ~max_failed ~assert_bounded_statements ~max_statement_growth ~perf_file
+         ~measurement
          ~tags:
            [ tag "variant" variant
            ; tag "git_branch" branch
