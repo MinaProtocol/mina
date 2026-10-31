@@ -46,8 +46,7 @@ module Deploy_account_update = struct
       public_key = pk_compressed
     ; update =
         { Account_update.Update.dummy with
-          verification_key =
-            Set { data = vk; hash = Zkapp_account.digest_vk vk }
+          verification_key = Set (Verification_key_wire.of_data vk)
         ; permissions =
             Set
               { edit_state = Proof

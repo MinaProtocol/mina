@@ -310,9 +310,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { Account_update.Update.dummy with
           verification_key =
             Zkapp_basic.Set_or_keep.Set
-              { data = Pickles.Side_loaded.Verification_key.dummy
-              ; hash = Zkapp_account.dummy_vk_hash ()
-              }
+              (Verification_key_wire.of_hashed
+                 { With_hash.data = Pickles.Side_loaded.Verification_key.dummy
+                 ; hash = Zkapp_account.dummy_vk_hash ()
+                 } )
         }
       in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in

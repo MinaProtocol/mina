@@ -83,7 +83,10 @@ let suite () =
             { Account_update.Update.dummy with
               permissions =
                 Set { Permissions.user_default with access = access_permission }
-            ; verification_key = Set { data = vk; hash = vk_hash }
+            ; verification_key =
+                Set
+                  (Verification_key_wire.of_hashed
+                     { data = vk; hash = vk_hash } )
             }
         ; preconditions =
             { Account_update.Preconditions.network =

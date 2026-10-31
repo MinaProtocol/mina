@@ -385,7 +385,7 @@ end
 module Verifiable : sig
   type t =
     ( Account_update.t
-    , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
+    , Verification_key_wire.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
   [@@deriving sexp_of]
@@ -460,10 +460,7 @@ module Verifiable : sig
 end = struct
   type t =
     ( Account_update.t
-    , ( Side_loaded_verification_key.Stable.Latest.t
-      , Zkapp_basic.F.Stable.Latest.t )
-      With_hash.Stable.Latest.t
-      option )
+    , Verification_key_wire.t option )
     Call_forest.With_hashes_and_data.Stable.Latest.t
     Poly.Stable.Latest.t
   [@@deriving sexp_of]
@@ -488,8 +485,9 @@ end = struct
       Serializable.t =
     { fee_payer
     ; account_updates =
-        Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            (Account_update.read_all_proofs_from_disk upd, aux) )
+        Call_forest.map account_updates ~f:(fun (upd, vk) ->
+            ( Account_update.read_all_proofs_from_disk upd
+            , Option.map vk ~f:Verification_key_wire.to_hashed ) )
     ; memo
     }
 
@@ -497,17 +495,18 @@ end = struct
       ({ fee_payer; account_updates; memo } : Serializable.t) : t =
     { fee_payer
     ; account_updates =
-        Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            (Account_update.write_all_proofs_to_disk ~proof_cache_db upd, aux) )
+        Call_forest.map account_updates ~f:(fun (upd, vk) ->
+            ( Account_update.write_all_proofs_to_disk ~proof_cache_db upd
+            , Option.map vk ~f:Verification_key_wire.of_hashed ) )
     ; memo
     }
 
   let ok_if_vk_hash_expected ~got ~expected =
-    if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
+    if not @@ Zkapp_basic.F.equal (Verification_key_wire.hash got) expected then
       Error
         (Error.create "Expected vk hash doesn't match hash in vk we received"
            [ ("expected_vk_hash", expected)
-           ; ("got_vk_hash", With_hash.hash got)
+           ; ("got_vk_hash", Verification_key_wire.hash got)
            ]
            [%sexp_of: (string * Zkapp_basic.F.t) list] )
     else Ok got
@@ -720,7 +719,7 @@ end = struct
             let vks =
               Option.value vks_opt ~default:Zkapp_basic.F_map.Map.empty
             in
-            Map.set vks ~key:vk.hash ~data:vk )
+            Map.set vks ~key:(Verification_key_wire.hash vk) ~data:vk )
     end
 
     module Command_wrapper : Command_wrapper_intf with type 'a t = 'a = struct
@@ -742,7 +741,9 @@ end = struct
 
       let find (t : t) ~account_id ~vk_hash =
         let%bind.Option vk = Map.find t account_id in
-        Option.some_if (Zkapp_basic.F.equal vk_hash vk.hash) vk
+        Option.some_if
+          (Zkapp_basic.F.equal vk_hash (Verification_key_wire.hash vk))
+          vk
 
       let add (t : t) ~account_id ~vk = Map.set t ~key:account_id ~data:vk
     end
@@ -1488,7 +1489,7 @@ module For_tests = struct
             (* replace dummy vk hashes in authorization kind *)
             ( match p.body.authorization_kind with
             | Proof _vk_hash ->
-                Proof (With_hash.hash vk)
+                Proof (Verification_key_wire.hash vk)
             | ak ->
                 ak )
         }

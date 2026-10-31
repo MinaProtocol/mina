@@ -138,8 +138,7 @@ module Accounts = struct
             in
 
             let verification_key =
-              Option.map verification_key
-                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
+              Option.map verification_key ~f:Verification_key_wire.of_data
             in
             let%map action_state =
               if
