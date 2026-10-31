@@ -1,0 +1,22 @@
+(tests
+ (names test_daemon_settings)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_kernel
+  async
+  yojson
+  ;; local libraries
+  init
+  cli_lib
+  currency
+  logger
+  mina_compile_config
+  mina_stdlib
+  node_config
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
