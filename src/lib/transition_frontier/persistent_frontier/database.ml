@@ -403,17 +403,18 @@ let add ~arcs_cache ~transition =
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
 let move_root ~old_root_hash ~new_root ~garbage =
-  let new_root_hash =
-    (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+  let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
+  let new_root_common_unwrapped =
+    Root_data.Limited.common new_root
+    |> Root_data.Common.read_all_proofs_from_disk
   in
   fun batch ->
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
-    Batch.set batch ~key:Root_common
-      ~data:(Root_data.Limited.Stable.Latest.common new_root) ;
+    Batch.set batch ~key:Root_common ~data:new_root_common_unwrapped ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
       ~data:
         (List.map ~f:With_hash.data
-           (Root_data.Limited.Stable.Latest.protocol_states new_root) ) ;
+           (Root_data.Limited.protocol_states new_root) ) ;
     List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
         (* because we are removing entire forks of the tree, there is
          * no need to have extra logic to any remove arcs to the node
