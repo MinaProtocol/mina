@@ -164,7 +164,9 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash" ) )
+                    "snarked ledger hash"
+                | `Incorrect_protocol_state e ->
+                    "protocol state (" ^ Error.to_string_hum e ^ ")" ) )
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
@@ -354,8 +356,6 @@ module For_tests = struct
     let%bind slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~slot_advancement
-        ~constraint_constants:
-          precomputed_values.Precomputed_values.constraint_constants
         ~constants:precomputed_values.consensus_constants
     in
     let zkapp_cmd_limit = None in
@@ -450,6 +450,13 @@ module For_tests = struct
         Option.value_map ledger_proof_opt ~f:Ledger_proof.Cached.statement
           ~default:previous_ledger_proof_stmt
       in
+      let supply_increase =
+        match ledger_proof_opt with
+        | Some proof ->
+            (Ledger_proof.Cached.statement proof).supply_increase
+        | None ->
+            Currency.Amount.Signed.zero
+      in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.genesis_ledger_hash
@@ -474,7 +481,7 @@ module For_tests = struct
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }
-          ~coinbase_receiver ~supercharge_coinbase
+          ~coinbase_receiver ~supercharge_coinbase ~supply_increase
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
