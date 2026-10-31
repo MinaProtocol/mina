@@ -727,15 +727,6 @@ debian-download-create-legacy-hardfork: ## Download and create legacy hardfork D
 
 	@buildkite-cache-manager read --root legacy/debians/$(CODENAME) "mina-create-$(NETWORK_NAME)-prefork-genesis_*_amd64.deb" _build
 
-.PHONY: debian-reversion
-debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
-	$(call check_env_var,DEB)
-	$(call check_env_var,NEW_VERSION)
-	@./scripts/debian/reversion.sh "$(DEB)" "$(NEW_VERSION)" \
-		$(if $(NEW_SUITE),--suite "$(NEW_SUITE)") \
-		$(if $(NEW_NAME),--name "$(NEW_NAME)") \
-		$(if $(OUTPUT),--output "$(OUTPUT)")
-
 ########################################
 # Release management
 
