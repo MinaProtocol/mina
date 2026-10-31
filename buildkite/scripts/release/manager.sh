@@ -287,14 +287,6 @@ function calculate_debian_version() {
     echo "$__artifact:$__target_version-$__codename$__network_suffix-$__arch"
 }
 
-function extract_version_from_deb() {
-    local __deb_file=$1
-    # Extract the version from a Debian package filename
-    # Expected format: {package_name}_{version}_{arch}.deb
-    # Uses split with between underscores and outputs only the version string
-    basename "$__deb_file" .deb | cut -d'_' -f2
-}
-
 
 
 # Maps a manager.sh artifact name to the docker image name used by CI.
@@ -520,7 +512,6 @@ function publish_debian() {
     fi
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
-    local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
         local __sign_arg=("--sign" "$__debian_sign_key")
