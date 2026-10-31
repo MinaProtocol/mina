@@ -54,12 +54,10 @@ MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildki
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-# Since 4.0.x the binaries resolve their profile at run time, from MINA_PROFILE
-# or from /etc/coda/build_config/PROFILE. Only the create-prefork-genesis
-# package is installed here, and it ships no PROFILE file (that comes with
-# mina-<network>-profile), so name the profile explicitly. The profile is not
-# the network: it is the build profile the network's packages are compiled
-# with (Profiles.fromNetwork in buildkite/src/Constants/Profiles.dhall).
+# The create-prefork-genesis package ships no /etc/coda/build_config/PROFILE
+# file (that comes with mina-<network>-profile), so the build profile is
+# passed through MINA_PROFILE. Same mapping as Profiles.fromNetwork in
+# buildkite/src/Constants/Profiles.dhall.
 case "$NETWORK" in
   mainnet) MINA_PROFILE="mainnet" ;;
   devnet) MINA_PROFILE="devnet" ;;
