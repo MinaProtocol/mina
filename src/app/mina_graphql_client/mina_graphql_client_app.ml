@@ -117,6 +117,29 @@ let best_chain_command =
          | Error e ->
              `Assoc [ ("error", Error_json.error_to_yojson e) ] ) )
 
+let scan_state_command =
+  Command.async ~summary:"Query per-tree scan state work and available slots"
+    (let%map_open.Command uri_str = graphql_uri_flag
+     and state_hash =
+       flag "--state-hash"
+         ~doc:"STATE_HASH Block state hash (default: best tip)"
+         (optional string)
+     in
+     fun () ->
+       let logger = Logger.null () in
+       let node_uri = Uri.of_string uri_str in
+       let%map result =
+         Mina_graphql_client.Client.get_scan_state ?state_hash ~logger node_uri
+       in
+       match result with
+       | Ok scan_state ->
+           Yojson.Safe.pretty_to_channel Out_channel.stdout
+             (Mina_graphql_client.Types.scan_state_to_yojson scan_state)
+       | Error error ->
+           prerr_endline
+             (Yojson.Safe.to_string (Error_json.error_to_yojson error)) ;
+           Shutdown.shutdown 1 )
+
 let metrics_command =
   Command.async ~summary:"Query daemon metrics"
     (let%map_open.Command uri_str = graphql_uri_flag in
@@ -421,6 +444,7 @@ let () =
        [ ("peer", peer_command)
        ; ("account", account_command)
        ; ("best-chain", best_chain_command)
+       ; ("scan-state", scan_state_command)
        ; ("metrics", metrics_command)
        ; ("slot", slot_command)
        ; ("send-payment", send_payment_command)
