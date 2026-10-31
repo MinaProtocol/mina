@@ -25,7 +25,7 @@
 # Supported backends: Google Cloud Storage (gs), Hetzner, local filesystem
 #
 # Usage examples:
-#   ./manager.sh publish --buildkite-build-id 12345 --source-version 1.0.0 --target-version 1.0.1 --channel stable
+#   ./manager.sh publish --buildkite-build-id 12345 --source-version 1.0.1 --target-version 1.0.1 --channel stable
 #   ./manager.sh verify --version 1.0.1 --channel stable --artifacts mina-daemon,mina-archive
 #
 # For detailed help on any command, use: ./manager.sh [command] --help
@@ -136,7 +136,6 @@ function main_help(){
     echo ""
     echo " publish - publish build artifact to debian repository and docker registry";
     echo " pull - pull artifacts from cache into local folder";
-    echo " reversion - reversion all .deb packages in a folder";
     echo " progress - show progress of promoting/publishing release artifacts";
     echo " fix - fix debian package repository";
     echo " validate - validate debian repo hashes and optionally fix + invalidate CDN";
@@ -286,14 +285,6 @@ function calculate_debian_version() {
     local __network_suffix
     __network_suffix=$(get_suffix $__artifact $__network)
     echo "$__artifact:$__target_version-$__codename$__network_suffix-$__arch"
-}
-
-function extract_version_from_deb() {
-    local __deb_file=$1
-    # Extract the version from a Debian package filename
-    # Expected format: {package_name}_{version}_{arch}.deb
-    # Uses split with between underscores and outputs only the version string
-    basename "$__deb_file" .deb | cut -d'_' -f2
 }
 
 
@@ -498,27 +489,21 @@ function get_cached_debian_or_download() {
 function publish_debian() {
     local __artifact=$1
     local __codename=$2
-    local __source_version=$3
-    local __target_version=$4
-    local __channel=$5
-    local __network=$6
-    local __profile=$7
-    local __verify=$8
-    local __dry_run=$9
-    local __backend=${10}
-    local __debian_repo=${11}
-    local __arch=${12}
-    local __force_upload_debians=${13:-0}
-    local __debian_sign_key=${14}
-    local __new_artifact_name=${15:-""}
+    local __target_version=$3
+    local __channel=$4
+    local __network=$5
+    local __profile=$6
+    local __verify=$7
+    local __dry_run=$8
+    local __backend=$9
+    local __debian_repo=${10}
+    local __arch=${11}
+    local __force_upload_debians=${12:-0}
+    local __debian_sign_key=${13}
     local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network $__profile)
-
-    if [[ -z ${__new_artifact_name+x} || -z ${__new_artifact_name} || ${__new_artifact_name} == "" ]]; then
-        __new_artifact_name=$__artifact_full_name
-    fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
     echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
@@ -527,7 +512,6 @@ function publish_debian() {
     fi
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
-    local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
         local __sign_arg=("--sign" "$__debian_sign_key")
@@ -537,28 +521,10 @@ function publish_debian() {
         local __signed_arg=""
     fi
 
-    if [[ $__source_version != "$__target_version" ]]; then
-        echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
-        check_app "deb-toolkit"
-        local __session_dir
-        __session_dir=$(mktemp -d -t deb-session-XXXXXX)
-        local __input_deb="${__deb}_${__source_version}_${__arch}.deb"
-        local __output_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb"
-
-        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session open "$__input_deb" "$__session_dir"
-        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session reversion "$__session_dir" "$__target_version"
-        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session replace-suite "$__session_dir" "$__channel"
-        if [[ "$__new_artifact_name" != "$__artifact_full_name" ]]; then
-            prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session rename-package "$__session_dir" "$__new_artifact_name"
-        fi
-        prefix_cmd "$SUBCOMMAND_TAB" deb-toolkit session save "$__session_dir" "$__output_deb"
-        rm -rf "$__session_dir"
-    fi
-
     if [[ $__dry_run == 0 ]]; then
         # shellcheck disable=SC2068,SC2046
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
-            --names "$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb" \
+            --names "$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__target_version}_${__arch}.deb" \
             --version $__target_version \
             --bucket $__debian_repo \
             $(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi) \
@@ -570,10 +536,10 @@ function publish_debian() {
 
         if [[ $__verify == 1 ]]; then
 
-            echo "     📋 Verifying: $__new_artifact_name debian to $__channel channel with $__target_version version"
+            echo "     📋 Verifying: $__artifact_full_name debian to $__channel channel with $__target_version version"
 
             prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/verify.sh \
-                -p $__new_artifact_name \
+                -p $__artifact_full_name \
                 --version $__target_version \
                 -m $__codename \
                 -r $__debian_repo \
@@ -657,7 +623,7 @@ function publish_help(){
     printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
     printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id of release build to publish";
     printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish";
-    printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish";
+    printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish. Must equal --source-version unless --only-dockers";
     printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
     printf "  %-25s %s\n" "--channel" "[string] target debian channel";
     printf "  %-25s %s\n" "--source-docker-repo" "[string] source docker repo. Default: $DEFAULT_DOCKER_REPO";
@@ -669,13 +635,12 @@ function publish_help(){
     printf "  %-25s %s\n" "--backend" "[string] backend to use for storage. e.g gs,hetzner. default: gs";
     printf "  %-25s %s\n" "--debian-repo" "[string] debian repository to publish to. default: $DEBIAN_REPO";
     printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
-    printf "  %-25s %s\n" "--strip-network-from-archive" "[bool] strip network from archive name. E.g mina-archive-devnet -> mina-archive";
     printf "  %-25s %s\n" "--force-upload-debians" "[bool] force upload debian packages even if they exist already in the repository";
     printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME publish --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet --buildkite-build-id 123 --source-version 2.0.0-rc1-48efea4 --target-version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel alpha --publish-to-docker-io --only-dockers --verify --dry-run
+    echo "  " $CLI_NAME publish --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet --buildkite-build-id 123 --source-version 2.0.0-rc1-48efea4 --target-version 2.0.0-rc1 --codenames bullseye,focal --channel alpha --publish-to-docker-io --only-dockers --verify --dry-run
     echo ""
     echo " Above command will publish mina-logproc,mina-archive,mina-rosetta artifacts to debian repository and docker registry"
     echo ""
@@ -703,7 +668,6 @@ function publish(){
     local __backend="gs"
     local __debian_repo=$DEBIAN_REPO
     local __debian_sign_key=""
-    local __strip_network_from_archive=0
     local __archs=${DEFAULT_ARCHITECTURES}
     local __force_upload_debians=0
     local __profile=$DEFAULT_PROFILE
@@ -778,10 +742,6 @@ function publish(){
                 __debian_sign_key=${2:?$error_message}
                 shift 2;
             ;;
-            --strip-network-from-archive )
-                __strip_network_from_archive=1
-                shift 1;
-            ;;
             --archs )
                 __archs=${2:?$error_message}
                 shift 2;
@@ -826,6 +786,12 @@ function publish(){
         publish_help; exit 1;
     fi
 
+    # Debians are uploaded as built. A different version needs a new package build.
+    if [[ $__only_dockers == 0 && $__source_version != "$__target_version" ]]; then
+        echo -e "❌ ${RED} !! Debian packages are published with their build version: --source-version ($__source_version) and --target-version ($__target_version) must be equal. Use --only-dockers to retag docker images only${CLEAR}\n";
+        publish_help; exit 1;
+    fi
+
     echo ""
     echo " ℹ️  Publishing mina artifacts with following parameters:"
     echo " - Publishing artifacts: $__artifacts"
@@ -843,7 +809,6 @@ function publish(){
     echo " - Backend: $__backend"
     echo " - Debian repo: $__debian_repo"
     echo " - Debian sign key: $__debian_sign_key"
-    echo " - Strip network from archive: $__strip_network_from_archive"
     echo " - Architectures: $__archs"
     echo " - Profile: $__profile"
     echo " - Force upload debians: $__force_upload_debians"
@@ -894,7 +859,6 @@ function publish(){
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                             $__codename \
-                                            $__source_version \
                                             $__target_version \
                                             $__channel \
                                             "" \
@@ -917,16 +881,9 @@ function publish(){
                             mina-archive)
                                 for network in "${__networks_arr[@]}"; do
 
-                                    if [[ $__strip_network_from_archive == 1 ]]; then
-                                        new_name="mina-archive"
-                                    else
-                                        new_name=""
-                                    fi
-
                                     if [[ $__only_dockers == 0 ]]; then
                                             publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -937,8 +894,7 @@ function publish(){
                                                 $__debian_repo \
                                                 "$__arch" \
                                                 "$__force_upload_debians" \
-                                                "$__debian_sign_key" \
-                                                "$new_name"
+                                                "$__debian_sign_key"
                                     fi
 
                                     if [[ $__only_debians == 0 ]]; then
@@ -951,7 +907,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -975,7 +930,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -999,7 +953,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -1023,7 +976,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -1047,7 +999,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -1071,7 +1022,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -1095,7 +1045,6 @@ function publish(){
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                                 $__codename \
-                                                $__source_version \
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
@@ -1989,14 +1938,14 @@ function persist_help(){
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id to persist artifacts";
     printf "  %-25s %s\n" "--local-debian-path" "[string] path to local .deb file or directory (exclusive with --buildkite-build-id)";
-    printf "  %-25s %s\n" "--source-folder" "[string] folder with {codename}/*.deb structure (as produced by pull/reversion)";
+    printf "  %-25s %s\n" "--source-folder" "[string] folder with {codename}/*.deb structure (as produced by pull)";
     printf "  %-25s %s\n" "--target" "[string] target location to persist artifacts";
     echo ""
     echo "Example:"
     echo ""
     echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --buildkite-build-id 123 --target /debians_legacy
     echo "  " $CLI_NAME persist --backend gs --artifacts mina-archive --local-debian-path /path/to/debs --target /debians_legacy
-    echo "  " $CLI_NAME persist --source-folder ./reversioned --target /debians_legacy
+    echo "  " $CLI_NAME persist --source-folder ./debians --target /debians_legacy
     echo ""
     echo " The --source-folder mode uploads all .deb files found under {source-folder}/{codename}/ to"
     echo " {backend root}/{target}/debians/{codename}/ preserving the codename structure."
@@ -2018,8 +1967,6 @@ function persist(){
     local __source_folder
     local __target
     local __codename
-    local __new_version
-    local __suite="unstable"
     local __arch="$DEFAULT_ARCHITECTURES"
 
     while [ ${#} -gt 0 ]; do
@@ -2053,16 +2000,8 @@ function persist(){
                 __source_folder=${2:?$error_message}
                 shift 2;
             ;;
-            --new-version )
-                __new_version=${2:?$error_message}
-                shift 2;
-            ;;
             --target )
                 __target=${2:?$error_message}
-                shift 2;
-            ;;
-            --suite )
-                __suite=${2:?$error_message}
                 shift 2;
             ;;
             --arch )
@@ -2229,12 +2168,8 @@ function persist(){
         echo " - Local debian path: $__local_debian_path"
     fi
     echo " - Codename: $__codename"
-    echo " - Suite: $__suite"
     echo " - Architecture: $__arch"
     echo " - Target: $__target"
-    if [[ -n ${__new_version+x} ]]; then
-        echo " - New version: $__new_version"
-    fi
 
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
@@ -2259,29 +2194,6 @@ function persist(){
         else
             storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb" "$tmp_dir"
         fi
-
-        if [[ -n ${__new_version+x} ]]; then
-            local __source_version
-            echo " - Extracting source version from $tmp_dir/${__artifact}_*_${__arch}.deb"
-            __source_version=$(extract_version_from_deb "$(ls $tmp_dir/${__artifact}_*_${__arch}.deb | head -1)")
-
-            local __deb
-            __deb=$(ls $tmp_dir/${__artifact}_*_${__arch}.deb | head -1)
-
-            local __artifact_full_name
-            __artifact_full_name=$(get_artifact_with_suffix $__artifact)
-
-            echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__new_version"
-            prefix_cmd "$SUBCOMMAND_TAB" reversion --deb "$tmp_dir/${__artifact_full_name}" \
-                --package ${__artifact_full_name} \
-                --source-version ${__source_version} \
-                --new-version ${__new_version} \
-                --suite "unstable" \
-                --new-suite ${__suite} \
-                --new-name ${__artifact_full_name} \
-                --arch ${__arch}
-        fi
-
 
         storage_upload "$__backend" "$tmp_dir/${__artifact}_*" "$(storage_root "$__backend")/$__target/debians/$__codename/"
     done
@@ -2448,189 +2360,6 @@ function pull(){
     echo " ℹ️  Summary: $__success_count/$__total_configs packages downloaded successfully."
     if [[ $__fail_count -gt 0 ]]; then
         echo -e " ⚠️  $__fail_count package(s) were not found and skipped."
-    fi
-    echo " ✅  Done."
-    echo ""
-}
-
-#==============
-# reversion
-#
-# Reversions all .deb files found in a folder structure produced by `pull`.
-# Walks {source-folder}/{codename}/*.deb and writes reversioned debs to
-# {output-folder}/{codename}/*.deb.
-#==============
-function reversion_help(){
-    echo "Reversion all .deb packages in a folder (as produced by 'pull')."
-    echo ""
-    echo "     $CLI_NAME reversion [-options]"
-    echo ""
-    echo "Parameters:"
-    echo ""
-    printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--source-folder" "[string] folder with {codename}/*.deb structure (required)";
-    printf "  %-25s %s\n" "--output-folder" "[string] folder to write reversioned debs into (required)";
-    printf "  %-25s %s\n" "--new-version" "[string] new version string (required, e.g. 3.0.0-rc1)";
-    printf "  %-25s %s\n" "--suite" "[string] replace suite in control file (e.g. stable, unstable)";
-    printf "  %-25s %s\n" "--name" "[string] rename the package (e.g. mina-devnet-hardfork)";
-    echo ""
-    echo "Examples:"
-    echo ""
-    echo "  $CLI_NAME reversion --source-folder ./debians --output-folder ./reversioned --new-version 3.0.0-rc1 --suite stable"
-    echo ""
-    echo "  Above command will reversion all .deb files found under ./debians/{codename}/ and write"
-    echo "  the results to ./reversioned/{codename}/ preserving the codename subdirectory structure."
-    echo ""
-}
-
-function reversion(){
-    if [[ ${#} == 0 ]]; then
-        reversion_help; exit 0;
-    fi
-
-    local __source_folder=""
-    local __output_folder=""
-    local __new_version=""
-    local __suite=""
-    local __name=""
-
-    while [ ${#} -gt 0 ]; do
-        error_message="Error: a value is needed for '$1'";
-        case $1 in
-            -h | --help )
-                reversion_help; exit 0;
-            ;;
-            --source-folder )
-                __source_folder=${2:?$error_message}
-                shift 2;
-            ;;
-            --output-folder )
-                __output_folder=${2:?$error_message}
-                shift 2;
-            ;;
-            --new-version )
-                __new_version=${2:?$error_message}
-                shift 2;
-            ;;
-            --suite )
-                __suite=${2:?$error_message}
-                shift 2;
-            ;;
-            --name )
-                __name=${2:?$error_message}
-                shift 2;
-            ;;
-            * )
-                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
-                echo "";
-                reversion_help; exit 1;
-            ;;
-        esac
-    done
-
-    if [[ -z "$__source_folder" ]]; then
-        echo -e "❌ ${RED} !! Source folder (--source-folder) is required${CLEAR}\n";
-        reversion_help; exit 1;
-    fi
-
-    if [[ -z "$__output_folder" ]]; then
-        echo -e "❌ ${RED} !! Output folder (--output-folder) is required${CLEAR}\n";
-        reversion_help; exit 1;
-    fi
-
-    if [[ -z "$__new_version" ]]; then
-        echo -e "❌ ${RED} !! New version (--new-version) is required${CLEAR}\n";
-        reversion_help; exit 1;
-    fi
-
-    if [[ ! -d "$__source_folder" ]]; then
-        echo -e "❌ ${RED} !! Source folder does not exist: $__source_folder${CLEAR}\n";
-        exit 1;
-    fi
-
-    echo ""
-    echo " ℹ️  Reversioning .deb packages with following parameters:"
-    echo " - Source folder: $__source_folder"
-    echo " - Output folder: $__output_folder"
-    echo " - New version: $__new_version"
-    if [[ -n "$__suite" ]]; then
-        echo " - Suite: $__suite"
-    fi
-    if [[ -n "$__name" ]]; then
-        echo " - Rename to: $__name"
-    fi
-
-    local __reversion_script="$SCRIPTPATH/../../../scripts/debian/reversion.sh"
-
-    if [[ ! -f "$__reversion_script" ]]; then
-        echo -e "❌ ${RED} !! Reversion script not found at: $__reversion_script${CLEAR}\n";
-        exit 1;
-    fi
-
-    local __total_count=0
-    local __success_count=0
-    local __fail_count=0
-
-    for __codename_dir in "$__source_folder"/*/; do
-        if [[ ! -d "$__codename_dir" ]]; then
-            continue
-        fi
-
-        local __codename
-        __codename=$(basename "$__codename_dir")
-        local __output_codename_dir="$__output_folder/$__codename"
-        mkdir -p "$__output_codename_dir"
-
-        for __deb_file in "$__codename_dir"*.deb; do
-            if [[ ! -f "$__deb_file" ]]; then
-                continue
-            fi
-
-            (( __total_count++ )) || true
-            local __deb_basename
-            __deb_basename=$(basename "$__deb_file")
-            echo "  🔄  Reversioning $__codename/$__deb_basename -> version $__new_version"
-
-            # Parse package name and arch from deb filename ({name}_{version}_{arch}.deb)
-            local __pkg_name __pkg_arch __final_name
-            __pkg_name=$(echo "$__deb_basename" | sed 's/_[^_]*_[^_]*\.deb$//')
-            __pkg_arch=$(echo "$__deb_basename" | sed 's/.*_\([^_]*\)\.deb$/\1/')
-            if [[ -n "$__name" ]]; then
-                __final_name="$__name"
-            else
-                __final_name="$__pkg_name"
-            fi
-            local __output_file="$__output_codename_dir/${__final_name}_${__new_version}_${__pkg_arch}.deb"
-
-            local __reversion_args=()
-            __reversion_args+=("$__deb_file" "$__new_version")
-
-            if [[ -n "$__suite" ]]; then
-                __reversion_args+=(--suite "$__suite")
-            fi
-            if [[ -n "$__name" ]]; then
-                __reversion_args+=(--name "$__name")
-            fi
-
-            __reversion_args+=(--output "$__output_file")
-
-            if prefix_cmd "$SUBCOMMAND_TAB" "$__reversion_script" "${__reversion_args[@]}"; then
-                (( __success_count++ )) || true
-            else
-                echo -e "  ⚠️  Warning: failed to reversion $__codename/$__deb_basename — skipping"
-                (( __fail_count++ )) || true
-            fi
-        done
-    done
-
-    echo ""
-    if [[ $__total_count -eq 0 ]]; then
-        echo -e " ⚠️  No .deb files found in $__source_folder/{codename}/ subdirectories."
-    else
-        echo " ℹ️  Summary: $__success_count/$__total_count packages reversioned successfully."
-        if [[ $__fail_count -gt 0 ]]; then
-            echo -e " ⚠️  $__fail_count package(s) failed to reversion."
-        fi
     fi
     echo " ✅  Done."
     echo ""
@@ -3081,7 +2810,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | verify | validate | fix | persist | pull | reversion | progress)
+        publish | verify | validate | fix | persist | pull | progress)
             $1 "${@:2}";
         ;;
         * )
