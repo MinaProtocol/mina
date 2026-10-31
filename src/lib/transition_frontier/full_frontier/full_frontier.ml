@@ -351,16 +351,10 @@ module Util = struct
         protocol_states_for_root_scan_state ~new_scan_state
         ~old_root_state:(Breadcrumb.protocol_state_with_hashes parent)
     in
-    let heir_transition =
-      Breadcrumb.validated_transition heir
-      |> Mina_block.Validated.read_all_proofs_from_disk
-    in
-    let new_scan_state_unwrapped =
-      Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
-    in
     let new_root_data =
-      Root_data.Limited.Stable.Latest.create ~transition:heir_transition
-        ~scan_state:new_scan_state_unwrapped
+      Root_data.Limited.create
+        ~transition:(Breadcrumb.validated_transition heir)
+        ~scan_state:new_scan_state
         ~pending_coinbase:
           (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
         ~protocol_states
@@ -669,12 +663,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       Applied { mutant = old_best_tip; new_root = None }
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash =
-        (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
-      in
+      let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.Stable.Latest.protocol_states new_root
+        Root_data.Limited.protocol_states new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
