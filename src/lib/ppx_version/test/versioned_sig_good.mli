@@ -14,6 +14,8 @@ module Good : sig
     end
   end]
 
+  type t = Stable.Latest.t
+
   (* make sure t is an int *)
   val is_42 : t -> bool
 end

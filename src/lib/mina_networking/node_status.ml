@@ -66,6 +66,24 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  { node_ip_addr : Peer.Inet_addr.t
+  ; node_peer_id : Peer.Id.t
+        [@to_yojson fun peer_id -> `String peer_id]
+        [@of_yojson function `String s -> Ok s | _ -> Error "expected string"]
+  ; sync_status : Sync_status.t
+  ; peers : Peer.t list
+  ; block_producers : Signature_lib.Public_key.Compressed.t list
+  ; protocol_state_hash : State_hash.t
+  ; ban_statuses : (Peer.t * Trust_system.Peer_status.t) list
+  ; k_block_hashes_and_timestamps :
+      (State_hash.t * Mina_stdlib.Bounded_types.String.t) list
+  ; git_commit : Mina_stdlib.Bounded_types.String.t
+  ; uptime_minutes : int
+  ; block_height_opt : int option [@default None]
+  }
+[@@deriving to_yojson, of_yojson]
+
 type response = (t, Error.t) result
 
 let response_to_yojson (response : response) : Yojson.Safe.t =

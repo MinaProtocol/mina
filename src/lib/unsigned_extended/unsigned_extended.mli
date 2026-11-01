@@ -11,8 +11,6 @@ module Extend : F
 module UInt64 : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       [@@@with_all_version_tags]
 
@@ -31,8 +29,6 @@ end
 module UInt32 : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       [@@@with_all_version_tags]
 

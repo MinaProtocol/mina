@@ -13,6 +13,8 @@ module Width : sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
   val of_int_exn : int -> t
 
   val to_int : t -> int
@@ -33,6 +35,9 @@ module Width : sig
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   module Length : Nat.Add.Intf_transparent
@@ -45,6 +50,8 @@ end = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   let zero = Char.of_int_exn 0
 
@@ -59,8 +66,6 @@ end = struct
   module Max_vector = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a Vector.Vector_2.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
@@ -80,8 +85,6 @@ end = struct
   module Max_at_most = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type 'a t = 'a At_most.At_most_2.Stable.V1.t
         [@@deriving compare, yojson, sexp, hash, equal]
@@ -116,6 +119,9 @@ module Domains = struct
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { h : 'a }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 end
 
 module Repr = struct
@@ -130,6 +136,13 @@ module Repr = struct
       [@@deriving sexp, equal, compare, yojson]
     end
   end]
+
+  type 'g t = 'g Stable.Latest.t =
+    { max_proofs_verified : Proofs_verified.t
+    ; actual_wrap_domain_size : Proofs_verified.t
+    ; wrap_index : 'g Plonk_verification_key_evals.t
+    }
+  [@@deriving sexp, equal, compare, yojson]
 end
 
 module Poly = struct
@@ -149,6 +162,15 @@ module Poly = struct
       [@@deriving hash]
     end
   end]
+
+  type ('g, 'proofs_verified, 'vk) t =
+        ('g, 'proofs_verified, 'vk) Stable.Latest.t =
+    { max_proofs_verified : 'proofs_verified
+    ; actual_wrap_domain_size : 'proofs_verified
+    ; wrap_index : 'g Plonk_verification_key_evals.t
+    ; wrap_vk : 'vk option
+    }
+  [@@deriving hash]
 end
 
 let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =

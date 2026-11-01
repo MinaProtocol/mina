@@ -26,8 +26,6 @@ let to_hex_string = Field.to_hex_string
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     module T = struct
       type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]

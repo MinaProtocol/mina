@@ -15,6 +15,12 @@ module Poly = struct
     end
   end]
 
+  type ('single_spec, 'sub_zkapp_spec) t =
+        ('single_spec, 'sub_zkapp_spec) Stable.Latest.t =
+    | Single of ('single_spec, Id.Single.t) With_job_meta.t
+    | Sub_zkapp_command of ('sub_zkapp_spec, Id.Sub_zkapp.t) With_job_meta.t
+  [@@deriving sexp, yojson]
+
   let map ~f_single_spec ~f_subzkapp_spec = function
     | Single job ->
         Single (With_job_meta.map ~f_spec:f_single_spec job)
@@ -36,8 +42,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       (Single_spec.Stable.V2.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t

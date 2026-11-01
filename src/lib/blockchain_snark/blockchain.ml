@@ -34,10 +34,7 @@ module Stable = struct
   end
 end]
 
-include (
-  Stable.Latest :
-    sig
-      type t = Stable.Latest.t [@@deriving sexp, yojson]
-    end )
+type t = Stable.Latest.t = { state : Protocol_state.Value.t; proof : Proof.t }
+[@@deriving fields, sexp, yojson]
 
 [%%define_locally Stable.Latest.(create, state, proof)]
