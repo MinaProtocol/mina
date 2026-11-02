@@ -559,14 +559,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ~fee_payer_account ~source_account ~receiver_account txn)
     end
 
-    let%snarkydef_ check_signature ~signature_kind shifted ~payload
-        ~is_user_command ~signer ~signature =
+    let%snarkydef_ check_signature ~signature_kind ~payload ~is_user_command
+        ~signer ~signature =
       let%bind input =
         Transaction_union_payload.Checked.to_input_legacy payload
       in
       let%bind verifies =
-        Schnorr.Legacy.Checked.verifies ~signature_kind shifted signature signer
-          input
+        Schnorr.Legacy.Checked.verifies ~signature_kind signature signer input
       in
       [%with_label_ "check signature"] (fun () ->
           Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
@@ -647,13 +646,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~max_proofs_verified:
               (module Pickles.Side_loaded.Verification_key.Max_width) )
 
-    let signature_verifies ~signature_kind ~shifted ~payload_digest signature pk
-        =
+    let signature_verifies ~signature_kind ~payload_digest signature pk =
       let%bind pk =
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Chunked.Checked.verifies ~signature_kind shifted signature pk
+      Schnorr.Chunked.Checked.verifies ~signature_kind signature pk
         (Random_oracle.Input.Chunked.field payload_digest)
 
     module Zkapp_command_snark = struct
@@ -1679,11 +1677,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                               assert false )
                     in
                     run_checked
-                      (let%bind (module S) =
-                         Tick.Inner_curve.Checked.Shifted.create ()
-                       in
-                       signature_verifies ~signature_kind
-                         ~shifted:(module S)
+                      (signature_verifies ~signature_kind
                          ~payload_digest:commitment signature
                          account_update.data.public_key )
               in
@@ -2237,8 +2231,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let%snarkydef_ apply_tagged_transaction ~signature_kind
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        (type shifted)
-        (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
         fee_payment_root global_slot pending_coinbase_stack_init
         pending_coinbase_stack_before pending_coinbase_after state_body
         ({ signer; signature; payload } as txn : Transaction_union.var) =
@@ -2248,8 +2240,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let%bind () =
         [%with_label_ "Check transaction signature"] (fun () ->
-            check_signature shifted ~signature_kind ~payload ~is_user_command
-              ~signer ~signature )
+            check_signature ~signature_kind ~payload ~is_user_command ~signer
+              ~signature )
       in
       let%bind signer_pk = Public_key.compress_var signer in
       let%bind () =
@@ -3117,7 +3109,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%snarkydef_ main ~signature_kind ~constraint_constants
         (statement : Statement.With_sok.var) =
       let%bind () = dummy_constraints () in
-      let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
       let%bind t =
         with_label __LOC__ (fun () ->
             exists Transaction_union.typ ~request:(As_prover.return Transaction) )
@@ -3136,7 +3127,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let%bind fee_payment_root_after, fee_excess, supply_increase =
         apply_tagged_transaction ~signature_kind ~constraint_constants
-          (module Shifted)
           statement.source.first_pass_ledger global_slot pending_coinbase_init
           statement.source.pending_coinbase_stack
           statement.target.pending_coinbase_stack state_body t

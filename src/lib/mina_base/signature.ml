@@ -65,7 +65,7 @@ module Raw = struct
     try Some (to_field field_enc, to_scalar scalar_enc) with _ -> None
 end
 
-type var = Field.Var.t * Inner_curve.Scalar.var
+type var = Signature_lib.Schnorr.Chunked.Signature.var
 
 [%%define_locally
 Stable.Latest.
