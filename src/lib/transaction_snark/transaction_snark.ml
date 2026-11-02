@@ -208,8 +208,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type (_, _, _, _) t_typed =
         | Opt_signed_batch : (unit, unit, unit, unit) t_typed
-        | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
-        | Opt_signed : (unit, unit, unit, unit) t_typed
         | Proved
             : ( Zkapp_statement.Checked.t * unit
               , Zkapp_statement.t * unit
@@ -222,10 +220,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         match t with
         | Opt_signed_batch ->
             List.init opt_signed_batch_size ~f:(fun _ -> opt_signed)
-        | Opt_signed_opt_signed ->
-            [ opt_signed; opt_signed ]
-        | Opt_signed ->
-            [ opt_signed ]
         | Proved ->
             [ { auth_type = Proof; is_start = `No } ]
     end
@@ -2359,38 +2353,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                   } )
             ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
             }
-        | Opt_signed_opt_signed ->
-            { identifier = "opt_signed-opt_signed"
-            ; prevs = M.[]
-            ; main =
-                (fun { public_input = stmt } ->
-                  let zkapp_input_opt, _ =
-                    main ~signature_kind ?witness:!witness s
-                      ~constraint_constants stmt
-                  in
-                  assert (Option.is_none zkapp_input_opt) ;
-                  { previous_proof_statements = []
-                  ; public_output = ()
-                  ; auxiliary_output = ()
-                  } )
-            ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-            }
-        | Opt_signed ->
-            { identifier = "opt_signed"
-            ; prevs = M.[]
-            ; main =
-                (fun { public_input = stmt } ->
-                  let zkapp_input_opt, _ =
-                    main ~signature_kind ?witness:!witness s
-                      ~constraint_constants stmt
-                  in
-                  assert (Option.is_none zkapp_input_opt) ;
-                  { previous_proof_statements = []
-                  ; public_output = ()
-                  ; auxiliary_output = ()
-                  } )
-            ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
-            }
         | Opt_signed_batch ->
             { identifier = "opt_signed-batch"
             ; prevs = M.[]
@@ -3403,8 +3365,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   (** Merge circuit: combines two transaction proofs into one.
-      Used for ALL transaction types (base, zkapp_opt_signed_opt_signed,
-      zkapp_opt_signed, zkapp_proved). *)
+      Used for ALL transaction types (base, zkapp_proved,
+      zkapp_opt_signed_batch). *)
   module Merge = struct
     open Tick
 
@@ -3542,7 +3504,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N6.n )
+    , Nat.N4.n )
     Pickles.Tag.t
 
   let system ~signature_kind ~proof_level ~constraint_constants =
@@ -3557,8 +3519,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         [ Base.rule ~signature_kind ~constraint_constants
         ; Merge.rule ~proof_level self
-        ; zkapp_command ~signature_kind Opt_signed_opt_signed
-        ; zkapp_command ~signature_kind Opt_signed
         ; zkapp_command ~signature_kind Proved
         ; zkapp_command ~signature_kind Opt_signed_batch
         ] )
@@ -3774,31 +3734,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~return_typ:Tick.Typ.unit
         (main ~signature_kind ~constraint_constants))
 
-  (** Return the constraint system for the zkapp-opt_signed-opt_signed circuit. *)
-  let zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
-      ~constraint_constants =
-    let spec = Zkapp_command_segment.Basic.spec Opt_signed_opt_signed in
-    Tick.constraint_system ~input_typ:Statement.With_sok.typ
-      ~return_typ:Tick.Typ.unit (fun stmt ->
-        let open Tick in
-        let (_ : Zkapp_statement.Checked.t option * _) =
-          Base.Zkapp_command_snark.main ~signature_kind spec
-            ~constraint_constants stmt
-        in
-        Checked.return () )
-
-  (** Return the constraint system for the zkapp-opt_signed circuit. *)
-  let zkapp_opt_signed_constraint_system ~signature_kind ~constraint_constants =
-    let spec = Zkapp_command_segment.Basic.spec Opt_signed in
-    Tick.constraint_system ~input_typ:Statement.With_sok.typ
-      ~return_typ:Tick.Typ.unit (fun stmt ->
-        let open Tick in
-        let (_ : Zkapp_statement.Checked.t option * _) =
-          Base.Zkapp_command_snark.main ~signature_kind spec
-            ~constraint_constants stmt
-        in
-        Checked.return () )
-
   (** Return the constraint system for the zkapp-proved circuit. *)
   let zkapp_proved_constraint_system ~signature_kind ~constraint_constants =
     let spec = Zkapp_command_segment.Basic.spec Proved in
@@ -3829,14 +3764,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     [ ("transaction-merge", digest (merge_constraint_system ()))
     ; ( "transaction-base"
       , digest (base_constraint_system ~signature_kind ~constraint_constants) )
-    ; ( "zkapp-opt_signed-opt_signed"
-      , digest
-          (zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
-             ~constraint_constants ) )
-    ; ( "zkapp-opt_signed"
-      , digest
-          (zkapp_opt_signed_constraint_system ~signature_kind
-             ~constraint_constants ) )
     ; ( "zkapp-proved"
       , digest
           (zkapp_proved_constraint_system ~signature_kind ~constraint_constants)
@@ -4256,14 +4183,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let ( tag
         , cache_handle
         , p
-        , Pickles.Provers.
-            [ base
-            ; merge
-            ; _opt_signed_opt_signed
-            ; _opt_signed
-            ; proved
-            ; opt_signed_batch
-            ] ) =
+        , Pickles.Provers.[ base; merge; proved; opt_signed_batch ] ) =
       system ~signature_kind ~proof_level ~constraint_constants
 
     module Proof = (val p)
