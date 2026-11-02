@@ -41,8 +41,8 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
-      type t = User_command.Stable.V3.t list [@@deriving sexp, yojson, hash]
+    module V4 = struct
+      type t = User_command.Stable.V4.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -164,8 +164,8 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V4 = struct
-        type t = (User_command.Stable.V3.t * Diff_error.Stable.V3.t) list
+      module V5 = struct
+        type t = (User_command.Stable.V4.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id

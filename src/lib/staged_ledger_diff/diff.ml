@@ -146,7 +146,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
     module V4 = struct
       type t =
         ( Transaction_snark_work.Stable.V3.t
-        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        , User_command.Stable.V4.t With_status.Stable.V2.t )
         Pre_diff_two.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
@@ -156,7 +156,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
     module V3 = struct
       type t =
         ( Transaction_snark_work.Stable.V2.t
-        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        , User_command.Stable.V4.t With_status.Stable.V2.t )
         Pre_diff_two.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
@@ -195,7 +195,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
     module V4 = struct
       type t =
         ( Transaction_snark_work.Stable.V3.t
-        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        , User_command.Stable.V4.t With_status.Stable.V2.t )
         Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
@@ -205,7 +205,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
     module V3 = struct
       type t =
         ( Transaction_snark_work.Stable.V2.t
-        , User_command.Stable.V3.t With_status.Stable.V2.t )
+        , User_command.Stable.V4.t With_status.Stable.V2.t )
         Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 

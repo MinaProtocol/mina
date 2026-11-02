@@ -21,8 +21,8 @@ end
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Account_update.Graphql_repr.Stable.V2.t list Poly.Stable.V2.t
+    module V3 = struct
+      type t = Account_update.Graphql_repr.Stable.V3.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -34,8 +34,8 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Account_update.Simple.Stable.V2.t list Poly.Stable.V2.t
+    module V3 = struct
+      type t = Account_update.Simple.Stable.V3.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -70,9 +70,9 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        (Account_update.Stable.V2.t, unit, unit) Call_forest.Stable.V1.t
+        (Account_update.Stable.V3.t, unit, unit) Call_forest.Stable.V1.t
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 

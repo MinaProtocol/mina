@@ -671,9 +671,9 @@ module Update = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
-      type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
+      type t = Mina_wire_types.Mina_base.Account_update.Update.V3.t =
         { app_state :
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V2.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -1129,11 +1129,11 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V2.t
+          ; update : Update.Stable.V3.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
@@ -1187,11 +1187,11 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V2.t
+          ; update : Update.Stable.V3.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
@@ -1214,11 +1214,11 @@ module Body = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V3.t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V2.t
-        ; update : Update.Stable.V2.t
+        ; update : Update.Stable.V3.t
         ; balance_change :
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
@@ -1741,9 +1741,9 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          ( Body.Graphql_repr.Stable.V2.t
+          ( Body.Graphql_repr.Stable.V3.t
           , Control.Stable.V2.t )
           Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
@@ -1766,9 +1766,9 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+          (Body.Simple.Stable.V3.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1780,9 +1780,9 @@ module T = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       (** A account_update to a zkApp transaction *)
-      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+      type t = (Body.Stable.V3.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
