@@ -363,10 +363,8 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 List.iter breadcrumb_subtrees ~f:(fun tree ->
                     Mina_stdlib.Rose_tree.iter tree
                       ~f:(fun (cached_breadcrumb, _vc) ->
-                        let (_ : Transition_frontier.Breadcrumb.t) =
-                          Cached.invalidate_with_failure cached_breadcrumb
-                        in
-                        () ) ) ;
+                        Block_registry.finish block_registry cached_breadcrumb
+                          `Ignored ) ) ;
                 [%log error]
                   "Error, failed to attach all catchup breadcrumbs to \
                    transition frontier: $error"
@@ -712,6 +710,58 @@ let%test_module "Transition_handler.Processor tests" =
           [%test_eq: Block_outcome_log.event list] outcomes
             [ Block_outcome_log.Cache_removed { state_hash; outcome = `Failure }
             ; Frontier_add { state_hash; source = `Catchup; added = false }
+            ] )
+
+    let%test_unit "Catchup blocks finish once when passing them on fails" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let first, second =
+            match chain with
+            | first :: second :: _ ->
+                (first, second)
+            | _ ->
+                assert false
+          in
+          let (), outcomes =
+            Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred
+                @@ fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                (* Closed, as Clear leaves it, so passing on a block fails. *)
+                let _, processed_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
+                in
+                Strict_pipe.Writer.close processed_transition_writer ;
+                let handle =
+                  handler_for ~block_registry ~processed_transition_writer
+                    frontier ~capacity:1
+                in
+                let cached breadcrumb =
+                  ( Block_registry.register_exn block_registry
+                      (downcast_breadcrumb breadcrumb)
+                      ~valid_cb:None
+                    |> Cached.transform ~f:(fun _ -> breadcrumb)
+                  , None )
+                in
+                let subtree =
+                  Mina_stdlib.Rose_tree.T
+                    ( cached first
+                    , [ Mina_stdlib.Rose_tree.T (cached second, []) ] )
+                in
+                handle
+                  (`Catchup_breadcrumbs
+                    ([ subtree ], `Ledger_catchup (Ivar.create ())) ) )
+          in
+          let first = state_hash first and second = state_hash second in
+          [%test_eq: Block_outcome_log.event list] outcomes
+            [ Block_outcome_log.Cache_removed
+                { state_hash = first; outcome = `Consumed }
+            ; Frontier_add
+                { state_hash = first; source = `Catchup; added = true }
+            ; Cache_removed { state_hash = second; outcome = `Failure }
             ] )
 
     let%test_unit "adding transitions whose parents are in the frontier" =
