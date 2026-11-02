@@ -2,8 +2,8 @@
 
 # Reject a release variable that is set to something Dhall will quietly ignore.
 #
-# MINA_RELEASE_DOCKER_REPO, MINA_RELEASE_DEBIAN_REPO and
-# MINA_RELEASE_DEBIAN_MIRROR carry Dhall values, and the expressions that read
+# MINA_RELEASE_DOCKER_REPO, MINA_RELEASE_DOCKER_MIRROR, MINA_RELEASE_DEBIAN_REPO
+# and MINA_RELEASE_DEBIAN_MIRROR carry Dhall values, and the expressions that read
 # them end in `? None` so that an unset variable means "use what the job
 # declares" (or, for a mirror, "no second target"). That fallback cannot tell
 # "unset" from "set to something that does not resolve", because Dhall
@@ -47,6 +47,11 @@ DEBIAN_ACCEPTED=(
   "${DEBIAN_UNION}.Stable"
   "${DEBIAN_UNION}.O1Test"
 )
+
+# What the packaging jobs declare (Command/MinaArtifact.dhall,
+# PackagingSpec.docker_repo), and so the registry in the image tags when
+# MINA_RELEASE_DOCKER_REPO is unset.
+DOCKER_DEFAULT="${DOCKER_UNION}.InternalEurope"
 
 # What Jobs/Release/PublishDebians.dhall declares, and so where the packages
 # go when MINA_RELEASE_DEBIAN_REPO is unset.
@@ -92,18 +97,26 @@ check() {
 }
 
 check MINA_RELEASE_DOCKER_REPO "${DOCKER_ACCEPTED[@]}"
+check MINA_RELEASE_DOCKER_MIRROR "${DOCKER_ACCEPTED[@]}"
 check MINA_RELEASE_DEBIAN_REPO "${DEBIAN_ACCEPTED[@]}"
 check MINA_RELEASE_DEBIAN_MIRROR "${DEBIAN_ACCEPTED[@]}"
 
-# A mirror is a second target. The same repository twice is not a release
-# anyone means to run, and Dhall would render it without a word.
-primary="${MINA_RELEASE_DEBIAN_REPO:-${DEBIAN_DEFAULT}}"
-if [[ -n "${MINA_RELEASE_DEBIAN_MIRROR:-}" && "${MINA_RELEASE_DEBIAN_MIRROR}" == "$primary" ]]; then
-  echo -e "${RED}❌ MINA_RELEASE_DEBIAN_MIRROR names the repository the packages already go to.${CLEAR}" >&2
+# not_the_primary <mirror variable> <primary variable> <primary default>: a
+# mirror is a second target. The same one twice is not a release anyone means
+# to run, and Dhall would render it without a word.
+not_the_primary() {
+  local mirror_name="$1" primary_name="$2" default="$3" mirror primary
+  mirror="${!mirror_name:-}"
+  primary="${!primary_name:-$default}"
+  [[ -n "$mirror" && "$mirror" == "$primary" ]] || return 0
+  echo -e "${RED}❌ ${mirror_name} names the target the release already goes to.${CLEAR}" >&2
   echo "" >&2
-  echo "    primary:  ${primary}$([[ -z "${MINA_RELEASE_DEBIAN_REPO:-}" ]] && echo '  (the job default; MINA_RELEASE_DEBIAN_REPO is unset)')" >&2
-  echo "    mirror:   ${MINA_RELEASE_DEBIAN_MIRROR}" >&2
+  echo "    primary:  ${primary}$([[ -z "${!primary_name:-}" ]] && echo "  (the job default; ${primary_name} is unset)")" >&2
+  echo "    mirror:   ${mirror}" >&2
   echo "" >&2
-  echo "    A mirror is a second repository. Leave it unset to publish to one." >&2
+  echo "    A mirror is a second target. Leave it unset to publish to one." >&2
   exit 1
-fi
+}
+
+not_the_primary MINA_RELEASE_DOCKER_MIRROR MINA_RELEASE_DOCKER_REPO "$DOCKER_DEFAULT"
+not_the_primary MINA_RELEASE_DEBIAN_MIRROR MINA_RELEASE_DEBIAN_REPO "$DEBIAN_DEFAULT"
