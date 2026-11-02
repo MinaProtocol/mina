@@ -1079,7 +1079,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         Transition_handler.Block_registry.finish block_registry c
           ( match e with
           | `Invalid_body_reference ->
-              `Ignored
+              `Rejected
           | `Exn _
           | `Fatal_error _
           | `Invalid_staged_ledger_diff _

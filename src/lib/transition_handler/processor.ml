@@ -290,8 +290,10 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                processor: $error" ;
             Deferred.return (Error ())
         | Error `Invalid_body_reference ->
+            (* The body is not the one the block's header commits to, so the
+               block is invalid whatever our own state. *)
             Block_registry.finish block_registry
-              cached_initially_validated_transition `Ignored ;
+              cached_initially_validated_transition `Rejected ;
             Internal_tracing.with_state_hash state_hash
             @@ fun () ->
             [%log internal] "Failure"
@@ -763,6 +765,49 @@ let%test_module "Transition_handler.Processor tests" =
               assert (phys_equal vc valid_cb)
           | _ ->
               failwith "expected the block passed on once, with its callback" )
+
+    let%test_unit "A block whose body does not match its header is rejected" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let[@warning "-8"] (first :: second :: _) = chain in
+          (* The first block's header, carrying the second block's body. *)
+          let forged =
+            let header_validated =
+              Envelope.Incoming.map
+                (downcast_breadcrumb first)
+                ~f:Mina_block.Validation.to_header
+            in
+            Envelope.Incoming.map header_validated ~f:(fun header ->
+                Mina_block.Validation.with_body header
+                  (Mina_block.body
+                     (Transition_frontier.Breadcrumb.block second) ) )
+          in
+          let answers =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let handle = handler_for ~block_registry frontier ~capacity:1 in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let cached =
+                  Block_registry.register_exn block_registry forged
+                    ~valid_cb:(Some valid_cb)
+                in
+                let%map () =
+                  handle
+                    (`Partially_valid_transition
+                      (`Block cached, `Valid_cb (Some valid_cb)) )
+                in
+                List.rev !answers )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Reject ] )
 
     let%test_unit "A catchup block whose parent is not in the frontier is \
                    ignored, not passed on" =
