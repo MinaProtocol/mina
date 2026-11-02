@@ -387,11 +387,17 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
     | E (Best_tip_changed _) ->
         () )
 
-let create ~logger ~root =
+(** A catchup tree for a frontier with [root] and [breadcrumbs]. The tree must
+    hold every breadcrumb in the frontier: when the frontier's root moves to one
+    it doesn't hold, [apply_diffs] can't tell which catchup jobs are stale, and
+    clears them all. *)
+let create ~logger ~root ~breadcrumbs =
   let t =
     { states = Node.State.Enum.Table.create ()
     ; nodes = State_hash.Table.create ()
     ; logger
     }
   in
-  create_node_full t root ; t
+  create_node_full t root ;
+  List.iter breadcrumbs ~f:(breadcrumb_added t) ;
+  t
