@@ -143,7 +143,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     Transition_handler.Processor.create_handler
       ~context:(module Context)
       ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
-      ~catchup_scheduler ~processed_transition_writer ?transaction_pool_proxy ()
+      ~block_registry ~catchup_scheduler ~processed_transition_writer
+      ?transaction_pool_proxy ()
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Strict_pipe.Reader.Merge.iter

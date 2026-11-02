@@ -112,7 +112,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       ~hash:(Mina_block.Validated.state_hash transition) )
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~get_completed_work ~frontier ~catchup_scheduler
+    ~verifier ~get_completed_work ~frontier ~block_registry ~catchup_scheduler
     ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
     ?transaction_pool_proxy =
   let is_block_in_frontier =
@@ -208,10 +208,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         | Ok t ->
             return (Ok t)
         | Error `Not_selected_over_frontier_root ->
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
             let%map () = handle_not_selected () in
             Error ()
         | Error `Already_in_frontier ->
@@ -220,10 +218,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             [%log warn] ~metadata
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
             return (Error ())
         | Error `Parent_missing_from_frontier -> (
             [%log internal] "Schedule_catchup" ;
@@ -260,10 +256,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               "Refusing to process the transition with hash $state_hash \
                because parent is missing from the transition frontier \
                (unexpected case, there is likely a bug somewhere)" ;
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
             Deferred.return (Error ())
         | Some x ->
             return x
@@ -315,8 +309,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       Result.return result
 
 let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier ~get_completed_work ~catchup_scheduler
-    ~processed_transition_writer ?transaction_pool_proxy () =
+    ~time_controller ~frontier ~get_completed_work ~block_registry
+    ~catchup_scheduler ~processed_transition_writer ?transaction_pool_proxy () =
   let open Context in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
@@ -325,8 +319,8 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
   let process_transition =
     process_transition
       ~context:(module Context)
-      ~get_completed_work ~trust_system ~verifier ~frontier ~catchup_scheduler
-      ~processed_transition_writer ~time_controller
+      ~get_completed_work ~trust_system ~verifier ~frontier ~block_registry
+      ~catchup_scheduler ~processed_transition_writer ~time_controller
   in
   fun msg ->
     let open Deferred.Let_syntax in
@@ -520,9 +514,11 @@ let%test_module "Transition_handler.Processor tests" =
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
-    (* The handler for [frontier], with the pipes it writes to buffering up
-       to [capacity] items unread. *)
-    let handler_for frontier ~capacity =
+    (* The handler for [frontier] and [block_registry], with the pipes it
+       writes to buffering up to [capacity] items unread. *)
+    let handler_for
+        ?(block_registry = Block_registry.create ~logger ~cache_exceptions:true)
+        frontier ~capacity =
       let _, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
       in
@@ -541,8 +537,8 @@ let%test_module "Transition_handler.Processor tests" =
       create_handler
         ~context:(module Context)
         ~time_controller ~verifier ~get_completed_work:(Fn.const None)
-        ~trust_system ~frontier ~catchup_scheduler ~processed_transition_writer
-        ?transaction_pool_proxy:None ()
+        ~trust_system ~frontier ~block_registry ~catchup_scheduler
+        ~processed_transition_writer ?transaction_pool_proxy:None ()
 
     (* A frontier holding just a root, and a chain of breadcrumbs on it. *)
     let gen_frontier_and_chain =
@@ -613,6 +609,44 @@ let%test_module "Transition_handler.Processor tests" =
                  ; Frontier_add { state_hash; source = `Catchup; added = true }
                  ] ) ) )
 
+    let%test_unit "A block already in the frontier is answered Ignore" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let answers =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let handle =
+                  handler_for ~block_registry frontier
+                    ~capacity:(List.length chain)
+                in
+                let%bind () =
+                  Deferred.List.iter chain ~f:(fun breadcrumb ->
+                      handle (`Local_breadcrumb (Cached.pure breadcrumb)) )
+                in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let cached =
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb (List.hd_exn chain))
+                    ~valid_cb:(Some valid_cb)
+                in
+                let%map () =
+                  handle
+                    (`Partially_valid_transition
+                      (`Block cached, `Valid_cb (Some valid_cb)) )
+                in
+                List.rev !answers )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Ignore ] )
+
     let%test_unit "adding transitions whose parents are in the frontier" =
       let frontier_size = 1 in
       let branch_size = 10 in
@@ -646,10 +680,10 @@ let%test_module "Transition_handler.Processor tests" =
                     (Buffered
                        (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
-                let cache =
-                  Unprocessed_transition_cache.create ~logger
-                    ~cache_exceptions:true
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
                 in
+                let cache = Block_registry.cache block_registry in
                 let catchup_scheduler =
                   Catchup_scheduler.create ~logger ~precomputed_values ~verifier
                     ~trust_system ~frontier ~time_controller ~catchup_job_writer
@@ -660,8 +694,8 @@ let%test_module "Transition_handler.Processor tests" =
                     ~context:(module Context)
                     ~time_controller ~verifier
                     ~get_completed_work:(Fn.const None) ~trust_system ~frontier
-                    ~catchup_scheduler ~processed_transition_writer
-                    ?transaction_pool_proxy:None ()
+                    ~block_registry ~catchup_scheduler
+                    ~processed_transition_writer ?transaction_pool_proxy:None ()
                 in
                 don't_wait_for
                   (Strict_pipe.Reader.Merge.iter
