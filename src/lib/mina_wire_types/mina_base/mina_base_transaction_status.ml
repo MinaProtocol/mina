@@ -42,11 +42,11 @@ module Failure = struct
       | Account_is_new_precondition_unsatisfied
       | Protocol_state_precondition_unsatisfied
       | Unexpected_verification_key_hash
-      | Proof_with_outdated_verification_key
       | Valid_while_precondition_unsatisfied
       | Incorrect_nonce
       | Invalid_fee_excess
       | Cancelled
+      | Proof_with_outdated_verification_key
   end
 
   module Collection = struct

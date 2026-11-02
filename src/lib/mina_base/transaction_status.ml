@@ -46,11 +46,11 @@ module Failure = struct
         | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Unexpected_verification_key_hash
-        | Proof_with_outdated_verification_key
         | Valid_while_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
         | Cancelled
+        | Proof_with_outdated_verification_key
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -131,9 +131,9 @@ module Failure = struct
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add
       ~valid_while_precondition_unsatisfied:add
-      ~unexpected_verification_key_hash:add
-      ~proof_with_outdated_verification_key:add ~incorrect_nonce:add
+      ~unexpected_verification_key_hash:add ~incorrect_nonce:add
       ~invalid_fee_excess:add ~cancelled:add
+      ~proof_with_outdated_verification_key:add
 
   let gen = Quickcheck.Generator.of_list all
 
