@@ -132,11 +132,7 @@ include struct
   open Mina_networking
 
   type 'a fn_with_mocks =
-       ?get_some_initial_peers:
-         ( Rpcs.Get_some_initial_peers.query
-         , Rpcs.Get_some_initial_peers.response )
-         Gossip_net.Fake.rpc_mock
-    -> ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
+       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
          ( Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
          , Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
          Gossip_net.Fake.rpc_mock
@@ -176,8 +172,7 @@ include struct
        -> consensus_local_state:Consensus.Data.Local_state.t
        -> peer_state )
       fn_with_mocks =
-   fun ?get_some_initial_peers
-       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
+   fun ?get_staged_ledger_aux_and_pending_coinbases_at_hash
        ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
        ?get_transition_chain_proof ?get_ancestry ?get_best_tip
        ?get_completed_snarks ~frontier ~snark ~consensus_local_state ->
@@ -185,8 +180,6 @@ include struct
       let get_mock (type q r) (rpc : (q, r) Rpcs.rpc) :
           (q, r) Gossip_net.Fake.rpc_mock option =
         match rpc with
-        | Get_some_initial_peers ->
-            get_some_initial_peers
         | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
             get_staged_ledger_aux_and_pending_coinbases_at_hash
         | Answer_sync_ledger_query ->
@@ -221,7 +214,7 @@ module Generator = struct
     -> max_frontier_length:int
     -> peer_state Generator.t
 
-  let fresh_peer_custom_rpc ?get_some_initial_peers
+  let fresh_peer_custom_rpc
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
@@ -249,22 +242,21 @@ module Generator = struct
     let snark = None in
     make_peer_state ~frontier ~snark ~consensus_local_state
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
-      ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_completed_snarks ?get_transition_knowledge
+      ?answer_sync_ledger_query ?get_ancestry ?get_best_tip
+      ?get_completed_snarks ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain
 
   let fresh_peer ~context:(module Context : CONTEXT) ~verifier
       ~max_frontier_length =
     fresh_peer_custom_rpc
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
-      ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_transition_knowledge:None
-      ?get_transition_chain_proof:None ?get_transition_chain:None
-      ?get_completed_snarks:None
+      ?answer_sync_ledger_query:None ?get_ancestry:None ?get_best_tip:None
+      ?get_transition_knowledge:None ?get_transition_chain_proof:None
+      ?get_transition_chain:None ?get_completed_snarks:None
       ~context:(module Context)
       ~verifier ~max_frontier_length
 
-  let peer_with_branch_custom_rpc ~frontier_branch_size ?get_some_initial_peers
+  let peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
@@ -296,18 +288,17 @@ module Generator = struct
 
     make_peer_state ~frontier ~snark:None ~consensus_local_state
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
-      ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
-      ?get_best_tip ?get_completed_snarks ?get_transition_knowledge
+      ?answer_sync_ledger_query ?get_ancestry ?get_best_tip
+      ?get_completed_snarks ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain
 
   let peer_with_branch ~frontier_branch_size ~context:(module Context : CONTEXT)
       ~verifier ~max_frontier_length =
     peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
-      ?get_some_initial_peers:None ?answer_sync_ledger_query:None
-      ?get_ancestry:None ?get_best_tip:None ?get_completed_snarks:None
-      ?get_transition_knowledge:None ?get_transition_chain_proof:None
-      ?get_transition_chain:None
+      ?answer_sync_ledger_query:None ?get_ancestry:None ?get_best_tip:None
+      ?get_completed_snarks:None ?get_transition_knowledge:None
+      ?get_transition_chain_proof:None ?get_transition_chain:None
       ~context:(module Context)
       ~verifier ~max_frontier_length
 
