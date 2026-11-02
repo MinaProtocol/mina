@@ -61,7 +61,21 @@ type t =
         Mina_stdlib.Rose_tree.t
         list )
       Capped_supervisor.t
+  ; building_stopped : bool ref
+        (* Whether breadcrumbs built from now on should be released rather
+           than handed to the transition processor. *)
   }
+
+(* Release a block that won't be built, along with its validation
+   callback. *)
+let release_unbuilt (cached_transition, vc) =
+  (* TODO consider rejecting the callback in some cases,
+     see https://github.com/MinaProtocol/mina/issues/11087 *)
+  Option.value_map vc ~default:ignore
+    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
+  ignore
+    ( Cached.invalidate_with_failure cached_transition
+      : Mina_block.initial_valid_block Envelope.Incoming.t )
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~catchup_job_writer
@@ -77,6 +91,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   let collected_transitions = State_hash.Table.create () in
   let parent_root_timeouts = State_hash.Table.create () in
   let validation_callbacks = State_hash.Table.create () in
+  let building_stopped = ref false in
   let breadcrumb_builder_supervisor =
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
@@ -90,24 +105,27 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
             transition_branches
         with
         | Ok trees_of_breadcrumbs ->
-            Writer.write catchup_breadcrumbs_writer
-              (trees_of_breadcrumbs, `Catchup_scheduler)
+            if !building_stopped then
+              List.iter trees_of_breadcrumbs ~f:(fun tree ->
+                  Mina_stdlib.Rose_tree.iter tree
+                    ~f:(fun (cached_breadcrumb, vc) ->
+                      Option.value_map vc ~default:ignore
+                        ~f:
+                          Mina_net2.Validation_callback
+                          .fire_if_not_already_fired `Ignore ;
+                      ignore
+                        ( Cached.invalidate_with_failure cached_breadcrumb
+                          : Transition_frontier.Breadcrumb.t ) ) )
+            else
+              Writer.write catchup_breadcrumbs_writer
+                (trees_of_breadcrumbs, `Catchup_scheduler)
         | Error err ->
             [%log debug]
               !"Error during buildup breadcrumbs inside catchup_scheduler: \
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree
-                  ~f:(fun (cached_transition, vc) ->
-                    (* TODO consider rejecting the callback in some cases,
-                       see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore
-                      ( Cached.invalidate_with_failure cached_transition
-                        : Mina_block.initial_valid_block Envelope.Incoming.t ) ) ) )
+                Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) )
   in
   { logger
   ; collected_transitions
@@ -116,17 +134,27 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   ; parent_root_timeouts
   ; breadcrumb_builder_supervisor
   ; validation_callbacks
+  ; building_stopped
   }
 
 (** Release every block the scheduler holds, cancel its timeouts, and forget
-    them, so that nothing later reaches a released block. *)
+    them, so that nothing later reaches a released block. Stop building
+    breadcrumbs: blocks waiting to be built are released, and breadcrumbs
+    finished from now on are released rather than handed on. *)
 let clean_up
     { collected_transitions
     ; validation_callbacks
     ; parent_root_timeouts
     ; time_controller
+    ; breadcrumb_builder_supervisor
+    ; building_stopped
     ; _
     } =
+  building_stopped := true ;
+  Capped_supervisor.stop breadcrumb_builder_supervisor
+    ~release:(fun (_initial_hash, transition_branches) ->
+      List.iter transition_branches ~f:(fun subtree ->
+          Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) ) ;
   Hashtbl.iter collected_transitions
     ~f:
       (List.iter ~f:(fun b ->
@@ -511,6 +539,70 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   ()
               | `Ok _ ->
                   failwith "a catchup job was emitted after cleaning up" ) )
+
+    let%test_unit "Cleaning up releases blocks dispatched to be built" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length ~frontier_size:1 ~branch_size:1 () )
+        ~f:(fun (frontier, branch) ->
+          let _catchup_job_reader, catchup_job_writer =
+            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          let breadcrumb = List.hd_exn branch in
+          let scheduler =
+            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer
+          in
+          let cache =
+            Unprocessed_transition_cache.create ~logger ~cache_exceptions:true
+          in
+          watch scheduler
+            ~timeout_duration:(Block_time.Span.of_ms 10_000L)
+            ~valid_cb:None
+            ~cached_transition:
+              ( downcast_breadcrumb breadcrumb
+              |> Unprocessed_transition_cache.register_exn cache ) ;
+          (* Don't record what earlier tests left running. *)
+          Async.Thread_safe.block_on_async_exn
+            Async.Scheduler.yield_until_no_jobs_remain ;
+          Gc.full_major () ;
+          let (), outcomes =
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred (fun () ->
+                    (* The block's parent arrives, dispatching it to be built,
+                       and then the scheduler is cleaned up before the build
+                       starts. *)
+                    Or_error.ok_exn
+                      (notify scheduler
+                         ~hash:
+                           (Transition_frontier.Breadcrumb.parent_hash
+                              breadcrumb ) ) ;
+                    clean_up scheduler ;
+                    Async.Scheduler.yield_until_no_jobs_remain () ) )
+          in
+          [%test_eq: Block_outcome_log.event list] outcomes
+            [ Cache_removed
+                { state_hash =
+                    Transition_frontier.Breadcrumb.state_hash breadcrumb
+                ; outcome = `Failure
+                }
+            ] ;
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              match%map
+                Block_time.Timeout.await
+                  ~timeout_duration:(Block_time.Span.of_ms 1_000L)
+                  time_controller
+                  (Strict_pipe.Reader.read catchup_breadcrumbs_reader)
+              with
+              | `Timeout ->
+                  ()
+              | `Ok _ ->
+                  failwith "breadcrumbs were built after cleaning up" ) )
 
     let%test_unit "catchup jobs do not fire after timeout if they are \
                    invalidated" =
