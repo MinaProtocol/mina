@@ -287,7 +287,17 @@ module Diff = struct
         , Option.map one
             ~f:Pre_diff_with_at_most_one_coinbase.Stable.V3.to_latest )
 
-      let coinbase = coinbase
+      let coinbase ~constraint_constants ~supercharge_coinbase ((two, one) : t)
+          =
+        match
+          ( two.Pre_diff_two.Stable.V2.coinbase
+          , Option.value_map one ~default:At_most_one.Stable.V1.Zero
+              ~f:(fun d -> d.Pre_diff_one.Stable.V2.coinbase) )
+        with
+        | At_most_two.Stable.V1.Zero, At_most_one.Stable.V1.Zero ->
+            Some Currency.Amount.zero
+        | _ ->
+            coinbase_amount ~constraint_constants ~supercharge_coinbase
     end
   end]
 
