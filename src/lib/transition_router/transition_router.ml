@@ -617,6 +617,43 @@ let update_most_recent_valid_block ~context:(module Context : CONTEXT)
     Broadcast_pipe.Writer.write most_recent_valid_block_writer header_with_hash
   else Deferred.unit
 
+(** If a valid block or header shows the frontier is too far behind to catch
+    up, stop the frontier controller and start bootstrapping; either way, pass
+    the transition on to whichever controller is reading. *)
+let route_valid_transition t ~get_current_frontier ~clear_writer
+    (b_or_h, `Valid_cb vc) =
+  let (module Context : CONTEXT) = t.context in
+  let { producer_transition_writer_ref; network_transition_pipe; _ } = t in
+  don't_wait_for
+  @@ let%map () =
+       let header_with_hash =
+         block_or_header_to_header_hashed_with_validation b_or_h
+       in
+       match get_current_frontier () with
+       | Some frontier ->
+           if
+             is_transition_for_bootstrap
+               ~context:(module Context)
+               frontier header_with_hash
+           then (
+             Option.iter ~f:Strict_pipe.Writer.kill
+               !producer_transition_writer_ref ;
+             let initial_root_transition =
+               Transition_frontier.(
+                 Breadcrumb.validated_transition (root frontier))
+             in
+             let%bind () = Strict_pipe.Writer.write clear_writer `Clear in
+             let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+             ignore
+             @@ start_bootstrap_controller t ~initial_root_transition
+                  ~best_seen_transition:(Some b_or_h) )
+           else Deferred.unit
+       | None ->
+           Deferred.unit
+     in
+     Strict_pipe.Swappable.write network_transition_pipe
+       (b_or_h, `Valid_cb (Some vc))
+
 (* [sync_local_state] may be `false` for tests, where we want
    to set local state in the test
 *)
@@ -756,38 +793,5 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                 ~get_most_recent_valid_block ~most_recent_valid_block_writer ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
-           ~f:(fun (b_or_h, `Valid_cb vc) ->
-             don't_wait_for
-             @@ let%map () =
-                  let header_with_hash =
-                    block_or_header_to_header_hashed_with_validation b_or_h
-                  in
-                  match get_current_frontier () with
-                  | Some frontier ->
-                      if
-                        is_transition_for_bootstrap
-                          ~context:(module Context)
-                          frontier header_with_hash
-                      then (
-                        Option.iter ~f:Strict_pipe.Writer.kill
-                          !producer_transition_writer_ref ;
-                        let initial_root_transition =
-                          Transition_frontier.(
-                            Breadcrumb.validated_transition (root frontier))
-                        in
-                        let%bind () =
-                          Strict_pipe.Writer.write clear_writer `Clear
-                        in
-                        let%map () =
-                          Transition_frontier.close ~loc:__LOC__ frontier
-                        in
-                        ignore
-                        @@ start_bootstrap_controller t ~initial_root_transition
-                             ~best_seen_transition:(Some b_or_h) )
-                      else Deferred.unit
-                  | None ->
-                      Deferred.unit
-                in
-                Strict_pipe.Swappable.write network_transition_pipe
-                  (b_or_h, `Valid_cb (Some vc)) ) ) ;
+           ~f:(route_valid_transition t ~get_current_frontier ~clear_writer) ) ;
   (verified_transition_reader, initialization_finish_signal)
