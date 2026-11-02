@@ -1856,7 +1856,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~(previous_consensus_state : Value.t)
           ~(consensus_transition : Consensus_transition.t)
           ~(previous_protocol_state_hash : Mina_base.State_hash.t)
-          ~(supply_increase : Currency.Amount.Signed.t)
+          ~(total_currency : Currency.Amount.t)
           ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
           ~(genesis_ledger_hash : Mina_base.Frozen_ledger_hash.t)
           ~(producer_vrf_result : Random_oracle.Digest.t)
@@ -1887,18 +1887,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     previous_consensus_state.curr_global_slot_since_hard_fork )
                ~f:(fun diff -> Ok diff)
         in
-        let%map total_currency =
-          let total, `Overflow overflow =
-            Amount.add_signed_flagged previous_consensus_state.total_currency
-              supply_increase
-          in
-          if overflow then
-            Or_error.errorf
-              !"New total currency less than zero. supply_increase: %{sexp: \
-                Amount.Signed.t} previous total currency: %{sexp: Amount.t}"
-              supply_increase previous_consensus_state.total_currency
-          else Ok total
-        and () =
+        let%map () =
           if
             Consensus_transition.(
               equal consensus_transition Consensus_transition.genesis)
@@ -2062,7 +2051,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                (negative_one ~genesis_ledger ~genesis_epoch_data ~constants
                   ~constraint_constants )
              ~previous_protocol_state_hash:negative_one_protocol_state_hash
-             ~consensus_transition ~supply_increase:Currency.Amount.Signed.zero
+             ~consensus_transition ~total_currency:genesis_ledger.total_currency
              ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
              ~block_stake_winner:genesis_winner_pk
              ~block_creator:genesis_winner_pk
@@ -2107,7 +2096,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%snarkydef_ update_var (previous_state : var)
           (transition_data : Consensus_transition.var)
           (previous_protocol_state_hash : Mina_base.State_hash.var)
-          ~(supply_increase : Currency.Amount.Signed.var)
+          ~(total_currency : Currency.Amount.var)
           ~(previous_blockchain_state_ledger_hash :
              Mina_base.Frozen_ledger_hash.var ) ~genesis_ledger_hash
           ~constraint_constants
@@ -2179,14 +2168,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           compute_supercharge_coinbase ~winner_account
             ~global_slot:global_slot_since_genesis
         in
-        let%bind new_total_currency, `Overflow overflow =
-          Currency.Amount.Checked.add_signed_flagged
-            previous_state.total_currency supply_increase
-        in
-        let%bind () =
-          [%with_label_ "Total currency is greater than or equal to zero"]
-            (fun () -> Boolean.Assert.is_true (Boolean.not overflow))
-        in
+        (*The total currency is carried in the transaction snark's registers
+          now, so it arrives already computed; the transaction snark is what
+          rejects an update that would take it out of range.*)
+        let new_total_currency = total_currency in
         let%bind has_ancestor_in_same_checkpoint_window =
           same_checkpoint_window ~constants ~prev:prev_global_slot
             ~next:next_global_slot
@@ -3262,8 +3247,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~previous_protocol_state_hash ~blockchain_state ~consensus_transition
           ~producer_vrf_result ~block_stake_winner ~block_creator
           ~coinbase_receiver ~supercharge_coinbase ~snarked_ledger_hash
-          ~genesis_ledger_hash ~supply_increase
-          ?(adjust_consensus_state = Fn.id) ~logger () =
+          ~genesis_ledger_hash ~total_currency ?(adjust_consensus_state = Fn.id)
+          ~logger () =
         let open Or_error.Let_syntax in
         [%log internal] "Consensus_state_update" ;
         let%map consensus_state =
@@ -3271,7 +3256,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~previous_consensus_state:
               (Protocol_state.consensus_state previous_protocol_state)
             ~consensus_transition ~producer_vrf_result
-            ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
+            ~previous_protocol_state_hash ~total_currency ~snarked_ledger_hash
             ~genesis_ledger_hash ~block_stake_winner ~block_creator
             ~coinbase_receiver ~supercharge_coinbase
           >>| adjust_consensus_state
@@ -3290,7 +3275,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let generate_transition
           ~(previous_protocol_state : Protocol_state.Value.t) ~blockchain_state
           ~current_time ~(block_data : Block_data.t) ~supercharge_coinbase
-          ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase ~logger
+          ~snarked_ledger_hash ~genesis_ledger_hash ~total_currency ~logger
           ~constraint_constants =
         [%log internal] "Generate_transition" ;
         let constants =
@@ -3320,14 +3305,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~block_creator
                ~coinbase_receiver:block_data.stake_proof.coinbase_receiver_pk
                ~supercharge_coinbase ~snarked_ledger_hash ~genesis_ledger_hash
-               ~supply_increase ~logger () )
+               ~total_currency ~logger () )
         in
         [%log internal] "Generate_transition_done" ;
         (protocol_state, consensus_transition)
 
       let expected_protocol_state ~constraint_constants
           ~(previous_protocol_state : Protocol_state.Value.t)
-          ~previous_protocol_state_hash ~blockchain_state ~supply_increase
+          ~previous_protocol_state_hash ~blockchain_state ~total_currency
           ~(candidate : Protocol_state.Value.t) ~logger =
         let constants =
           constants_of_protocol_state ~constraint_constants
@@ -3372,17 +3357,17 @@ module Make_str (A : Wire_types.Concrete) = struct
             (Blockchain_state.snarked_ledger_hash previous_blockchain_state)
           ~genesis_ledger_hash:
             (Blockchain_state.genesis_ledger_hash previous_blockchain_state)
-          ~supply_increase ~adjust_consensus_state ~logger ()
+          ~total_currency ~adjust_consensus_state ~logger ()
 
       include struct
         let%snarkydef.Tick next_state_checked ~constraint_constants
             ~(prev_state : Protocol_state.var)
             ~(prev_state_hash : Mina_base.State_hash.var) transition
-            supply_increase =
+            total_currency =
           Consensus_state.update_var ~constraint_constants
             (Protocol_state.consensus_state prev_state)
             (Snark_transition.consensus_transition transition)
-            prev_state_hash ~supply_increase
+            prev_state_hash ~total_currency
             ~previous_blockchain_state_ledger_hash:
               ( Protocol_state.blockchain_state prev_state
               |> Blockchain_state.snarked_ledger_hash )
@@ -3400,7 +3385,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
              -> coinbase_receiver:Public_key.Compressed.t
              -> supercharge_coinbase:bool
-             -> supply_increase:Currency.Amount.Signed.t
+             -> total_currency:Currency.Amount.t
              -> Consensus_state.Value.t )
             Quickcheck.Generator.t =
           let open Consensus_state in
@@ -3414,7 +3399,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
                  ) ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
-              ~coinbase_receiver ~supercharge_coinbase ~supply_increase ->
+              ~coinbase_receiver ~supercharge_coinbase ~total_currency ->
             let prev =
               Protocol_state.consensus_state
                 (With_hash.data previous_protocol_state)
@@ -3431,15 +3416,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             let curr_epoch, curr_slot =
               Global_slot.to_epoch_and_slot curr_global_slot_since_hard_fork
-            in
-            (* As in [Consensus_state.update]: the total currency only changes
-               by the supply increase of the emitted ledger proof. *)
-            let total_currency =
-              let total, `Overflow overflow =
-                Amount.add_signed_flagged prev.total_currency supply_increase
-              in
-              assert (not overflow) ;
-              total
             in
             let prev_epoch, prev_slot =
               Consensus_state.curr_epoch_and_slot prev
@@ -3555,8 +3531,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let consensus_transition : Consensus_transition.t =
           Global_slot.slot_number global_slot
         in
-        let supply_increase =
-          Currency.Amount.(Signed.of_unsigned (of_nanomina_int_exn 42))
+        let total_currency =
+          Option.value_exn
+            Currency.Amount.(
+              add previous_consensus_state.total_currency
+                (of_nanomina_int_exn 42))
         in
         (* setup ledger, needed to compute producer_vrf_result here and handler below *)
         let open Mina_base in
@@ -3600,7 +3579,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let next_consensus_state =
           update ~constants ~previous_consensus_state ~consensus_transition
-            ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
+            ~previous_protocol_state_hash ~total_currency ~snarked_ledger_hash
             ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
             ~block_stake_winner:producer_public_key_compressed
             ~block_creator:producer_public_key_compressed
@@ -3645,8 +3624,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             exists State_hash.typ
               ~compute:(As_prover.return previous_protocol_state_hash)
           in
-          let%bind supply_increase =
-            exists Amount.Signed.typ ~compute:(As_prover.return supply_increase)
+          let%bind total_currency =
+            exists Amount.typ ~compute:(As_prover.return total_currency)
           in
           let%bind previous_blockchain_state_ledger_hash =
             exists Mina_base.Frozen_ledger_hash.typ
@@ -3662,7 +3641,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let result =
             update_var previous_state transition_data
-              previous_protocol_state_hash ~supply_increase
+              previous_protocol_state_hash ~total_currency
               ~previous_blockchain_state_ledger_hash ~genesis_ledger_hash
               ~constraint_constants ~protocol_constants:constants_checked
           in
