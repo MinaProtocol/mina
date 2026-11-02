@@ -166,7 +166,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Ledger_catchup.create_job_handler
            ~context:(module Context)
            ~trust_system ~verifier ~network ~frontier
-           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache )
+           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+           ~schedule:
+             (Otp_lib.Event_loop.submit
+                (Otp_lib.Event_loop.create ~handle:(fun run -> run ())) ) )
         ~f:(fun process_catchup_job ->
           O1trace.thread "handle_super_catchup_jobs" (fun () ->
               Strict_pipe.Reader.iter_without_pushback catchup_job_reader
