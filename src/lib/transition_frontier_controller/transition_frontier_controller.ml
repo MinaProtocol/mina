@@ -17,34 +17,6 @@ module type CONTEXT = sig
   val signature_kind : Mina_signature_kind.t
 end
 
-(** A catchup job: the parent hash of a forest of blocks whose ancestry is
-    missing, and the forest. *)
-type catchup_job =
-  Mina_base.State_hash.t
-  * ( ( Mina_block.initial_valid_block Network_peer.Envelope.Incoming.t
-      , Mina_base.State_hash.t )
-      Cache_lib.Cached.t
-    * Mina_net2.Validation_callback.t option )
-    Mina_stdlib.Rose_tree.t
-    list
-
-(** What the frontier controller's dispatcher handles, one event at a time, in
-    the order they arrive. *)
-type event =
-  | Validated of
-      ( [ `Block of
-          ( Mina_block.initial_valid_block Network_peer.Envelope.Incoming.t
-          , Mina_base.State_hash.t )
-          Cache_lib.Cached.t
-        | `Header of
-          Mina_block.initial_valid_header Network_peer.Envelope.Incoming.t ]
-      * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
-      (** A block or header the validator found relevant to the frontier. *)
-  | Resume_catchup of (unit -> unit)
-  | Catchup_job of catchup_job
-  | Catchup_ready of (catchup_job -> unit)
-      (** Super catchup has been set up, and handles jobs with this. *)
-
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
     ~network_transition_reader ~producer_transition_reader ~clear_reader
@@ -147,37 +119,17 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true ) ) ;
-  let process_catchup_job = ref None in
-  let catchup_jobs_before_ready = Queue.create () in
-  let cleared = ref false in
   let dispatcher =
-    O1trace.sync_thread "dispatch_blocks" (fun () ->
-        Otp_lib.Event_loop.create ~handle:(function
-          | Validated _ when !cleared ->
-              ()
-          | Validated transition ->
-              Strict_pipe.Writer.write primary_transition_writer transition
-          | Resume_catchup resume ->
-              resume ()
-          | Catchup_job _ when !cleared ->
-              ()
-          | Catchup_job job -> (
-              match !process_catchup_job with
-              | Some process ->
-                  process job
-              | None ->
-                  Queue.enqueue catchup_jobs_before_ready job )
-          | Catchup_ready process ->
-              process_catchup_job := Some process ;
-              Queue.iter catchup_jobs_before_ready ~f:process ;
-              Queue.clear catchup_jobs_before_ready ) )
+    Transition_handler.Block_dispatcher.create
+      ~on_validated:(Strict_pipe.Writer.write primary_transition_writer)
   in
   let validate_transition =
     Transition_handler.Validator.create_handler
       ~context:(module Context)
       ~trust_system ~time_controller ~frontier
       ~on_valid:(fun transition ->
-        Otp_lib.Event_loop.submit dispatcher (Validated transition) )
+        Transition_handler.Block_dispatcher.submit dispatcher
+          (Validated transition) )
       ~unprocessed_transition_cache
   in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
@@ -200,7 +152,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
         ~f:process_message ) ;
   Strict_pipe.Reader.iter_without_pushback catchup_job_reader ~f:(fun job ->
-      Otp_lib.Event_loop.submit dispatcher (Catchup_job job) )
+      Transition_handler.Block_dispatcher.submit dispatcher (Catchup_job job) )
   |> don't_wait_for ;
   O1trace.background_thread "perform_super_catchup" (fun () ->
       Deferred.map
@@ -209,14 +161,13 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
            ~trust_system ~verifier ~network ~frontier
            ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
            ~schedule:(fun resume ->
-             Otp_lib.Event_loop.submit dispatcher (Resume_catchup resume) ) )
+             Transition_handler.Block_dispatcher.submit dispatcher
+               (Resume_catchup resume) ) )
         ~f:(fun process ->
-          Otp_lib.Event_loop.submit dispatcher (Catchup_ready process) ) ) ;
-  (* Clearing pre-empts the dispatcher: valid transitions and catchup jobs it
-     has yet to handle are dropped, as those still in their pipes were. *)
+          Transition_handler.Block_dispatcher.submit dispatcher
+            (Catchup_ready process) ) ) ;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
-      cleared := true ;
-      Queue.clear catchup_jobs_before_ready ;
+      Transition_handler.Block_dispatcher.clear dispatcher ;
       let open Strict_pipe.Writer in
       kill primary_transition_writer ;
       kill processed_transition_writer ;
