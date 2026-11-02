@@ -103,7 +103,11 @@ let create_ledger_and_transactions ~signature_kind
 
 module Transaction_key = struct
   module T = struct
-    type t = { proof_segments : int; signed_single : int; signed_pair : int }
+    type t =
+      { proof_segments : int
+      ; non_proof_segments : int
+      ; non_proof_updates : int
+      }
     [@@deriving hash, sexp, compare]
   end
 
@@ -160,23 +164,27 @@ module Transaction_key = struct
     ignore
     @@ Mina_ledger.Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
          second_pass_ledger ;
+    let add_non_proof_segment ~updates (t : t) =
+      { t with
+        non_proof_segments = t.non_proof_segments + 1
+      ; non_proof_updates = t.non_proof_updates + updates
+      }
+    in
     List.fold
-      ~init:({ proof_segments = 0; signed_single = 0; signed_pair = 0 } : t)
+      ~init:
+        ( { proof_segments = 0; non_proof_segments = 0; non_proof_updates = 0 }
+          : t )
       segments
-      ~f:(fun ({ proof_segments; signed_single; signed_pair } as acc)
-              (_, segment, _) ->
+      ~f:(fun acc (_, segment, _) ->
         match segment with
         | Transaction_snark.Zkapp_command_segment.Basic.Proved ->
-            { acc with proof_segments = proof_segments + 1 }
+            { acc with proof_segments = acc.proof_segments + 1 }
         | Opt_signed ->
-            { acc with signed_single = signed_single + 1 }
+            add_non_proof_segment ~updates:1 acc
         | Opt_signed_opt_signed ->
-            { acc with signed_pair = signed_pair + 1 }
-        | Opt_signed_batch n ->
-            { acc with
-              signed_pair = signed_pair + (n / 2)
-            ; signed_single = signed_single + (n mod 2)
-            } )
+            add_non_proof_segment ~updates:2 acc
+        | Opt_signed_batch updates ->
+            add_non_proof_segment ~updates acc )
 end
 
 module Time_values = struct
@@ -747,14 +755,14 @@ let profile_zkapps
           (ndx + 1) zkapp_span )
   in
   printf
-    "| No.| Proof updates| Non-proof pairs| Non-proof singles| Mempool \
+    "| No.| Proof updates| Non-proof updates| Non-proof segments| Mempool \
      verification time (sec)| Transaction proving time (sec)|Permutation|\n\
     \ |--|--|--|--|--|--|--|\n" ;
   List.iteri
     ( Transaction_key.Table.to_alist transaction_combinations
     |> List.sort ~compare:(fun (k1, _) (k2, _) ->
            let total_updates (k : Transaction_key.t) =
-             k.proof_segments + (2 * k.signed_pair) + k.signed_single
+             k.proof_segments + k.non_proof_updates
            in
            let total_compare =
              Int.compare (total_updates k1) (total_updates k2)
@@ -762,15 +770,15 @@ let profile_zkapps
            let proof_compare =
              Int.compare k1.proof_segments k2.proof_segments
            in
-           let signed_pair_compare =
-             Int.compare k1.signed_pair k2.signed_pair
+           let non_proof_segments_compare =
+             Int.compare k1.non_proof_segments k2.non_proof_segments
            in
            if total_compare <> 0 then total_compare
            else if proof_compare <> 0 then proof_compare
-           else signed_pair_compare ) )
+           else non_proof_segments_compare ) )
     ~f:(fun i (k, (_, t, perm)) ->
       printf "| %d| %d| %d| %d| %f| %f| %s|\n" (i + 1) k.proof_segments
-        k.signed_pair k.signed_single
+        k.non_proof_updates k.non_proof_segments
         (Time.Span.to_sec t.verification_time)
         (Time.Span.to_sec t.proving_time)
         perm ) ;
