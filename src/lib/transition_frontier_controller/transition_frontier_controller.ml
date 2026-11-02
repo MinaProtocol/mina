@@ -182,11 +182,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~f:process_message ) ;
   let process_catchup_job = ref None in
   let catchup_jobs_before_ready = Queue.create () in
+  let cleared = ref false in
   let dispatcher =
     O1trace.sync_thread "dispatch_blocks" (fun () ->
         Otp_lib.Event_loop.create ~handle:(function
           | Resume_catchup resume ->
               resume ()
+          | Catchup_job _ when !cleared ->
+              ()
           | Catchup_job job -> (
               match !process_catchup_job with
               | Some process ->
@@ -211,7 +214,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              Otp_lib.Event_loop.submit dispatcher (Resume_catchup resume) ) )
         ~f:(fun process ->
           Otp_lib.Event_loop.submit dispatcher (Catchup_ready process) ) ) ;
+  (* Clearing pre-empts the dispatcher: catchup jobs it has yet to handle are
+     dropped, as those still in the job pipe were. *)
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
+      cleared := true ;
+      Queue.clear catchup_jobs_before_ready ;
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
       kill primary_transition_writer ;
