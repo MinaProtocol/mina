@@ -17,6 +17,10 @@ module type CONTEXT = sig
   val signature_kind : Mina_signature_kind.t
 end
 
+(** What the frontier controller's dispatcher handles, one event at a time, in
+    the order they arrive. *)
+type event = Resume_catchup of (unit -> unit)
+
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
     ~network_transition_reader ~producer_transition_reader ~clear_reader
@@ -161,15 +165,19 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Transition_handler.Processor.inputs ~primary_transition_reader
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
         ~f:process_message ) ;
+  let dispatcher =
+    O1trace.sync_thread "dispatch_blocks" (fun () ->
+        Otp_lib.Event_loop.create ~handle:(function Resume_catchup resume ->
+            resume () ) )
+  in
   O1trace.background_thread "perform_super_catchup" (fun () ->
       Deferred.bind
         (Ledger_catchup.create_job_handler
            ~context:(module Context)
            ~trust_system ~verifier ~network ~frontier
            ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
-           ~schedule:
-             (Otp_lib.Event_loop.submit
-                (Otp_lib.Event_loop.create ~handle:(fun run -> run ())) ) )
+           ~schedule:(fun resume ->
+             Otp_lib.Event_loop.submit dispatcher (Resume_catchup resume) ) )
         ~f:(fun process_catchup_job ->
           O1trace.thread "handle_super_catchup_jobs" (fun () ->
               Strict_pipe.Reader.iter_without_pushback catchup_job_reader
