@@ -2,14 +2,12 @@
 
 set -eux -o pipefail
 
-SESSION_DIR_SCRIPTS="$(realpath "$(dirname "${BASH_SOURCE[0]}")")/session"
-
 usage() {
   cat <<EOF
 Usage: $0 <input.deb> <new-version> [options]
 
 Reversion a Debian package: changes version, and optionally suite and package name.
-Orchestrates the deb-session-* scripts into a single pipeline.
+Orchestrates the deb-toolkit session verbs (mina-release-toolkit) into a single pipeline.
 
 Arguments:
   <input.deb>           Path to the input .deb file
@@ -71,6 +69,11 @@ if [[ ! -f "$INPUT_DEB" ]]; then
   exit 1
 fi
 
+command -v deb-toolkit &> /dev/null || {
+  echo "ERROR: deb-toolkit not found on PATH. Install it from https://github.com/MinaProtocol/mina-release-toolkit/releases" >&2
+  exit 1
+}
+
 # Create a temporary session directory with cleanup
 SESSION_DIR=$(mktemp -d -t deb-session-XXXXXX)
 cleanup() {
@@ -79,31 +82,31 @@ cleanup() {
 trap cleanup EXIT
 
 # Open session
-"$SESSION_DIR_SCRIPTS/deb-session-open.sh" "$INPUT_DEB" "$SESSION_DIR"
+deb-toolkit session open "$INPUT_DEB" "$SESSION_DIR"
 
 # Always reversion
-"$SESSION_DIR_SCRIPTS/deb-session-reversion.sh" "$SESSION_DIR" "$NEW_VERSION"
+deb-toolkit session reversion "$SESSION_DIR" "$NEW_VERSION"
 
 # Optionally replace suite
 if [[ -n "$NEW_SUITE" ]]; then
-  "$SESSION_DIR_SCRIPTS/deb-session-replace-suite.sh" "$SESSION_DIR" "$NEW_SUITE"
+  deb-toolkit session replace-suite "$SESSION_DIR" "$NEW_SUITE"
 fi
 
 # Optionally rename package
 if [[ -n "$NEW_NAME" ]]; then
-  "$SESSION_DIR_SCRIPTS/deb-session-rename-package.sh" "$SESSION_DIR" "$NEW_NAME"
+  deb-toolkit session rename-package "$SESSION_DIR" "$NEW_NAME"
 fi
 
 # Determine output path
 if [[ -n "$OUTPUT" ]]; then
   OUT="$OUTPUT"
 else
-  PKG=$("$SESSION_DIR_SCRIPTS/deb-session-read-field.sh" "$SESSION_DIR" Package)
-  ARCH=$("$SESSION_DIR_SCRIPTS/deb-session-read-field.sh" "$SESSION_DIR" Architecture)
+  PKG=$(deb-toolkit session read-field "$SESSION_DIR" Package)
+  ARCH=$(deb-toolkit session read-field "$SESSION_DIR" Architecture)
   OUT="$(dirname "$INPUT_DEB")/${PKG}_${NEW_VERSION}_${ARCH}.deb"
 fi
 
 # Save
-"$SESSION_DIR_SCRIPTS/deb-session-save.sh" "$SESSION_DIR" "$OUT"
+deb-toolkit session save "$SESSION_DIR" "$OUT"
 
 echo "✅ Reversioned package written to $OUT"

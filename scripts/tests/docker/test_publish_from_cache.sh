@@ -154,11 +154,58 @@ t_dry_run_pushes_nothing () {
   expect "dry run pushed" not grep -qE "^(push|buildx)" "$CALLS"
 }
 
+t_publishes_release_services_only () {
+  # The auto-hardfork image and the delegation verifier are in the cache, as
+  # the packaging stage builds them, but a release does not push them.
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet
+  archive pkg mina-daemon-auto-hardfork reg/mina-daemon-auto-hardfork:1.0.0-devnet
+  archive gen mina-delegation-verifier reg/mina-delegation-verifier:1.0.0-bookworm
+  run MINA_GENERIC_CACHE_ROOT=gen
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "release image not pushed" called "push reg/mina-daemon:1.0.0-devnet"
+  expect "auto-hardfork image must not be pushed" not called "push reg/mina-daemon-auto-hardfork:1.0.0-devnet"
+  expect "delegation verifier must not be pushed" not called "push reg/mina-delegation-verifier:1.0.0-bookworm"
+  expect "skipped archives must be listed" grep -q "mina-daemon-auto-hardfork/1.0.0-devnet" <<< "$OUT"
+}
+
+t_release_dockers_names_the_services () {
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet
+  archive pkg mina-daemon-auto-hardfork reg/mina-daemon-auto-hardfork:1.0.0-devnet
+  run MINA_RELEASE_DOCKERS=mina-daemon-auto-hardfork
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "named service not pushed" called "push reg/mina-daemon-auto-hardfork:1.0.0-devnet"
+  expect "unnamed service must not be pushed" not called "push reg/mina-daemon:1.0.0-devnet"
+}
+
+t_release_docker_tags_narrows_the_variants () {
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-devnet
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-devnet-generic
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-lightnet
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-focal-devnet
+  archive pkg mina-archive reg/mina-archive:1.0.0-noble-devnet
+  run MINA_RELEASE_DOCKER_TAGS="*-noble-devnet, *-jammy-devnet"
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "matching daemon tag not pushed" called "push reg/mina-daemon:1.0.0-noble-devnet"
+  expect "matching archive tag not pushed" called "push reg/mina-archive:1.0.0-noble-devnet"
+  expect "generic variant must not be pushed" not called "push reg/mina-daemon:1.0.0-noble-devnet-generic"
+  expect "lightnet must not be pushed" not called "push reg/mina-daemon:1.0.0-noble-lightnet"
+  expect "other codename must not be pushed" not called "push reg/mina-daemon:1.0.0-focal-devnet"
+}
+
+t_no_release_image_fails () {
+  archive pkg mina-daemon-auto-hardfork reg/mina-daemon-auto-hardfork:1.0.0-devnet
+  run
+  expect "only non-release images must be an error" test $RC -ne 0
+  expect "nothing may be pushed" not grep -q "^push" "$CALLS"
+}
+
 for t in t_pushes_primary_and_tags_the_rest t_refuses_a_tag_holding_another_image \
          t_publishes_one_archive_at_a_time \
          t_skips_a_tag_already_holding_this_image t_force_overwrites \
          t_nothing_to_publish_fails t_reads_the_generic_build_too \
-         t_read_cache_root_names_the_packaging_build t_dry_run_pushes_nothing; do
+         t_read_cache_root_names_the_packaging_build t_dry_run_pushes_nothing \
+         t_publishes_release_services_only t_release_dockers_names_the_services \
+         t_release_docker_tags_narrows_the_variants t_no_release_image_fails; do
   echo "TEST: $t"
   setup
   "$t"

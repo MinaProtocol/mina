@@ -294,9 +294,5 @@ let token_symbol_to_bits_of_bits_roundtrip () =
 
 let token_symbol_of_bits_to_bits_roundtrip () =
   let open Account.Token_symbol in
-  Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
-    (let open Quickcheck.Generator.Let_syntax in
-    let%bind len = Int.gen_incl 0 max_length in
-    String.gen_with_length len
-      (Char.gen_uniform_inclusive Char.min_value Char.max_value))
-    ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
+  Quickcheck.test ~trials:30 ~seed:(`Deterministic "") gen ~f:(fun x ->
+      assert (String.equal (of_bits (to_bits x)) x) )

@@ -888,7 +888,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               [%log internal] "Produce_validated_transition" ;
               let header =
                 Header.create ~protocol_state ~protocol_state_proof
-                  ~delta_block_chain_proof ()
+                  ~delta_block_chain_proof
+                  ?proposed_protocol_version_opt:
+                    (Protocol_version.get_proposed_opt ())
+                  ()
               in
               let body = Body.create staged_ledger_diff in
               let%bind transition =

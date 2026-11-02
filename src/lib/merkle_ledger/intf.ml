@@ -238,8 +238,14 @@ module type SYNC_RECIPIENT = sig
 
   (** Replace the accounts in the subtree at the given address: the given
       accounts fill its leftmost leaves, and any accounts in the leaves after
-      them are removed. *)
-  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
+      them are removed.
+
+      [subtree_hashes] are hashes that nodes in the subtree, the subtree's
+      root included, will have once the accounts are written, for a caller
+      that has already computed them. They are stored as given, without being
+      checked, rather than computed again. *)
+  val set_all_accounts_rooted_at_exn :
+    ?subtree_hashes:(addr * hash) list -> t -> addr -> account list -> unit
 end
 
 module Inputs = struct
@@ -481,7 +487,12 @@ module Ledger = struct
     include S
 
     (** See [SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. *)
-    val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+    val set_all_accounts_rooted_at_exn :
+         ?subtree_hashes:(Addr.t * hash) list
+      -> t
+      -> Addr.t
+      -> account list
+      -> unit
 
     val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
 
@@ -558,8 +569,13 @@ module Ledger = struct
       module Config : Config
 
       (** See [SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. Both ledgers are
-          updated. *)
-      val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+          updated. The [subtree_hashes] are those of the primary ledger. *)
+      val set_all_accounts_rooted_at_exn :
+           ?subtree_hashes:(Addr.t * hash) list
+        -> t
+        -> Addr.t
+        -> account list
+        -> unit
 
       val dbs_synced : primary_ledger -> converting_ledger -> bool
 
