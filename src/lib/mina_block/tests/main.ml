@@ -176,7 +176,7 @@ let v4_reads_mesa_zkapp_account () =
       assert (
         Yojson.Safe.equal json
           (Mina_block.Precomputed.Versioned.to_yojson versioned) ) ;
-      let latest = Mina_block.Precomputed.Stable.V4.to_latest block in
+      let latest = Mina_block.Precomputed.V4.to_latest block in
       match latest.accounts_accessed with
       | (_, { zkapp = Some { verification_key = Some vk; _ }; _ }) :: _ ->
           [%test_eq: int] 3 (Mina_numbers.Txn_version.to_int vk.txn_version)
