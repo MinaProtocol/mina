@@ -800,13 +800,17 @@ let forest_pick forest =
       assert false )
 
 (** Start a loop that runs resumptions one at a time, in the order they are
-    queued, and return the function that queues one. *)
+    queued, and return the function that queues one. A resumption is dropped
+    if its node's [finished] has been filled by the time it would run: the
+    node has been removed or has finished, and whatever it was resuming with
+    has been released. *)
 let create_resumption_queue () =
   let resumptions_r, resumptions_w = Pipe.create () in
   don't_wait_for
-    (Pipe.iter_without_pushback resumptions_r ~f:(fun resumption ->
-         resumption () ) ) ;
-  Pipe.write_without_pushback resumptions_w
+    (Pipe.iter_without_pushback resumptions_r ~f:(fun (finished, resumption) ->
+         if Ivar.is_empty finished then resumption () ) ) ;
+  fun ~finished resumption ->
+    Pipe.write_without_pushback resumptions_w (finished, resumption)
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
@@ -877,7 +881,11 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     (* TODO: See if the bail out is happening. *)
     upon
       (Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ])
-      (function Ok x -> resume (fun () -> f x) | Error `Finished -> ())
+      (function
+        | Ok x ->
+            resume ~finished:node.result (fun () -> f x)
+        | Error `Finished ->
+            () )
   and retry node =
     step node
       (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
@@ -1116,7 +1124,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           Gauge.set Catchup.build_breadcrumb_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         upon (Scheduler.yield ()) (fun () ->
-            resume (fun () -> on_yielded node (c, valid_cb) breadcrumb) )
+            resume ~finished:node.result (fun () ->
+                on_yielded node (c, valid_cb) breadcrumb ) )
   and on_yielded node (c, valid_cb) breadcrumb =
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
@@ -1457,10 +1466,22 @@ let%test_module "Resuming catchup nodes" =
     let%test_unit "Resumptions run in the order they are queued" =
       [%test_eq: int list]
         (resumed_by_queue (fun resume resumption ->
-             resume (resumption 1) ;
-             resume (resumption 2) ;
-             resume (resumption 3) ) )
+             let finished = Ivar.create () in
+             resume ~finished (resumption 1) ;
+             resume ~finished (resumption 2) ;
+             resume ~finished (resumption 3) ) )
         [ 1; 2; 3 ]
+
+    let%test_unit "Resumptions for a node finished while they wait are dropped"
+        =
+      [%test_eq: int list]
+        (resumed_by_queue (fun resume resumption ->
+             let finished = Ivar.create () in
+             let other = Ivar.create () in
+             resume ~finished (resumption 1) ;
+             resume ~finished:other (resumption 2) ;
+             Ivar.fill finished () ) )
+        [ 2 ]
   end )
 
 (* Unit tests *)
