@@ -150,6 +150,17 @@ end
 module Coinbase_applied = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        { coinbase : Coinbase.Stable.V2.t With_status.Stable.V2.t
+        ; new_accounts : Account_id.Stable.V2.t list
+        ; burned_tokens : Currency.Amount.Stable.V1.t
+        }
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         { coinbase : Coinbase.Stable.V1.t With_status.Stable.V2.t
@@ -158,7 +169,11 @@ module Coinbase_applied = struct
         }
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest ({ coinbase; new_accounts; burned_tokens } : t) : Latest.t =
+        { coinbase = With_status.map coinbase ~f:Coinbase.Stable.V1.to_latest
+        ; new_accounts
+        ; burned_tokens
+        }
     end
   end]
 end
@@ -168,8 +183,14 @@ module Varying : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
+    module V4 : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+
     module V3 : sig
       type t [@@deriving sexp, to_yojson]
+
+      val to_latest : t -> V4.t
     end
   end]
 
@@ -190,6 +211,16 @@ end = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V4 = struct
+      type t =
+        | Command of Command_applied.Stable.V3.t
+        | Fee_transfer of Fee_transfer_applied.Stable.V2.t
+        | Coinbase of Coinbase_applied.Stable.V3.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V3 = struct
       type t =
         | Command of Command_applied.Stable.V3.t
@@ -197,7 +228,13 @@ end = struct
         | Coinbase of Coinbase_applied.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest : t -> Latest.t = function
+        | Command c ->
+            Command c
+        | Fee_transfer f ->
+            Fee_transfer f
+        | Coinbase c ->
+            Coinbase (Coinbase_applied.Stable.V2.to_latest c)
     end
   end]
 
@@ -230,12 +267,21 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  module V4 = struct
+    type t =
+      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V4.t }
+    [@@deriving sexp, to_yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V3 = struct
     type t =
       { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V3.t }
     [@@deriving sexp, to_yojson]
 
-    let to_latest = Fn.id
+    let to_latest ({ previous_hash; varying } : t) : Latest.t =
+      { previous_hash; varying = Varying.Stable.V3.to_latest varying }
   end
 end]
 

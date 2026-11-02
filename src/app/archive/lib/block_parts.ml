@@ -48,6 +48,11 @@ type t =
             derive. *)
   }
 
+let coinbase_fee_transfer_hash =
+  Option.map ~f:(fun { Coinbase.Fee_transfer.receiver_pk; fee } ->
+      Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token:Token_id.default
+      |> Transaction_hash.hash_fee_transfer )
+
 let transaction_of_latest ~command_hash : Transaction.t -> transaction =
   function
   | Command command ->
@@ -65,19 +70,34 @@ let transaction_of_latest ~command_hash : Transaction.t -> transaction =
         { coinbase
         ; hash = Transaction_hash.hash_coinbase coinbase
         ; fee_transfer_hash =
-            Coinbase.fee_transfer coinbase
-            |> Option.map ~f:(fun { Coinbase.Fee_transfer.receiver_pk; fee } ->
-                   Fee_transfer.Single.create ~receiver_pk ~fee
-                     ~fee_token:Token_id.default
-                   |> Transaction_hash.hash_fee_transfer )
+            coinbase_fee_transfer_hash (Coinbase.fee_transfer coinbase)
+        }
+
+(** A transaction of the version V4 and V3 blocks carry, recorded as
+    [transaction_of_latest] records one, except that its coinbase is hashed
+    at the version it has there. *)
+let transaction_of_v3 ~command_hash ~signature_kind ~proof_cache_db :
+    Transaction.Stable.V3.t -> transaction = function
+  | Transaction.Poly.Stable.V2.Command command ->
+      transaction_of_latest ~command_hash
+        (Command
+           (User_command.write_all_proofs_to_disk ~signature_kind
+              ~proof_cache_db command ) )
+  | Fee_transfer fee_transfer ->
+      transaction_of_latest ~command_hash (Fee_transfer fee_transfer)
+  | Coinbase coinbase ->
+      Coinbase
+        { coinbase = Coinbase.Stable.V1.to_latest coinbase
+        ; hash = Transaction_hash.hash_coinbase_v1 coinbase
+        ; fee_transfer_hash = coinbase_fee_transfer_hash coinbase.fee_transfer
         }
 
 (** The parts of a block, from its protocol state, of whatever version, and
     [get_transactions], which gives its transactions from its coinbase
-    receiver and whether its coinbase is supercharged, with the hashes of its
-    commands given by [command_hash]. The blockchain state differs in shape
-    between versions, so the parts taken from it are given separately. *)
-let of_protocol_state ~command_hash ~state_hash ~protocol_state
+    receiver and whether its coinbase is supercharged, each recorded as
+    [transaction_of] gives. The blockchain state differs in shape between
+    versions, so the parts taken from it are given separately. *)
+let of_protocol_state ~transaction_of ~state_hash ~protocol_state
     ~snarked_ledger_hash ~staged_ledger_hash ~timestamp ~get_transactions
     ~protocol_version ~proposed_protocol_version =
   let consensus_state = Protocol_state.consensus_state protocol_state in
@@ -91,8 +111,7 @@ let of_protocol_state ~command_hash ~state_hash ~protocol_state
        in
        match get_transactions ~coinbase_receiver ~supercharge_coinbase with
        | Ok transactions ->
-           List.map transactions
-             ~f:(With_status.map ~f:(transaction_of_latest ~command_hash))
+           List.map transactions ~f:(With_status.map ~f:transaction_of)
        | Error e ->
            Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e) )
   in
@@ -132,7 +151,10 @@ let of_latest ~constraint_constants ~state_hash
     ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
     ~proposed_protocol_version =
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
-  of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
+  of_protocol_state
+    ~transaction_of:
+      (transaction_of_latest
+         ~command_hash:Transaction_hash.hash_command_with_hashes )
     ~state_hash ~protocol_state
     ~snarked_ledger_hash:(Blockchain_state.snarked_ledger_hash blockchain_state)
     ~staged_ledger_hash:(Blockchain_state.staged_ledger_hash blockchain_state)
@@ -144,7 +166,7 @@ let of_latest ~constraint_constants ~state_hash
 
 (** The parts of a block whose protocol state is at the version V4 and V3
     blocks carry, given as for [of_protocol_state]. *)
-let of_protocol_state_v3 ~command_hash ~state_hash
+let of_protocol_state_v3 ~transaction_of ~state_hash
     ~(protocol_state : Protocol_state.Value.Stable.V3.t) =
   let { Blockchain_state.Poly.Stable.V2.staged_ledger_hash
       ; ledger_proof_statement
@@ -153,7 +175,7 @@ let of_protocol_state_v3 ~command_hash ~state_hash
       } =
     Protocol_state.blockchain_state protocol_state
   in
-  of_protocol_state ~command_hash ~state_hash ~protocol_state
+  of_protocol_state ~transaction_of ~state_hash ~protocol_state
     ~snarked_ledger_hash:
       ledger_proof_statement.Snarked_ledger_state.Poly.Stable.V2.target
         .first_pass_ledger
@@ -179,22 +201,17 @@ let of_precomputed_v5 ~constraint_constants ~proof_cache_db
 let of_precomputed_v4 ~constraint_constants ~proof_cache_db
     (t : Mina_block.Precomputed.Stable.V4.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  of_protocol_state_v3 ~command_hash:Transaction_hash.hash_command_with_hashes
+  of_protocol_state_v3
+    ~transaction_of:
+      (transaction_of_v3 ~command_hash:Transaction_hash.hash_command_with_hashes
+         ~signature_kind ~proof_cache_db )
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
     ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
     ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
       Staged_ledger.Pre_diff_info.get_transactions_stable_v3
         ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
-        (t.staged_ledger_diff : Staged_ledger_diff.Stable.V3.t)
-      |> Result.map
-           ~f:
-             (List.map
-                ~f:
-                  (With_status.map
-                     ~f:
-                       (Transaction.write_all_proofs_to_disk ~signature_kind
-                          ~proof_cache_db ) ) ) )
+        (t.staged_ledger_diff : Staged_ledger_diff.Stable.V3.t) )
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
@@ -215,10 +232,11 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
       (let two, one =
          Berkeley_types.Diff.commands_with_hashes t.staged_ledger_diff
        in
-       let { Staged_ledger_diff.Pre_diff_two.commands; _ } = two in
+       let { Staged_ledger_diff.Pre_diff_two.Stable.V2.commands; _ } = two in
        let one_commands =
          Option.value_map one ~default:[]
-           ~f:(fun { Staged_ledger_diff.Pre_diff_one.commands; _ } -> commands)
+           ~f:(fun { Staged_ledger_diff.Pre_diff_one.Stable.V2.commands; _ } ->
+             commands )
        in
        List.map (commands @ one_commands)
          ~f:(fun { With_status.data = command, hash; _ } ->
@@ -228,10 +246,12 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
        |> Transaction_hash.Map.of_alist_exn )
   in
   of_protocol_state_v3
-    ~command_hash:(fun command ->
-      Map.find_exn
-        (Lazy.force berkeley_hashes)
-        (Transaction_hash.hash_command_with_hashes command) )
+    ~transaction_of:
+      (transaction_of_v3 ~signature_kind ~proof_cache_db
+         ~command_hash:(fun command ->
+           Map.find_exn
+             (Lazy.force berkeley_hashes)
+             (Transaction_hash.hash_command_with_hashes command) ) )
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
     ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
@@ -242,15 +262,7 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
             coinbase_amount = berkeley_coinbase_amount
           }
         ~coinbase_receiver ~supercharge_coinbase
-        (Berkeley_types.Diff.to_mesa t.staged_ledger_diff)
-      |> Result.map
-           ~f:
-             (List.map
-                ~f:
-                  (With_status.map
-                     ~f:
-                       (Transaction.write_all_proofs_to_disk ~signature_kind
-                          ~proof_cache_db ) ) ) )
+        (Berkeley_types.Diff.to_mesa t.staged_ledger_diff) )
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 

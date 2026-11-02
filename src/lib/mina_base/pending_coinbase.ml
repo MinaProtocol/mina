@@ -411,6 +411,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Action = struct
       [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t = Update_none | Update_one | Update_two_coinbase_in_second
+          [@@deriving equal, sexp, to_yojson]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
           type t =
             | Update_none
@@ -419,7 +426,17 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Update_two_coinbase_in_second
           [@@deriving equal, sexp, to_yojson]
 
-          let to_latest = Fn.id
+          let to_latest : t -> Latest.t = function
+            | Update_none ->
+                Update_none
+            | Update_one ->
+                Update_one
+            | Update_two_coinbase_in_first ->
+                failwith
+                  "Pending_coinbase.Update.Action.Stable.V1.to_latest: a block \
+                   no longer adds a coinbase in its first partition"
+            | Update_two_coinbase_in_second ->
+                Update_two_coinbase_in_second
         end
       end]
 
@@ -430,20 +447,21 @@ module Make_str (A : Wire_types.Concrete) = struct
             (false, false)
         | Update_one ->
             (true, false)
-        | Update_two_coinbase_in_first ->
-            (false, true)
         | Update_two_coinbase_in_second ->
             (true, true)
 
+      (* [(false, true)] used to mean two stacks with the coinbase in the first
+         of them, which a block whose coinbase is its last transaction cannot
+         produce. [Checked.assert_valid] rules it out in-circuit. *)
       let of_bits = function
         | false, false ->
             Update_none
         | true, false ->
             Update_one
-        | false, true ->
-            Update_two_coinbase_in_first
         | true, true ->
             Update_two_coinbase_in_second
+        | false, true ->
+            failwith "Pending_coinbase.Update.Action: unused bit pattern"
 
       let var_of_t t =
         let x, y = to_bits t in
@@ -457,10 +475,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Checked = struct
         let no_update (b0, b1) = Boolean.((not b0) &&& not b1)
 
-        let update_two_stacks_coinbase_in_first (b0, b1) =
-          Boolean.((not b0) &&& b1)
-
         let update_two_stacks_coinbase_in_second (b0, b1) = Boolean.(b0 &&& b1)
+
+        (* Three of the four bit patterns name an action; reject the fourth. *)
+        let assert_valid (b0, b1) = Boolean.Assert.any [ b0; Boolean.not b1 ]
       end
     end
 
@@ -477,11 +495,19 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t = (Action.Stable.V2.t, Amount.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : Latest.t =
+          { t with action = Action.Stable.V1.to_latest t.action }
       end
     end]
 
@@ -580,10 +606,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module T = struct
     (* Total number of stacks *)
     let max_coinbase_stack_count ~depth = Int.pow 2 depth
-
-    let chain if_ b ~then_ ~else_ =
-      let%bind then_ = then_ and else_ = else_ in
-      if_ b ~then_ ~else_
 
     (*pair of coinbase and state stacks*)
     module Stack = struct
@@ -880,6 +902,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Find_index_of_newest_stacks act ))
         in
         let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
+        let%bind () = Update.Action.Checked.assert_valid action in
         let%bind no_update = Update.Action.Checked.no_update action in
         let update_state_stack (stack : Stack.var) =
           (*get previous stack to carry-forward the stack of state body hashes*)
@@ -912,15 +935,26 @@ module Make_str (A : Wire_types.Concrete) = struct
             Currency.Amount.Checked.if_ supercharge_coinbase
               ~then_:supercharged_coinbase ~else_:coinbase_amount
           in
-          let%bind rem_amount =
-            Currency.Amount.Checked.sub total_coinbase_amount amount
+          (*A block has exactly one coinbase unless it has no transactions at
+            all, and that coinbase is for the protocol's whole amount for the
+            block. Note this is [no_update] rather than [no_coinbase]: a block
+            that reaches the second stack still has a coinbase, it is just not
+            in this stack.*)
+          let%bind () =
+            with_label __LOC__ (fun () ->
+                let%bind expected_amount =
+                  Currency.Amount.Checked.if_ no_update
+                    ~then_:Currency.Amount.(var_of_t zero)
+                    ~else_:total_coinbase_amount
+                in
+                Currency.Amount.Checked.assert_equal amount expected_amount )
           in
           let%bind no_coinbase_in_this_stack =
             Update.Action.Checked.update_two_stacks_coinbase_in_second action
           in
           let%bind amount1_equal_to_zero = equal_to_zero amount in
-          let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
-          (*if no update then coinbase amount has to be zero*)
+          (*Kept alongside the check above so that the no-coinbase case does not
+            rest on the configured coinbase amount being non-zero.*)
           let%bind () =
             with_label __LOC__ (fun () ->
                 let%bind check =
@@ -931,19 +965,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind no_coinbase =
             Boolean.(no_update ||| no_coinbase_in_this_stack)
           in
-          (* TODO: Optimize here since we are pushing twice to the same stack *)
-          let%bind stack_with_amount1 =
+          let%bind stack_with_coinbase =
             Stack.Checked.push_coinbase (coinbase_receiver, amount) stack
           in
-          let%bind stack_with_amount2 =
-            Stack.Checked.push_coinbase
-              (coinbase_receiver, rem_amount)
-              stack_with_amount1
-          in
-          chain Stack.if_ no_coinbase ~then_:(return stack)
-            ~else_:
-              (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
-                 ~else_:stack_with_amount2 )
+          Stack.if_ no_coinbase ~then_:stack ~else_:stack_with_coinbase
         in
         (*This is for the second stack for when transactions in a block occupy
           two trees of the scan state; the second tree will carry-forward the state
@@ -952,12 +977,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind add_coinbase =
             Update.Action.Checked.update_two_stacks_coinbase_in_second action
           in
-          let%bind update_state =
-            let%bind update_second_stack =
-              Update.Action.Checked.update_two_stacks_coinbase_in_first action
-            in
-            Boolean.(update_second_stack ||| add_coinbase)
-          in
+          (* The second stack is only touched when the block reaches it, which
+             is exactly when it carries the coinbase. *)
+          let update_state = add_coinbase in
           let%bind stack =
             let%bind stack_with_state =
               Stack.Checked.push_state state_body_hash global_slot
@@ -1365,42 +1387,38 @@ module Make_str (A : Wire_types.Concrete) = struct
       -> t Or_error.t
   end
 
+  (* A block's coinbase is for the protocol's whole amount, which
+     [Checked.add_coinbase] requires. [Coinbase.Gen.gen] picks any amount up
+     to it, so the tests of the circuit keep the generated receiver and fee
+     transfer with the whole amount. *)
+  let protocol_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~supercharged_coinbase (coinbase : Coinbase.t) =
+    let amount =
+      if supercharged_coinbase then
+        Option.value_exn
+          (Currency.Amount.scale constraint_constants.coinbase_amount
+             constraint_constants.supercharged_coinbase_factor )
+      else constraint_constants.coinbase_amount
+    in
+    Coinbase.create ~amount ~receiver:coinbase.receiver
+      ~fee_transfer:coinbase.fee_transfer ~fee_remainder:Currency.Fee.zero
+    |> Or_error.ok_exn
+
   let add_coinbase_with_zero_checks (type t)
       (module T : Pending_coinbase_intf with type t = t) (t : t)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~coinbase ~supercharged_coinbase ~state_body_hash ~global_slot
-      ~is_new_stack =
+      ~coinbase ~state_body_hash ~global_slot ~is_new_stack =
     let depth = constraint_constants.pending_coinbase_depth in
     if Amount.equal coinbase.Coinbase.amount Amount.zero then t
     else
-      let max_coinbase_amount =
-        if supercharged_coinbase then
-          Option.value_exn
-            (Currency.Amount.scale constraint_constants.coinbase_amount
-               constraint_constants.supercharged_coinbase_factor )
-        else constraint_constants.coinbase_amount
-      in
-      let coinbase' =
-        Coinbase.create
-          ~amount:
-            (Option.value_exn (Amount.sub max_coinbase_amount coinbase.amount))
-          ~receiver:coinbase.receiver ~fee_transfer:None
-        |> Or_error.ok_exn
-      in
       let t_with_state =
         T.add_state ~depth t state_body_hash global_slot ~is_new_stack
         |> Or_error.ok_exn
       in
       (*add coinbase to the same stack*)
-      let interim_tree =
-        T.add_coinbase ~depth t_with_state ~coinbase ~is_new_stack:false
-        |> Or_error.ok_exn
-      in
-      if Amount.equal coinbase'.amount Amount.zero then interim_tree
-      else
-        T.add_coinbase ~depth interim_tree ~coinbase:coinbase'
-          ~is_new_stack:false
-        |> Or_error.ok_exn
+      T.add_coinbase ~depth t_with_state ~coinbase ~is_new_stack:false
+      |> Or_error.ok_exn
 
   let%test_unit "Checked_stack = Unchecked_stack" =
     let open Quickcheck in
@@ -1439,6 +1457,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
               , state_body_hash
               , global_slot ) ->
+        let coinbase =
+          protocol_coinbase ~constraint_constants ~supercharged_coinbase
+            coinbase
+        in
         let amount = coinbase.amount in
         let is_new_stack, action =
           Currency.Amount.(
@@ -1449,7 +1471,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           add_coinbase_with_zero_checks ~constraint_constants
             (module T)
             pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
-            ~global_slot ~supercharged_coinbase
+            ~global_slot
         in
         (* inside the `open' below, Checked means something else, so define this function *)
         let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1504,6 +1526,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               , state_body_hash
               , global_slot ) ->
         let pending_coinbases = create ~depth () |> Or_error.ok_exn in
+        let coinbase =
+          protocol_coinbase ~constraint_constants ~supercharged_coinbase
+            coinbase
+        in
         let amount = coinbase.amount in
         let action =
           Currency.Amount.(
@@ -1514,7 +1540,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           add_coinbase_with_zero_checks ~constraint_constants
             (module T)
             pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
-            ~global_slot ~supercharged_coinbase
+            ~global_slot
         in
         (* inside the `open' below, Checked means something else, so define these functions *)
         let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1613,14 +1639,14 @@ module Make_str (A : Wire_types.Concrete) = struct
             List.fold coinbases ~init:t'
               ~f:(fun
                    pending_coinbases
-                   ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+                   ( (coinbase, `Supercharged_coinbase _supercharged_coinbase)
                    , state_body_hash
                    , global_slot )
                  ->
                 add_coinbase_with_zero_checks ~constraint_constants
                   (module Pending_coinbase)
                   pending_coinbases ~coinbase ~is_new_stack:false
-                  ~state_body_hash ~global_slot ~supercharged_coinbase )
+                  ~state_body_hash ~global_slot )
           in
           let new_stack =
             Or_error.ok_exn

@@ -194,10 +194,11 @@ let v3_command_hashes_match_archive () =
       let two, one =
         Berkeley_types.Diff.commands_with_hashes block.staged_ledger_diff
       in
-      let { Staged_ledger_diff.Pre_diff_two.commands; _ } = two in
+      let { Staged_ledger_diff.Pre_diff_two.Stable.V2.commands; _ } = two in
       let one_commands =
         Option.value_map one ~default:[]
-          ~f:(fun { Staged_ledger_diff.Pre_diff_one.commands; _ } -> commands)
+          ~f:(fun { Staged_ledger_diff.Pre_diff_one.Stable.V2.commands; _ } ->
+            commands )
       in
       [%test_eq: string list] archived_hashes
         (List.map (commands @ one_commands)

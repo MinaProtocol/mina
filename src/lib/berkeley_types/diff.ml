@@ -17,9 +17,10 @@ type 'command pre_diffs =
 type t = { diff : User_command.t pre_diffs } [@@deriving yojson]
 
 let map_commands ((two, one) : 'a pre_diffs) ~(f : 'a -> 'b) : 'b pre_diffs =
-  let f = Mina_base.With_status.map ~f in
-  ( Diff.Pre_diff_two.map two ~f1:Fn.id ~f2:f
-  , Option.map one ~f:(Diff.Pre_diff_one.map ~f1:Fn.id ~f2:f) )
+  let f = List.map ~f:(Mina_base.With_status.map ~f) in
+  ( { two with Diff.Pre_diff_two.Stable.V2.commands = f two.commands }
+  , Option.map one ~f:(fun one ->
+        { one with Diff.Pre_diff_one.Stable.V2.commands = f one.commands } ) )
 
 (** Each command keeps its Berkeley hash. *)
 let commands_with_hashes ({ diff } : t) :

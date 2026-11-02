@@ -275,7 +275,8 @@ let excess (payload : t) : Amount.Signed.t =
   | Coinbase ->
       Amount.Signed.zero
 
-let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
+let fee_excess ~fee_remainder
+    ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   match tag with
   | Payment | Stake_delegation ->
       (* For all user commands, the fee excess is just the fee. *)
@@ -284,12 +285,16 @@ let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
       Option.value_exn (Amount.add_fee amount fee)
       |> Amount.to_fee |> Fee.Signed.of_unsigned |> Fee.Signed.negate
   | Coinbase ->
-      Fee.Signed.zero
+      (* A coinbase discharges the excess that it pays out to its receiver. *)
+      Fee.Signed.negate (Fee.Signed.of_unsigned fee_remainder)
 
-let expected_supply_increase (payload : payload) =
+let expected_supply_increase ~fee_remainder (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->
-      payload.body.amount
+      (* [body.amount] is everything the coinbase credits; only the part that
+         was not taken from the fee excess is newly minted. *)
+      Option.value_exn
+        (Amount.sub payload.body.amount (Amount.of_fee fee_remainder))
   | Payment | Stake_delegation | Fee_transfer ->
       Amount.zero

@@ -79,6 +79,16 @@ module Pre_diff_two = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        }
+      [@@deriving equal, compare, sexp, yojson]
+    end
+
     module V2 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
@@ -93,7 +103,7 @@ module Pre_diff_two = struct
   type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
     { completed_works : 'a list
     ; commands : 'b list
-    ; coinbase : Ft.t At_most_two.t
+    ; coinbase : Ft.t At_most_one.t
     ; internal_command_statuses : Transaction_status.t list
     }
   [@@deriving equal, compare, sexp, yojson]
@@ -147,7 +157,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
       type t =
         ( Transaction_snark_work.Stable.V3.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_two.Stable.V2.t
+        Pre_diff_two.Stable.V3.t
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
@@ -160,11 +170,24 @@ module Pre_diff_with_at_most_two_coinbase = struct
         Pre_diff_two.Stable.V2.t
       [@@deriving equal, sexp, yojson]
 
-      let to_latest (t : t) : Latest.t =
-        { t with
-          completed_works =
-            List.map t.completed_works
+      let to_latest
+          ({ completed_works; commands; coinbase; internal_command_statuses } :
+            t ) : Latest.t =
+        { completed_works =
+            List.map completed_works
               ~f:Transaction_snark_work.Stable.V2.to_latest
+        ; commands
+        ; coinbase =
+            ( match coinbase with
+            | Zero ->
+                Zero
+            | One ft ->
+                One ft
+            | Two _ ->
+                failwith
+                  "Pre_diff_with_at_most_two_coinbase.Stable.V3.to_latest: a \
+                   block may carry at most one coinbase" )
+        ; internal_command_statuses
         }
     end
   end]
@@ -256,7 +279,7 @@ module Diff = struct
       , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
           ~f:(fun d -> d.Pre_diff_one.coinbase) )
     with
-    | At_most_two.Zero, At_most_one.Zero ->
+    | At_most_one.Zero, At_most_one.Zero ->
         Some Currency.Amount.zero
     | _ ->
         coinbase_amount
@@ -287,7 +310,17 @@ module Diff = struct
         , Option.map one
             ~f:Pre_diff_with_at_most_one_coinbase.Stable.V3.to_latest )
 
-      let coinbase = coinbase
+      let coinbase ~constraint_constants ~supercharge_coinbase ((two, one) : t)
+          =
+        match
+          ( two.Pre_diff_two.Stable.V2.coinbase
+          , Option.value_map one ~default:At_most_one.Stable.V1.Zero
+              ~f:(fun d -> d.Pre_diff_one.Stable.V2.coinbase) )
+        with
+        | At_most_two.Stable.V1.Zero, At_most_one.Stable.V1.Zero ->
+            Some Currency.Amount.zero
+        | _ ->
+            coinbase_amount ~constraint_constants ~supercharge_coinbase
     end
   end]
 
@@ -329,7 +362,7 @@ module Stable = struct
       { diff =
           ( { completed_works = []
             ; commands = []
-            ; coinbase = At_most_two.Zero
+            ; coinbase = At_most_one.Zero
             ; internal_command_statuses = []
             }
           , None )
@@ -391,7 +424,7 @@ module With_valid_signatures_and_proofs = struct
     { diff =
         ( { completed_works = []
           ; commands = []
-          ; coinbase = At_most_two.Zero
+          ; coinbase = At_most_one.Zero
           ; internal_command_statuses = []
           }
         , None )
@@ -433,7 +466,7 @@ module With_valid_signatures = struct
       , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
           ~f:(fun d -> d.coinbase) )
     with
-    | At_most_two.Zero, At_most_one.Zero ->
+    | At_most_one.Zero, At_most_one.Zero ->
         Some Currency.Amount.zero
     | _ ->
         coinbase_amount
@@ -564,7 +597,7 @@ let empty_diff : t =
   { diff =
       ( { completed_works = []
         ; commands = []
-        ; coinbase = At_most_two.Zero
+        ; coinbase = At_most_one.Zero
         ; internal_command_statuses = []
         }
       , None )
@@ -574,7 +607,7 @@ let is_empty = function
   | { diff =
         ( { completed_works = []
           ; commands = []
-          ; coinbase = At_most_two.Zero
+          ; coinbase = At_most_one.Zero
           ; internal_command_statuses = []
           }
         , None )

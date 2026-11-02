@@ -43,6 +43,10 @@ val hash_fee_transfer : Fee_transfer.Single.t -> t
 
 val hash_coinbase : Coinbase.t -> t
 
+(** The hash of a coinbase of version 1, as the blocks of an earlier version
+    carry. *)
+val hash_coinbase_v1 : Coinbase.Stable.V1.t -> t
+
 (** the input string can be either a Base58Check encoding of a
     Signed command.Stable.V1.t instance, or, the Base64 encoding
     of a later version of a signed command or

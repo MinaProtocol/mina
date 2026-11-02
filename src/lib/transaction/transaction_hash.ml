@@ -104,6 +104,12 @@ let hash_zkapp_command (type p aux)
 (* no signatures to replace for internal commands *)
 let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest)
 
+let hash_coinbase_v1 =
+  mk_hasher
+    ( module struct
+      include Mina_base.Coinbase.Stable.V1
+    end )
+
 let hash_fee_transfer = mk_hasher (module Fee_transfer.Single.Stable.Latest)
 
 let hash_zkapp_command_with_hashes
