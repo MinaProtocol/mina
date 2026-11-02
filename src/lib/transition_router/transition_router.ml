@@ -544,6 +544,25 @@ let wait_till_genesis ~logger ~time_controller
       (logger_loop ())
     |> Deferred.ignore_m
 
+(** Make a valid block or header the most recent valid block, if consensus
+    prefers it to the current one. *)
+let update_most_recent_valid_block ~context:(module Context : CONTEXT)
+    ~get_most_recent_valid_block ~most_recent_valid_block_writer (b_or_h, _) =
+  let header_with_hash =
+    block_or_header_to_header_hashed_with_validation b_or_h
+  in
+  let current_header_with_hash = get_most_recent_valid_block () in
+  if
+    Consensus.Hooks.equal_select_status `Take
+      (Consensus.Hooks.select
+         ~context:(module Context)
+         ~existing:(to_consensus_state current_header_with_hash)
+         ~candidate:(to_consensus_state header_with_hash) )
+  then
+    (* TODO: do we need to push valid_cb? *)
+    Broadcast_pipe.Writer.write most_recent_valid_block_writer header_with_hash
+  else Deferred.unit
+
 (* [sync_local_state] may be `false` for tests, where we want
    to set local state in the test
 *)
@@ -663,22 +682,11 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         Strict_pipe.Reader.Fork.two valid_transition_reader
       in
       don't_wait_for
-      @@ Strict_pipe.Reader.iter valid_transition_reader1 ~f:(fun (b_or_h, _) ->
-             let header_with_hash =
-               block_or_header_to_header_hashed_with_validation b_or_h
-             in
-             let current_header_with_hash = get_most_recent_valid_block () in
-             if
-               Consensus.Hooks.equal_select_status `Take
-                 (Consensus.Hooks.select
-                    ~context:(module Context)
-                    ~existing:(to_consensus_state current_header_with_hash)
-                    ~candidate:(to_consensus_state header_with_hash) )
-             then
-               (* TODO: do we need to push valid_cb? *)
-               Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                 header_with_hash
-             else Deferred.unit ) ;
+      @@ Strict_pipe.Reader.iter valid_transition_reader1
+           ~f:
+             (update_most_recent_valid_block
+                ~context:(module Context)
+                ~get_most_recent_valid_block ~most_recent_valid_block_writer ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (b_or_h, `Valid_cb vc) ->
