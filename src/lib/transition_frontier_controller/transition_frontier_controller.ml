@@ -24,6 +24,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
+  let block_registry =
+    Transition_handler.Block_registry.create ~logger ~cache_exceptions
+  in
   let f_drop_head name head valid_cb =
     let hashes =
       match head with
@@ -34,17 +37,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           With_hash.hash @@ Validation.header_with_hash
           @@ Network_peer.Envelope.Incoming.data h
     in
-    Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
-      ~logger ;
     match head with
     | `Block b ->
-        let (_ : Mina_block.initial_valid_block Network_peer.Envelope.Incoming.t)
-            =
-          Cache_lib.Cached.invalidate_with_failure b
-        in
-        ()
+        (* Dropping a block for want of room says nothing about the peer that
+           sent it, so it is ignored rather than rejected. *)
+        Mina_block.handle_dropped_transition hashes ~pipe_name:name ~logger ;
+        Transition_handler.Block_registry.finish block_registry b `Ignored
     | `Header _ ->
-        ()
+        Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
+          ~logger
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
@@ -75,9 +76,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
     Strict_pipe.create ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
-  in
-  let block_registry =
-    Transition_handler.Block_registry.create ~logger ~cache_exceptions
   in
   List.iter collected_transitions ~f:(fun (t, vc) ->
       let b_or_h =
