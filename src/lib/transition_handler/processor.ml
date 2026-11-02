@@ -314,25 +314,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             ~metadata:[ ("reason", `String (Error.to_string_hum err)) ] ) ;
       Result.return result
 
-let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
+let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier ~get_completed_work
-    ~(primary_transition_reader :
-       ( [ `Block of
-           ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
-       Reader.t )
-    ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~(clean_up_catchup_scheduler : unit Ivar.t) ~catchup_job_writer
-    ~(catchup_breadcrumbs_reader :
-       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-         * Mina_net2.Validation_callback.t option )
-         Mina_stdlib.Rose_tree.t
-         list
-       * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
-       Reader.t )
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
@@ -341,7 +325,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~processed_transition_writer ?transaction_pool_proxy =
+       Writer.t ) ~processed_transition_writer ?transaction_pool_proxy () =
   let open Context in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
@@ -357,6 +341,130 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
       ~context:(module Context)
       ~get_completed_work ~trust_system ~verifier ~frontier ~catchup_scheduler
       ~processed_transition_writer ~time_controller
+  in
+  fun msg ->
+    let open Deferred.Let_syntax in
+    O1trace.thread "transition_handler_processor" (fun () ->
+        match msg with
+        | `Catchup_breadcrumbs (breadcrumb_subtrees, subsequent_callback_action)
+          -> (
+            ( match%map
+                Deferred.Or_error.List.iter breadcrumb_subtrees
+                  ~f:(fun subtree ->
+                    Mina_stdlib.Rose_tree.Deferred.Or_error.iter
+                      subtree
+                      (* It could be the case that by the time we try and
+                         * add the breadcrumb, it's no longer relevant when
+                         * we're catching up *) ~f:(fun (b, valid_cb) ->
+                        let state_hash =
+                          Frontier_base.Breadcrumb.state_hash (Cached.peek b)
+                        in
+                        let%map result =
+                          add_and_finalize ~logger ~only_if_present:true
+                            ~source:`Catchup ~valid_cb b
+                        in
+                        Internal_tracing.with_state_hash state_hash
+                        @@ fun () ->
+                        ( match result with
+                        | Error err ->
+                            [%log internal] "Failure"
+                              ~metadata:
+                                [ ("reason", `String (Error.to_string_hum err))
+                                ]
+                        | Ok () ->
+                            [%log internal] "Breadcrumb_integrated" ) ;
+                        result ) )
+              with
+            | Ok () ->
+                ()
+            | Error err ->
+                List.iter breadcrumb_subtrees ~f:(fun tree ->
+                    Mina_stdlib.Rose_tree.iter tree
+                      ~f:(fun (cached_breadcrumb, _vc) ->
+                        let (_ : Transition_frontier.Breadcrumb.t) =
+                          Cached.invalidate_with_failure cached_breadcrumb
+                        in
+                        () ) ) ;
+                [%log error]
+                  "Error, failed to attach all catchup breadcrumbs to \
+                   transition frontier: $error"
+                  ~metadata:[ ("error", Error_json.error_to_yojson err) ] )
+            >>| fun () ->
+            match subsequent_callback_action with
+            | `Ledger_catchup decrement_signal ->
+                if Ivar.is_full decrement_signal then
+                  [%log error] "Ivar.fill bug is here!" ;
+                Ivar.fill decrement_signal ()
+            | `Catchup_scheduler ->
+                () )
+        | `Local_breadcrumb breadcrumb ->
+            let state_hash =
+              Transition_frontier.Breadcrumb.validated_transition
+                (Cached.peek breadcrumb)
+              |> Mina_block.Validated.state_hash
+            in
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Begin_local_block_processing" ;
+            let transition_time =
+              Transition_frontier.Breadcrumb.validated_transition
+                (Cached.peek breadcrumb)
+              |> Mina_block.Validated.header |> Mina_block.Header.protocol_state
+              |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+              |> Block_time.to_time_exn
+            in
+            Perf_histograms.add_span ~name:"accepted_transition_local_latency"
+              (Core_kernel.Time.diff
+                 Block_time.(now time_controller |> to_time_exn)
+                 transition_time ) ;
+            let%map () =
+              match%map
+                add_and_finalize ~logger ~only_if_present:false
+                  ~source:`Internal breadcrumb ~valid_cb:None
+              with
+              | Ok () ->
+                  [%log internal] "Breadcrumb_integrated" ;
+                  ()
+              | Error err ->
+                  [%log internal] "Failure"
+                    ~metadata:[ ("reason", `String (Error.to_string_hum err)) ] ;
+                  [%log error]
+                    ~metadata:[ ("error", Error_json.error_to_yojson err) ]
+                    "Error, failed to attach produced breadcrumb to transition \
+                     frontier: $error" ;
+                  let (_ : Transition_frontier.Breadcrumb.t) =
+                    Cached.invalidate_with_failure breadcrumb
+                  in
+                  ()
+            in
+            Mina_metrics.(
+              Gauge.dec_one
+                Transition_frontier_controller.transitions_being_processed)
+        | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb) ->
+            process_transition ~block_or_header ~valid_cb
+              ?transaction_pool_proxy )
+
+let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
+    ~time_controller ~frontier ~get_completed_work
+    ~(primary_transition_reader :
+       ( [ `Block of
+           ( Mina_block.initial_valid_block Envelope.Incoming.t
+           , State_hash.t )
+           Cached.t
+         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
+       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
+       Reader.t )
+    ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
+    ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
+    ~catchup_breadcrumbs_writer ~processed_transition_writer
+    ?transaction_pool_proxy =
+  let handle =
+    create_handler
+      ~context:(module Context)
+      ~verifier ~trust_system ~time_controller ~frontier ~get_completed_work
+      ~clean_up_catchup_scheduler ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~processed_transition_writer
+      ?transaction_pool_proxy ()
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Reader.Merge.iter
@@ -377,115 +485,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
         ; Reader.map primary_transition_reader ~f:(fun vt ->
               `Partially_valid_transition vt )
         ]
-        ~f:(fun msg ->
-          let open Deferred.Let_syntax in
-          O1trace.thread "transition_handler_processor" (fun () ->
-              match msg with
-              | `Catchup_breadcrumbs
-                  (breadcrumb_subtrees, subsequent_callback_action) -> (
-                  ( match%map
-                      Deferred.Or_error.List.iter breadcrumb_subtrees
-                        ~f:(fun subtree ->
-                          Mina_stdlib.Rose_tree.Deferred.Or_error.iter
-                            subtree
-                            (* It could be the case that by the time we try and
-                               * add the breadcrumb, it's no longer relevant when
-                               * we're catching up *) ~f:(fun (b, valid_cb) ->
-                              let state_hash =
-                                Frontier_base.Breadcrumb.state_hash
-                                  (Cached.peek b)
-                              in
-                              let%map result =
-                                add_and_finalize ~logger ~only_if_present:true
-                                  ~source:`Catchup ~valid_cb b
-                              in
-                              Internal_tracing.with_state_hash state_hash
-                              @@ fun () ->
-                              ( match result with
-                              | Error err ->
-                                  [%log internal] "Failure"
-                                    ~metadata:
-                                      [ ( "reason"
-                                        , `String (Error.to_string_hum err) )
-                                      ]
-                              | Ok () ->
-                                  [%log internal] "Breadcrumb_integrated" ) ;
-                              result ) )
-                    with
-                  | Ok () ->
-                      ()
-                  | Error err ->
-                      List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Mina_stdlib.Rose_tree.iter tree
-                            ~f:(fun (cached_breadcrumb, _vc) ->
-                              let (_ : Transition_frontier.Breadcrumb.t) =
-                                Cached.invalidate_with_failure cached_breadcrumb
-                              in
-                              () ) ) ;
-                      [%log error]
-                        "Error, failed to attach all catchup breadcrumbs to \
-                         transition frontier: $error"
-                        ~metadata:[ ("error", Error_json.error_to_yojson err) ]
-                  )
-                  >>| fun () ->
-                  match subsequent_callback_action with
-                  | `Ledger_catchup decrement_signal ->
-                      if Ivar.is_full decrement_signal then
-                        [%log error] "Ivar.fill bug is here!" ;
-                      Ivar.fill decrement_signal ()
-                  | `Catchup_scheduler ->
-                      () )
-              | `Local_breadcrumb breadcrumb ->
-                  let state_hash =
-                    Transition_frontier.Breadcrumb.validated_transition
-                      (Cached.peek breadcrumb)
-                    |> Mina_block.Validated.state_hash
-                  in
-                  Internal_tracing.with_state_hash state_hash
-                  @@ fun () ->
-                  [%log internal] "Begin_local_block_processing" ;
-                  let transition_time =
-                    Transition_frontier.Breadcrumb.validated_transition
-                      (Cached.peek breadcrumb)
-                    |> Mina_block.Validated.header
-                    |> Mina_block.Header.protocol_state
-                    |> Protocol_state.blockchain_state
-                    |> Blockchain_state.timestamp |> Block_time.to_time_exn
-                  in
-                  Perf_histograms.add_span
-                    ~name:"accepted_transition_local_latency"
-                    (Core_kernel.Time.diff
-                       Block_time.(now time_controller |> to_time_exn)
-                       transition_time ) ;
-                  let%map () =
-                    match%map
-                      add_and_finalize ~logger ~only_if_present:false
-                        ~source:`Internal breadcrumb ~valid_cb:None
-                    with
-                    | Ok () ->
-                        [%log internal] "Breadcrumb_integrated" ;
-                        ()
-                    | Error err ->
-                        [%log internal] "Failure"
-                          ~metadata:
-                            [ ("reason", `String (Error.to_string_hum err)) ] ;
-                        [%log error]
-                          ~metadata:
-                            [ ("error", Error_json.error_to_yojson err) ]
-                          "Error, failed to attach produced breadcrumb to \
-                           transition frontier: $error" ;
-                        let (_ : Transition_frontier.Breadcrumb.t) =
-                          Cached.invalidate_with_failure breadcrumb
-                        in
-                        ()
-                  in
-                  Mina_metrics.(
-                    Gauge.dec_one
-                      Transition_frontier_controller.transitions_being_processed)
-              | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb)
-                ->
-                  process_transition ~block_or_header ~valid_cb
-                    ?transaction_pool_proxy ) ) )
+        ~f:handle )
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
