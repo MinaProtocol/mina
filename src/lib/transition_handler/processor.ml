@@ -33,21 +33,12 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
     |> Int64.of_int )
   |> Block_time.Span.min (Block_time.Span.of_ms (Int64.of_int 5000))
 
-let cached_transform_deferred_result ~transform_cached ~transform_result cached
-    =
-  Cached.transform cached ~f:transform_cached
-  |> Cached.sequence_deferred
-  >>= Fn.compose transform_result Cached.sequence_result
-
 (* add a breadcrumb and perform post processing *)
-let add_and_finalize ~logger ~frontier ~catchup_scheduler
+let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
     ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let module Inclusion_time = Mina_metrics.Block_latency.Inclusion_time in
-  let breadcrumb =
-    if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
-    else Cached.invalidate_with_success cached_breadcrumb
-  in
+  let breadcrumb = Cached.peek cached_breadcrumb in
   let consensus_constants = precomputed_values.consensus_constants in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
@@ -83,6 +74,9 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       let%map () = Transition_frontier.add_breadcrumb_exn frontier breadcrumb in
       true
   in
+  if not (Cached.is_pure cached_breadcrumb) then
+    Block_registry.finish block_registry cached_breadcrumb
+      (if added then `Added else `Ignored) ;
   Block_outcome_log.record (fun () ->
       Frontier_add
         { state_hash; source = (source :> Block_outcome_log.source); added } ) ;
@@ -103,7 +97,9 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       in
       Inclusion_time.update (Block_time.Span.to_time_span time_elapsed) ) ;
   [%log internal] "Add_and_finalize_done" ;
-  if Writer.is_closed processed_transition_writer then
+  (* Only an added block is passed on, to be answered and rebroadcast. *)
+  if not added then Ok ()
+  else if Writer.is_closed processed_transition_writer then
     Or_error.error_string "processed transitions closed"
   else (
     Writer.write processed_transition_writer
@@ -112,7 +108,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       ~hash:(Mina_block.Validated.state_hash transition) )
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~get_completed_work ~frontier ~catchup_scheduler
+    ~verifier ~get_completed_work ~frontier ~block_registry ~catchup_scheduler
     ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
     ?transaction_pool_proxy =
   let is_block_in_frontier =
@@ -208,10 +204,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         | Ok t ->
             return (Ok t)
         | Error `Not_selected_over_frontier_root ->
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
             let%map () = handle_not_selected () in
             Error ()
         | Error `Already_in_frontier ->
@@ -220,10 +214,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             [%log warn] ~metadata
               "Refusing to process the transition with hash $state_hash \
                because is is already in the transition frontier" ;
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
             return (Error ())
         | Error `Parent_missing_from_frontier -> (
             [%log internal] "Schedule_catchup" ;
@@ -260,49 +252,54 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               "Refusing to process the transition with hash $state_hash \
                because parent is missing from the transition frontier \
                (unexpected case, there is likely a bug somewhere)" ;
-            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-              Cached.invalidate_with_failure
-                cached_initially_validated_transition
-            in
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
             Deferred.return (Error ())
         | Some x ->
             return x
       in
       let%bind breadcrumb =
-        cached_transform_deferred_result cached_initially_validated_transition
-          ~transform_cached:(fun _ ->
-            Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-              ~verifier ~get_completed_work ~trust_system
-              ~transition_receipt_time ~sender:(Some sender)
-              ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
-          ~transform_result:(function
-            | Error (`Invalid_staged_ledger_hash error)
-            | Error (`Invalid_staged_ledger_diff error) ->
-                Internal_tracing.with_state_hash state_hash
-                @@ fun () ->
-                [%log internal] "Failure"
-                  ~metadata:[ ("reason", `String (Error.to_string_hum error)) ] ;
-                [%log error]
-                  ~metadata:
-                    (metadata @ [ ("error", Error_json.error_to_yojson error) ])
-                  "Error while building breadcrumb in the transition handler \
-                   processor: $error" ;
-                Deferred.return (Error ())
-            | Error (`Fatal_error exn) ->
-                Internal_tracing.with_state_hash state_hash
-                @@ fun () ->
-                [%log internal] "Failure"
-                  ~metadata:[ ("reason", `String "Fatal error") ] ;
-                raise exn
-            | Ok breadcrumb ->
-                Deferred.return (Ok breadcrumb) )
+        let%bind.Deferred result =
+          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
+            ~verifier ~get_completed_work ~trust_system ~transition_receipt_time
+            ~sender:(Some sender) ~parent:parent_breadcrumb
+            ~transition:mostly_validated_transition ?transaction_pool_proxy
+            (* TODO: Can we skip here? *) ()
+        in
+        match result with
+        | Error (`Invalid_staged_ledger_hash error)
+        | Error (`Invalid_staged_ledger_diff error) ->
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String (Error.to_string_hum error)) ] ;
+            [%log error]
+              ~metadata:
+                (metadata @ [ ("error", Error_json.error_to_yojson error) ])
+              "Error while building breadcrumb in the transition handler \
+               processor: $error" ;
+            Deferred.return (Error ())
+        | Error (`Fatal_error exn) ->
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Fatal error") ] ;
+            raise exn
+        | Ok breadcrumb ->
+            Deferred.return
+              (Ok
+                 (Cached.transform cached_initially_validated_transition
+                    ~f:(fun _ -> breadcrumb) ) )
       in
       Mina_metrics.(
         Counter.inc_one
           Transition_frontier_controller.breadcrumbs_built_by_processor) ;
       let%map.Deferred result =
-        add_and_finalize ~logger ~frontier ~catchup_scheduler
+        add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
           ~processed_transition_writer ~only_if_present:false ~time_controller
           ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb
       in
@@ -315,18 +312,18 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       Result.return result
 
 let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier ~get_completed_work ~catchup_scheduler
-    ~processed_transition_writer ?transaction_pool_proxy () =
+    ~time_controller ~frontier ~get_completed_work ~block_registry
+    ~catchup_scheduler ~processed_transition_writer ?transaction_pool_proxy () =
   let open Context in
   let add_and_finalize =
-    add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
-      ~time_controller ~precomputed_values
+    add_and_finalize ~frontier ~block_registry ~catchup_scheduler
+      ~processed_transition_writer ~time_controller ~precomputed_values
   in
   let process_transition =
     process_transition
       ~context:(module Context)
-      ~get_completed_work ~trust_system ~verifier ~frontier ~catchup_scheduler
-      ~processed_transition_writer ~time_controller
+      ~get_completed_work ~trust_system ~verifier ~frontier ~block_registry
+      ~catchup_scheduler ~processed_transition_writer ~time_controller
   in
   fun msg ->
     let open Deferred.Let_syntax in
@@ -367,10 +364,8 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 List.iter breadcrumb_subtrees ~f:(fun tree ->
                     Mina_stdlib.Rose_tree.iter tree
                       ~f:(fun (cached_breadcrumb, _vc) ->
-                        let (_ : Transition_frontier.Breadcrumb.t) =
-                          Cached.invalidate_with_failure cached_breadcrumb
-                        in
-                        () ) ) ;
+                        Block_registry.finish block_registry cached_breadcrumb
+                          `Ignored ) ) ;
                 [%log error]
                   "Error, failed to attach all catchup breadcrumbs to \
                    transition frontier: $error"
@@ -520,29 +515,36 @@ let%test_module "Transition_handler.Processor tests" =
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
-    (* The handler for [frontier], with the pipes it writes to buffering up
-       to [capacity] items unread. *)
-    let handler_for frontier ~capacity =
+    (* The handler for [frontier] and [block_registry], with the pipes it
+       writes to buffering up to [capacity] items unread. *)
+    let handler_for
+        ?(block_registry = Block_registry.create ~logger ~cache_exceptions:true)
+        ?processed_transition_writer frontier ~capacity =
       let _, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
       in
       let _, catchup_breadcrumbs_writer =
         Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
       in
-      let _, processed_transition_writer =
-        Strict_pipe.create
-          (Buffered (`Capacity capacity, `Overflow (Drop_head ignore)))
+      let processed_transition_writer =
+        match processed_transition_writer with
+        | Some writer ->
+            writer
+        | None ->
+            snd
+              (Strict_pipe.create
+                 (Buffered (`Capacity capacity, `Overflow (Drop_head ignore))) )
       in
       let catchup_scheduler =
         Catchup_scheduler.create ~logger ~precomputed_values ~verifier
-          ~trust_system ~frontier ~time_controller ~catchup_job_writer
-          ~catchup_breadcrumbs_writer
+          ~block_registry ~trust_system ~frontier ~time_controller
+          ~catchup_job_writer ~catchup_breadcrumbs_writer
       in
       create_handler
         ~context:(module Context)
         ~time_controller ~verifier ~get_completed_work:(Fn.const None)
-        ~trust_system ~frontier ~catchup_scheduler ~processed_transition_writer
-        ?transaction_pool_proxy:None ()
+        ~trust_system ~frontier ~block_registry ~catchup_scheduler
+        ~processed_transition_writer ?transaction_pool_proxy:None ()
 
     (* A frontier holding just a root, and a chain of breadcrumbs on it. *)
     let gen_frontier_and_chain =
@@ -613,6 +615,156 @@ let%test_module "Transition_handler.Processor tests" =
                  ; Frontier_add { state_hash; source = `Catchup; added = true }
                  ] ) ) )
 
+    let%test_unit "A block already in the frontier is answered Ignore" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let answers =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let handle =
+                  handler_for ~block_registry frontier
+                    ~capacity:(List.length chain)
+                in
+                let%bind () =
+                  Deferred.List.iter chain ~f:(fun breadcrumb ->
+                      handle (`Local_breadcrumb (Cached.pure breadcrumb)) )
+                in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let cached =
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb (List.hd_exn chain))
+                    ~valid_cb:(Some valid_cb)
+                in
+                let%map () =
+                  handle
+                    (`Partially_valid_transition
+                      (`Block cached, `Valid_cb (Some valid_cb)) )
+                in
+                List.rev !answers )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Ignore ] )
+
+    let%test_unit "A catchup block whose parent is not in the frontier is \
+                   ignored, not passed on" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          (* The second block in the chain, whose parent was never added. *)
+          let breadcrumb = List.nth_exn chain 1 in
+          let (answers, processed), outcomes =
+            Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred
+                @@ fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let processed_reader, processed_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
+                in
+                let handle =
+                  handler_for ~block_registry ~processed_transition_writer
+                    frontier ~capacity:1
+                in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let cached =
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb breadcrumb)
+                    ~valid_cb:(Some valid_cb)
+                  |> Cached.transform ~f:(fun _ -> breadcrumb)
+                in
+                let subtree =
+                  Mina_stdlib.Rose_tree.of_non_empty_list
+                    (Mina_stdlib.Nonempty_list.singleton (cached, Some valid_cb))
+                in
+                let%bind () =
+                  handle
+                    (`Catchup_breadcrumbs
+                      ([ subtree ], `Ledger_catchup (Ivar.create ())) )
+                in
+                Strict_pipe.Writer.close processed_transition_writer ;
+                let processed = ref 0 in
+                let%map () =
+                  Strict_pipe.Reader.iter processed_reader ~f:(fun _ ->
+                      incr processed ; Deferred.unit )
+                in
+                (List.rev !answers, !processed) )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Ignore ] ;
+          [%test_eq: int] processed 0 ;
+          let state_hash = state_hash breadcrumb in
+          [%test_eq: Block_outcome_log.event list] outcomes
+            [ Block_outcome_log.Cache_removed { state_hash; outcome = `Failure }
+            ; Frontier_add { state_hash; source = `Catchup; added = false }
+            ] )
+
+    let%test_unit "Catchup blocks finish once when passing them on fails" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let first, second =
+            match chain with
+            | first :: second :: _ ->
+                (first, second)
+            | _ ->
+                assert false
+          in
+          let (), outcomes =
+            Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred
+                @@ fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                (* Closed, as Clear leaves it, so passing on a block fails. *)
+                let _, processed_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
+                in
+                Strict_pipe.Writer.close processed_transition_writer ;
+                let handle =
+                  handler_for ~block_registry ~processed_transition_writer
+                    frontier ~capacity:1
+                in
+                let cached breadcrumb =
+                  ( Block_registry.register_exn block_registry
+                      (downcast_breadcrumb breadcrumb)
+                      ~valid_cb:None
+                    |> Cached.transform ~f:(fun _ -> breadcrumb)
+                  , None )
+                in
+                let subtree =
+                  Mina_stdlib.Rose_tree.T
+                    ( cached first
+                    , [ Mina_stdlib.Rose_tree.T (cached second, []) ] )
+                in
+                handle
+                  (`Catchup_breadcrumbs
+                    ([ subtree ], `Ledger_catchup (Ivar.create ())) ) )
+          in
+          let first = state_hash first and second = state_hash second in
+          [%test_eq: Block_outcome_log.event list] outcomes
+            [ Block_outcome_log.Cache_removed
+                { state_hash = first; outcome = `Consumed }
+            ; Frontier_add
+                { state_hash = first; source = `Catchup; added = true }
+            ; Cache_removed { state_hash = second; outcome = `Failure }
+            ] )
+
     let%test_unit "adding transitions whose parents are in the frontier" =
       let frontier_size = 1 in
       let branch_size = 10 in
@@ -646,22 +798,22 @@ let%test_module "Transition_handler.Processor tests" =
                     (Buffered
                        (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
-                let cache =
-                  Unprocessed_transition_cache.create ~logger
-                    ~cache_exceptions:true
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
                 in
+                let cache = Block_registry.cache block_registry in
                 let catchup_scheduler =
                   Catchup_scheduler.create ~logger ~precomputed_values ~verifier
-                    ~trust_system ~frontier ~time_controller ~catchup_job_writer
-                    ~catchup_breadcrumbs_writer
+                    ~block_registry ~trust_system ~frontier ~time_controller
+                    ~catchup_job_writer ~catchup_breadcrumbs_writer
                 in
                 let handle =
                   create_handler
                     ~context:(module Context)
                     ~time_controller ~verifier
                     ~get_completed_work:(Fn.const None) ~trust_system ~frontier
-                    ~catchup_scheduler ~processed_transition_writer
-                    ?transaction_pool_proxy:None ()
+                    ~block_registry ~catchup_scheduler
+                    ~processed_transition_writer ?transaction_pool_proxy:None ()
                 in
                 don't_wait_for
                   (Strict_pipe.Reader.Merge.iter

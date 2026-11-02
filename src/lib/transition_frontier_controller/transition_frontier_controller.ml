@@ -24,6 +24,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
+  let block_registry =
+    Transition_handler.Block_registry.create ~logger ~cache_exceptions
+  in
   let f_drop_head name head valid_cb =
     let hashes =
       match head with
@@ -34,17 +37,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           With_hash.hash @@ Validation.header_with_hash
           @@ Network_peer.Envelope.Incoming.data h
     in
-    Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
-      ~logger ;
     match head with
     | `Block b ->
-        let (_ : Mina_block.initial_valid_block Network_peer.Envelope.Incoming.t)
-            =
-          Cache_lib.Cached.invalidate_with_failure b
-        in
-        ()
+        (* Dropping a block for want of room says nothing about the peer that
+           sent it, so it is ignored rather than rejected. *)
+        Mina_block.handle_dropped_transition hashes ~pipe_name:name ~logger ;
+        Transition_handler.Block_registry.finish block_registry b `Ignored
     | `Header _ ->
-        ()
+        Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
+          ~logger
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
@@ -76,10 +77,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     Strict_pipe.create ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  let unprocessed_transition_cache =
-    Transition_handler.Unprocessed_transition_cache.create ~logger
-      ~cache_exceptions
-  in
   List.iter collected_transitions ~f:(fun (t, vc) ->
       let b_or_h =
         match Network_peer.Envelope.Incoming.data t with
@@ -88,9 +85,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              * registering these will not fail, so long as there
              * are no duplicates in the list *)
             `Block
-              ( Transition_handler.Unprocessed_transition_cache.register_exn
-                  unprocessed_transition_cache
-              @@ Network_peer.Envelope.Incoming.map ~f:(const b) t )
+              (Transition_handler.Block_registry.register_exn block_registry
+                 (Network_peer.Envelope.Incoming.map ~f:(const b) t)
+                 ~valid_cb:vc )
         | `Header h ->
             `Header (Network_peer.Envelope.Incoming.map ~f:(const h) t)
       in
@@ -130,21 +127,22 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~on_valid:(fun transition ->
         Transition_handler.Block_dispatcher.submit dispatcher
           (Validated transition) )
-      ~unprocessed_transition_cache
+      ~block_registry
   in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Pipe_lib.Choosable_synchronous_pipe.iter network_transition_reader
         ~f:validate_transition ) ;
   let catchup_scheduler =
     Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
-      ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
-      ~catchup_breadcrumbs_writer
+      ~block_registry ~verifier ~trust_system ~frontier ~time_controller
+      ~catchup_job_writer ~catchup_breadcrumbs_writer
   in
   let process_message =
     Transition_handler.Processor.create_handler
       ~context:(module Context)
       ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
-      ~catchup_scheduler ~processed_transition_writer ?transaction_pool_proxy ()
+      ~block_registry ~catchup_scheduler ~processed_transition_writer
+      ?transaction_pool_proxy ()
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Strict_pipe.Reader.Merge.iter
@@ -159,7 +157,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Ledger_catchup.create_job_handler
            ~context:(module Context)
            ~trust_system ~verifier ~network ~frontier
-           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+           ~catchup_breadcrumbs_writer ~block_registry
            ~schedule:(fun resume ->
              Transition_handler.Block_dispatcher.submit dispatcher
                (Resume_catchup resume) ) )

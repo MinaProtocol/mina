@@ -42,8 +42,7 @@ val create_job_handler :
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
        Strict_pipe.Writer.t
-  -> unprocessed_transition_cache:
-       Transition_handler.Unprocessed_transition_cache.t
+  -> block_registry:Transition_handler.Block_registry.t
   -> schedule:((unit -> unit) -> unit)
   -> (   State_hash.t
          * ( ( Mina_block.initial_valid_block Envelope.Incoming.t

@@ -154,8 +154,8 @@ let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   >>| List.zip_exn blocks >>| List.map ~f
 
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
-    enveloped_transition =
+    ~frontier ~block_registry ~slot_tx_end ~slot_chain_end enveloped_transition
+    =
   let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
@@ -171,7 +171,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     in
     Transition_handler.Validator.validate_transition_is_relevant
       ~context:(module Context)
-      ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+      ~frontier ~block_registry ~valid_cb:None ~slot_tx_end ~slot_chain_end
       enveloped_initially_validated_transition
   in
   let state_hash =
@@ -618,8 +618,8 @@ module Verify_work_batcher = struct
 end
 
 let initial_validate ~context:(module Context : CONTEXT) ~trust_system
-    ~(batcher : _ Initial_validate_batcher.t) ~frontier
-    ~unprocessed_transition_cache transition =
+    ~(batcher : _ Initial_validate_batcher.t) ~frontier ~block_registry
+    transition =
   let open Context in
   let verification_start_time = Core.Time.now () in
   let open Deferred.Result.Let_syntax in
@@ -686,8 +686,7 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
   in
   verify_transition
     ~context:(module Context)
-    ~trust_system ~frontier ~unprocessed_transition_cache ~slot_tx_end
-    ~slot_chain_end tv
+    ~trust_system ~frontier ~block_registry ~slot_tx_end ~slot_chain_end tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base
@@ -808,7 +807,7 @@ let create_resumption_queue ~schedule ~finished resumption =
   schedule (fun () -> if Ivar.is_empty finished then resumption ())
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
-    ~schedule ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
+    ~schedule ~downloader ~trust_system ~frontier ~block_registry
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -901,7 +900,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           ( initial_validate
               ~context:(module Context)
               ~trust_system ~batcher:initial_validation_batcher ~frontier
-              ~unprocessed_transition_cache
+              ~block_registry
               { external_block with
                 data =
                   { With_hash.data = external_block.data; hash = state_hash }
@@ -934,13 +933,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
            | Error _ ->
                (* TODO consider rejecting the callback in some cases,
                   see https://github.com/MinaProtocol/mina/issues/11087 *)
-               Option.value_map valid_cb ~default:ignore
-                 ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                 `Ignore ;
-               if not (Cached.was_consumed av) then
-                 ignore
-                   ( Cached.invalidate_with_failure av
-                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+               Transition_handler.Block_registry.finish block_registry av
+                 `Ignored ;
                finish t node ~is_error:true ;
                Error `Finished )
           ~f:(on_parent_added node (av, valid_cb))
@@ -1060,11 +1054,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                   record trust_system logger peer
                     Actions.(Sent_invalid_proof, None))
                 |> don't_wait_for ) ;
-            Option.value_map valid_cb ~default:ignore
-              ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Reject ;
-            ignore
-              ( Cached.invalidate_with_failure tv
-                : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+            Transition_handler.Block_registry.finish block_registry tv `Rejected ;
             failed node ~sender `Verify
         | Ok av ->
             let av =
@@ -1085,11 +1075,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
            see https://github.com/MinaProtocol/mina/issues/11087 *)
-        Option.value_map valid_cb ~default:ignore
-          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
-        ignore
-          ( Cached.invalidate_with_failure c
-            : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+        Transition_handler.Block_registry.finish block_registry c `Ignored ;
         let e =
           match e with
           | `Exn e ->
@@ -1138,8 +1124,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
 (** Set up super catchup for [frontier], and return the function that handles
     one catchup job. *)
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~frontier ~build_func ~unprocessed_transition_cache
-    ~schedule
+    ~verifier ~network ~frontier ~build_func ~block_registry ~schedule
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
@@ -1244,8 +1229,8 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   let run_state_machine =
     setup_state_machine_runner ~t ~verifier ~schedule ~downloader
       ~context:(module Context)
-      ~trust_system ~frontier ~unprocessed_transition_cache
-      ~catchup_breadcrumbs_writer ~build_func
+      ~trust_system ~frontier ~block_registry ~catchup_breadcrumbs_writer
+      ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
@@ -1386,13 +1371,11 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
             List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
+                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, _vc) ->
                     (* TODO consider rejecting the callback in some cases,
                        see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore @@ Cached.invalidate_with_failure node ) )
+                    Transition_handler.Block_registry.finish block_registry node
+                      `Ignored ) )
         | Ok (root, state_hashes) ->
             [%log' debug t.logger]
               ~metadata:
@@ -1595,16 +1578,15 @@ let%test_module "Ledger_catchup tests" =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Crash))
       in
-      let unprocessed_transition_cache =
-        Transition_handler.Unprocessed_transition_cache.create ~logger
-          ~cache_exceptions:true
+      let block_registry =
+        Transition_handler.Block_registry.create ~logger ~cache_exceptions:true
       in
       don't_wait_for
         (let%bind process_catchup_job =
            create_job_handler
              ~context:(module Context)
              ~verifier ~trust_system ~network ~frontier
-             ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+             ~catchup_breadcrumbs_writer ~block_registry
              ~build_func:
                (Transition_frontier.Breadcrumb.build
                   ~get_completed_work:(Fn.const None) )
@@ -1614,7 +1596,7 @@ let%test_module "Ledger_catchup tests" =
          in
          Strict_pipe.Reader.iter_without_pushback catchup_job_reader
            ~f:process_catchup_job ) ;
-      { cache = unprocessed_transition_cache
+      { cache = Transition_handler.Block_registry.cache block_registry
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
       }
