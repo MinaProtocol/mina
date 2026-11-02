@@ -12,6 +12,8 @@ module type Full = sig
         ; fee_transfer : Fee_transfer.Stable.V1.t option
         }
       [@@deriving sexp, bin_io, compare, equal, version, hash, yojson]
+
+      val to_latest : t -> t
     end
 
     module Latest = V1
