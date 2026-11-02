@@ -76,9 +76,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     Strict_pipe.create ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
+  let block_registry =
+    Transition_handler.Block_registry.create ~logger ~cache_exceptions
+  in
   let unprocessed_transition_cache =
-    Transition_handler.Unprocessed_transition_cache.create ~logger
-      ~cache_exceptions
+    Transition_handler.Block_registry.cache block_registry
   in
   List.iter collected_transitions ~f:(fun (t, vc) ->
       let b_or_h =
@@ -88,9 +90,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              * registering these will not fail, so long as there
              * are no duplicates in the list *)
             `Block
-              ( Transition_handler.Unprocessed_transition_cache.register_exn
-                  unprocessed_transition_cache
-              @@ Network_peer.Envelope.Incoming.map ~f:(const b) t )
+              (Transition_handler.Block_registry.register_exn block_registry
+                 (Network_peer.Envelope.Incoming.map ~f:(const b) t)
+                 ~valid_cb:vc )
         | `Header h ->
             `Header (Network_peer.Envelope.Incoming.map ~f:(const h) t)
       in
