@@ -84,7 +84,7 @@ module Pre_diff_two = struct
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_two.Stable.V1.t
-        ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        ; internal_command_statuses : Transaction_status.Stable.V3.t list
         }
       [@@deriving equal, compare, sexp, yojson]
     end
@@ -116,7 +116,7 @@ module Pre_diff_one = struct
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
-        ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        ; internal_command_statuses : Transaction_status.Stable.V3.t list
         }
       [@@deriving equal, compare, sexp, yojson]
     end

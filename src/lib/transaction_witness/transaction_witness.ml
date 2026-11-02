@@ -31,7 +31,7 @@ module Zkapp_command_segment_witness = struct
             , bool
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , Mina_numbers.Index.Stable.V1.t
-            , Transaction_status.Failure.Collection.Stable.V1.t )
+            , Transaction_status.Failure.Collection.Stable.V2.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
             ( Zkapp_command.Stable.V2.t
@@ -69,7 +69,7 @@ module Zkapp_command_segment_witness = struct
             , bool
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , Mina_numbers.Index.Stable.V1.t
-            , Transaction_status.Failure.Collection.Stable.V1.t )
+            , Transaction_status.Failure.Collection.Stable.V2.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
             ( Zkapp_command.Stable.V2.t
@@ -208,7 +208,7 @@ module Stable = struct
       ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V4.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V4.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-      ; status : Mina_base.Transaction_status.Stable.V2.t
+      ; status : Mina_base.Transaction_status.Stable.V3.t
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       }
     [@@deriving sexp, yojson]
@@ -223,7 +223,7 @@ module Stable = struct
       ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V4.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V3.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-      ; status : Mina_base.Transaction_status.Stable.V2.t
+      ; status : Mina_base.Transaction_status.Stable.V3.t
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       }
     [@@deriving sexp, yojson]

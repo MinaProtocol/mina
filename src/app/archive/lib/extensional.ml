@@ -38,7 +38,7 @@ module User_command = struct
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
         ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
-        ; failure_reason : Transaction_status.Failure.Stable.V2.t option
+        ; failure_reason : Transaction_status.Failure.Stable.V3.t option
         }
       [@@deriving yojson, equal]
 
@@ -70,7 +70,7 @@ module Internal_command = struct
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
         ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
-        ; failure_reason : Transaction_status.Failure.Stable.V2.t option
+        ; failure_reason : Transaction_status.Failure.Stable.V3.t option
         }
       [@@deriving yojson, equal]
 
@@ -97,7 +97,7 @@ module Zkapp_command = struct
               [@of_yojson Transaction_hash.of_yojson]
         ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reasons :
-            Transaction_status.Failure.Collection.Display.Stable.V1.t option
+            Transaction_status.Failure.Collection.Display.Stable.V2.t option
         }
       [@@deriving yojson, equal]
 

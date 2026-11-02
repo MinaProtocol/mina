@@ -3,8 +3,8 @@ open Core_kernel
 module Failure = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Transaction_status.Failure.V3.t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
@@ -46,6 +46,7 @@ module Failure = struct
         | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Unexpected_verification_key_hash
+        | Proof_with_outdated_verification_key
         | Valid_while_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
@@ -60,8 +61,8 @@ module Failure = struct
     module Display = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
-          type t = (int * Stable.V2.t list) list
+        module V2 = struct
+          type t = (int * Stable.V3.t list) list
           [@@deriving equal, compare, yojson, sexp, hash]
 
           let to_latest = Fn.id
@@ -71,8 +72,8 @@ module Failure = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Stable.V2.t list list
+      module V2 = struct
+        type t = Stable.V3.t list list
         [@@deriving equal, compare, yojson, sexp, hash]
 
         let to_latest = Fn.id
@@ -130,7 +131,8 @@ module Failure = struct
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add
       ~valid_while_precondition_unsatisfied:add
-      ~unexpected_verification_key_hash:add ~incorrect_nonce:add
+      ~unexpected_verification_key_hash:add
+      ~proof_with_outdated_verification_key:add ~incorrect_nonce:add
       ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
@@ -220,6 +222,8 @@ module Failure = struct
         "Valid_while_precondition_unsatisfied"
     | Unexpected_verification_key_hash ->
         "Unexpected_verification_key_hash"
+    | Proof_with_outdated_verification_key ->
+        "Proof_with_outdated_verification_key"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
@@ -310,6 +314,8 @@ module Failure = struct
         Ok Valid_while_precondition_unsatisfied
     | "Unexpected_verification_key_hash" ->
         Ok Unexpected_verification_key_hash
+    | "Proof_with_outdated_verification_key" ->
+        Ok Proof_with_outdated_verification_key
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -458,6 +464,9 @@ module Failure = struct
     | Unexpected_verification_key_hash ->
         "The account update's verification key hash does not match the \
          verification key in the ledger account"
+    | Proof_with_outdated_verification_key ->
+        "The account update is authorized by a proof, but the ledger account's \
+         verification key was set under an older transaction version"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->
@@ -470,10 +479,10 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t = Mina_wire_types.Mina_base.Transaction_status.V2.t =
+  module V3 = struct
+    type t = Mina_wire_types.Mina_base.Transaction_status.V3.t =
       | Applied
-      | Failed of Failure.Collection.Stable.V1.t
+      | Failed of Failure.Collection.Stable.V2.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id

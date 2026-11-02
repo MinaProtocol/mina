@@ -33,7 +33,7 @@ module Local_state = struct
         , bool
         , Mina_base.Zkapp_command.Transaction_commitment.V1.t
         , Mina_numbers.Index.V1.t
-        , Mina_base.Transaction_status.Failure.Collection.V1.t )
+        , Mina_base.Transaction_status.Failure.Collection.V2.t )
         V1.t
     end
   end

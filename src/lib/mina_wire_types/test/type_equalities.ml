@@ -270,14 +270,14 @@ module Mina_base = struct
       (W.Pending_coinbase.Hash_versioned)
   include Assert_equal0V2 (O.Fee_excess.Stable) (W.Fee_excess)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Transaction_status.Failure.Stable)
       (W.Transaction_status.Failure)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Transaction_status.Failure.Collection.Stable)
       (W.Transaction_status.Failure.Collection)
-  include Assert_equal0V2 (O.Transaction_status.Stable) (W.Transaction_status)
+  include Assert_equal0V3 (O.Transaction_status.Stable) (W.Transaction_status)
   include Assert_equal1V2 (O.With_status.Stable) (W.With_status)
   include
     Assert_equal0V1
