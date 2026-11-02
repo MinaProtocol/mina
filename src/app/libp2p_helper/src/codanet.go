@@ -247,13 +247,14 @@ type Helper struct {
 	HeartbeatPeer     func(peer.ID)
 	peerstoreDs       *dsb.Datastore
 	dhtDs             *dsb.Datastore
+	blockStorage      *BitswapStorageLmdb
 	closeOnce         sync.Once
 	closeErr          error
 }
 
-// Close shuts down the DHT and the host, and then closes the datastores they
-// write to. It returns the first error it meets, but carries on closing the
-// rest. Calls after the first return the first call's result.
+// Close shuts down bitswap, the DHT and the host, and then closes the
+// datastores they write to. It returns the first error it meets, but carries
+// on closing the rest. Calls after the first return the first call's result.
 func (h *Helper) Close() error {
 	h.closeOnce.Do(func() {
 		record := func(err error) {
@@ -261,10 +262,12 @@ func (h *Helper) Close() error {
 				h.closeErr = err
 			}
 		}
+		record(h.Bitswap.Close())
 		if h.Dht != nil {
 			record(h.Dht.Close())
 		}
 		record(h.Host.Close())
+		h.blockStorage.Close()
 		record(h.peerstoreDs.Close())
 		record(h.dhtDs.Close())
 	})
@@ -840,8 +843,9 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			lanPatcher.Heartbeat(p)
 			wanPatcher.Heartbeat(p)
 		},
-		peerstoreDs: ds,
-		dhtDs:       dsDht,
+		peerstoreDs:  ds,
+		blockStorage: bstore,
+		dhtDs:        dsDht,
 	}
 
 	// The peerstore persists across restarts, so it may still hold
