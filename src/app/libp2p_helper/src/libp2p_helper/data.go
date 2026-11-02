@@ -102,9 +102,12 @@ type mdnsListener struct {
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
-	l.FoundPeer <- peerDiscovery{
+	select {
+	case l.FoundPeer <- peerDiscovery{
 		info:   info,
 		source: PEER_DISCOVERY_SOURCE_MDNS,
+	}:
+	case <-l.app.Ctx.Done():
 	}
 }
 
