@@ -875,7 +875,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     let state_hash = node.state_hash in
     let failed = failed node in
     let step d = step node d in
-    let retry () = retry node in
     let open Deferred.Result.Let_syntax in
     match node.state with
     | Failed | Finished | Root _ ->
@@ -902,65 +901,21 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         in
         on_initial_validated node ~start_time ~sender:external_block.sender
           result
-    | To_verify (tv, valid_cb) -> (
+    | To_verify (tv, valid_cb) ->
         [%log debug] "To_verify $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         let start_time = Time.now () in
         let iv = Cached.peek tv in
         (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
-        match%bind
+        let%bind result =
           step
             (* TODO: give the batch verifier a way to somehow throw away stuff if
                this node gets removed from the tree. *)
             ( Verify_work_batcher.verify verify_work_batcher iv
             |> Deferred.map ~f:Result.return )
-        with
-        | Error _e ->
-            [%log' debug t.logger] "Couldn't reach verifier. Retrying"
-              ~metadata:[ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
-            (* No need to redownload in this case. We just wait a little and try again. *)
-            retry ()
-        | Ok result -> (
-            Mina_metrics.(
-              Gauge.set Catchup.verification_time
-                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-            match result with
-            | Error err ->
-                [%log' warn t.logger] "verification failed! redownloading"
-                  ~metadata:
-                    [ ("state_hash", State_hash.to_yojson node.state_hash)
-                    ; ( "error"
-                      , Error_json.error_to_yojson
-                          (Verifier.invalid_to_error err) )
-                    ] ;
-                ( match iv.sender with
-                | Local ->
-                    ()
-                | Remote peer ->
-                    Trust_system.(
-                      record trust_system logger peer
-                        Actions.(Sent_invalid_proof, None))
-                    |> don't_wait_for ) ;
-                Option.value_map valid_cb ~default:ignore
-                  ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                  `Reject ;
-                ignore
-                  ( Cached.invalidate_with_failure tv
-                    : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
-                failed ~sender:iv.sender `Verify
-            | Ok av ->
-                let av =
-                  { av with
-                    data =
-                      Mina_block.Validation
-                      .skip_frontier_dependencies_validation
-                        `This_block_belongs_to_a_detached_subtree av.data
-                  }
-                in
-                let av = Cached.transform tv ~f:(fun _ -> av) in
-                set_state t node (Wait_for_parent (av, valid_cb)) ;
-                run_node node ) )
+        in
+        on_verified node ~start_time ~sender:iv.sender (tv, valid_cb) result
     | Wait_for_parent (av, valid_cb) ->
         [%log debug] "Wait_for_parent $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
@@ -1119,6 +1074,53 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             (* To_initial_validate may only occur for a downloaded block,
                hence there is no validation callback *)
             set_state t node (To_verify (tv, None)) ;
+            run_node node )
+  and on_verified node ~start_time ~sender (tv, valid_cb) result =
+    let failed = failed node in
+    let retry () = retry node in
+    match result with
+    | Error _e ->
+        [%log' debug t.logger] "Couldn't reach verifier. Retrying"
+          ~metadata:[ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
+        (* No need to redownload in this case. We just wait a little and try again. *)
+        retry ()
+    | Ok result -> (
+        Mina_metrics.(
+          Gauge.set Catchup.verification_time
+            Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+        match result with
+        | Error err ->
+            [%log' warn t.logger] "verification failed! redownloading"
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson node.state_hash)
+                ; ( "error"
+                  , Error_json.error_to_yojson (Verifier.invalid_to_error err)
+                  )
+                ] ;
+            ( match sender with
+            | Local ->
+                ()
+            | Remote peer ->
+                Trust_system.(
+                  record trust_system logger peer
+                    Actions.(Sent_invalid_proof, None))
+                |> don't_wait_for ) ;
+            Option.value_map valid_cb ~default:ignore
+              ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Reject ;
+            ignore
+              ( Cached.invalidate_with_failure tv
+                : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+            failed ~sender `Verify
+        | Ok av ->
+            let av =
+              { av with
+                data =
+                  Mina_block.Validation.skip_frontier_dependencies_validation
+                    `This_block_belongs_to_a_detached_subtree av.data
+              }
+            in
+            let av = Cached.transform tv ~f:(fun _ -> av) in
+            set_state t node (Wait_for_parent (av, valid_cb)) ;
             run_node node )
   in
   run_node
