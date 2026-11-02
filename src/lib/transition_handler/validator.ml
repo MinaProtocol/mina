@@ -140,173 +140,280 @@ let validate_transition_or_header_is_relevant
            ~context:(module Context)
            ~slot_chain_end ~frontier header_with_hash
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
-    ~frontier ~transition_reader ~valid_transition_writer
+(** Return the function that validates one incoming block or header against
+    [frontier], writing it to [valid_transition_writer] if it is relevant. *)
+let create_handler ~context:(module Context : CONTEXT) ~trust_system
+    ~time_controller ~frontier ~valid_transition_writer
     ~unprocessed_transition_cache =
   let open Context in
   let module Lru = Core_extended_cache.Lru in
   let outdated_root_cache = Lru.create ~destruct:None 1000 in
-  O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
-      Pipe_lib.Choosable_synchronous_pipe.iter transition_reader
-        ~f:(fun (b_or_h, `Valid_cb vc) ->
-          let header_with_hash, sender =
-            match b_or_h with
-            | `Block b ->
-                let block_with_hash, _ = Envelope.Incoming.data b in
-                ( With_hash.map ~f:Mina_block.header block_with_hash
-                , Envelope.Incoming.sender b )
-            | `Header h ->
-                let header_with_hash, _ = Envelope.Incoming.data h in
-                (header_with_hash, Envelope.Incoming.sender h)
-          in
-          let header = With_hash.data header_with_hash in
-          let transition_hash =
-            State_hash.With_state_hashes.state_hash header_with_hash
-          in
-          Internal_tracing.Context_call.with_call_id
-            ~tag:"transition_handler_validator"
-          @@ fun () ->
-          Internal_tracing.with_state_hash transition_hash
-          @@ fun () ->
-          let slot_tx_end =
-            Runtime_config.slot_tx_end
-              precomputed_values.Precomputed_values.runtime_config
-          in
-          let slot_chain_end =
-            Runtime_config.slot_chain_end precomputed_values.runtime_config
-          in
-          match
-            validate_transition_or_header_is_relevant
-              ~context:(module Context)
-              ~frontier ~unprocessed_transition_cache ~slot_tx_end
-              ~slot_chain_end b_or_h
+  fun (b_or_h, `Valid_cb vc) ->
+    let header_with_hash, sender =
+      match b_or_h with
+      | `Block b ->
+          let block_with_hash, _ = Envelope.Incoming.data b in
+          ( With_hash.map ~f:Mina_block.header block_with_hash
+          , Envelope.Incoming.sender b )
+      | `Header h ->
+          let header_with_hash, _ = Envelope.Incoming.data h in
+          (header_with_hash, Envelope.Incoming.sender h)
+    in
+    let header = With_hash.data header_with_hash in
+    let transition_hash =
+      State_hash.With_state_hashes.state_hash header_with_hash
+    in
+    Internal_tracing.Context_call.with_call_id
+      ~tag:"transition_handler_validator"
+    @@ fun () ->
+    Internal_tracing.with_state_hash transition_hash
+    @@ fun () ->
+    let slot_tx_end =
+      Runtime_config.slot_tx_end
+        precomputed_values.Precomputed_values.runtime_config
+    in
+    let slot_chain_end =
+      Runtime_config.slot_chain_end precomputed_values.runtime_config
+    in
+    match
+      validate_transition_or_header_is_relevant
+        ~context:(module Context)
+        ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+        b_or_h
+    with
+    | Ok b_or_h' ->
+        let%map () =
+          Trust_system.record_envelope_sender trust_system logger sender
+            ( Trust_system.Actions.Sent_useful_gossip
+            , Some
+                ( "external transition $state_hash"
+                , [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("header", Mina_block.Header.to_yojson header)
+                  ] ) )
+        in
+        ( match
+            Block_time.to_time_exn
+              ( Mina_block.Header.protocol_state header
+              |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+              )
           with
-          | Ok b_or_h' ->
-              let%map () =
-                Trust_system.record_envelope_sender trust_system logger sender
-                  ( Trust_system.Actions.Sent_useful_gossip
-                  , Some
-                      ( "external transition $state_hash"
-                      , [ ("state_hash", State_hash.to_yojson transition_hash)
-                        ; ("header", Mina_block.Header.to_yojson header)
-                        ] ) )
-              in
-              ( match
-                  Block_time.to_time_exn
-                    ( Mina_block.Header.protocol_state header
-                    |> Protocol_state.blockchain_state
-                    |> Blockchain_state.timestamp )
-                with
-              | transition_time ->
-                  Perf_histograms.add_span
-                    ~name:"accepted_transition_remote_latency"
-                    (Core_kernel.Time.diff
-                       Block_time.(now time_controller |> to_time_exn)
-                       transition_time )
-              | exception _ ->
-                  () ) ;
-              [%log internal] "Validate_transition_done" ;
-              Writer.write valid_transition_writer (b_or_h', `Valid_cb vc)
-          | Error err -> (
-              (* Every dropped block must answer its callback, or libp2p
-                 times it out and penalises the sender. *)
-              Option.iter vc ~f:(fun vc ->
-                  Mina_net2.Validation_callback.fire_if_not_already_fired vc
-                    ( match err with
-                    | `Non_empty_staged_ledger_diff_after_stop_slot
-                    | `Block_after_after_stop_slot ->
-                        `Reject
-                    | `In_frontier _ | `In_process _ | `Disconnected ->
-                        `Ignore ) ) ;
-              match err with
-              | `In_frontier _ | `In_process _ ->
-                  [%log internal] "Failure"
-                    ~metadata:
-                      [ ("reason", `String "In_frontier or In_process") ] ;
-                  Trust_system.record_envelope_sender trust_system logger sender
-                    ( Trust_system.Actions.Sent_old_gossip
-                    , Some
-                        ( "external transition with state hash $state_hash"
-                        , [ ("state_hash", State_hash.to_yojson transition_hash)
-                          ; ("header", Mina_block.Header.to_yojson header)
-                          ] ) )
-              | `Disconnected ->
-                  [%log internal] "Failure"
-                    ~metadata:[ ("reason", `String "Disconnected") ] ;
-                  Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
-                  let protocol_state =
-                    Mina_block.Header.protocol_state header
-                  in
-                  [%log error]
-                    ~metadata:
-                      [ ("state_hash", State_hash.to_yojson transition_hash)
-                      ; ("reason", `String "not selected over current root")
-                      ; ( "protocol_state"
-                        , Mina_block.Header.protocol_state header
-                          |> Protocol_state.value_to_yojson )
-                      ]
-                    "Validation error: external transition with state hash \
-                     $state_hash was rejected for reason $reason" ;
-                  let is_in_root_history =
-                    let open Transition_frontier.Extensions in
-                    get_extension
-                      (Transition_frontier.extensions frontier)
-                      Root_history
-                    |> Root_history.mem
-                  in
-                  let parent_hash =
-                    Protocol_state.previous_state_hash protocol_state
-                  in
-                  let action =
-                    if
-                      is_in_root_history transition_hash
-                      || Option.is_some
-                           (Lru.find outdated_root_cache transition_hash)
-                    then Trust_system.Actions.Sent_old_gossip
-                    else if
-                      is_in_root_history parent_hash
-                      || Option.is_some
-                           (Lru.find outdated_root_cache parent_hash)
-                    then (
-                      Lru.add outdated_root_cache ~key:transition_hash ~data:() ;
-                      Sent_useless_gossip )
-                    else Disconnected_chain
-                  in
-                  Trust_system.record_envelope_sender trust_system logger sender
-                    ( action
-                    , Some
-                        ( "received transition that was not connected to our \
-                           chain from $sender"
-                        , [ ("sender", Envelope.Sender.to_yojson sender)
-                          ; ("header", Mina_block.Header.to_yojson header)
-                          ] ) )
-              | `Non_empty_staged_ledger_diff_after_stop_slot ->
-                  [%log error]
-                    ~metadata:
-                      [ ("state_hash", State_hash.to_yojson transition_hash)
-                      ; ( "reason"
-                        , `String
-                            "not empty staged ledger diff after slot_tx_end" )
-                      ; ( "block_slot"
-                        , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                          @@ Consensus.Data.Consensus_state.curr_global_slot
-                          @@ Protocol_state.consensus_state
-                          @@ Header.protocol_state header )
-                      ]
-                    "Validation error: external transition with state hash \
-                     $state_hash was rejected for reason $reason" ;
-                  Deferred.unit
+        | transition_time ->
+            Perf_histograms.add_span ~name:"accepted_transition_remote_latency"
+              (Core_kernel.Time.diff
+                 Block_time.(now time_controller |> to_time_exn)
+                 transition_time )
+        | exception _ ->
+            () ) ;
+        [%log internal] "Validate_transition_done" ;
+        Writer.write valid_transition_writer (b_or_h', `Valid_cb vc)
+    | Error err -> (
+        (* Every dropped block must answer its callback, or libp2p
+           times it out and penalises the sender. *)
+        Option.iter vc ~f:(fun vc ->
+            Mina_net2.Validation_callback.fire_if_not_already_fired vc
+              ( match err with
+              | `Non_empty_staged_ledger_diff_after_stop_slot
               | `Block_after_after_stop_slot ->
-                  [%log error]
-                    ~metadata:
-                      [ ("state_hash", State_hash.to_yojson transition_hash)
-                      ; ("reason", `String "block after slot_chain_end")
-                      ; ( "block_slot"
-                        , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                          @@ Consensus.Data.Consensus_state.curr_global_slot
-                          @@ Protocol_state.consensus_state
-                          @@ Header.protocol_state header )
-                      ]
-                    "Validation error: external transition with state hash \
-                     $state_hash was rejected for reason $reason" ;
-                  Deferred.unit ) ) )
+                  `Reject
+              | `In_frontier _ | `In_process _ | `Disconnected ->
+                  `Ignore ) ) ;
+        match err with
+        | `In_frontier _ | `In_process _ ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "In_frontier or In_process") ] ;
+            Trust_system.record_envelope_sender trust_system logger sender
+              ( Trust_system.Actions.Sent_old_gossip
+              , Some
+                  ( "external transition with state hash $state_hash"
+                  , [ ("state_hash", State_hash.to_yojson transition_hash)
+                    ; ("header", Mina_block.Header.to_yojson header)
+                    ] ) )
+        | `Disconnected ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Disconnected") ] ;
+            Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
+            let protocol_state = Mina_block.Header.protocol_state header in
+            [%log error]
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson transition_hash)
+                ; ("reason", `String "not selected over current root")
+                ; ( "protocol_state"
+                  , Mina_block.Header.protocol_state header
+                    |> Protocol_state.value_to_yojson )
+                ]
+              "Validation error: external transition with state hash \
+               $state_hash was rejected for reason $reason" ;
+            let is_in_root_history =
+              let open Transition_frontier.Extensions in
+              get_extension
+                (Transition_frontier.extensions frontier)
+                Root_history
+              |> Root_history.mem
+            in
+            let parent_hash =
+              Protocol_state.previous_state_hash protocol_state
+            in
+            let action =
+              if
+                is_in_root_history transition_hash
+                || Option.is_some (Lru.find outdated_root_cache transition_hash)
+              then Trust_system.Actions.Sent_old_gossip
+              else if
+                is_in_root_history parent_hash
+                || Option.is_some (Lru.find outdated_root_cache parent_hash)
+              then (
+                Lru.add outdated_root_cache ~key:transition_hash ~data:() ;
+                Sent_useless_gossip )
+              else Disconnected_chain
+            in
+            Trust_system.record_envelope_sender trust_system logger sender
+              ( action
+              , Some
+                  ( "received transition that was not connected to our chain \
+                     from $sender"
+                  , [ ("sender", Envelope.Sender.to_yojson sender)
+                    ; ("header", Mina_block.Header.to_yojson header)
+                    ] ) )
+        | `Non_empty_staged_ledger_diff_after_stop_slot ->
+            [%log error]
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson transition_hash)
+                ; ( "reason"
+                  , `String "not empty staged ledger diff after slot_tx_end" )
+                ; ( "block_slot"
+                  , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                    @@ Consensus.Data.Consensus_state.curr_global_slot
+                    @@ Protocol_state.consensus_state
+                    @@ Header.protocol_state header )
+                ]
+              "Validation error: external transition with state hash \
+               $state_hash was rejected for reason $reason" ;
+            Deferred.unit
+        | `Block_after_after_stop_slot ->
+            [%log error]
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson transition_hash)
+                ; ("reason", `String "block after slot_chain_end")
+                ; ( "block_slot"
+                  , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                    @@ Consensus.Data.Consensus_state.curr_global_slot
+                    @@ Protocol_state.consensus_state
+                    @@ Header.protocol_state header )
+                ]
+              "Validation error: external transition with state hash \
+               $state_hash was rejected for reason $reason" ;
+            Deferred.unit )
+
+let%test_module "Transition_handler.Validator tests" =
+  ( module struct
+    open Async
+
+    let logger = Logger.null ()
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    let trust_system = Trust_system.null ()
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.For_tests.default ~constraint_constants ~logger
+            ~proof_level:precomputed_values.proof_level () )
+
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
+
+    (* A frontier holding just a root, and a chain of breadcrumbs on it. *)
+    let gen_frontier_and_chain =
+      let branch_size = 1 in
+      Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+        ~verifier ~max_length:(branch_size + 1) ~frontier_size:1 ~branch_size ()
+
+    (* [breadcrumb]'s block as it arrives from the network. *)
+    let incoming_block breadcrumb =
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      |> Mina_block.Validated.remember
+      |> Mina_block.Validation.reset_frontier_dependencies_validation
+      |> Mina_block.Validation.reset_staged_ledger_diff_validation
+      |> fun data -> Envelope.Incoming.wrap ~data ~sender:Envelope.Sender.Local
+
+    (* Validate [breadcrumb]'s block against [frontier], returning how its
+       validation callback resolved and the state hashes of the transitions
+       written on as valid. *)
+    let validate frontier breadcrumb =
+      Thread_safe.block_on_async_exn (fun () ->
+          let valid_transition_reader, valid_transition_writer =
+            Pipe_lib.Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
+          in
+          let unprocessed_transition_cache =
+            Unprocessed_transition_cache.create ~logger ~cache_exceptions:false
+          in
+          let handle =
+            create_handler
+              ~context:(module Context)
+              ~trust_system ~time_controller ~frontier ~valid_transition_writer
+              ~unprocessed_transition_cache
+          in
+          let vc =
+            Mina_net2.Validation_callback.create
+              (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+          in
+          let resolved = ref None in
+          Mina_net2.Validation_callback.set_on_resolve vc (fun outcome ->
+              resolved := Some outcome ) ;
+          let%bind () =
+            handle (`Block (incoming_block breadcrumb), `Valid_cb (Some vc))
+          in
+          Pipe_lib.Strict_pipe.Writer.close valid_transition_writer ;
+          let valid = ref [] in
+          let%map () =
+            Pipe_lib.Strict_pipe.Reader.iter valid_transition_reader
+              ~f:(fun x ->
+                valid := x :: !valid ;
+                Deferred.unit )
+          in
+          ( !resolved
+          , List.rev_map !valid ~f:(fun (b_or_h, `Valid_cb _) ->
+                match b_or_h with
+                | `Block cached ->
+                    let block =
+                      Cache_lib.Cached.invalidate_with_failure cached
+                    in
+                    State_hash.With_state_hashes.state_hash
+                      (Mina_block.Validation.block_with_hash
+                         (Envelope.Incoming.data block) )
+                | `Header h ->
+                    State_hash.With_state_hashes.state_hash
+                      (fst (Envelope.Incoming.data h)) ) ) )
+
+    type resolution = [ `Accept | `Reject | `Ignore | `Expired ] option
+    [@@deriving compare, sexp]
+
+    let%test_unit "A block already in the frontier is ignored" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, _chain) ->
+          let resolved, valid =
+            validate frontier (Transition_frontier.root frontier)
+          in
+          [%test_eq: resolution] resolved (Some `Ignore) ;
+          [%test_eq: State_hash.t list] valid [] )
+
+    let%test_unit "A block extending the frontier is passed on unanswered" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let block = List.hd_exn chain in
+          let resolved, valid = validate frontier block in
+          [%test_eq: resolution] resolved None ;
+          [%test_eq: State_hash.t list] valid
+            [ Transition_frontier.Breadcrumb.state_hash block ] )
+  end )
