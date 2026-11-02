@@ -1966,15 +1966,15 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; caller_caller = Token_id.(Checked.constant default)
               ; calls =
                   { hash =
-                      exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
-                          Zkapp_command.Call_forest.hash calls )
+                      Zkapp_command.Digest.Forest.Checked.constant
+                        (Zkapp_command.Call_forest.hash calls)
                   ; data = Prover_value.create (fun () -> calls)
                   }
               }
           ; hash =
-              lazy
-                (exists Mina_base.Stack_frame.Digest.typ ~compute:(fun () ->
-                     Mina_base.Stack_frame.Digest.create frame ) )
+              Lazy.from_val
+                (Mina_base.Stack_frame.Digest.Checked.constant
+                   (Mina_base.Stack_frame.Digest.create frame) )
           }
         in
         ( { stack_frame
