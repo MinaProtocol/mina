@@ -892,18 +892,17 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
       ~f:(fun () -> run_node node)
   and run_node (node : Node.t) =
     let state_hash = node.state_hash in
-    let step d ~f = step node d ~f in
     match node.state with
     | Failed | Finished | Root _ ->
         ()
     | To_download download_job ->
         let start_time = Time.now () in
-        step
+        step node
           (Downloader.Job.result download_job)
           ~f:(on_downloaded node ~start_time)
     | To_initial_validate external_block ->
         let start_time = Time.now () in
-        step
+        step node
           ( initial_validate
               ~context:(module Context)
               ~trust_system ~batcher:initial_validation_batcher ~frontier
@@ -922,7 +921,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         let start_time = Time.now () in
         let iv = Cached.peek tv in
         (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
-        step
+        step node
           (* TODO: give the batch verifier a way to somehow throw away stuff if
              this node gets removed from the tree. *)
           ( Verify_work_batcher.verify verify_work_batcher iv
@@ -932,7 +931,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         [%log debug] "Wait_for_parent $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
-        step
+        step node
           (let parent = Hashtbl.find_exn t.nodes node.parent in
            match%map.Async.Deferred Ivar.read parent.result with
            | Ok `Added_to_frontier ->
@@ -972,7 +971,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             ~transition:av.data ~sender:(Some av.sender)
             ~transition_receipt_time ()
         in
-        step
+        step node
           (Deferred.map ~f:Result.return s)
           ~f:
             (on_built node ~start_time ~sender:av.sender ~parent_hash
@@ -1007,15 +1006,13 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     set_state t node (To_initial_validate external_block) ;
     run_node node
   and on_initial_validated node ~start_time ~sender result =
-    let failed = failed node in
-    let retry () = retry node in
     match result with
     | Error (`Error e) ->
         (* TODO: Log *)
         (* Validation failed. Record the failure and go back to download. *)
-        failed ~error:e ~sender `Initial_validate
+        failed node ~error:e ~sender `Initial_validate
     | Error `Couldn't_reach_verifier ->
-        retry ()
+        retry node
     | Ok result -> (
         Mina_metrics.(
           Gauge.set Catchup.initial_validation_time
@@ -1041,14 +1038,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             set_state t node (To_verify (tv, None)) ;
             run_node node )
   and on_verified node ~start_time ~sender (tv, valid_cb) result =
-    let failed = failed node in
-    let retry () = retry node in
     match result with
     | Error _e ->
         [%log' debug t.logger] "Couldn't reach verifier. Retrying"
           ~metadata:[ ("state_hash", State_hash.to_yojson node.state_hash) ] ;
         (* No need to redownload in this case. We just wait a little and try again. *)
-        retry ()
+        retry node
     | Ok result -> (
         Mina_metrics.(
           Gauge.set Catchup.verification_time
@@ -1075,7 +1070,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             ignore
               ( Cached.invalidate_with_failure tv
                 : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
-            failed ~sender `Verify
+            failed node ~sender `Verify
         | Ok av ->
             let av =
               { av with
@@ -1091,7 +1086,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
     run_node node
   and on_built node ~start_time ~sender ~parent_hash (c, valid_cb) result =
-    let failed = failed node in
     match result with
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
@@ -1118,7 +1112,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                       (State_hash.to_base58_check parent_hash) ) )
                 ~tag:"parent breadcrumb not found"
         in
-        failed ~error:e ~sender `Build_breadcrumb
+        failed node ~error:e ~sender `Build_breadcrumb
     | Ok breadcrumb ->
         Mina_metrics.(
           Gauge.set Catchup.build_breadcrumb_time
