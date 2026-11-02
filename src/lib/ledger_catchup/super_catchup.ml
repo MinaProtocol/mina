@@ -933,13 +933,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
            | Error _ ->
                (* TODO consider rejecting the callback in some cases,
                   see https://github.com/MinaProtocol/mina/issues/11087 *)
-               Option.value_map valid_cb ~default:ignore
-                 ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                 `Ignore ;
-               if not (Cached.was_consumed av) then
-                 ignore
-                   ( Cached.invalidate_with_failure av
-                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+               Transition_handler.Block_registry.finish block_registry av
+                 `Ignored ;
                finish t node ~is_error:true ;
                Error `Finished )
           ~f:(on_parent_added node (av, valid_cb))
@@ -1059,11 +1054,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                   record trust_system logger peer
                     Actions.(Sent_invalid_proof, None))
                 |> don't_wait_for ) ;
-            Option.value_map valid_cb ~default:ignore
-              ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Reject ;
-            ignore
-              ( Cached.invalidate_with_failure tv
-                : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+            Transition_handler.Block_registry.finish block_registry tv `Rejected ;
             failed node ~sender `Verify
         | Ok av ->
             let av =
@@ -1084,11 +1075,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
            see https://github.com/MinaProtocol/mina/issues/11087 *)
-        Option.value_map valid_cb ~default:ignore
-          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
-        ignore
-          ( Cached.invalidate_with_failure c
-            : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+        Transition_handler.Block_registry.finish block_registry c `Ignored ;
         let e =
           match e with
           | `Exn e ->
@@ -1384,13 +1371,11 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
             List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
+                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, _vc) ->
                     (* TODO consider rejecting the callback in some cases,
                        see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore @@ Cached.invalidate_with_failure node ) )
+                    Transition_handler.Block_registry.finish block_registry node
+                      `Ignored ) )
         | Ok (root, state_hashes) ->
             [%log' debug t.logger]
               ~metadata:
