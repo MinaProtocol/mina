@@ -10,7 +10,7 @@ module Stable = struct
           { statement : Transaction_snark.Statement.With_sok.Stable.V3.t
           ; witness :
               Transaction_snark.Zkapp_command_segment.Witness.Stable.V3.t
-          ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+          ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V2.t
           }
       | Merge of
           { proof1 : Ledger_proof.Stable.V3.t
@@ -59,7 +59,9 @@ module Stable = struct
             ; witness =
                 Transaction_snark.Zkapp_command_segment.Witness.Stable.V2
                 .to_latest witness
-            ; spec
+            ; spec =
+                Transaction_snark.Zkapp_command_segment.Basic.Stable.V1
+                .to_latest spec
             }
       | Merge { proof1; proof2 } ->
           Merge

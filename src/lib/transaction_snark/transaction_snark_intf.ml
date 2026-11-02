@@ -71,7 +71,7 @@ module type Full = sig
     ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N5.n )
+    , Nat.N4.n )
     Pickles.Tag.t
 
   val verify :
@@ -149,11 +149,25 @@ module type Full = sig
     module Basic : sig
       [%%versioned:
       module Stable : sig
+        module V2 : sig
+          type t =
+            | Opt_signed_opt_signed
+            | Opt_signed
+            | Proved
+            | Opt_signed_batch of int
+          [@@deriving sexp, yojson]
+        end
+
         module V1 : sig
           type t = Opt_signed_opt_signed | Opt_signed | Proved
           [@@deriving sexp, yojson]
+
+          val to_latest : t -> V2.t
         end
       end]
+
+      (** The number of slots in an [Opt_signed_batch] segment. *)
+      val opt_signed_batch_size : int
 
       val to_single_list : t -> Spec.single list
     end
@@ -263,20 +277,14 @@ module type Full = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Tick.R1CS_constraint_system.t
 
-  (** Return the constraint system for the zkapp-opt_signed-opt_signed circuit. *)
-  val zkapp_opt_signed_opt_signed_constraint_system :
-       signature_kind:Mina_signature_kind.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Tick.R1CS_constraint_system.t
-
-  (** Return the constraint system for the zkapp-opt_signed circuit. *)
-  val zkapp_opt_signed_constraint_system :
-       signature_kind:Mina_signature_kind.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> Tick.R1CS_constraint_system.t
-
   (** Return the constraint system for the zkapp-proved circuit. *)
   val zkapp_proved_constraint_system :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Tick.R1CS_constraint_system.t
+
+  (** Return the constraint system for the zkapp-opt_signed-batch circuit. *)
+  val zkapp_opt_signed_batch_constraint_system :
        signature_kind:Mina_signature_kind.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Tick.R1CS_constraint_system.t
@@ -319,8 +327,13 @@ module type Full = sig
          Tick.Checked.t
 
     module Zkapp_command_snark : sig
+      (** Whether the [i]th slot of a segment with optional slots is used. *)
+      type _ Snarky_backendless.Request.t +=
+        | Slot_active : int -> bool Snarky_backendless.Request.t
+
       val main :
            signature_kind:Mina_signature_kind.t
+        -> ?optional_slots:bool
         -> ?witness:Zkapp_command_segment.Witness.t
         -> Zkapp_command_segment.Spec.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
