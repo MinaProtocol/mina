@@ -104,6 +104,7 @@ val rejected_blocks :
   * Block_time.t
   * [ `Invalid_proof
     | `Invalid_delta_transition_chain_proof
+    | `Invalid_body_reference
     | `Too_early
     | `Too_late
     | `Invalid_genesis_protocol_state

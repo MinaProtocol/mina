@@ -11,6 +11,7 @@ type validation_error =
   | `Invalid_genesis_protocol_state
   | `Invalid_proof of Error.t
   | `Invalid_delta_block_chain_proof
+  | `Invalid_body_reference
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
   | `Invalid_protocol_version ]
@@ -56,6 +57,8 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ]
     | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
+    | `Invalid_body_reference ->
+        [ ("reason", `String "invalid body reference") ]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
         ; ("error", Error_json.error_to_yojson err)
@@ -105,6 +108,10 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         , time_received
         , `Invalid_delta_transition_chain_proof ) ;
       punish Sent_invalid_transition_chain_merkle_proof None
+  | `Invalid_body_reference ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_body_reference) ;
+      punish Gossiped_invalid_transition None
   | `Invalid_time_received `Too_early ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_early) ;
       Queue.enqueue Transition_frontier.rejected_blocks
@@ -131,6 +138,20 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Mismatched_protocol_version) ;
       punish Sent_mismatched_protocol_version None
+
+(** Whether [block]'s body is the one its blockchain state commits to. The
+    state hash commits to the body only through this reference, so blocks
+    with the same state hash can otherwise carry different bodies. *)
+let body_matches_reference block =
+  let body_reference =
+    Mina_block.Stable.Latest.header block
+    |> Header.protocol_state |> Protocol_state.blockchain_state
+    |> Blockchain_state.body_reference
+  in
+  Blake2.equal body_reference
+    (Staged_ledger_diff.Body.compute_reference
+       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+       (Mina_block.Stable.Latest.body block) )
 
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
@@ -274,6 +295,18 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
               Interruptible.lift Deferred.unit
                 (Mina_net2.Validation_callback.await_timeout valid_cb)
             in
+            let reject error =
+              Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
+                `Reject ;
+              let%map () =
+                Interruptible.uninterruptible
+                @@ handle_validation_error ~logger ~rejected_blocks_logger
+                     ~time_received ~trust_system ~sender
+                     ~header_with_hash:header_hashed
+                     ~delta:genesis_constants.protocol.delta error
+              in
+              Error ()
+            in
             match%bind
               let open Interruptible.Result.Let_syntax in
               Validation.(
@@ -286,6 +319,14 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
                 >>= defer validate_delta_block_chain
                 >>= defer validate_protocol_versions)
             with
+            | Ok _
+              when match b_or_h with
+                   | `Block b_env ->
+                       not
+                         (body_matches_reference (Envelope.Incoming.data b_env))
+                   | `Header _ ->
+                       false ->
+                reject `Invalid_body_reference
             | Ok verified_header ->
                 [%log internal] "Initial_validation_done" ;
                 let body b =
@@ -316,16 +357,7 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
                   , time_received ) ;
                 return (Ok (b_or_h', `Valid_cb valid_cb))
             | Error error ->
-                Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
-                  `Reject ;
-                let%map () =
-                  Interruptible.uninterruptible
-                  @@ handle_validation_error ~logger ~rejected_blocks_logger
-                       ~time_received ~trust_system ~sender
-                       ~header_with_hash:header_hashed
-                       ~delta:genesis_constants.protocol.delta error
-                in
-                Error ()
+                reject error
           in
           Interruptible.force computation )
         else Deferred.Result.fail () )
@@ -353,3 +385,87 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
       else (
         Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Ignore ;
         Deferred.Result.fail () ) )
+
+let%test_module "Initial validation of block bodies" =
+  ( module struct
+    let logger = Logger.null ()
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.For_tests.default
+            ~constraint_constants:precomputed_values.constraint_constants
+            ~logger ~proof_level:precomputed_values.proof_level () )
+
+    (* A chain of two blocks, with the second's body. *)
+    let gen_chain =
+      Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+        ~verifier ~max_length:3 ~frontier_size:1 ~branch_size:2 ()
+
+    (* Validate each block in [blocks] as received from the network, in
+       order, returning how each one's validation callback was answered. *)
+    let answers_for blocks =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let initialization_finish_signal = Ivar.create () in
+          Ivar.fill initialization_finish_signal () ;
+          let validate =
+            unstage
+              (validate ~signature_kind:Mina_signature_kind.Testnet
+                 ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+                 ~logger ~trust_system:(Trust_system.null ()) ~verifier
+                 ~initialization_finish_signal ~precomputed_values )
+          in
+          Deferred.List.map blocks ~how:`Sequential ~f:(fun block ->
+              let valid_cb =
+                Mina_net2.Validation_callback.create
+                  (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+              in
+              (* The start of the block's slot. *)
+              let time_received =
+                Mina_block.Stable.Latest.header block
+                |> Header.protocol_state |> Protocol_state.consensus_state
+                |> Consensus.Data.Consensus_state.consensus_time
+                |> Consensus.Data.Consensus_time.start_time
+                     ~constants:precomputed_values.consensus_constants
+              in
+              let%bind result =
+                validate
+                  ~b_or_h:
+                    (`Block
+                      (Envelope.Incoming.wrap ~data:block
+                         ~sender:Envelope.Sender.Local ) )
+                  ~time_received ~valid_cb
+              in
+              let%map answer =
+                Async.Clock_ns.with_timeout (Time_ns.Span.of_sec 1.)
+                  (Mina_net2.Validation_callback.await valid_cb)
+              in
+              let answer =
+                match answer with `Result answer -> answer | `Timeout -> None
+              in
+              (Result.is_ok result, answer) ) )
+
+    type answer = [ `Accept | `Reject | `Ignore ] option
+    [@@deriving compare, sexp]
+
+    let%test_unit "A block whose body does not match its header is rejected, \
+                   whichever copy arrives first" =
+      Quickcheck.test ~trials:1 gen_chain ~f:(fun (_frontier, chain) ->
+          let[@warning "-8"] [ first; second ] =
+            List.map chain ~f:Transition_frontier.Breadcrumb.block
+          in
+          let real = Mina_block.read_all_proofs_from_disk first in
+          (* The first block's header, carrying the second block's body. *)
+          let fake =
+            Mina_block.create ~header:(Mina_block.header first)
+              ~body:(Mina_block.body second)
+            |> Mina_block.read_all_proofs_from_disk
+          in
+          [%test_eq: (bool * answer) list]
+            (answers_for [ fake; real ])
+            [ (false, Some `Reject); (true, None) ] ;
+          [%test_eq: (bool * answer) list]
+            (answers_for [ real; fake ])
+            [ (true, None); (false, Some `Reject) ] )
+  end )
