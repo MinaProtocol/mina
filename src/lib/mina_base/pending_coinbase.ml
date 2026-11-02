@@ -1387,43 +1387,38 @@ module Make_str (A : Wire_types.Concrete) = struct
       -> t Or_error.t
   end
 
+  (* A block's coinbase is for the protocol's whole amount, which
+     [Checked.add_coinbase] requires. [Coinbase.Gen.gen] picks any amount up
+     to it, so the tests of the circuit keep the generated receiver and fee
+     transfer with the whole amount. *)
+  let protocol_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~supercharged_coinbase (coinbase : Coinbase.t) =
+    let amount =
+      if supercharged_coinbase then
+        Option.value_exn
+          (Currency.Amount.scale constraint_constants.coinbase_amount
+             constraint_constants.supercharged_coinbase_factor )
+      else constraint_constants.coinbase_amount
+    in
+    Coinbase.create ~amount ~receiver:coinbase.receiver
+      ~fee_transfer:coinbase.fee_transfer ~fee_remainder:Currency.Fee.zero
+    |> Or_error.ok_exn
+
   let add_coinbase_with_zero_checks (type t)
       (module T : Pending_coinbase_intf with type t = t) (t : t)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~coinbase ~supercharged_coinbase ~state_body_hash ~global_slot
-      ~is_new_stack =
+      ~coinbase ~state_body_hash ~global_slot ~is_new_stack =
     let depth = constraint_constants.pending_coinbase_depth in
     if Amount.equal coinbase.Coinbase.amount Amount.zero then t
     else
-      let max_coinbase_amount =
-        if supercharged_coinbase then
-          Option.value_exn
-            (Currency.Amount.scale constraint_constants.coinbase_amount
-               constraint_constants.supercharged_coinbase_factor )
-        else constraint_constants.coinbase_amount
-      in
-      let coinbase' =
-        Coinbase.create
-          ~amount:
-            (Option.value_exn (Amount.sub max_coinbase_amount coinbase.amount))
-          ~receiver:coinbase.receiver ~fee_transfer:None
-          ~fee_remainder:Currency.Fee.zero
-        |> Or_error.ok_exn
-      in
       let t_with_state =
         T.add_state ~depth t state_body_hash global_slot ~is_new_stack
         |> Or_error.ok_exn
       in
       (*add coinbase to the same stack*)
-      let interim_tree =
-        T.add_coinbase ~depth t_with_state ~coinbase ~is_new_stack:false
-        |> Or_error.ok_exn
-      in
-      if Amount.equal coinbase'.amount Amount.zero then interim_tree
-      else
-        T.add_coinbase ~depth interim_tree ~coinbase:coinbase'
-          ~is_new_stack:false
-        |> Or_error.ok_exn
+      T.add_coinbase ~depth t_with_state ~coinbase ~is_new_stack:false
+      |> Or_error.ok_exn
 
   let%test_unit "Checked_stack = Unchecked_stack" =
     let open Quickcheck in
@@ -1462,6 +1457,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
               , state_body_hash
               , global_slot ) ->
+        let coinbase =
+          protocol_coinbase ~constraint_constants ~supercharged_coinbase
+            coinbase
+        in
         let amount = coinbase.amount in
         let is_new_stack, action =
           Currency.Amount.(
@@ -1472,7 +1471,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           add_coinbase_with_zero_checks ~constraint_constants
             (module T)
             pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
-            ~global_slot ~supercharged_coinbase
+            ~global_slot
         in
         (* inside the `open' below, Checked means something else, so define this function *)
         let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1527,6 +1526,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               , state_body_hash
               , global_slot ) ->
         let pending_coinbases = create ~depth () |> Or_error.ok_exn in
+        let coinbase =
+          protocol_coinbase ~constraint_constants ~supercharged_coinbase
+            coinbase
+        in
         let amount = coinbase.amount in
         let action =
           Currency.Amount.(
@@ -1537,7 +1540,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           add_coinbase_with_zero_checks ~constraint_constants
             (module T)
             pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
-            ~global_slot ~supercharged_coinbase
+            ~global_slot
         in
         (* inside the `open' below, Checked means something else, so define these functions *)
         let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1636,14 +1639,14 @@ module Make_str (A : Wire_types.Concrete) = struct
             List.fold coinbases ~init:t'
               ~f:(fun
                    pending_coinbases
-                   ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+                   ( (coinbase, `Supercharged_coinbase _supercharged_coinbase)
                    , state_body_hash
                    , global_slot )
                  ->
                 add_coinbase_with_zero_checks ~constraint_constants
                   (module Pending_coinbase)
                   pending_coinbases ~coinbase ~is_new_stack:false
-                  ~state_body_hash ~global_slot ~supercharged_coinbase )
+                  ~state_body_hash ~global_slot )
           in
           let new_stack =
             Or_error.ok_exn
