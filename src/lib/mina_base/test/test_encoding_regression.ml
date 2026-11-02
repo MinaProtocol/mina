@@ -108,7 +108,7 @@ let test_pending_coinbase_hash_empty_encoding () =
 (* Coinbase: receiver = Public_key from sk=1, amount = 1 MINA *)
 let test_coinbase_encoding () =
   let expected =
-    "Kw31TqNVMsSNE1e59HHuMhv9zbLAKXfLowbrot2t1RKjb42Nb5rFiaSRybQ"
+    "2SZVs3SVrB7cxgRpdHYuc6PbchCXa8nLESBzrqvFJ8rMgyJM4HSQPxEZp5XP8"
   in
   let sk = Signature_lib.Private_key.of_string_exn "1" in
   let pk =
