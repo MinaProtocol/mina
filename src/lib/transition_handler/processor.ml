@@ -534,6 +534,95 @@ let%test_module "Transition_handler.Processor tests" =
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
+    (* The handler for [frontier], with the pipes it writes to buffering up
+       to [capacity] items unread. *)
+    let handler_for frontier ~capacity =
+      let _, catchup_job_writer =
+        Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
+      in
+      let _, catchup_breadcrumbs_writer =
+        Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
+      in
+      let _, processed_transition_writer =
+        Strict_pipe.create
+          (Buffered (`Capacity capacity, `Overflow (Drop_head ignore)))
+      in
+      create_handler
+        ~context:(module Context)
+        ~time_controller ~verifier ~get_completed_work:(Fn.const None)
+        ~trust_system ~clean_up_catchup_scheduler:(Ivar.create ()) ~frontier
+        ~catchup_job_writer ~catchup_breadcrumbs_writer
+        ~processed_transition_writer ?transaction_pool_proxy:None ()
+
+    (* A frontier holding just a root, and a chain of breadcrumbs on it. *)
+    let gen_frontier_and_chain =
+      let branch_size = 4 in
+      Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+        ~verifier ~max_length:(branch_size + 1) ~frontier_size:1 ~branch_size ()
+
+    let state_hash = Transition_frontier.Breadcrumb.state_hash
+
+    let%test_unit "Produced breadcrumbs are added to the frontier" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let (), outcomes =
+            Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred
+                @@ fun () ->
+                let handle =
+                  handler_for frontier ~capacity:(List.length chain)
+                in
+                Deferred.List.iter chain ~f:(fun breadcrumb ->
+                    handle (`Local_breadcrumb (Cached.pure breadcrumb)) ) )
+          in
+          [%test_eq: Block_outcome_log.event list] outcomes
+            (List.map chain ~f:(fun breadcrumb ->
+                 Block_outcome_log.Frontier_add
+                   { state_hash = state_hash breadcrumb
+                   ; source = `Internal
+                   ; added = true
+                   } ) ) )
+
+    let%test_unit "Breadcrumbs from catchup are added to the frontier" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let finished = Ivar.create () in
+          let (), outcomes =
+            Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred
+                @@ fun () ->
+                let handle =
+                  handler_for frontier ~capacity:(List.length chain)
+                in
+                let cache =
+                  Unprocessed_transition_cache.create ~logger
+                    ~cache_exceptions:true
+                in
+                (* As catchup holds them: registered blocks, transformed into
+                   the breadcrumbs built from them. *)
+                let cached_breadcrumb breadcrumb =
+                  downcast_breadcrumb breadcrumb
+                  |> Unprocessed_transition_cache.register_exn cache
+                  |> Cached.transform ~f:(fun _ -> breadcrumb)
+                in
+                let subtree =
+                  List.map chain ~f:(fun breadcrumb ->
+                      (cached_breadcrumb breadcrumb, None) )
+                  |> Mina_stdlib.Nonempty_list.of_list_opt |> Option.value_exn
+                  |> Mina_stdlib.Rose_tree.of_non_empty_list
+                in
+                handle
+                  (`Catchup_breadcrumbs ([ subtree ], `Ledger_catchup finished)) )
+          in
+          assert (Ivar.is_full finished) ;
+          [%test_eq: Block_outcome_log.event list] outcomes
+            (List.concat_map chain ~f:(fun breadcrumb ->
+                 let state_hash = state_hash breadcrumb in
+                 [ Block_outcome_log.Cache_removed
+                     { state_hash; outcome = `Consumed }
+                 ; Frontier_add { state_hash; source = `Catchup; added = true }
+                 ] ) ) )
+
     let%test_unit "adding transitions whose parents are in the frontier" =
       let frontier_size = 1 in
       let branch_size = 10 in
