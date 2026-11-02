@@ -799,6 +799,15 @@ let forest_pick forest =
       List.iter forest ~f:(Mina_stdlib.Rose_tree.iter ~f:return) ;
       assert false )
 
+(** Start a loop that runs resumptions one at a time, in the order they are
+    queued, and return the function that queues one. *)
+let create_resumption_queue () =
+  let resumptions_r, resumptions_w = Pipe.create () in
+  don't_wait_for
+    (Pipe.iter_without_pushback resumptions_r ~f:(fun resumption ->
+         resumption () ) ) ;
+  Pipe.write_without_pushback resumptions_w
+
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
@@ -837,14 +846,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "set_state $exn"
   in
-  (* Nodes resume one at a time, in the order their awaited results arrive. *)
-  let resume =
-    let resumptions_r, resumptions_w = Pipe.create () in
-    don't_wait_for
-      (Pipe.iter_without_pushback resumptions_r ~f:(fun resumption ->
-           resumption () ) ) ;
-    Pipe.write_without_pushback resumptions_w
-  in
+  let resume = create_resumption_queue () in
   let rec failed (node : Node.t) ?error ~sender failure_reason =
     [%log' debug t.logger] "failed with $error"
       ~metadata:
@@ -1442,6 +1444,24 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                 : State_hash.t * Length.t ) )
   in
   return process_catchup_job
+
+let%test_module "Resuming catchup nodes" =
+  ( module struct
+    let resumed_by_queue f =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let resumed = ref [] in
+          f (create_resumption_queue ()) (fun i () -> resumed := i :: !resumed) ;
+          let%map () = Scheduler.yield_until_no_jobs_remain () in
+          List.rev !resumed )
+
+    let%test_unit "Resumptions run in the order they are queued" =
+      [%test_eq: int list]
+        (resumed_by_queue (fun resume resumption ->
+             resume (resumption 1) ;
+             resume (resumption 2) ;
+             resume (resumption 3) ) )
+        [ 1; 2; 3 ]
+  end )
 
 (* Unit tests *)
 
