@@ -118,7 +118,6 @@ module Ledger : sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> genesis_backing_type:Mina_ledger.Root.Config.backing_type
     -> ?ledger_name_prefix:string
-    -> ?overwrite_version:Mina_numbers.Txn_version.t
     -> Runtime_config.Ledger.t
     -> (Genesis_ledger.Packed.t * Runtime_config.Ledger.t * string) Or_error.t
        Deferred.t
@@ -153,7 +152,6 @@ val init_from_config_file :
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> logger:Logger.t
   -> proof_level:Genesis_constants.Proof_level.t
-  -> ?overwrite_version:Mina_numbers.Txn_version.t
   -> ?genesis_dir:string
   -> Runtime_config.t
   -> Precomputed_values.t Or_error.t Deferred.t
