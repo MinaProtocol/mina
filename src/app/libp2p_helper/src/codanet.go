@@ -251,9 +251,9 @@ type Helper struct {
 	closeErr          error
 }
 
-// Close shuts down the DHT and the host, and then closes the datastores they
-// write to. It returns the first error it meets, but carries on closing the
-// rest. Calls after the first return the first call's result.
+// Close shuts down bitswap, the DHT and the host, and then closes the
+// datastores they write to. It returns the first error it meets, but carries
+// on closing the rest. Calls after the first return the first call's result.
 func (h *Helper) Close() error {
 	h.closeOnce.Do(func() {
 		record := func(err error) {
@@ -261,6 +261,7 @@ func (h *Helper) Close() error {
 				h.closeErr = err
 			}
 		}
+		record(h.Bitswap.Close())
 		if h.Dht != nil {
 			record(h.Dht.Close())
 		}
