@@ -434,12 +434,6 @@ let has_zero_vesting_period = function
   | Zkapp_command p ->
       Zkapp_command.has_zero_vesting_period p
 
-let is_incompatible_version = function
-  | Signed_command _ ->
-      false
-  | Zkapp_command p ->
-      Zkapp_command.is_incompatible_version p
-
 let has_invalid_call_forest :
        ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest
     -> bool = function
@@ -460,7 +454,6 @@ module Well_formedness_error = struct
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
     | Zkapp_invalid_call_forest
     | Transaction_type_disabled
-    | Incompatible_version
   [@@deriving compare, to_yojson, sexp]
 
   let to_string = function
@@ -473,8 +466,6 @@ module Well_formedness_error = struct
     | Zkapp_invalid_call_forest ->
         "Zkapp has an invalid call forest (root account updates may not use \
          tokens)"
-    | Incompatible_version ->
-        "Set verification-key permission is updated to an incompatible version"
     | Transaction_type_disabled ->
         "Transaction type disabled"
 end
@@ -488,7 +479,6 @@ let check_well_formedness (type aux) ~(genesis_constants : Genesis_constants.t)
           ~minimum_fee:genesis_constants.minimum_user_command_fee
       , Insufficient_fee )
     ; (has_zero_vesting_period, Zero_vesting_period)
-    ; (is_incompatible_version, Incompatible_version)
     ; (is_disabled, Transaction_type_disabled)
     ; (has_invalid_call_forest, Zkapp_invalid_call_forest)
     ]

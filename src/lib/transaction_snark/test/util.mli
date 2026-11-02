@@ -89,6 +89,7 @@ val test_snapp_update :
      ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
+  -> ?vk_txn_version:Mina_numbers.Txn_version.t
   -> vk:
        (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
        Async.Deferred.t

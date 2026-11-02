@@ -328,8 +328,9 @@ module Json_layout = struct
           let open Mina_base.Zkapp_account in
           { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
           ; verification_key =
-              Option.map zkapp.verification_key ~f:With_hash.data
-          ; zkapp_version = zkapp.zkapp_version
+              Option.map ~f:With_hash.data
+                (fst (Vk_with_version.to_flat zkapp.verification_key))
+          ; zkapp_version = snd (Vk_with_version.to_flat zkapp.verification_key)
           ; action_state =
               Pickles_types.Vector.Vector_5.to_list zkapp.action_state
           ; last_action_slot =
@@ -743,8 +744,7 @@ module Accounts = struct
       in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
-          , Mina_base.Verification_key_wire.t option
-          , Zkapp_account.Zkapp_version.t
+          , Mina_base.Zkapp_account.Vk_with_version.t option
           , Zkapp_account.Field.t
           , Mina_numbers.Global_slot_since_genesis.t
           , bool
@@ -756,8 +756,12 @@ module Accounts = struct
               Mina_base.Zkapp_state.V.of_list_exn
               @@ pad_app_state_do app.app_state
           ; verification_key =
-              Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
-          ; zkapp_version = app.zkapp_version
+              Mina_base.Zkapp_account.Vk_with_version.of_flat
+                ~zkapp_version:app.zkapp_version
+                (Option.map
+                   ~f:(With_hash.of_data ~hash_data)
+                   app.verification_key )
+              |> Or_error.ok_exn
           ; action_state =
               Pickles_types.Vector.Vector_5.of_list_exn app.action_state
           ; last_action_slot =

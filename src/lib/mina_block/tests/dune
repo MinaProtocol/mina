@@ -38,7 +38,9 @@
   core_kernel
   disk_cache.lmdb
   mina_base
+  mesa_types
   mina_block
+  mina_numbers
   mina_state
   mina_transaction
   staged_ledger_diff

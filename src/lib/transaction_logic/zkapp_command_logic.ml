@@ -554,8 +554,16 @@ module type Controller_intf = sig
   val access_perm_fallback_to_signature_with_older_version : t -> t
 end
 
+module type Verification_key_intf = sig
+  include Iffable
+
+  val is_some : t -> bool
+end
+
 module type Txn_version_intf = sig
   include Iffable
+
+  val current : t
 
   val equal_to_current : t -> bool
 
@@ -654,11 +662,21 @@ module type Account_intf = sig
 
   val register_verification_key : t -> unit
 
+  type txn_version
+
   type verification_key
 
   val verification_key : t -> verification_key
 
-  val set_verification_key : verification_key -> t -> t
+  (** The transaction version stored with the verification key; zero when
+      there is no verification key.
+  *)
+  val verification_key_txn_version : t -> txn_version
+
+  (** Set the verification key and its transaction version. The version is
+      dropped when the key is absent.
+  *)
+  val set_verification_key : verification_key -> txn_version -> t -> t
 
   type verification_key_hash
 
@@ -707,12 +725,6 @@ module type Account_intf = sig
   val permissions : t -> Permissions.t
 
   val set_permissions : Permissions.t -> t -> t
-
-  type txn_version
-
-  val txn_version : t -> txn_version
-
-  val set_txn_version_to_current : t -> t
 end
 
 module Eff = struct
@@ -820,7 +832,7 @@ module type Inputs_intf = sig
        and type transaction_commitment := Transaction_commitment.t
        and type index := Index.t)
 
-  and Verification_key : (Iffable with type bool := Bool.t)
+  and Verification_key : (Verification_key_intf with type bool := Bool.t)
   and Verification_key_hash :
     (Verification_key_hash_intf with type bool := Bool.t)
 
@@ -1550,9 +1562,19 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    (* A verification key set under an older transaction version may not work
+       with the current proof system, so the permissions that would need a
+       proof from it fall back to signatures. An account without a key has no
+       version and never falls back. *)
+    let verification_key_is_stale =
+      Bool.(
+        Verification_key.is_some (Account.verification_key a)
+        &&& Txn_version.older_than_current
+              (Account.verification_key_txn_version a))
+    in
     let auth_with_fallback ~fallback_logic auth =
-      Account.txn_version a |> Txn_version.older_than_current
-      |> Controller.if_ ~then_:(fallback_logic auth) ~else_:auth
+      Controller.if_ verification_key_is_stale ~then_:(fallback_logic auth)
+        ~else_:auth
     in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
@@ -1637,12 +1659,20 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_verification_key
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
+      (* Setting the key, even to its current value, stamps it with the current
+         transaction version: an authorized party has vouched for the key under
+         the current protocol. *)
+      let txn_version =
+        Txn_version.if_
+          (Set_or_keep.is_set verification_key)
+          ~then_:Txn_version.current
+          ~else_:(Account.verification_key_txn_version a)
+      in
       let verification_key =
         Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
           (Account.verification_key a)
       in
-      let a = Account.set_verification_key verification_key a in
-      let a = Account.set_txn_version_to_current a in
+      let a = Account.set_verification_key verification_key txn_version a in
       (a, local_state)
     in
     (* Update action state. *)

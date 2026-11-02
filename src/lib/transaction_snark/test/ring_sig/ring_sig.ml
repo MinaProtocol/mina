@@ -169,7 +169,8 @@ let test_ring_sig_zkapp_tx () =
                zkapp =
                  Some
                    { (Option.value ~default:Zkapp_account.default a.zkapp) with
-                     verification_key = Some vk
+                     verification_key =
+                       Some (Zkapp_account.Vk_with_version.stamp_current vk)
                    }
              } ) ;
           let sender_pk = sender.public_key |> Public_key.compress in

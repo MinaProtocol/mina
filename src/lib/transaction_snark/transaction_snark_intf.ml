@@ -440,12 +440,14 @@ module type Full = sig
 
     val trivial_zkapp_account :
          ?permissions:Permissions.t
+      -> ?vk_txn_version:Mina_numbers.Txn_version.t
       -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
       -> Account.key
       -> Account.t
 
     val create_trivial_zkapp_account :
          ?permissions:Permissions.t
+      -> ?vk_txn_version:Mina_numbers.Txn_version.t
       -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
       -> ledger:Mina_ledger.Ledger.t
       -> Account.key

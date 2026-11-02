@@ -999,6 +999,8 @@ module Make (L : Ledger_intf.S) :
 
       let if_ = value_if
 
+      let current = Mina_numbers.Txn_version.current
+
       let equal_to_current = Mina_numbers.Txn_version.equal_to_current
 
       let older_than_current = Mina_numbers.Txn_version.older_than_current
@@ -1069,6 +1071,8 @@ module Make (L : Ledger_intf.S) :
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
       let if_ = value_if
+
+      let is_some = Option.is_some
     end
 
     module Verification_key_hash = struct
@@ -1211,17 +1215,32 @@ module Make (L : Ledger_intf.S) :
 
       let register_verification_key (_ : t) = ()
 
-      let verification_key (a : t) = (get_zkapp a).verification_key
+      let verification_key (a : t) =
+        Zkapp_account.verification_key_wire (get_zkapp a)
 
-      let set_verification_key verification_key (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
+      let verification_key_txn_version (a : t) =
+        match (get_zkapp a).verification_key with
+        | Some { txn_version; _ } ->
+            txn_version
+        | None ->
+            Mina_numbers.Txn_version.zero
+
+      let set_verification_key verification_key txn_version (a : t) =
+        set_zkapp a ~f:(fun zkapp ->
+            { zkapp with
+              verification_key =
+                Option.map verification_key ~f:(fun vk ->
+                    { Zkapp_account.Vk_with_version.Poly.vk; txn_version } )
+            } )
 
       let verification_key_hash (a : t) =
         match a.zkapp with
         | None ->
             None
         | Some zkapp ->
-            Option.map zkapp.verification_key ~f:With_hash.hash
+            Option.map
+              (Zkapp_account.verification_key_wire zkapp)
+              ~f:With_hash.hash
 
       let last_action_slot (a : t) = (get_zkapp a).last_action_slot
 
@@ -1269,20 +1288,9 @@ module Make (L : Ledger_intf.S) :
 
       type txn_version = Txn_version.t
 
-      let txn_version (a : t) : txn_version =
-        snd a.permissions.set_verification_key
-
       let permissions (a : t) = a.permissions
 
       let set_permissions permissions (a : t) = { a with permissions }
-
-      let set_txn_version_to_current (a : t) =
-        let set_verification_key =
-          ( fst a.permissions.set_verification_key
-          , Mina_numbers.Txn_version.current )
-        in
-        let permissions = { a.permissions with set_verification_key } in
-        { a with permissions }
     end
 
     module Amount = struct
@@ -2312,9 +2320,10 @@ module For_tests = struct
                 { Zkapp_account.default with
                   verification_key =
                     Some
-                      { With_hash.hash = Zkapp_basic.F.zero
-                      ; data = Side_loaded_verification_key.dummy
-                      }
+                      (Zkapp_account.Vk_with_version.stamp_current
+                         { With_hash.hash = Zkapp_basic.F.zero
+                         ; data = Side_loaded_verification_key.dummy
+                         } )
                 }
             else None
           in

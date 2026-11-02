@@ -137,9 +137,10 @@ module Accounts = struct
                   t (List.length app_state)
             in
 
-            let verification_key =
-              Option.map verification_key
-                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
+            let%bind verification_key =
+              Zkapp_account.Vk_with_version.of_flat ~zkapp_version
+                (Option.map verification_key
+                   ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk) )
             in
             let%map action_state =
               if
@@ -159,7 +160,6 @@ module Accounts = struct
             Some
               { Zkapp_account.verification_key
               ; app_state
-              ; zkapp_version
               ; action_state
               ; last_action_slot
               ; proved_state
@@ -263,7 +263,6 @@ module Accounts = struct
           ~f:(fun
                { app_state
                ; verification_key
-               ; zkapp_version
                ; action_state
                ; last_action_slot
                ; proved_state
@@ -271,6 +270,9 @@ module Accounts = struct
                }
              ->
             let app_state = Zkapp_state.V.to_list app_state in
+            let verification_key, zkapp_version =
+              Zkapp_account.Vk_with_version.to_flat verification_key
+            in
             let verification_key =
               Option.map verification_key ~f:With_hash.data
             in
@@ -751,6 +753,6 @@ let%test_module "Runtime config" =
             zkapp
       in
       assert (
-        Option.equal Verification_key_wire.equal zkapp_account.verification_key
-          default.verification_key )
+        Option.equal Mina_base.Zkapp_account.Vk_with_version.equal
+          zkapp_account.verification_key default.verification_key )
   end )

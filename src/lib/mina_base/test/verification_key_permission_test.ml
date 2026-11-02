@@ -43,12 +43,11 @@ let update_vk_perm_with_different_version () =
           ~genesis_constants:Genesis_constants.For_unit_tests.t
           (Zkapp_command (update_vk_perm_to_be ~auth:(auth, different_version)))
       with
-      | Ok _ ->
+      | Ok () ->
+          ()
+      | Error _ ->
           raise
-            (Failure "Well-formedness check was expected to fail, but didn't")
-      | Error e ->
-          [%test_eq: User_command.Well_formedness_error.t list] e
-            [ Incompatible_version ] )
+            (Failure "Well-formedness check was expected to pass, but didn't") )
 
 let update_vk_perm_with_current_version () =
   Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
