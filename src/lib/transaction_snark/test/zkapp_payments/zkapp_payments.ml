@@ -241,6 +241,55 @@ let suite () =
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
     let () =
+      test "transfers to more receivers than one segment holds"
+      @@ fun () ->
+      (* A fee payer, a sender and 7 receivers: 9 non-proof account updates,
+         more than fit in one batched segment, so this proves a full batch
+         followed by another batch in the same transaction. *)
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, _new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let fee = Fee.of_nanomina_int_exn 1_000_000 in
+                  let amount = Amount.of_mina_int_exn 1 in
+                  let spec = List.hd_exn specs in
+                  let receivers =
+                    List.take (List.tl_exn specs) 7
+                    |> List.map ~f:(fun s ->
+                           ( Signature_lib.Public_key.compress
+                               (fst s.sender).public_key
+                           , amount ) )
+                  in
+                  assert (List.length receivers = 7) ;
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; fee_payer = None
+                    ; receivers
+                    ; amount =
+                        Amount.scale amount (List.length receivers)
+                        |> Option.value_exn
+                    ; zkapp_account_keypairs = []
+                    ; memo
+                    ; new_zkapp_account = false
+                    ; snapp_update = Account_update.Update.dummy
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; actions = []
+                    ; preconditions = None
+                    }
+                  in
+                  let zkapp_command =
+                    Transaction_snark.For_tests.multiple_transfers
+                      ~constraint_constants test_spec
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+
+    let () =
       test "zkapps payments failed due to insufficient funds"
       @@ fun () ->
       let open Mina_transaction_logic.For_tests in
