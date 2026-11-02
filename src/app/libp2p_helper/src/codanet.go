@@ -245,6 +245,27 @@ type Helper struct {
 	MsgStats          *MessageStats
 	NodeStatus        []byte
 	HeartbeatPeer     func(peer.ID)
+	peerstoreDs       *dsb.Datastore
+	dhtDs             *dsb.Datastore
+}
+
+// Close shuts down the DHT and the host, and then closes the datastores they
+// write to. It returns the first error it meets, but carries on closing the
+// rest.
+func (h *Helper) Close() error {
+	var firstErr error
+	record := func(err error) {
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if h.Dht != nil {
+		record(h.Dht.Close())
+	}
+	record(h.Host.Close())
+	record(h.peerstoreDs.Close())
+	record(h.dhtDs.Close())
+	return firstErr
 }
 
 type MessageStats struct {
@@ -816,6 +837,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			lanPatcher.Heartbeat(p)
 			wanPatcher.Heartbeat(p)
 		},
+		peerstoreDs: ds,
+		dhtDs:       dsDht,
 	}
 
 	// The peerstore persists across restarts, so it may still hold
