@@ -536,7 +536,7 @@ let%test_module "Transition_handler.Processor tests" =
       let catchup_scheduler =
         Catchup_scheduler.create ~logger ~precomputed_values ~verifier
           ~trust_system ~frontier ~time_controller ~catchup_job_writer
-          ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+          ~catchup_breadcrumbs_writer
       in
       create_handler
         ~context:(module Context)
@@ -646,7 +646,6 @@ let%test_module "Transition_handler.Processor tests" =
                     (Buffered
                        (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
-                let clean_up_catchup_scheduler = Ivar.create () in
                 let cache =
                   Unprocessed_transition_cache.create ~logger
                     ~cache_exceptions:true
@@ -655,7 +654,6 @@ let%test_module "Transition_handler.Processor tests" =
                   Catchup_scheduler.create ~logger ~precomputed_values ~verifier
                     ~trust_system ~frontier ~time_controller ~catchup_job_writer
                     ~catchup_breadcrumbs_writer
-                    ~clean_up_signal:clean_up_catchup_scheduler
                 in
                 let handle =
                   create_handler

@@ -73,25 +73,10 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~clean_up_signal =
+       Writer.t ) =
   let collected_transitions = State_hash.Table.create () in
   let parent_root_timeouts = State_hash.Table.create () in
   let validation_callbacks = State_hash.Table.create () in
-  upon (Ivar.read clean_up_signal) (fun () ->
-      Hashtbl.iter collected_transitions
-        ~f:
-          (List.iter ~f:(fun b ->
-               let hash =
-                 Cached.peek b |> Envelope.Incoming.data
-                 |> Validation.block_with_hash
-                 |> State_hash.With_state_hashes.state_hash
-               in
-               let vc = Hashtbl.find validation_callbacks hash in
-               Option.value_map ~default:ignore
-                 ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
-               ignore @@ Cached.invalidate_with_failure b ) ) ;
-      Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
-          Block_time.Timeout.cancel time_controller timeout () ) ) ;
   let breadcrumb_builder_supervisor =
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
@@ -132,6 +117,29 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   ; breadcrumb_builder_supervisor
   ; validation_callbacks
   }
+
+(** Release every block the scheduler holds, and cancel its timeouts. *)
+let clean_up
+    { collected_transitions
+    ; validation_callbacks
+    ; parent_root_timeouts
+    ; time_controller
+    ; _
+    } =
+  Hashtbl.iter collected_transitions
+    ~f:
+      (List.iter ~f:(fun b ->
+           let hash =
+             Cached.peek b |> Envelope.Incoming.data
+             |> Validation.block_with_hash
+             |> State_hash.With_state_hashes.state_hash
+           in
+           let vc = Hashtbl.find validation_callbacks hash in
+           Option.value_map ~default:ignore
+             ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
+           ignore @@ Cached.invalidate_with_failure b ) ) ;
+  Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
+      Block_time.Timeout.cancel time_controller timeout () )
 
 let mem t transition =
   Hashtbl.mem t.collected_transitions
@@ -412,7 +420,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
             create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~catchup_breadcrumbs_writer
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -443,6 +451,57 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
                   Strict_pipe.Writer.close catchup_job_writer ) )
 
+    let%test_unit "Cleaning up releases the blocks waiting for their parents" =
+      let timeout_duration = Block_time.Span.of_ms 200L in
+      let test_delta = Block_time.Span.of_ms 100L in
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
+        ~f:(fun (frontier, branch) ->
+          let catchup_job_reader, catchup_job_writer =
+            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+            Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          let disjoint_breadcrumb = List.last_exn branch in
+          let scheduler =
+            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer
+          in
+          let cache =
+            Unprocessed_transition_cache.create ~logger ~cache_exceptions:true
+          in
+          watch scheduler ~timeout_duration ~valid_cb:None
+            ~cached_transition:
+              ( downcast_breadcrumb disjoint_breadcrumb
+              |> Unprocessed_transition_cache.register_exn cache ) ;
+          let (), outcomes =
+            Block_outcome_log.For_tests.recording (fun () -> clean_up scheduler)
+          in
+          [%test_eq: Block_outcome_log.event list] outcomes
+            [ Cache_removed
+                { state_hash =
+                    Transition_frontier.Breadcrumb.state_hash
+                      disjoint_breadcrumb
+                ; outcome = `Failure
+                }
+            ] ;
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              match%map
+                Block_time.Timeout.await
+                  ~timeout_duration:
+                    Block_time.Span.(timeout_duration + test_delta)
+                  time_controller
+                  (Strict_pipe.Reader.read catchup_job_reader)
+              with
+              | `Timeout ->
+                  ()
+              | `Ok _ ->
+                  failwith "a catchup job was emitted after cleaning up" ) )
+
     let%test_unit "catchup jobs do not fire after timeout if they are \
                    invalidated" =
       let timeout_duration = Block_time.Span.of_ms 200L in
@@ -472,7 +531,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~catchup_breadcrumbs_writer
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -549,7 +608,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~catchup_breadcrumbs_writer
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch
