@@ -1047,23 +1047,26 @@ end = struct
                ~of_fee_payer:Account_update.of_fee_payer_no_aux
                ~of_account_update:Account_update.forget_aux zkapp_command )
     in
-    let batch ~kind account_updates stmts =
-      let rec take ~length controls_rev account_updates stmts =
-        match (account_updates, stmts) with
-        | ( { Account_update.Poly.authorization =
-                (Control.Poly.Signature _ | None_given) as control
-            ; _
-            }
-            :: account_updates
-          , _ :: stmts )
-          when length < batch_size ->
-            take ~length:(length + 1) (control :: controls_rev) account_updates
+    let rec next_non_proof_controls_batch ~length account_updates stmts =
+      match (account_updates, stmts) with
+      | ( { Account_update.Poly.authorization =
+              (Control.Poly.Signature _ | None_given) as control
+          ; _
+          }
+          :: account_updates
+        , _ :: stmts )
+        when length > 0 ->
+          let controls, account_updates, stmts =
+            next_non_proof_controls_batch ~length:(length - 1) account_updates
               stmts
-        | _ ->
-            (List.rev controls_rev, account_updates, stmts)
-      in
+          in
+          (control :: controls, account_updates, stmts)
+      | _ ->
+          ([], account_updates, stmts)
+    in
+    let batch ~kind account_updates stmts =
       let controls, remaining_account_updates, remaining_stmts =
-        take ~length:0 [] account_updates stmts
+        next_non_proof_controls_batch ~length:batch_size account_updates stmts
       in
       ( intermediate_state ~kind
           ~spec:(zkapp_segment_of_controls controls)
