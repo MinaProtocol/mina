@@ -18,7 +18,6 @@ open Otp_lib
 open Mina_base
 open Mina_block
 open Network_peer
-open Mina_net2
 
 type t =
   { logger : Logger.t
@@ -79,8 +78,7 @@ let release_unbuilt block_registry (cached_transition, _vc) =
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~block_registry ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
-       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-         * Validation_callback.t option )
+       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
@@ -106,8 +104,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
         | Ok trees_of_breadcrumbs ->
             if !building_stopped then
               List.iter trees_of_breadcrumbs ~f:(fun tree ->
-                  Mina_stdlib.Rose_tree.iter tree
-                    ~f:(fun (cached_breadcrumb, _vc) ->
+                  Mina_stdlib.Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
                       Block_registry.finish block_registry cached_breadcrumb
                         `Ignored ) )
             else
@@ -670,8 +667,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   failwith "pipe closed unexpectedly"
               | `Ok
                   (`Ok
-                    ( [ Mina_stdlib.Rose_tree.T ((received_breadcrumb, _vc), [])
-                      ]
+                    ( [ Mina_stdlib.Rose_tree.T (received_breadcrumb, []) ]
                     , `Catchup_scheduler ) ) ->
                   [%test_eq: State_hash.t]
                     (Transition_frontier.Breadcrumb.state_hash

@@ -963,9 +963,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         in
         step node
           (Deferred.map ~f:Result.return s)
-          ~f:
-            (on_built node ~start_time ~sender:av.sender ~parent_hash
-               (c, valid_cb) )
+          ~f:(on_built node ~start_time ~sender:av.sender ~parent_hash c)
   and on_downloaded node ~start_time (external_block, attempts) =
     let state_hash = node.state_hash in
     [%log' debug t.logger]
@@ -1071,7 +1069,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   and on_parent_added node (av, valid_cb) parent =
     set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
     run_node node
-  and on_built node ~start_time ~sender ~parent_hash (c, valid_cb) result =
+  and on_built node ~start_time ~sender ~parent_hash c result =
     match result with
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
@@ -1112,13 +1110,13 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         upon (Scheduler.yield ()) (fun () ->
             resume ~finished:node.result (fun () ->
-                on_yielded node (c, valid_cb) breadcrumb ) )
-  and on_yielded node (c, valid_cb) breadcrumb =
+                on_yielded node c breadcrumb ) )
+  and on_yielded node c breadcrumb =
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
     Strict_pipe.Writer.write catchup_breadcrumbs_writer
       ( [ Mina_stdlib.Rose_tree.of_non_empty_list
-            (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
+            (Mina_stdlib.Nonempty_list.singleton c)
         ]
       , `Ledger_catchup finished ) ;
     (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
@@ -1138,8 +1136,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~network ~frontier ~build_func ~block_registry ~schedule
     ~(catchup_breadcrumbs_writer :
-       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-         * Mina_net2.Validation_callback.t option )
+       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
@@ -1578,8 +1575,7 @@ let%test_module "Ledger_catchup tests" =
           , unit )
           Strict_pipe.Writer.t
       ; breadcrumbs_reader :
-          ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-            * Mina_net2.Validation_callback.t option )
+          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
             Mina_stdlib.Rose_tree.t
             list
           * [ `Catchup_scheduler | `Ledger_catchup of unit Ivar.t ] )
@@ -1676,7 +1672,7 @@ let%test_module "Ledger_catchup tests" =
               | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
                   let breadcrumb : Breadcrumb.t =
                     Mina_stdlib.Rose_tree.root (List.hd_exn breadcrumbs)
-                    |> Tuple2.get1 |> Cache_lib.Cached.invalidate_with_success
+                    |> Cache_lib.Cached.invalidate_with_success
                   in
                   Ivar.fill ivar () ; breadcrumb )
         in

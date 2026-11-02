@@ -357,13 +357,13 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       subtree
                       (* It could be the case that by the time we try and
                          * add the breadcrumb, it's no longer relevant when
-                         * we're catching up *) ~f:(fun (b, valid_cb) ->
+                         * we're catching up *) ~f:(fun b ->
                         let state_hash =
                           Frontier_base.Breadcrumb.state_hash (Cached.peek b)
                         in
                         let%map result =
                           add_and_finalize ~logger ~only_if_present:true
-                            ~source:`Catchup ~valid_cb b
+                            ~source:`Catchup ~valid_cb:None b
                         in
                         Internal_tracing.with_state_hash state_hash
                         @@ fun () ->
@@ -381,8 +381,7 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 ()
             | Error err ->
                 List.iter breadcrumb_subtrees ~f:(fun tree ->
-                    Mina_stdlib.Rose_tree.iter tree
-                      ~f:(fun (cached_breadcrumb, _vc) ->
+                    Mina_stdlib.Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
                         Block_registry.finish block_registry cached_breadcrumb
                           `Ignored ) ) ;
                 [%log error]
@@ -618,7 +617,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let subtree =
                   List.map chain ~f:(fun breadcrumb ->
-                      (cached_breadcrumb breadcrumb, None) )
+                      cached_breadcrumb breadcrumb )
                   |> Mina_stdlib.Nonempty_list.of_list_opt |> Option.value_exn
                   |> Mina_stdlib.Rose_tree.of_non_empty_list
                 in
@@ -741,7 +740,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let subtree =
                   Mina_stdlib.Rose_tree.of_non_empty_list
-                    (Mina_stdlib.Nonempty_list.singleton (cached, None))
+                    (Mina_stdlib.Nonempty_list.singleton cached)
                 in
                 let%bind () =
                   handle
@@ -843,7 +842,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let subtree =
                   Mina_stdlib.Rose_tree.of_non_empty_list
-                    (Mina_stdlib.Nonempty_list.singleton (cached, Some valid_cb))
+                    (Mina_stdlib.Nonempty_list.singleton cached)
                 in
                 let%bind () =
                   handle
@@ -895,11 +894,10 @@ let%test_module "Transition_handler.Processor tests" =
                     frontier ~capacity:1
                 in
                 let cached breadcrumb =
-                  ( Block_registry.register_exn block_registry
-                      (downcast_breadcrumb breadcrumb)
-                      ~valid_cb:None
-                    |> Cached.transform ~f:(fun _ -> breadcrumb)
-                  , None )
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb breadcrumb)
+                    ~valid_cb:None
+                  |> Cached.transform ~f:(fun _ -> breadcrumb)
                 in
                 let subtree =
                   Mina_stdlib.Rose_tree.T

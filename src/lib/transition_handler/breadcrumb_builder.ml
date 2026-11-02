@@ -50,11 +50,12 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
         |> Deferred.return
       in
       Mina_stdlib.Rose_tree.Deferred.Or_error.fold_map_over_subtrees
-        subtree_of_enveloped_transitions
-        ~init:(Cached.pure init_breadcrumb, None)
-        ~f:(fun (cached_parent, _parent_vc)
-                ( Mina_stdlib.Rose_tree.T
-                    ((cached_enveloped_transition, valid_cb), _) as subtree ) ->
+        subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
+        ~f:(fun
+             cached_parent
+             ( Mina_stdlib.Rose_tree.T
+                 ((cached_enveloped_transition, _valid_cb), _) as subtree )
+           ->
           let%map.Deferred cached_result =
             Cached.transform cached_enveloped_transition
               ~f:(fun enveloped_transition ->
@@ -166,5 +167,4 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                             Deferred.return (Or_error.of_exn exn) ) ) )
             |> Cached.sequence_deferred
           in
-          Result.map ~f:(Fn.flip Tuple2.create valid_cb)
-          @@ Cached.sequence_result cached_result ) )
+          Cached.sequence_result cached_result ) )
