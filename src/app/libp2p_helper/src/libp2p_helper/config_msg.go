@@ -153,9 +153,13 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) (*capnp.Message, f
 						app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
 					} else {
 						for peer := range peerCh {
-							foundPeerCh <- peerDiscovery{
+							select {
+							case foundPeerCh <- peerDiscovery{
 								info:   peer,
 								source: PEER_DISCOVERY_SOURCE_ROUTING,
+							}:
+							case <-app.Ctx.Done():
+								return
 							}
 						}
 					}
