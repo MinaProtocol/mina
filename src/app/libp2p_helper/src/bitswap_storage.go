@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ipfs/boxo/blockstore"
 	blocks "github.com/ipfs/go-block-format"
@@ -43,6 +44,25 @@ type BitswapStorageLmdb struct {
 	// functioning as a set. Querying reference DB by the `<key>` prefix
 	// allows to determine whether some root is still referencing the key
 	refsDB lmdb.DBI
+	// closeLock is held for reading by every operation and for writing by
+	// Close, so that Close waits for operations in flight and operations
+	// after it fail rather than use the closed environment.
+	closeLock sync.RWMutex
+	closed    bool
+}
+
+// ErrBitswapStorageClosed is returned by operations on a closed storage.
+var ErrBitswapStorageClosed = errors.New("bitswap storage is closed")
+
+// whileOpen runs f unless the storage is closed, keeping it open until f
+// returns.
+func (bs *BitswapStorageLmdb) whileOpen(f func() error) error {
+	bs.closeLock.RLock()
+	defer bs.closeLock.RUnlock()
+	if bs.closed {
+		return ErrBitswapStorageClosed
+	}
+	return f()
 }
 
 func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
@@ -74,16 +94,18 @@ func (b *BitswapStorageLmdb) Blockstore() blockstore.Blockstore {
 }
 
 func (bs *BitswapStorageLmdb) UpdateReferences(ctx context.Context, root [32]byte, exists bool, keys ...[32]byte) error {
-	for _, key := range keys {
-		compositeKey := append(key[:], root[:]...)
-		err := bs.blockstore.PutData(ctx, bs.refsDB, compositeKey, func([]byte, bool) ([]byte, bool, error) {
-			return nil, exists, nil
-		})
-		if err != nil {
-			return err
+	return bs.whileOpen(func() error {
+		for _, key := range keys {
+			compositeKey := append(key[:], root[:]...)
+			err := bs.blockstore.PutData(ctx, bs.refsDB, compositeKey, func([]byte, bool) ([]byte, bool, error) {
+				return nil, exists, nil
+			})
+			if err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
@@ -99,32 +121,41 @@ func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 }
 
 func (bs *BitswapStorageLmdb) StoreBlocks(ctx context.Context, blocks []blocks.Block) error {
-	return bs.blockstore.PutMany(ctx, blocks)
+	return bs.whileOpen(func() error {
+		return bs.blockstore.PutMany(ctx, blocks)
+	})
 }
 
 func (bs *BitswapStorageLmdb) ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error {
-	return bs.blockstore.View(ctx, BlockHashToCid(key), callback)
+	return bs.whileOpen(func() error {
+		return bs.blockstore.View(ctx, BlockHashToCid(key), callback)
+	})
 }
 
 func (bs *BitswapStorageLmdb) GetStatus(ctx context.Context, key [32]byte) (res RootBlockStatus, err error) {
-	r, err := bs.blockstore.GetData(ctx, bs.statusDB, key[:])
-	if err != nil {
-		return
-	}
-	res, err = UnmarshalRootBlockStatus(r)
+	err = bs.whileOpen(func() error {
+		r, err := bs.blockstore.GetData(ctx, bs.statusDB, key[:])
+		if err != nil {
+			return err
+		}
+		res, err = UnmarshalRootBlockStatus(r)
+		return err
+	})
 	return
 }
 
 func (bs *BitswapStorageLmdb) DeleteStatus(ctx context.Context, key [32]byte) error {
-	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
-		prev, err := UnmarshalRootBlockStatus(prevVal)
-		if err != nil {
-			return nil, false, err
-		}
-		if exists && prev != Deleting {
-			return nil, false, fmt.Errorf("wrong status deletion from %d", prev)
-		}
-		return nil, false, nil
+	return bs.whileOpen(func() error {
+		return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
+			prev, err := UnmarshalRootBlockStatus(prevVal)
+			if err != nil {
+				return nil, false, err
+			}
+			if exists && prev != Deleting {
+				return nil, false, fmt.Errorf("wrong status deletion from %d", prev)
+			}
+			return nil, false, nil
+		})
 	})
 }
 
@@ -136,19 +167,21 @@ func isStatusTransitionAllowed(exists bool, prev RootBlockStatus, newStatus Root
 }
 
 func (bs *BitswapStorageLmdb) SetStatus(ctx context.Context, key [32]byte, newStatus RootBlockStatus) error {
-	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
-		var prev RootBlockStatus
-		if exists {
-			var err error
-			prev, err = UnmarshalRootBlockStatus(prevVal)
-			if err != nil {
-				return nil, false, err
+	return bs.whileOpen(func() error {
+		return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
+			var prev RootBlockStatus
+			if exists {
+				var err error
+				prev, err = UnmarshalRootBlockStatus(prevVal)
+				if err != nil {
+					return nil, false, err
+				}
 			}
-		}
-		if !isStatusTransitionAllowed(exists, prev, newStatus) {
-			return nil, false, fmt.Errorf("wrong status transition: from %d to %d (exists: %v)", prev, newStatus, exists)
-		}
-		return []byte{byte(newStatus)}, true, nil
+			if !isStatusTransitionAllowed(exists, prev, newStatus) {
+				return nil, false, fmt.Errorf("wrong status transition: from %d to %d (exists: %v)", prev, newStatus, exists)
+			}
+			return []byte{byte(newStatus)}, true, nil
+		})
 	})
 }
 
@@ -177,10 +210,12 @@ func (bs *BitswapStorageLmdb) DeleteBlocks(ctx context.Context, keys [][32]byte)
 	for i := range keys {
 		keys_[i] = keys[i][:]
 	}
-	return bs.blockstore.DeleteBlocksIf(ctx, keys_, func(txn *lmdb.Txn, key []byte) (bool, error) {
-		// Delete a block from blocksDB if it has no references in the refsDB
-		hasPrefix, err := hasKeyWithPrefix(bs.refsDB, txn, key)
-		return !hasPrefix, err
+	return bs.whileOpen(func() error {
+		return bs.blockstore.DeleteBlocksIf(ctx, keys_, func(txn *lmdb.Txn, key []byte) (bool, error) {
+			// Delete a block from blocksDB if it has no references in the refsDB
+			hasPrefix, err := hasKeyWithPrefix(bs.refsDB, txn, key)
+			return !hasPrefix, err
+		})
 	})
 }
 
@@ -231,7 +266,15 @@ func BlockHashToCidSuffix(h [32]byte) string {
 	return s[len(s)-6:]
 }
 
+// Close waits for operations in flight and closes the storage. Operations
+// after it return ErrBitswapStorageClosed, and later calls do nothing.
 func (b *BitswapStorageLmdb) Close() {
+	b.closeLock.Lock()
+	defer b.closeLock.Unlock()
+	if b.closed {
+		return
+	}
+	b.closed = true
 	b.blockstore.CloseDB(b.statusDB)
 	b.blockstore.Close()
 }
