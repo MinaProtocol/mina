@@ -885,36 +885,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         let%bind external_block, attempts =
           step (Downloader.Job.result download_job)
         in
-        [%log' debug t.logger]
-          ~metadata:
-            [ ("state_hash", State_hash.to_yojson state_hash)
-            ; ( "donwload_number"
-              , `Int
-                  (Hashtbl.count t.nodes ~f:(fun node ->
-                       Node.State.Enum.equal
-                         (Node.State.enum node.state)
-                         To_download ) ) )
-            ; ("total_nodes", `Int (Hashtbl.length t.nodes))
-            ; ( "node_states"
-              , let s = Node.State.Enum.Table.create () in
-                Hashtbl.iter t.nodes ~f:(fun node ->
-                    Hashtbl.incr s (Node.State.enum node.state) ) ;
-                `List
-                  (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                       `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
-            ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-            ; ("downloader", Downloader.to_yojson downloader)
-            ]
-          "download finished $state_hash" ;
-        node.attempts <- attempts ;
-        Mina_metrics.(
-          Gauge.set Catchup.download_time
-            Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-        set_state t node (To_initial_validate external_block) ;
-        run_node node
-    | To_initial_validate external_block -> (
+        on_downloaded node ~start_time (external_block, attempts)
+    | To_initial_validate external_block ->
         let start_time = Time.now () in
-        match%bind
+        let%bind result =
           step
             ( initial_validate
                 ~context:(module Context)
@@ -925,38 +899,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                     { With_hash.data = external_block.data; hash = state_hash }
                 }
             |> Deferred.map ~f:(fun x -> Ok x) )
-        with
-        | Error (`Error e) ->
-            (* TODO: Log *)
-            (* Validation failed. Record the failure and go back to download. *)
-            failed ~error:e ~sender:external_block.sender `Initial_validate
-        | Error `Couldn't_reach_verifier ->
-            retry ()
-        | Ok result -> (
-            Mina_metrics.(
-              Gauge.set Catchup.initial_validation_time
-                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-            match result with
-            | `In_frontier hash -> (
-                match Transition_frontier.find frontier hash with
-                | None ->
-                    [%log' error t.logger]
-                      "Failed to find transition in frontier despite \
-                       In_frontier result"
-                      ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-                    failwithf
-                      "Failed to find transition %s in frontier despite \
-                       In_frontier result"
-                      (State_hash.to_base58_check hash)
-                      ()
-                | Some _ ->
-                    finish t node ~is_error:false ;
-                    Deferred.return (Ok ()) )
-            | `Building_path tv ->
-                (* To_initial_validate may only occur for a downloaded block,
-                   hence there is no validation callback *)
-                set_state t node (To_verify (tv, None)) ;
-                run_node node ) )
+        in
+        on_initial_validated node ~start_time ~sender:external_block.sender
+          result
     | To_verify (tv, valid_cb) -> (
         [%log debug] "To_verify $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
@@ -1111,6 +1056,70 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
             set_state t node Finished ;
             return () )
+  and on_downloaded node ~start_time (external_block, attempts) =
+    let state_hash = node.state_hash in
+    [%log' debug t.logger]
+      ~metadata:
+        [ ("state_hash", State_hash.to_yojson state_hash)
+        ; ( "donwload_number"
+          , `Int
+              (Hashtbl.count t.nodes ~f:(fun node ->
+                   Node.State.Enum.equal
+                     (Node.State.enum node.state)
+                     To_download ) ) )
+        ; ("total_nodes", `Int (Hashtbl.length t.nodes))
+        ; ( "node_states"
+          , let s = Node.State.Enum.Table.create () in
+            Hashtbl.iter t.nodes ~f:(fun node ->
+                Hashtbl.incr s (Node.State.enum node.state) ) ;
+            `List
+              (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
+                   `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
+        ; ("total_jobs", `Int (Downloader.total_jobs downloader))
+        ; ("downloader", Downloader.to_yojson downloader)
+        ]
+      "download finished $state_hash" ;
+    node.attempts <- attempts ;
+    Mina_metrics.(
+      Gauge.set Catchup.download_time
+        Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+    set_state t node (To_initial_validate external_block) ;
+    run_node node
+  and on_initial_validated node ~start_time ~sender result =
+    let failed = failed node in
+    let retry () = retry node in
+    match result with
+    | Error (`Error e) ->
+        (* TODO: Log *)
+        (* Validation failed. Record the failure and go back to download. *)
+        failed ~error:e ~sender `Initial_validate
+    | Error `Couldn't_reach_verifier ->
+        retry ()
+    | Ok result -> (
+        Mina_metrics.(
+          Gauge.set Catchup.initial_validation_time
+            Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+        match result with
+        | `In_frontier hash -> (
+            match Transition_frontier.find frontier hash with
+            | None ->
+                [%log' error t.logger]
+                  "Failed to find transition in frontier despite In_frontier \
+                   result"
+                  ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
+                failwithf
+                  "Failed to find transition %s in frontier despite \
+                   In_frontier result"
+                  (State_hash.to_base58_check hash)
+                  ()
+            | Some _ ->
+                finish t node ~is_error:false ;
+                Deferred.return (Ok ()) )
+        | `Building_path tv ->
+            (* To_initial_validate may only occur for a downloaded block,
+               hence there is no validation callback *)
+            set_state t node (To_verify (tv, None)) ;
+            run_node node )
   in
   run_node
 
