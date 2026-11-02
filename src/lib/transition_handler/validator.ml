@@ -303,3 +303,117 @@ let create_handler ~context:(module Context : CONTEXT) ~trust_system
               "Validation error: external transition with state hash \
                $state_hash was rejected for reason $reason" ;
             Deferred.unit )
+
+let%test_module "Transition_handler.Validator tests" =
+  ( module struct
+    open Async
+
+    let logger = Logger.null ()
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    let trust_system = Trust_system.null ()
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.For_tests.default ~constraint_constants ~logger
+            ~proof_level:precomputed_values.proof_level () )
+
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
+
+    (* A frontier holding just a root, and a chain of breadcrumbs on it. *)
+    let gen_frontier_and_chain =
+      let branch_size = 1 in
+      Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+        ~verifier ~max_length:(branch_size + 1) ~frontier_size:1 ~branch_size ()
+
+    (* [breadcrumb]'s block as it arrives from the network. *)
+    let incoming_block breadcrumb =
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      |> Mina_block.Validated.remember
+      |> Mina_block.Validation.reset_frontier_dependencies_validation
+      |> Mina_block.Validation.reset_staged_ledger_diff_validation
+      |> fun data -> Envelope.Incoming.wrap ~data ~sender:Envelope.Sender.Local
+
+    (* Validate [breadcrumb]'s block against [frontier], returning how its
+       validation callback resolved and the state hashes of the transitions
+       written on as valid. *)
+    let validate frontier breadcrumb =
+      Thread_safe.block_on_async_exn (fun () ->
+          let valid_transition_reader, valid_transition_writer =
+            Pipe_lib.Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
+          in
+          let unprocessed_transition_cache =
+            Unprocessed_transition_cache.create ~logger ~cache_exceptions:false
+          in
+          let handle =
+            create_handler
+              ~context:(module Context)
+              ~trust_system ~time_controller ~frontier ~valid_transition_writer
+              ~unprocessed_transition_cache
+          in
+          let vc =
+            Mina_net2.Validation_callback.create
+              (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+          in
+          let resolved = ref None in
+          Mina_net2.Validation_callback.set_on_resolve vc (fun outcome ->
+              resolved := Some outcome ) ;
+          let%bind () =
+            handle (`Block (incoming_block breadcrumb), `Valid_cb (Some vc))
+          in
+          Pipe_lib.Strict_pipe.Writer.close valid_transition_writer ;
+          let valid = ref [] in
+          let%map () =
+            Pipe_lib.Strict_pipe.Reader.iter valid_transition_reader
+              ~f:(fun x ->
+                valid := x :: !valid ;
+                Deferred.unit )
+          in
+          ( !resolved
+          , List.rev_map !valid ~f:(fun (b_or_h, `Valid_cb _) ->
+                match b_or_h with
+                | `Block cached ->
+                    let block =
+                      Cache_lib.Cached.invalidate_with_failure cached
+                    in
+                    State_hash.With_state_hashes.state_hash
+                      (Mina_block.Validation.block_with_hash
+                         (Envelope.Incoming.data block) )
+                | `Header h ->
+                    State_hash.With_state_hashes.state_hash
+                      (fst (Envelope.Incoming.data h)) ) ) )
+
+    type resolution = [ `Accept | `Reject | `Ignore | `Expired ] option
+    [@@deriving compare, sexp]
+
+    let%test_unit "A block already in the frontier is ignored" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, _chain) ->
+          let resolved, valid =
+            validate frontier (Transition_frontier.root frontier)
+          in
+          [%test_eq: resolution] resolved (Some `Ignore) ;
+          [%test_eq: State_hash.t list] valid [] )
+
+    let%test_unit "A block extending the frontier is passed on unanswered" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let block = List.hd_exn chain in
+          let resolved, valid = validate frontier block in
+          [%test_eq: resolution] resolved None ;
+          [%test_eq: State_hash.t list] valid
+            [ Transition_frontier.Breadcrumb.state_hash block ] )
+  end )
