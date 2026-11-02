@@ -4,6 +4,7 @@
 -- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + genesis_accounts: the accounts of each era's genesis ledger
 -- + token_symbols.value, zkapp_uris.value: text -> bytea
+-- + drop zkapp_permissions.set_verification_key_txn_version
 -- + record status in migration_history
 --
 -- Add further 5.0.0 schema changes here as they land, and bump
@@ -26,7 +27,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '5.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.3';
+SET archive.migration_version = '0.0.4';
 
 -- TODO: put below in a common script
 
@@ -101,7 +102,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea; drop zkapp_permissions.set_verification_key_txn_version.',
             'starting'::migration_status
         );
     ELSIF
@@ -118,7 +119,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea.',
+            'Upgrade from protocol version 4.0.0 to 5.0.0. Index user_commands.{fee_payer_id,source_id,receiver_id}; add genesis_accounts; token_symbols/zkapp_uris value to bytea; drop zkapp_permissions.set_verification_key_txn_version.',
             'starting'::migration_status
         );
     ELSIF
@@ -281,7 +282,16 @@ BEGIN
     END LOOP;
 END $$;
 
--- 5. Update schema_history
+-- 5. zkapp_permissions.set_verification_key_txn_version
+--
+-- The set_verification_key permission no longer stores a transaction version.
+-- Rows that differed only in it are left as they are: the archive looks
+-- permissions up by the lowest matching id, and nothing else relies on rows
+-- being distinct. Dropping a column only changes the catalog, so the ACCESS
+-- EXCLUSIVE lock it takes is brief.
+ALTER TABLE zkapp_permissions DROP COLUMN IF EXISTS set_verification_key_txn_version;
+
+-- 6. Update schema_history
 
 DO $$
 BEGIN

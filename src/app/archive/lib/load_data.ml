@@ -176,7 +176,6 @@ let update_of_id pool update_id =
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key_auth
-                  ; set_verification_key_txn_version = _
                   ; set_zkapp_uri
                   ; edit_action_state
                   ; set_token_symbol
@@ -711,7 +710,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; set_delegate
             ; set_permissions
             ; set_verification_key_auth
-            ; set_verification_key_txn_version = _
             ; set_zkapp_uri
             ; edit_action_state
             ; set_token_symbol
