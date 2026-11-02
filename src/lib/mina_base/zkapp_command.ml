@@ -1064,7 +1064,7 @@ end = struct
       | _ ->
           ([], account_updates, stmts)
     in
-    let batch ~kind account_updates stmts =
+    let next_non_proof_controls_batch ~kind account_updates stmts =
       let controls, remaining_account_updates, remaining_stmts =
         next_non_proof_controls_batch ~length:batch_size account_updates stmts
       in
@@ -1093,7 +1093,7 @@ end = struct
              the same transaction. Batch up to [batch_size] of them.
           *)
           let segment, zkapp_command, stmts =
-            batch ~kind:`Same zkapp_command stmts
+            next_non_proof_controls_batch ~kind:`Same zkapp_command stmts
           in
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
@@ -1108,7 +1108,7 @@ end = struct
              start of a new transaction. Batch up to [batch_size] of them.
           *)
           let segment, zkapp_command, stmts =
-            batch ~kind:`New zkapp_command stmts
+            next_non_proof_controls_batch ~kind:`New zkapp_command stmts
           in
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
