@@ -74,9 +74,15 @@ let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
       let%map () = Transition_frontier.add_breadcrumb_exn frontier breadcrumb in
       true
   in
-  if not (Cached.is_pure cached_breadcrumb) then
-    Block_registry.finish block_registry cached_breadcrumb
-      (if added then `Added else `Ignored) ;
+  (* Produced blocks are not registered, and have no callback. *)
+  let valid_cb =
+    if Cached.is_pure cached_breadcrumb then None
+    else if added then
+      Block_registry.finish_added block_registry cached_breadcrumb
+    else (
+      Block_registry.finish block_registry cached_breadcrumb `Ignored ;
+      None )
+  in
   Block_outcome_log.record (fun () ->
       Frontier_add
         { state_hash; source = (source :> Block_outcome_log.source); added } ) ;
@@ -694,6 +700,58 @@ let%test_module "Transition_handler.Processor tests" =
           in
           [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
             [ `Ignore ] )
+
+    let%test_unit "An added block is passed on with its registered callback" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let breadcrumb = List.hd_exn chain in
+          let valid_cb =
+            Mina_net2.Validation_callback.create
+              (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+          in
+          let passed_on =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let processed_reader, processed_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
+                in
+                let handle =
+                  handler_for ~block_registry ~processed_transition_writer
+                    frontier ~capacity:1
+                in
+                let cached =
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb breadcrumb)
+                    ~valid_cb:(Some valid_cb)
+                  |> Cached.transform ~f:(fun _ -> breadcrumb)
+                in
+                let subtree =
+                  Mina_stdlib.Rose_tree.of_non_empty_list
+                    (Mina_stdlib.Nonempty_list.singleton (cached, None))
+                in
+                let%bind () =
+                  handle
+                    (`Catchup_breadcrumbs
+                      ([ subtree ], `Ledger_catchup (Ivar.create ())) )
+                in
+                Strict_pipe.Writer.close processed_transition_writer ;
+                let passed_on = ref [] in
+                let%map () =
+                  Strict_pipe.Reader.iter processed_reader
+                    ~f:(fun (_, _, `Valid_cb vc) ->
+                      passed_on := vc :: !passed_on ;
+                      Deferred.unit )
+                in
+                !passed_on )
+          in
+          match passed_on with
+          | [ Some vc ] ->
+              assert (phys_equal vc valid_cb)
+          | _ ->
+              failwith "expected the block passed on once, with its callback" )
 
     let%test_unit "A catchup block whose parent is not in the frontier is \
                    ignored, not passed on" =
