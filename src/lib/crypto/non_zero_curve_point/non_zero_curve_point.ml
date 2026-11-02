@@ -274,3 +274,25 @@ module Uncompressed = struct
 end
 
 include Uncompressed
+
+let%test_module "parity_var" =
+  ( module struct
+    let check y =
+      Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal Typ.field
+        Boolean.typ parity_var parity y
+
+    let two_to n = Fn.apply_n_times ~n (fun x -> Field.(x + x)) Field.one
+
+    let%test_unit "agrees with parity on random field elements" =
+      Quickcheck.test ~trials:100 Field.gen ~f:check
+
+    let%test_unit "agrees with parity at boundaries" =
+      let p_minus k = Field.(negate (of_int k)) in
+      List.iter ~f:check
+        ( List.map [ 0; 1; 2; 3 ] ~f:Field.of_int
+        @ List.map [ 1; 2; 3; 4 ] ~f:p_minus
+        @ List.concat_map [ 128; 254 ] ~f:(fun n ->
+              [ Field.(two_to n - one); two_to n; Field.(two_to n + one) ] )
+        @ List.map [ -1; 0; 1; 2 ] ~f:(fun k ->
+              Field.(p_minus 1 - two_to 128 + of_int k) ) )
+  end )
