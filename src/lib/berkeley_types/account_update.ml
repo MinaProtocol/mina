@@ -18,8 +18,7 @@ module Update = struct
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             Mina_base.Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
-        ; permissions :
-            Mina_base.Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         ; zkapp_uri :
             Mina_base.Zkapp_account.Zkapp_uri.Stable.V1.t
             Set_or_keep.Stable.V1.t
@@ -51,7 +50,7 @@ module Update = struct
     { app_state = Zkapp_state.V.to_mesa app_state ~pad:Set_or_keep.Keep
     ; delegate
     ; verification_key
-    ; permissions
+    ; permissions = Set_or_keep.map permissions ~f:Permissions.to_mesa
     ; zkapp_uri
     ; token_symbol
     ; timing
