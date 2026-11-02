@@ -108,6 +108,20 @@ let is_transition_for_bootstrap
           ~context:(module Context)
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
+(** Which controller the transition router is running. No blocks are produced
+    while bootstrapping, except in a rare race between bootstrap and block
+    creation, so produced blocks only go anywhere while participating. *)
+type phase =
+  | Starting  (** Neither controller has started yet. *)
+  | Bootstrapping
+  | Participating of
+      { producer_transition_writer :
+          ( Transition_frontier.Breadcrumb.t
+          , Strict_pipe.synchronous
+          , unit Deferred.t )
+          Strict_pipe.Writer.t
+      }
+
 (** What the transition router shares between the controllers it starts. *)
 type t =
   { context : (module CONTEXT)
@@ -118,13 +132,7 @@ type t =
   ; get_completed_work :
          Transaction_snark_work.Statement.t
       -> Transaction_snark_work.Checked.t option
-  ; producer_transition_writer_ref :
-      ( Transition_frontier.Breadcrumb.t
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
-      option
-      ref
+  ; phase : phase ref
   ; verified_transition_writer :
       ( [ `Transition of Mina_block.Validated.t ]
         * [ `Source of Block_outcome_log.source ]
@@ -156,7 +164,7 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
       ; network
       ; time_controller
       ; get_completed_work
-      ; producer_transition_writer_ref
+      ; phase
       ; verified_transition_writer
       ; clear_reader
       ; cache_exceptions
@@ -174,12 +182,7 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
   in
-  (* No block production happens when bootstrap is running. The
-     [producer_transition_writer_ref] pipe was created just to substitute a
-     value for the type and was never actually used. It could have been read
-     only by the transition frontier controller, and it's not running when
-     bootstrap controller is active *)
-  producer_transition_writer_ref := Some producer_transition_writer ;
+  phase := Participating { producer_transition_writer } ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let start_and_iterate =
     let%bind transition_frontier_controller_reader =
@@ -206,7 +209,7 @@ let start_bootstrap_controller t ~initial_root_transition ~best_seen_transition
   let { trust_system
       ; verifier
       ; network
-      ; producer_transition_writer_ref
+      ; phase
       ; network_transition_pipe
       ; consensus_local_state
       ; frontier_w
@@ -221,7 +224,7 @@ let start_bootstrap_controller t ~initial_root_transition ~best_seen_transition
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   Bootstrap_status.start_bootstrap bootstrap_status ;
-  producer_transition_writer_ref := None ;
+  phase := Bootstrapping ;
   let f b_or_h =
     Strict_pipe.Swappable.write network_transition_pipe (b_or_h, `Valid_cb None) ;
     let sender =
@@ -623,7 +626,7 @@ let update_most_recent_valid_block ~context:(module Context : CONTEXT)
 let route_valid_transition t ~get_current_frontier ~clear_writer
     (b_or_h, `Valid_cb vc) =
   let (module Context : CONTEXT) = t.context in
-  let { producer_transition_writer_ref; network_transition_pipe; _ } = t in
+  let { phase; network_transition_pipe; _ } = t in
   don't_wait_for
   @@ let%map () =
        let header_with_hash =
@@ -636,8 +639,11 @@ let route_valid_transition t ~get_current_frontier ~clear_writer
                ~context:(module Context)
                frontier header_with_hash
            then (
-             Option.iter ~f:Strict_pipe.Writer.kill
-               !producer_transition_writer_ref ;
+             ( match !phase with
+             | Participating { producer_transition_writer } ->
+                 Strict_pipe.Writer.kill producer_transition_writer
+             | Starting | Bootstrapping ->
+                 () ) ;
              let initial_root_transition =
                Transition_frontier.(
                  Breadcrumb.validated_transition (root frontier))
@@ -686,17 +692,15 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
-  (* Ref is None when bootstrap is in progress and Some writer when it's catch-up.
-     In fact, we don't expect any produced blocks during bootstrap (possible only in rare case
-     of race condition between bootstrap and block creation) *)
-  let producer_transition_writer_ref = ref None in
+  let phase = ref Starting in
   O1trace.background_thread "transition_router" (fun () ->
       don't_wait_for
       @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
-             Option.value_map ~f:Strict_pipe.Writer.write
-               ~default:(Fn.const Deferred.unit)
-               !producer_transition_writer_ref
-               x ) ;
+             match !phase with
+             | Participating { producer_transition_writer } ->
+                 Strict_pipe.Writer.write producer_transition_writer x
+             | Starting | Bootstrapping ->
+                 Deferred.unit ) ;
       Bootstrap_status.set_phase bootstrap_status Waiting_for_genesis ;
       let%bind () =
         wait_till_genesis ~logger ~time_controller ~precomputed_values
@@ -762,7 +766,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         ; network
         ; time_controller
         ; get_completed_work
-        ; producer_transition_writer_ref
+        ; phase
         ; verified_transition_writer
         ; clear_reader
         ; network_transition_pipe
