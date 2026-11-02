@@ -136,8 +136,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~f:validate_transition ) ;
   let catchup_scheduler =
     Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
-      ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
-      ~catchup_breadcrumbs_writer
+      ~block_registry ~verifier ~trust_system ~frontier ~time_controller
+      ~catchup_job_writer ~catchup_breadcrumbs_writer
   in
   let process_message =
     Transition_handler.Processor.create_handler
