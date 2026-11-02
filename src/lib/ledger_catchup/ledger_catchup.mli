@@ -23,21 +23,15 @@ module Catchup_jobs : sig
   val reader : int Broadcast_pipe.Reader.t
 end
 
-val run :
+(** Set up catchup for [frontier], and return the function that handles one
+    catchup job: the parent hash of a forest of blocks whose ancestry is
+    missing, and the forest. *)
+val create_job_handler :
      context:(module CONTEXT)
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> frontier:Transition_frontier.t
-  -> catchup_job_reader:
-       ( State_hash.t
-       * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-         * Mina_net2.Validation_callback.t option )
-         Mina_stdlib.Rose_tree.t
-         list )
-       Strict_pipe.Reader.t
   -> catchup_breadcrumbs_writer:
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
@@ -49,4 +43,12 @@ val run :
        Strict_pipe.Writer.t
   -> unprocessed_transition_cache:
        Transition_handler.Unprocessed_transition_cache.t
-  -> unit
+  -> (   State_hash.t
+         * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
+             , State_hash.t )
+             Cached.t
+           * Mina_net2.Validation_callback.t option )
+           Mina_stdlib.Rose_tree.t
+           list
+      -> unit )
+     Deferred.t
