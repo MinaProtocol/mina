@@ -2,8 +2,8 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type 'a t = 'a Mina_wire_types.Mina_base.With_status.V2.t =
+  module V3 = struct
+    type 'a t = 'a Mina_wire_types.Mina_base.With_status.V3.t =
       { data : 'a; status : Transaction_status.Stable.V3.t }
     [@@deriving sexp, yojson, equal, compare, fields]
 

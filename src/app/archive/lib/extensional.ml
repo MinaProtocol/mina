@@ -13,7 +13,7 @@ open Signature_lib
 module User_command = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       (* for `command_type` and `status`, a string is enough
          in any case, there aren't existing string conversions for the
          original OCaml types
@@ -56,7 +56,7 @@ end
 module Internal_command = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       (* for `command_type`, a string is enough
          no existing string conversion for the original OCaml type
       *)
@@ -86,7 +86,7 @@ end
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         { sequence_no : int
         ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
@@ -139,9 +139,9 @@ module Block = struct
         ; global_slot_since_genesis :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         ; timestamp : Block_time.Stable.V1.t
-        ; user_cmds : User_command.Stable.V2.t list
-        ; internal_cmds : Internal_command.Stable.V2.t list
-        ; zkapp_cmds : Zkapp_command.Stable.V2.t list
+        ; user_cmds : User_command.Stable.V3.t list
+        ; internal_cmds : Internal_command.Stable.V3.t list
+        ; zkapp_cmds : Zkapp_command.Stable.V3.t list
         ; protocol_version : Protocol_version.Stable.V2.t
         ; proposed_protocol_version : Protocol_version.Stable.V2.t option
         ; chain_status : Chain_status.Stable.V1.t

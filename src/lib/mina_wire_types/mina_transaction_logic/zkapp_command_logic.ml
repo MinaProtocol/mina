@@ -24,7 +24,7 @@ module Local_state = struct
   end
 
   module Value = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Mina_base.Stack_frame.Digest.V1.t
         , Mina_base.Call_stack_digest.V1.t
