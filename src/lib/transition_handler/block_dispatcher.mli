@@ -8,10 +8,9 @@ open Network_peer
     missing, and the forest. *)
 type catchup_job =
   State_hash.t
-  * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-      , State_hash.t )
-      Cache_lib.Cached.t
-    * Mina_net2.Validation_callback.t option )
+  * ( Mina_block.initial_valid_block Envelope.Incoming.t
+    , State_hash.t )
+    Cache_lib.Cached.t
     Mina_stdlib.Rose_tree.t
     list
 

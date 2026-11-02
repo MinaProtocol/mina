@@ -25,7 +25,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
               , `List
                   (List.map subtrees_of_enveloped_transitions ~f:(fun subtree ->
                        Mina_stdlib.Rose_tree.to_yojson
-                         (fun (enveloped_transitions, _vc) ->
+                         (fun enveloped_transitions ->
                            let transition, _ =
                              enveloped_transitions |> Cached.peek
                              |> Envelope.Incoming.data
@@ -53,8 +53,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
         subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
         ~f:(fun
              cached_parent
-             ( Mina_stdlib.Rose_tree.T
-                 ((cached_enveloped_transition, _valid_cb), _) as subtree )
+             ( Mina_stdlib.Rose_tree.T (cached_enveloped_transition, _) as
+             subtree )
            ->
           let%map.Deferred cached_result =
             Cached.transform cached_enveloped_transition
@@ -133,7 +133,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                           in
                           List.fold subtree_nodes
                             ~init:(Set.empty (module Network_peer.Peer))
-                            ~f:(fun inet_addrs (node, _vc) ->
+                            ~f:(fun inet_addrs node ->
                               match sender_from_tree_node node with
                               | Local ->
                                   failwith

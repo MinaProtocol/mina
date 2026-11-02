@@ -1155,12 +1155,12 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
   let pre_context
       (trees :
-        ((Mina_block.initial_valid_block Envelope.Incoming.t, _) Cached.t * _)
+        (Mina_block.initial_valid_block Envelope.Incoming.t, _) Cached.t
         Mina_stdlib.Rose_tree.t
         list ) =
     let f tree =
       let best = ref None in
-      Mina_stdlib.Rose_tree.iter tree ~f:(fun (x, _vc) ->
+      Mina_stdlib.Rose_tree.iter tree ~f:(fun x ->
           let x, _ = Envelope.Incoming.data (Cached.peek x) in
           best :=
             combine !best
@@ -1270,17 +1270,16 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
         let state_hashes =
           let target_length =
             let len =
-              forest_pick forest |> Tuple2.get1 |> Cached.peek
-              |> Envelope.Incoming.data |> Mina_block.Validation.block
-              |> Mina_block.blockchain_length
+              forest_pick forest |> Cached.peek |> Envelope.Incoming.data
+              |> Mina_block.Validation.block |> Mina_block.blockchain_length
             in
             Option.value_exn (Length.sub len (Length.of_int 1))
           in
           let blockchain_length_of_target_hash =
             let blockchain_length_of_dangling_block =
-              List.hd_exn forest |> Mina_stdlib.Rose_tree.root |> Tuple2.get1
-              |> Cached.peek |> Envelope.Incoming.data
-              |> Mina_block.Validation.block |> Mina_block.blockchain_length
+              List.hd_exn forest |> Mina_stdlib.Rose_tree.root |> Cached.peek
+              |> Envelope.Incoming.data |> Mina_block.Validation.block
+              |> Mina_block.blockchain_length
             in
             Unsigned.UInt32.pred blockchain_length_of_dangling_block
           in
@@ -1288,7 +1287,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
           match
             List.find_map
               (List.concat_map ~f:Mina_stdlib.Rose_tree.flatten forest)
-              ~f:(fun (c, _vc) ->
+              ~f:(fun c ->
                 let h =
                   State_hash.With_state_hashes.state_hash
                     (Mina_block.Validation.block_with_hash (Cached.peek c).data)
@@ -1320,7 +1319,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               let preferred_peers =
                 List.fold
                   (List.concat_map ~f:Mina_stdlib.Rose_tree.flatten forest)
-                  ~init:Peer.Set.empty ~f:(fun acc (c, _vc) ->
+                  ~init:Peer.Set.empty ~f:(fun acc c ->
                     match (Cached.peek c).sender with
                     | Local ->
                         acc
@@ -1344,7 +1343,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               List.iter forest ~f:(fun subtree ->
                   let transition =
                     Mina_stdlib.Rose_tree.root subtree
-                    |> Tuple2.get1 |> Cached.peek |> Envelope.Incoming.data
+                    |> Cached.peek |> Envelope.Incoming.data
                   in
                   let children_transitions =
                     List.concat_map
@@ -1352,8 +1351,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                       ~f:Mina_stdlib.Rose_tree.flatten
                   in
                   let children_state_hashes =
-                    List.map children_transitions
-                      ~f:(fun (cached_transition, _vc) ->
+                    List.map children_transitions ~f:(fun cached_transition ->
                         Cached.peek cached_transition
                         |> Envelope.Incoming.data
                         |> Mina_block.Validation.block_with_hash
@@ -1385,7 +1383,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
             List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, _vc) ->
+                Mina_stdlib.Rose_tree.iter subtree ~f:(fun node ->
                     (* TODO consider rejecting the callback in some cases,
                        see https://github.com/MinaProtocol/mina/issues/11087 *)
                     Transition_handler.Block_registry.finish block_registry node
@@ -1420,10 +1418,10 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
             (* if state_hashes is Ok, then we iterate through the forest and fold over state_hashes and call run_state_machine on each node.  order doesn't really matter because nodes called "out of order" will enter the `Wait_for_parent` state and begin running again when ready *)
             List.iter forest
               ~f:
-                (Mina_stdlib.Rose_tree.iter ~f:(fun b_and_c ->
+                (Mina_stdlib.Rose_tree.iter ~f:(fun b ->
                      let node =
                        create_node ~logger ~downloader t
-                         (`Initial_validated b_and_c)
+                         (`Initial_validated (b, None))
                      in
                      run_state_machine node ) ) ;
             ignore
@@ -1565,10 +1563,9 @@ let%test_module "Ledger_catchup tests" =
       { cache : Transition_handler.Unprocessed_transition_cache.t
       ; job_writer :
           ( State_hash.t
-            * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-                , State_hash.t )
-                Cached.t
-              * Mina_net2.Validation_callback.t option )
+            * ( Mina_block.initial_valid_block Envelope.Incoming.t
+              , State_hash.t )
+              Cached.t
               Mina_stdlib.Rose_tree.t
               list
           , Strict_pipe.crash Strict_pipe.buffered
@@ -1644,8 +1641,7 @@ let%test_module "Ledger_catchup tests" =
           (downcast_breadcrumb target_breadcrumb)
       in
       Strict_pipe.Writer.write test.job_writer
-        ( parent_hash
-        , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
+        (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
       (`Test test, `Cached_transition target_transition)
 
     let rec call_read ~target_best_tip_path ~breadcrumbs_reader
@@ -1800,8 +1796,7 @@ let%test_module "Ledger_catchup tests" =
           in
           [%log info] "download state hashes fails unit test" ;
           Strict_pipe.Writer.write test.job_writer
-            ( parent_hash
-            , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
+            (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
@@ -1898,8 +1893,7 @@ let%test_module "Ledger_catchup tests" =
               (downcast_breadcrumb target_breadcrumb)
           in
           Strict_pipe.Writer.write test.job_writer
-            ( parent_hash
-            , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
+            (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
               let final = Cache_lib.Cached.final_state target_transition in
               match%map

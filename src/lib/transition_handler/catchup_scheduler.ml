@@ -24,10 +24,9 @@ type t =
   ; time_controller : Block_time.Controller.t
   ; catchup_job_writer :
       ( State_hash.t
-        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+        * ( Mina_block.initial_valid_block Envelope.Incoming.t
+          , State_hash.t )
+          Cached.t
           Mina_stdlib.Rose_tree.t
           list
       , crash buffered
@@ -55,10 +54,9 @@ type t =
   ; parent_root_timeouts : unit Block_time.Timeout.t State_hash.Table.t
   ; breadcrumb_builder_supervisor :
       ( State_hash.t
-      * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-          , State_hash.t )
-          Cached.t
-        * Mina_net2.Validation_callback.t option )
+      * ( Mina_block.initial_valid_block Envelope.Incoming.t
+        , State_hash.t )
+        Cached.t
         Mina_stdlib.Rose_tree.t
         list )
       Capped_supervisor.t
@@ -70,7 +68,7 @@ type t =
 
 (* Release a block that won't be built, along with its validation
    callback. *)
-let release_unbuilt block_registry (cached_transition, _vc) =
+let release_unbuilt block_registry cached_transition =
   (* TODO consider rejecting the callback in some cases,
      see https://github.com/MinaProtocol/mina/issues/11087 *)
   Block_registry.finish block_registry cached_transition `Ignored
@@ -199,7 +197,7 @@ let rec extract_subtree t cached_transition =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
   in
   Mina_stdlib.Rose_tree.T
-    ((cached_transition, None), List.map successors ~f:(extract_subtree t))
+    (cached_transition, List.map successors ~f:(extract_subtree t))
 
 let extract_forest t hash =
   let successors =
@@ -473,8 +471,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           ignore
             ( Cached.invalidate_with_failure (Cached.transform failed ~f:Fn.id)
               : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
-          release_unbuilt block_registry (failed, None) ;
-          release_unbuilt block_registry (unbuilt, None) ;
+          release_unbuilt block_registry failed ;
+          release_unbuilt block_registry unbuilt ;
           assert (Ivar.is_full (Cached.final_state unbuilt)) )
 
     let%test_unit "Cleaning up releases the blocks waiting for their parents" =

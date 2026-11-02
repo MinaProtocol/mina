@@ -44,10 +44,9 @@ val create_job_handler :
   -> block_registry:Transition_handler.Block_registry.t
   -> schedule:((unit -> unit) -> unit)
   -> (   State_hash.t
-         * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-             , State_hash.t )
-             Cached.t
-           * Mina_net2.Validation_callback.t option )
+         * ( Mina_block.initial_valid_block Envelope.Incoming.t
+           , State_hash.t )
+           Cached.t
            Mina_stdlib.Rose_tree.t
            list
       -> unit )
