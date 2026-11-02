@@ -303,13 +303,3 @@ let create_handler ~context:(module Context : CONTEXT) ~trust_system
               "Validation error: external transition with state hash \
                $state_hash was rejected for reason $reason" ;
             Deferred.unit )
-
-let run ~context ~trust_system ~time_controller ~frontier ~transition_reader
-    ~valid_transition_writer ~unprocessed_transition_cache =
-  let handle_transition =
-    create_handler ~context ~trust_system ~time_controller ~frontier
-      ~valid_transition_writer ~unprocessed_transition_cache
-  in
-  O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
-      Pipe_lib.Choosable_synchronous_pipe.iter transition_reader
-        ~f:handle_transition )

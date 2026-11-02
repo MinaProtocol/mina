@@ -133,11 +133,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true ) ) ;
-  Transition_handler.Validator.run
-    ~context:(module Context)
-    ~trust_system ~time_controller ~frontier
-    ~transition_reader:network_transition_reader ~valid_transition_writer
-    ~unprocessed_transition_cache ;
+  let validate_transition =
+    Transition_handler.Validator.create_handler
+      ~context:(module Context)
+      ~trust_system ~time_controller ~frontier ~valid_transition_writer
+      ~unprocessed_transition_cache
+  in
+  O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
+      Pipe_lib.Choosable_synchronous_pipe.iter network_transition_reader
+        ~f:validate_transition ) ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
