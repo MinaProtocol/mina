@@ -1,0 +1,11 @@
+(test
+ (name test_mina_metrics)
+ (package mina_metrics)
+ (libraries
+  alcotest
+  core_kernel
+  prometheus
+  mina_metrics
+  mina_metrics.prometheus)
+ (preprocess
+  (pps ppx_jane)))
