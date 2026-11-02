@@ -805,12 +805,12 @@ let forest_pick forest =
     node has been removed or has finished, and whatever it was resuming with
     has been released. *)
 let create_resumption_queue () =
-  let resumptions_r, resumptions_w = Pipe.create () in
-  don't_wait_for
-    (Pipe.iter_without_pushback resumptions_r ~f:(fun (finished, resumption) ->
-         if Ivar.is_empty finished then resumption () ) ) ;
+  let loop =
+    Otp_lib.Event_loop.create ~handle:(fun (finished, resumption) ->
+        if Ivar.is_empty finished then resumption () )
+  in
   fun ~finished resumption ->
-    Pipe.write_without_pushback resumptions_w (finished, resumption)
+    Otp_lib.Event_loop.submit loop (finished, resumption)
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
