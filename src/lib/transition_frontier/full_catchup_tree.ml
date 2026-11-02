@@ -51,21 +51,18 @@ module Node = struct
       | To_download of Downloader_job.t
       | To_initial_validate of Mina_block.t Envelope.Incoming.t
       | To_verify of
-          ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          ( Mina_block.initial_valid_block Envelope.Incoming.t
+          , State_hash.t )
+          Cached.t
       | Wait_for_parent of
-          ( ( Mina_block.almost_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          ( Mina_block.almost_valid_block Envelope.Incoming.t
+          , State_hash.t )
+          Cached.t
       | To_build_breadcrumb of
-          ( [ `Parent of State_hash.t ]
+          [ `Parent of State_hash.t ]
           * ( Mina_block.almost_valid_block Envelope.Incoming.t
             , State_hash.t )
             Cached.t
-          * Mina_net2.Validation_callback.t option )
       (* TODO: Name this to Initial_root *)
       | Root of Breadcrumb.t Ivar.t
 
@@ -157,24 +154,12 @@ let remove_state states (node : Node.t) =
     | Some hashes ->
         State_hash.Set.remove hashes node.state_hash )
 
-(** How the catchup tree gives up the block a removed node holds, along with
-    the block's validation callback. *)
-type release =
-  { release :
-      'a.
-         ('a, State_hash.t) Cached.t
-      -> Mina_net2.Validation_callback.t option
-      -> unit
-  }
+(** How the catchup tree gives up the block a removed node holds. *)
+type release = { release : 'a. ('a, State_hash.t) Cached.t -> unit }
 
-(** Answer the callback [Ignore] and fail the block's cache entry. *)
+(** Fail the block's cache entry. *)
 let release_directly =
-  { release =
-      (fun c vc ->
-        Option.value_map ~default:ignore
-          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-        ignore (Cached.invalidate_with_failure c : _) )
-  }
+  { release = (fun c -> ignore (Cached.invalidate_with_failure c : _)) }
 
 (* Invariant: The length of the path from each best tip to its oldest
    ancestor is at most k *)
@@ -339,20 +324,17 @@ let remove_node' t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
-  | Wait_for_parent (c, vc) ->
-      if not (Cached.was_consumed c) then t.release.release c vc
-      else
-        Option.value_map ~default:ignore
-          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore
+  | Wait_for_parent c ->
+      if not (Cached.was_consumed c) then t.release.release c
   | To_download _job ->
       (* TODO: Cancel job somehow *)
       ()
   | To_initial_validate _ ->
       ()
-  | To_verify (c, vc) ->
-      t.release.release c vc
-  | To_build_breadcrumb (_parent, c, vc) ->
-      t.release.release c vc
+  | To_verify c ->
+      t.release.release c
+  | To_build_breadcrumb (_parent, c) ->
+      t.release.release c
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with

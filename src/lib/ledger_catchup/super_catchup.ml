@@ -738,7 +738,7 @@ let create_node ~logger ~downloader t x =
         , l
         , parent
         , Ivar.create () )
-    | `Initial_validated (b, valid_cb) ->
+    | `Initial_validated b ->
         let t = (Cached.peek b).Envelope.Incoming.data in
         let state_hash =
           Mina_block.Validation.block_with_hash t
@@ -755,7 +755,7 @@ let create_node ~logger ~downloader t x =
               , Mina_numbers.Length.to_yojson blockchain_length )
             ] ;
         [%log internal] "To_verify" ;
-        ( Node.State.To_verify (b, valid_cb)
+        ( Node.State.To_verify b
         , state_hash
         , Mina_block.Validation.block t |> Mina_block.blockchain_length
         , Mina_block.Validation.block t
@@ -909,10 +909,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           |> Deferred.map ~f:(fun x -> Ok x) )
           ~f:
             (on_initial_validated node ~start_time ~sender:external_block.sender)
-    | To_verify (tv, valid_cb) ->
-        [%log debug] "To_verify $state_hash %s callback"
-          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+    | To_verify tv ->
+        [%log debug] "To_verify $state_hash"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         let start_time = Time.now () in
         let iv = Cached.peek tv in
         (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
@@ -921,11 +920,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
              this node gets removed from the tree. *)
           ( Verify_work_batcher.verify verify_work_batcher iv
           |> Deferred.map ~f:Result.return )
-          ~f:(on_verified node ~start_time ~sender:iv.sender (tv, valid_cb))
-    | Wait_for_parent (av, valid_cb) ->
-        [%log debug] "Wait_for_parent $state_hash %s callback"
-          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+          ~f:(on_verified node ~start_time ~sender:iv.sender tv)
+    | Wait_for_parent av ->
+        [%log debug] "Wait_for_parent $state_hash"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         step node
           (let parent = Hashtbl.find_exn t.nodes node.parent in
            match%map.Async.Deferred Ivar.read parent.result with
@@ -938,11 +936,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                  `Ignored ;
                finish t node ~is_error:true ;
                Error `Finished )
-          ~f:(on_parent_added node (av, valid_cb))
-    | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) ->
-        [%log debug] "To_build_breadcrumb $state_hash %s callback"
-          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+          ~f:(on_parent_added node av)
+    | To_build_breadcrumb (`Parent parent_hash, c) ->
+        [%log debug] "To_build_breadcrumb $state_hash"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         let start_time = Time.now () in
         let transition_receipt_time = Some start_time in
         let av = Cached.peek c in
@@ -1023,9 +1020,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         | `Building_path tv ->
             (* To_initial_validate may only occur for a downloaded block,
                hence there is no validation callback *)
-            set_state t node (To_verify (tv, None)) ;
+            set_state t node (To_verify tv) ;
             run_node node )
-  and on_verified node ~start_time ~sender (tv, valid_cb) result =
+  and on_verified node ~start_time ~sender tv result =
     match result with
     | Error _e ->
         [%log' debug t.logger] "Couldn't reach verifier. Retrying"
@@ -1064,10 +1061,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               }
             in
             let av = Cached.transform tv ~f:(fun _ -> av) in
-            set_state t node (Wait_for_parent (av, valid_cb)) ;
+            set_state t node (Wait_for_parent av) ;
             run_node node )
-  and on_parent_added node (av, valid_cb) parent =
-    set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
+  and on_parent_added node av parent =
+    set_state t node (To_build_breadcrumb (`Parent parent, av)) ;
     run_node node
   and on_built node ~start_time ~sender ~parent_hash c result =
     match result with
@@ -1149,7 +1146,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   upon stop (fun () -> tear_down t) ;
   set_release t
     { release =
-        (fun c _vc ->
+        (fun c ->
           Transition_handler.Block_registry.finish block_registry c `Ignored )
     } ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
@@ -1420,8 +1417,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               ~f:
                 (Mina_stdlib.Rose_tree.iter ~f:(fun b ->
                      let node =
-                       create_node ~logger ~downloader t
-                         (`Initial_validated (b, None))
+                       create_node ~logger ~downloader t (`Initial_validated b)
                      in
                      run_state_machine node ) ) ;
             ignore
