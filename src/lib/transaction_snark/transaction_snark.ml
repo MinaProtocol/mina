@@ -4264,8 +4264,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         , Pickles.Provers.
             [ base
             ; merge
-            ; opt_signed_opt_signed
-            ; opt_signed
+            ; _opt_signed_opt_signed
+            ; _opt_signed
             ; proved
             ; opt_signed_batch
             ] ) =
@@ -4331,24 +4331,25 @@ module Make_str (A : Wire_types.Concrete) = struct
     let of_zkapp_command_segment_exn ~(statement : Proof.statement) ~witness
         ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
       Base.Zkapp_command_snark.witness := Some witness ;
+      let batch used =
+        if used < 1 || used > Zkapp_command_segment.Basic.opt_signed_batch_size
+        then
+          failwithf
+            "of_zkapp_command_segment_exn: Opt_signed_batch of %d account \
+             updates"
+            used () ;
+        opt_signed_batch
+          ~handler:(Base.Zkapp_command_snark.handle_used_slots used)
+          statement
+      in
       let res =
         match spec with
         | Opt_signed ->
-            opt_signed statement
+            batch 1
         | Opt_signed_opt_signed ->
-            opt_signed_opt_signed statement
+            batch 2
         | Opt_signed_batch used ->
-            if
-              used < 1
-              || used > Zkapp_command_segment.Basic.opt_signed_batch_size
-            then
-              failwithf
-                "of_zkapp_command_segment_exn: Opt_signed_batch of %d account \
-                 updates"
-                used () ;
-            opt_signed_batch
-              ~handler:(Base.Zkapp_command_snark.handle_used_slots used)
-              statement
+            batch used
         | Proved -> (
             match snapp_proof_data ~witness with
             | None ->
