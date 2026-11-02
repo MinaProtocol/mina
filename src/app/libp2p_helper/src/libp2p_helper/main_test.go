@@ -217,11 +217,11 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 	// assert we are able to send and receive multiple messages with size up to 1 << 10 bytes
 	appA, _ := newTestApp(t, nil, false)
 	appA.NoDHT = true
-	defer appA.P2p.Host.Close()
+	defer appA.P2p.Close()
 
 	appB, _ := newTestApp(t, nil, false)
 	appB.NoDHT = true
-	defer appB.P2p.Host.Close()
+	defer appB.P2p.Close()
 
 	// connect the two nodes
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -251,11 +251,11 @@ func TestLibp2pMetrics(t *testing.T) {
 	// assert we are able to get the correct metrics of libp2p node
 	appA, _ := newTestApp(t, nil, false)
 	appA.NoDHT = true
-	defer appA.P2p.Host.Close()
+	defer appA.P2p.Close()
 
 	appB, _ := newTestApp(t, nil, false)
 	appB.NoDHT = true
-	defer appB.P2p.Host.Close()
+	defer appB.P2p.Close()
 
 	// connect the two nodes
 	appAInfos, err := addrInfos(appA.P2p.Host)
