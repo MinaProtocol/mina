@@ -124,6 +124,51 @@ let bucketEnvList =
 
           in  Optional/toList Text maybeBucket
 
+let lowerName =
+          \(repo : DebianRepo)
+      ->  merge
+            { Unstable = "unstable"
+            , Nightly = "nightly"
+            , Stable = "stable"
+            , O1Test = "o1test"
+            }
+            repo
+
+let envOverride
+    : Optional (List DebianRepo)
+    =
+      -- The repositories a release pipeline publishes its debians to, if it
+      -- says. A list, because one release can go to more than one: the
+      -- unsigned packages.o1test.net that every consumer still reads, and the
+      -- signed repository of the channel.
+      --
+      -- An environment variable rather than a field on the job, for the same
+      -- reason as MINA_RELEASE_DOCKER_REPO (see DockerRepo.dhall): the job is
+      -- shared by every release pipeline, and only the environment of the
+      -- render can tell them apart. The value is a Dhall list, spelled out in
+      -- full, one element per repository:
+      --
+      --   MINA_RELEASE_DEBIAN_REPOS='[ < Unstable | Nightly | Stable | O1Test >.O1Test, < Unstable | Nightly | Stable | O1Test >.Stable ]'
+      --
+      -- Verbose for the reason given in DockerRepo.dhall: a plain word cannot
+      -- be turned into an alternative, and a typo must fail the type check
+      -- rather than pass as a string. A value that does not resolve at all
+      -- collapses into None here, the same as unset, which the ? cannot tell
+      -- apart; validate-release-env.sh checks the spelling before the render
+      -- so that case stops the build instead of publishing to the default.
+      --
+      -- WARNING: do not write an import here (see DockerRepo.dhall).
+        Some (env:MINA_RELEASE_DEBIAN_REPOS : List DebianRepo)
+      ? None (List DebianRepo)
+
+let effective
+    : List DebianRepo -> List DebianRepo
+    =
+      -- The repositories to publish to: what the pipeline asked for, else
+      -- what the job declares.
+          \(declared : List DebianRepo)
+      ->  Optional/default (List DebianRepo) declared envOverride
+
 in  { Type = DebianRepo
     , keyIdEnvList = keyIdEnvList
     , bucketEnvList = bucketEnvList
@@ -135,4 +180,7 @@ in  { Type = DebianRepo
     , keyId = keyId
     , keyArg = keyArg
     , isSigned = isSigned
+    , lowerName = lowerName
+    , envOverride = envOverride
+    , effective = effective
     }
