@@ -15,12 +15,15 @@ module type CONTEXT = sig
   val signature_kind : Mina_signature_kind.t
 end
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
+    ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
+    ~unprocessed_transition_cache =
   match Transition_frontier.catchup_state frontier with
   | Full _ ->
-      Super_catchup.run
+      Super_catchup.create_job_handler
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+        ~trust_system ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
+        ~unprocessed_transition_cache
+        ~build_func:
+          (Transition_frontier.Breadcrumb.build
+             ~get_completed_work:(Core_kernel.Fn.const None) )
