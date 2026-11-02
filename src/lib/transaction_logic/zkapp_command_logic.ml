@@ -1576,6 +1576,15 @@ module Make (Inputs : Inputs_intf) = struct
       Controller.if_ verification_key_is_stale ~then_:(fallback_logic auth)
         ~else_:auth
     in
+    (* A proof made against a stale key is never accepted, whatever the
+       permissions would otherwise allow. *)
+    let local_state =
+      Local_state.add_check local_state Proof_with_outdated_verification_key
+        Bool.(
+          not
+            ( Account_update.is_proved account_update
+            &&& verification_key_is_stale ))
+    in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
       let has_permission =
