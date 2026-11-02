@@ -212,9 +212,8 @@ let daemon ~logger ~interval archive blocks =
   in
   loop ()
 
-(* The environment variables of the bash script this program replaces. Each
-   flag falls back to its variable, so the program is configured the same way
-   as before. *)
+(* Each flag falls back to an environment variable; a flag wins over its
+   variable. *)
 module Env = struct
   let get name =
     match Sys.getenv name with
@@ -246,8 +245,8 @@ module Env = struct
   let archive_uri_vars =
     [ "DB_USERNAME"; "PGPASSWORD"; "DB_HOST"; "DB_PORT"; "DB_NAME" ]
 
-  (* The archive URI, from --archive-uri or from the five variables the bash
-     script built its connection string from. *)
+  (* The archive URI, from --archive-uri or built from DB_USERNAME, PGPASSWORD,
+     DB_HOST, DB_PORT and DB_NAME. *)
   let archive_uri = function
     | Some uri ->
         Uri.of_string uri

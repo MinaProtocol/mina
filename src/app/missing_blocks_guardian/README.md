@@ -2,8 +2,7 @@ Missing Blocks Guardian
 =======================
 
 `mina-missing-blocks-guardian` finds the blocks that an archive database
-lacks and restores them from a bucket of block files. It replaces the bash
-script `scripts/archive/missing-blocks-guardian.sh`.
+lacks and restores them from a bucket of block files.
 
 It runs `mina-missing-blocks-auditor` to find the first block whose parent
 is missing, downloads that parent as
@@ -22,8 +21,7 @@ Subcommands
 Flags and environment variables
 -------------------------------
 
-Each flag falls back to the environment variable the bash script used, so
-the program is configured the same way as before. A flag wins over its
+Each flag falls back to an environment variable. A flag wins over its
 variable.
 
 | Flag | Environment variable | Subcommands | Meaning |
@@ -49,7 +47,7 @@ mina-missing-blocks-guardian single-run \
   --network mainnet
 ```
 
-With the environment of the bash script:
+With environment variables:
 
 ```
 DB_USERNAME=postgres PGPASSWORD=postgres DB_HOST=localhost DB_PORT=5432 DB_NAME=archive \
