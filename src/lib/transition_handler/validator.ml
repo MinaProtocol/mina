@@ -204,7 +204,7 @@ let create_handler ~context:(module Context : CONTEXT) ~trust_system
         | exception _ ->
             () ) ;
         [%log internal] "Validate_transition_done" ;
-        on_valid (b_or_h', `Valid_cb vc)
+        on_valid b_or_h'
     | Error err -> (
         (* Every dropped block must answer its callback, or libp2p
            times it out and penalises the sender. *)
@@ -373,7 +373,7 @@ let%test_module "Transition_handler.Validator tests" =
             handle (`Block (incoming_block breadcrumb), `Valid_cb (Some vc))
           in
           ( !resolved
-          , List.rev_map !valid ~f:(fun (b_or_h, `Valid_cb _) ->
+          , List.rev_map !valid ~f:(fun b_or_h ->
                 match b_or_h with
                 | `Block cached ->
                     let block =

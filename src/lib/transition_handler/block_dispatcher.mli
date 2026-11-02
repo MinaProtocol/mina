@@ -21,7 +21,6 @@ type validated =
     , State_hash.t )
     Cache_lib.Cached.t
   | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
-  * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
 
 type event =
   | Validated of validated

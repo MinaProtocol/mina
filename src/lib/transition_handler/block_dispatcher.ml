@@ -15,7 +15,6 @@ type validated =
     , State_hash.t )
     Cache_lib.Cached.t
   | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
-  * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
 
 type event =
   | Validated of validated
@@ -73,12 +72,11 @@ let%test_module "Block_dispatcher" =
     (* The genesis block's header, validated as far as the validator leaves
        it. *)
     let validated : validated =
-      ( `Header
-          ( Mina_block.genesis ~precomputed_values
-          |> Mina_block.Validation.reset_frontier_dependencies_validation
-          |> Mina_block.Validation.reset_staged_ledger_diff_validation
-          |> Mina_block.Validation.to_header |> Envelope.Incoming.local )
-      , `Valid_cb None )
+      `Header
+        ( Mina_block.genesis ~precomputed_values
+        |> Mina_block.Validation.reset_frontier_dependencies_validation
+        |> Mina_block.Validation.reset_staged_ledger_diff_validation
+        |> Mina_block.Validation.to_header |> Envelope.Incoming.local )
 
     let job i : catchup_job =
       ( Quickcheck.random_value

@@ -36,20 +36,19 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
+    cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let module Inclusion_time = Mina_metrics.Block_latency.Inclusion_time in
   let breadcrumb = Cached.peek cached_breadcrumb in
   let consensus_constants = precomputed_values.consensus_constants in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
-  [%log debug] "add_and_finalize $state_hash %s callback"
+  [%log debug] "add_and_finalize $state_hash"
     ~metadata:
       [ ( "state_hash"
         , Transition_frontier.Breadcrumb.state_hash breadcrumb
           |> State_hash.to_yojson )
-      ]
-    (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+      ] ;
   let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
@@ -115,7 +114,7 @@ let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~block_registry ~catchup_scheduler
-    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
+    ~processed_transition_writer ~time_controller ~block_or_header
     ?transaction_pool_proxy =
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
@@ -320,7 +319,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       let%map.Deferred result =
         add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
           ~processed_transition_writer ~only_if_present:false ~time_controller
-          ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb
+          ~source:`Gossip breadcrumb ~precomputed_values
       in
       ( match result with
       | Ok () ->
@@ -363,7 +362,7 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                         in
                         let%map result =
                           add_and_finalize ~logger ~only_if_present:true
-                            ~source:`Catchup ~valid_cb:None b
+                            ~source:`Catchup b
                         in
                         Internal_tracing.with_state_hash state_hash
                         @@ fun () ->
@@ -419,7 +418,7 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
             let%map () =
               match%map
                 add_and_finalize ~logger ~only_if_present:false
-                  ~source:`Internal breadcrumb ~valid_cb:None
+                  ~source:`Internal breadcrumb
               with
               | Ok () ->
                   [%log internal] "Breadcrumb_integrated" ;
@@ -439,19 +438,17 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
             Mina_metrics.(
               Gauge.dec_one
                 Transition_frontier_controller.transitions_being_processed)
-        | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb) ->
-            process_transition ~block_or_header ~valid_cb
-              ?transaction_pool_proxy )
+        | `Partially_valid_transition block_or_header ->
+            process_transition ~block_or_header ?transaction_pool_proxy )
 
 (** The processor's inputs, each mapped to the message its handler takes. *)
 let inputs
     ~(primary_transition_reader :
-       ( [ `Block of
-           ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
+       [ `Block of
+         ( Mina_block.initial_valid_block Envelope.Incoming.t
+         , State_hash.t )
+         Cached.t
+       | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
        Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~catchup_breadcrumbs_reader =
@@ -662,9 +659,7 @@ let%test_module "Transition_handler.Processor tests" =
                     ~valid_cb:(Some valid_cb)
                 in
                 let%map () =
-                  handle
-                    (`Partially_valid_transition
-                      (`Block cached, `Valid_cb (Some valid_cb)) )
+                  handle (`Partially_valid_transition (`Block cached))
                 in
                 List.rev !answers )
           in
@@ -702,9 +697,7 @@ let%test_module "Transition_handler.Processor tests" =
                 Block_registry.register_header block_registry header
                   ~valid_cb:(Some valid_cb) ;
                 let%map () =
-                  handle
-                    (`Partially_valid_transition
-                      (`Header header, `Valid_cb (Some valid_cb)) )
+                  handle (`Partially_valid_transition (`Header header))
                 in
                 List.rev !answers )
           in
@@ -797,9 +790,7 @@ let%test_module "Transition_handler.Processor tests" =
                     ~valid_cb:(Some valid_cb)
                 in
                 let%map () =
-                  handle
-                    (`Partially_valid_transition
-                      (`Block cached, `Valid_cb (Some valid_cb)) )
+                  handle (`Partially_valid_transition (`Block cached))
                 in
                 List.rev !answers )
           in
@@ -977,8 +968,7 @@ let%test_module "Transition_handler.Processor tests" =
                       downcast_breadcrumb breadcrumb
                       |> Unprocessed_transition_cache.register_exn cache
                     in
-                    Strict_pipe.Writer.write valid_transition_writer
-                      (`Block b, `Valid_cb None) ) ;
+                    Strict_pipe.Writer.write valid_transition_writer (`Block b) ) ;
                 match%map
                   Block_time.Timeout.await
                     ~timeout_duration:(Block_time.Span.of_ms 30000L)
