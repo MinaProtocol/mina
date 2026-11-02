@@ -103,7 +103,11 @@ let suite () =
       test "account update using Proof auth when perm is set to Either"
       @@ fun () ->
       mk_update_perm_check ~current_auth:Proof ~account_perm:Either
-        ~vk_txn_version:older_version ()
+        ~vk_txn_version:older_version
+        ~failure_expected:
+          ( Transaction_status.Failure.Proof_with_outdated_verification_key
+          , Transaction_snark_tests.Util.Pass_2 )
+        ()
 
     (* Scenarios spanning several zkApp commands against one zkApp account,
        checking how the version stored with its verification key evolves. *)
