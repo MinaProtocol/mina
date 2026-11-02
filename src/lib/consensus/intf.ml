@@ -427,6 +427,32 @@ module type S = sig
     end
 
     module Vrf : sig
+      (** Evaluate the VRF for each delegator in [delegators], in order,
+          returning the best winning evaluation, if any, and the producer
+          whose delegator won. The delegators may belong to several
+          producers.
+
+          [should_stop] is consulted before each evaluation; once it returns
+          [true], the remaining delegators are not evaluated and the best win
+          found so far is returned. *)
+      val check_delegators :
+           context:(module CONTEXT)
+        -> should_stop:(unit -> bool)
+        -> global_slot:Mina_numbers.Global_slot_since_hard_fork.t
+        -> seed:Mina_base.Epoch_seed.t
+        -> total_stake:Amount.t
+        -> producer_private_key:('producer -> Signature_lib.Private_key.t)
+        -> ('producer * Mina_base.Account.Index.t * Mina_base.Account.t) list
+        -> ( ( [ `Vrf_eval of string ]
+             * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
+             * [> `Delegator of
+                  Signature_lib.Public_key.Compressed.t
+                  * Mina_base.Account.Index.t ]
+             * [> `Producer of 'producer ] )
+             option
+           , unit )
+           Interruptible.t
+
       (** Evaluate the VRF for each of the producer's delegators, returning the
           best winning evaluation, if any.
 

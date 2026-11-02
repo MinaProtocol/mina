@@ -837,28 +837,27 @@ module Make_str (A : Wire_types.Concrete) = struct
                   )
       end
 
-      let check ~context:(module Context : CONTEXT) ~should_stop
+      let check_delegators ~context:(module Context : CONTEXT) ~should_stop
           ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
-          ~producer_private_key ~producer_public_key ~total_stake
-          ~(get_delegators :
-                Public_key.Compressed.t
-             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+          ~total_stake
+          ~(producer_private_key : 'producer -> Signature_lib.Private_key.t)
+          (delegators :
+            ('producer * Mina_base.Account.Index.t * Mina_base.Account.t) list
+            ) =
         let open Context in
         let open Message in
         let open Interruptible.Let_syntax in
-        let delegators =
-          get_delegators producer_public_key
-          |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
-        in
         let rec go acc = function
           | [] ->
               Interruptible.return acc
           | _ :: _ when should_stop () ->
               Interruptible.return acc
-          | (delegator, (account : Mina_base.Account.t)) :: delegators ->
+          | (producer, delegator, (account : Mina_base.Account.t)) :: delegators
+            ->
               let%bind () = Interruptible.return () in
               let vrf_result =
-                T.eval ~constraint_constants ~private_key:producer_private_key
+                T.eval ~constraint_constants
+                  ~private_key:(producer_private_key producer)
                   { global_slot; seed; delegator }
               in
               let truncated_vrf_result = Output.truncate vrf_result in
@@ -894,11 +893,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (Some
                        ( `Vrf_eval vrf_eval
                        , `Vrf_output vrf_result
-                       , `Delegator (account.public_key, delegator) ) )
+                       , `Delegator (account.public_key, delegator)
+                       , `Producer producer ) )
                     delegators
                 in
                 match acc with
-                | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
+                | Some (`Vrf_eval prev_best_vrf_eval, _, _, _) ->
                     if String.compare prev_best_vrf_eval vrf_eval < 0 then
                       this_vrf ()
                     else go acc delegators
@@ -907,6 +907,27 @@ module Make_str (A : Wire_types.Concrete) = struct
               else go acc delegators
         in
         go None delegators
+
+      let check ~context ~should_stop
+          ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
+          ~producer_private_key ~producer_public_key ~total_stake
+          ~(get_delegators :
+                Public_key.Compressed.t
+             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+        let delegators =
+          get_delegators producer_public_key
+          |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
+          |> List.map ~f:(fun (delegator, account) -> ((), delegator, account))
+        in
+        Interruptible.map
+          (check_delegators ~context ~should_stop ~global_slot ~seed
+             ~total_stake
+             ~producer_private_key:(fun () -> producer_private_key)
+             delegators )
+          ~f:
+            (Option.map
+               ~f:(fun (vrf_eval, vrf_output, delegator, `Producer ()) ->
+                 (vrf_eval, vrf_output, delegator) ) )
     end
 
     module Optional_state_hash = struct
