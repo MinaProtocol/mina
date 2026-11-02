@@ -1,6 +1,5 @@
 open Async_kernel
 open Core_kernel
-open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Mina_block
@@ -141,10 +140,9 @@ let validate_transition_or_header_is_relevant
            ~slot_chain_end ~frontier header_with_hash
 
 (** Return the function that validates one incoming block or header against
-    [frontier], writing it to [valid_transition_writer] if it is relevant. *)
+    [frontier], passing it to [on_valid] if it is relevant. *)
 let create_handler ~context:(module Context : CONTEXT) ~trust_system
-    ~time_controller ~frontier ~valid_transition_writer
-    ~unprocessed_transition_cache =
+    ~time_controller ~frontier ~on_valid ~unprocessed_transition_cache =
   let open Context in
   let module Lru = Core_extended_cache.Lru in
   let outdated_root_cache = Lru.create ~destruct:None 1000 in
@@ -205,7 +203,7 @@ let create_handler ~context:(module Context : CONTEXT) ~trust_system
         | exception _ ->
             () ) ;
         [%log internal] "Validate_transition_done" ;
-        Writer.write valid_transition_writer (b_or_h', `Valid_cb vc)
+        on_valid (b_or_h', `Valid_cb vc)
     | Error err -> (
         (* Every dropped block must answer its callback, or libp2p
            times it out and penalises the sender. *)
@@ -352,16 +350,15 @@ let%test_module "Transition_handler.Validator tests" =
        written on as valid. *)
     let validate frontier breadcrumb =
       Thread_safe.block_on_async_exn (fun () ->
-          let valid_transition_reader, valid_transition_writer =
-            Pipe_lib.Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
-          in
+          let valid = ref [] in
           let unprocessed_transition_cache =
             Unprocessed_transition_cache.create ~logger ~cache_exceptions:false
           in
           let handle =
             create_handler
               ~context:(module Context)
-              ~trust_system ~time_controller ~frontier ~valid_transition_writer
+              ~trust_system ~time_controller ~frontier
+              ~on_valid:(fun x -> valid := x :: !valid)
               ~unprocessed_transition_cache
           in
           let vc =
@@ -371,16 +368,8 @@ let%test_module "Transition_handler.Validator tests" =
           let resolved = ref None in
           Mina_net2.Validation_callback.set_on_resolve vc (fun outcome ->
               resolved := Some outcome ) ;
-          let%bind () =
-            handle (`Block (incoming_block breadcrumb), `Valid_cb (Some vc))
-          in
-          Pipe_lib.Strict_pipe.Writer.close valid_transition_writer ;
-          let valid = ref [] in
           let%map () =
-            Pipe_lib.Strict_pipe.Reader.iter valid_transition_reader
-              ~f:(fun x ->
-                valid := x :: !valid ;
-                Deferred.unit )
+            handle (`Block (incoming_block breadcrumb), `Valid_cb (Some vc))
           in
           ( !resolved
           , List.rev_map !valid ~f:(fun (b_or_h, `Valid_cb _) ->
