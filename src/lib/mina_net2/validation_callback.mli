@@ -22,3 +22,8 @@ val fire_if_not_already_fired : t -> validation_result -> unit
 
 val set_message_type :
   t -> [ `Unknown | `Block | `Snark_work | `Transaction ] -> unit
+
+(** Name the block this callback validates by its state hash, so that how the
+    callback resolves is recorded in the block outcome log, including its
+    expiring unfired. *)
+val set_subject : t -> string Lazy.t -> unit

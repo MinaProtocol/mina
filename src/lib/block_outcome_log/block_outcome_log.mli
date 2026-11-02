@@ -30,6 +30,9 @@ type event =
     only called then, so building it may be expensive. *)
 val record : (unit -> event) -> unit
 
+(** Whether a test is recording, for work only worth doing then. *)
+val is_recording : unit -> bool
+
 module For_tests : sig
   (** Run [f], and return its result along with the events recorded while it
       ran, oldest first. Recording doesn't nest. *)

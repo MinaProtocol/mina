@@ -13,6 +13,7 @@
   base.caml
   ;; local libraries
   mina_net2
+  block_outcome_log
   mina_stdlib
   logger
   child_processes

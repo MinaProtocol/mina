@@ -25,6 +25,8 @@ let record event =
   | Some events ->
       events := event () :: !events
 
+let is_recording () = Option.is_some !recorded
+
 module For_tests = struct
   let start () =
     if Option.is_some !recorded then failwith "Already recording block outcomes" ;

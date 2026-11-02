@@ -24,6 +24,7 @@
   integers
   ;; local libraries
   blake2
+  block_outcome_log
   error_json
   child_processes
   mina_stdlib_unix
