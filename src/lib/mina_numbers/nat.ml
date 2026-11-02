@@ -66,6 +66,13 @@ struct
 
   let () = assert (N.length_in_bits * 2 < Field.size_in_bits + 1)
 
+  let assert_div_mod ~(x : var) ~(y : var) ~(q : var) ~(r : var) =
+    (* q * y + r = x
+
+       q * y = x - r
+    *)
+    assert_r1cs q y (Field.Var.sub x r)
+
   let div_mod (x : var) (y : var) =
     let%bind q, r =
       exists (Typ.tuple2 typ typ)
@@ -74,12 +81,7 @@ struct
             let%map x = read typ x and y = read typ y in
             (N.div x y, N.rem x y))
     in
-
-    (* q * y + r = x
-
-       q * y = x - r
-    *)
-    let%map () = assert_r1cs q y (Field.Var.sub x r) in
+    let%map () = assert_div_mod ~x ~y ~q ~r in
     (q, r)
 
   type t = var
