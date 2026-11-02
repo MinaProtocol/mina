@@ -223,6 +223,7 @@ module Worker_state = struct
             Interruptible.force
               (Consensus.Data.Vrf.check
                  ~context:(module Context)
+                 ~should_stop:(fun () -> false)
                  ~global_slot ~seed:epoch_data.epoch_seed
                  ~get_delegators:
                    (Public_key.Compressed.Table.find delegatee_table)
