@@ -1,5 +1,6 @@
 (test
  (name stop_slot_test)
+ (modules stop_slot_test)
  (libraries
   ;; opam libraries
   alcotest
@@ -38,3 +39,12 @@
  (deps %{workspace_root}/genesis_ledgers/mainnet.json)
  (action
   (copy %{deps} %{targets})))
+
+(test
+ (name permissions_test)
+ (modules permissions_test)
+ (libraries alcotest core_kernel runtime_config yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))
