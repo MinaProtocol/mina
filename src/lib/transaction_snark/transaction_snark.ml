@@ -1928,6 +1928,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       type _ Snarky_backendless.Request.t +=
         | Slot_active : int -> bool Snarky_backendless.Request.t
 
+      (** Answer [Slot_active] for a segment using its first [used] slots. *)
+      let handle_used_slots used
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | Slot_active slot ->
+            respond (Provide (slot < used))
+        | _ ->
+            respond Unhandled
+
       (** The local state from which an unused slot runs: one in which the
           next step is a valid no-op. Its call forest holds a single account
           update, without authorization, that changes nothing, on an account
@@ -4256,7 +4265,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; opt_signed_opt_signed
             ; opt_signed
             ; proved
-            ; _opt_signed_batch
+            ; opt_signed_batch
             ] ) =
       system ~signature_kind ~proof_level ~constraint_constants
 
@@ -4326,10 +4335,18 @@ module Make_str (A : Wire_types.Concrete) = struct
             opt_signed statement
         | Opt_signed_opt_signed ->
             opt_signed_opt_signed statement
-        | Opt_signed_batch _ ->
-            failwith
-              "of_zkapp_command_segment_exn: Opt_signed_batch segments are not \
-               supported yet"
+        | Opt_signed_batch used ->
+            if
+              used < 1
+              || used > Zkapp_command_segment.Basic.opt_signed_batch_size
+            then
+              failwithf
+                "of_zkapp_command_segment_exn: Opt_signed_batch of %d account \
+                 updates"
+                used () ;
+            opt_signed_batch
+              ~handler:(Base.Zkapp_command_snark.handle_used_slots used)
+              statement
         | Proved -> (
             match snapp_proof_data ~witness with
             | None ->
