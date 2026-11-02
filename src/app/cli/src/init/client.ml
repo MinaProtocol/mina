@@ -1778,6 +1778,112 @@ let get_peers_graphql =
                   ; peer_id = peer.peerId
                   } ) ) ) )
 
+let protocol_version_signals =
+  let module Option_string = struct
+    module T = struct
+      type t = string option [@@deriving compare, sexp]
+    end
+
+    include T
+    include Comparator.Make (T)
+  end in
+  let open Command.Param in
+  let max_length =
+    flag "--max-length" ~aliases:[ "max-length" ]
+      ~doc:
+        "N Only count the N blocks closest to the best tip (default: every \
+         block in the transition frontier)"
+      (optional int)
+  in
+  Command.async
+    ~summary:
+      "Tally the protocol versions that block producers signal in the blocks \
+       of the best chain\n\n\
+       Blocks are won in proportion to stake, so a version's share of blocks \
+       estimates its share of the stake producing blocks. Producers set the \
+       proposed version themselves, and it is not covered by the block proof."
+    (Cli_lib.Background_daemon.graphql_init
+       (Args.zip2 max_length Cli_lib.Flag.json)
+       ~f:(fun graphql_endpoint (max_length, json) ->
+         let%map response =
+           Graphql_client.query_exn
+             Graphql_queries.Protocol_version_signals.(
+               make @@ makeVariables ?max_length ())
+             graphql_endpoint
+         in
+         let blocks = Option.value response.bestChain ~default:[||] in
+         let num_blocks = Array.length blocks in
+         let heights =
+           Array.map blocks ~f:(fun block ->
+               Mina_numbers.Length.to_int
+                 block.protocolState.consensusState.blockHeight )
+         in
+         (* Proposed version (None if not signalled) -> blocks, producers *)
+         let tally =
+           Array.fold blocks
+             ~init:(Map.empty (module Option_string))
+             ~f:(fun tally block ->
+               let version =
+                 Option.map block.proposedProtocolVersion ~f:(fun v ->
+                     sprintf "%d.%d.%d" v.transaction v.network v.patch )
+               in
+               Map.update tally version ~f:(fun entry ->
+                   let count, producers =
+                     Option.value entry
+                       ~default:(0, Public_key.Compressed.Set.empty)
+                   in
+                   (count + 1, Set.add producers block.creatorAccount.publicKey) )
+               )
+           |> Map.to_alist
+           |> List.sort ~compare:(fun (v1, (n1, _)) (v2, (n2, _)) ->
+                  match Int.compare n2 n1 with
+                  | 0 ->
+                      Option_string.compare v1 v2
+                  | c ->
+                      c )
+         in
+         let share count =
+           if num_blocks = 0 then 0.
+           else Float.of_int count /. Float.of_int num_blocks
+         in
+         if json then
+           let height f =
+             if num_blocks = 0 then `Null
+             else `Int (Array.fold heights ~init:heights.(0) ~f)
+           in
+           `Assoc
+             [ ("blocks", `Int num_blocks)
+             ; ("min_height", height Int.min)
+             ; ("max_height", height Int.max)
+             ; ( "proposed_versions"
+               , `List
+                   (List.map tally ~f:(fun (version, (count, producers)) ->
+                        `Assoc
+                          [ ( "version"
+                            , Option.value_map version ~default:`Null
+                                ~f:(fun v -> `String v) )
+                          ; ("blocks", `Int count)
+                          ; ("share", `Float (share count))
+                          ; ("producers", `Int (Set.length producers))
+                          ] ) ) )
+             ]
+           |> Yojson.Safe.pretty_to_string |> print_endline
+         else if num_blocks = 0 then
+           printf "The best chain has no blocks to count\n"
+         else (
+           printf
+             "Proposed protocol versions in the %d blocks at heights %d to %d:\n\n"
+             num_blocks
+             (Array.fold heights ~init:heights.(0) ~f:Int.min)
+             (Array.fold heights ~init:heights.(0) ~f:Int.max) ;
+           printf "%-12s %8s %8s %10s\n" "Version" "Blocks" "Share" "Producers" ;
+           List.iter tally ~f:(fun (version, (count, producers)) ->
+               printf "%-12s %8d %7.1f%% %10d\n"
+                 (Option.value version ~default:"none")
+                 count
+                 (100. *. share count)
+                 (Set.length producers) ) ) ) )
+
 let add_peers_graphql =
   let open Command in
   let seed =
@@ -2541,6 +2647,7 @@ let advanced ~itn_features =
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
+    ; ("protocol-version-signals", protocol_version_signals)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
     ; ("archive-blocks", archive_blocks)
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
