@@ -570,3 +570,72 @@ let%test_unit "schnorr checked + unchecked" =
              s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
+
+(** Signatures that must be rejected, derived from a valid signature [s] by
+    [private_key] on [msg], using a second key and message for the
+    substitutions.
+*)
+let invalid_cases ~signature:((r, s) : Tick.Field.t * Tick.Inner_curve.Scalar.t)
+    ~public_key ~msg ~other_public_key ~other_msg =
+  [ ("tampered s", (public_key, msg, (r, Tick.Inner_curve.Scalar.(s + one))))
+  ; ("tampered r", (public_key, msg, (Tick.Field.(r + one), s)))
+  ; ("wrong message", (public_key, other_msg, (r, s)))
+  ; ("wrong public key", (other_public_key, msg, (r, s)))
+  ]
+
+let%test_unit "schnorr checked rejects invalid legacy signatures" =
+  let signature_kind = Mina_signature_kind.Testnet in
+  Quickcheck.test ~trials:3 (Quickcheck.Generator.tuple2 gen_legacy gen_legacy)
+    ~f:(fun ((pk, msg), (other_pk, other_msg)) ->
+      let signature = Legacy.sign ~signature_kind pk msg in
+      let public_key = Tick.Inner_curve.(scale one pk) in
+      let other_public_key = Tick.Inner_curve.(scale one other_pk) in
+      List.iter
+        (invalid_cases ~signature ~public_key ~msg ~other_public_key ~other_msg)
+        ~f:(fun (name, ((public_key, msg, s) as case)) ->
+          if Legacy.verify ~signature_kind s public_key msg then
+            failwithf "%s: unchecked verification accepted it" name () ;
+          Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+            Tick.Typ.(
+              tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
+                Legacy.Signature.typ)
+            Tick.Boolean.typ
+            (fun (public_key, msg, s) ->
+              let open Tick.Checked in
+              let%bind (module Shifted) =
+                Tick.Inner_curve.Checked.Shifted.create ()
+              in
+              Legacy.Checked.verifies ~signature_kind
+                (module Shifted)
+                s public_key msg )
+            (fun _ -> false)
+            case ) )
+
+let%test_unit "schnorr checked rejects invalid chunked signatures" =
+  let signature_kind = Mina_signature_kind.Testnet in
+  Quickcheck.test ~trials:3
+    (Quickcheck.Generator.tuple2 gen_chunked gen_chunked)
+    ~f:(fun ((pk, msg), (other_pk, other_msg)) ->
+      let signature = Chunked.sign ~signature_kind pk msg in
+      let public_key = Tick.Inner_curve.(scale one pk) in
+      let other_public_key = Tick.Inner_curve.(scale one other_pk) in
+      List.iter
+        (invalid_cases ~signature ~public_key ~msg ~other_public_key ~other_msg)
+        ~f:(fun (name, ((public_key, msg, s) as case)) ->
+          if Chunked.verify ~signature_kind s public_key msg then
+            failwithf "%s: unchecked verification accepted it" name () ;
+          Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+            Tick.Typ.(
+              tuple3 Tick.Inner_curve.typ (chunked_message_typ ())
+                Chunked.Signature.typ)
+            Tick.Boolean.typ
+            (fun (public_key, msg, s) ->
+              let open Tick.Checked in
+              let%bind (module Shifted) =
+                Tick.Inner_curve.Checked.Shifted.create ()
+              in
+              Chunked.Checked.verifies ~signature_kind
+                (module Shifted)
+                s public_key msg )
+            (fun _ -> false)
+            case ) )
