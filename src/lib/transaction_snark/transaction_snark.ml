@@ -3853,6 +3853,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
+    let batch_size = Zkapp_command_segment.Basic.opt_signed_batch_size
+
     type local_state =
       ( Stack_frame.value
       , Stack_frame.value list

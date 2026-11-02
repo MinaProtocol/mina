@@ -948,6 +948,12 @@ module Make_update_group (Input : sig
 
   type connecting_ledger_hash
 
+  (** The most consecutive non-proof account updates of one zkApp command to
+      group into a segment. Below 3, only the pairs and singles that every
+      grouping uses are formed.
+  *)
+  val batch_size : int
+
   val zkapp_segment_of_controls : _ Control.Poly.t list -> spec
 end) : sig
   module Zkapp_command_intermediate_state : sig
@@ -1040,12 +1046,65 @@ end = struct
                ~of_fee_payer:Account_update.of_fee_payer_no_aux
                ~of_account_update:Account_update.forget_aux zkapp_command )
     in
+    let batch_length account_updates =
+      let non_proof_run =
+        List.take_while account_updates
+          ~f:(fun
+               ({ Account_update.Poly.authorization; _ } :
+                 _ Account_update.Poly.t )
+             ->
+            match authorization with
+            | Control.Poly.Proof _ ->
+                false
+            | Signature _ | None_given ->
+                true )
+        |> List.length
+      in
+      Int.min batch_size non_proof_run
+    in
+    let batch ~kind account_updates stmts =
+      let n = batch_length account_updates in
+      let batch, account_updates = List.split_n account_updates n in
+      let before = List.hd_exn stmts in
+      let stmts = List.drop stmts n in
+      ( intermediate_state ~kind
+          ~spec:
+            (zkapp_segment_of_controls
+               (List.map batch
+                  ~f:(fun ({ authorization; _ } : _ Account_update.Poly.t) ->
+                    authorization ) ) )
+          ~before ~after:(List.hd_exn stmts)
+      , account_updates
+      , stmts )
+    in
     let rec group_by_zkapp_command_rev (zkapp_commands : _ list list) stmtss acc
         =
       match (zkapp_commands, stmtss) with
       | ([] | [ [] ]), [ _ ] ->
           (* We've associated statements with all given zkapp_command. *)
           acc
+      | zkapp_command :: zkapp_commands, stmts :: stmtss
+        when batch_length zkapp_command >= 3 ->
+          (* The next account updates are at least 3 non-proof account
+             updates within the same transaction. Batch them.
+          *)
+          let segment, zkapp_command, stmts =
+            batch ~kind:`Same zkapp_command stmts
+          in
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss) (segment :: acc)
+      | [] :: zkapp_command :: zkapp_commands, [ _ ] :: stmts :: stmtss
+        when batch_length zkapp_command >= 3 ->
+          (* The next account updates are at least 3 non-proof account
+             updates at the start of a new transaction. Batch them.
+          *)
+          let segment, zkapp_command, stmts =
+            batch ~kind:`New zkapp_command stmts
+          in
+          group_by_zkapp_command_rev
+            (zkapp_command :: zkapp_commands)
+            (stmts :: stmtss) (segment :: acc)
       | ( [ [ { Account_update.Poly.authorization = a1; _ } ] ]
         , [ [ before; after ] ] ) ->
           (* There are no later zkapp_command to pair this one with. Prove it on its
@@ -1289,6 +1348,10 @@ end
 type possible_segments = Proved | Signed_single | Signed_pair
 
 module Update_group = Make_update_group (struct
+  (* [valid_size] costs zkApp commands by the segments of the pairing
+     grouping, which do not depend on how the prover groups them. *)
+  let batch_size = 2
+
   type local_state = unit
 
   type global_state = unit
