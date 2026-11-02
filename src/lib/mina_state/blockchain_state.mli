@@ -6,6 +6,46 @@ open Currency
 module Poly : sig
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type ( 'staged_ledger_hash
+           , 'snarked_ledger_hash
+           , 'local_state
+           , 'time
+           , 'body_reference
+           , 'signed_amount
+           , 'pending_coinbase_stack
+           , 'fee_excess
+           , 'sok_digest
+           , 'protocol_versions )
+           t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'protocol_versions )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V3.t =
+        { staged_ledger_hash : 'staged_ledger_hash
+        ; genesis_ledger_hash : 'snarked_ledger_hash
+        ; ledger_proof_statement :
+            ( 'snarked_ledger_hash
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'local_state )
+            Snarked_ledger_state.Poly.Stable.V2.t
+        ; timestamp : 'time
+        ; body_reference : 'body_reference
+        ; protocol_versions : 'protocol_versions
+        }
+      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+    end
+
     module V2 : sig
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -58,8 +98,9 @@ module Value : sig
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
-        , unit )
-        Poly.Stable.V2.t
+        , unit
+        , Protocol_versions.Value.Stable.V1.t )
+        Poly.Stable.V3.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
       val to_latest : t -> t
@@ -86,6 +127,10 @@ module Value : sig
   end]
 end
 
+type protocol_versions = Protocol_versions.Value.t
+
+type protocol_versions_var = Protocol_versions.var
+
 include
   Snarkable.S
     with type var =
@@ -97,21 +142,24 @@ include
       , Currency.Amount.Signed.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
-      , unit )
+      , unit
+      , Protocol_versions.var )
       Poly.t
      and type value := Value.t
 
 val staged_ledger_hash :
-  ('staged_ledger_hash, _, _, _, _, _, _, _, _) Poly.t -> 'staged_ledger_hash
+  ('staged_ledger_hash, _, _, _, _, _, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
 val snarked_ledger_hash :
-  (_, 'snarked_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'snarked_ledger_hash
+     (_, 'snarked_ledger_hash, _, _, _, _, _, _, _, _) Poly.t
+  -> 'snarked_ledger_hash
 
 val snarked_local_state :
-  (_, _, 'local_state, _, _, _, _, _, _) Poly.t -> 'local_state
+  (_, _, 'local_state, _, _, _, _, _, _, _) Poly.t -> 'local_state
 
 val genesis_ledger_hash :
-  (_, 'snarked_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'snarked_ledger_hash
+     (_, 'snarked_ledger_hash, _, _, _, _, _, _, _, _) Poly.t
+  -> 'snarked_ledger_hash
 
 val ledger_proof_statement :
      ( _
@@ -122,7 +170,8 @@ val ledger_proof_statement :
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
-     , 'sok_digest )
+     , 'sok_digest
+     , _ )
      Poly.t
   -> ( 'snarked_ledger_hash
      , 'signed_amount
@@ -132,9 +181,12 @@ val ledger_proof_statement :
      , 'local_state )
      Snarked_ledger_state.Poly.t
 
-val timestamp : (_, _, _, 'time, _, _, _, _, _) Poly.t -> 'time
+val timestamp : (_, _, _, 'time, _, _, _, _, _, _) Poly.t -> 'time
 
-val body_reference : (_, _, _, _, 'ref, _, _, _, _) Poly.t -> 'ref
+val body_reference : (_, _, _, _, 'ref, _, _, _, _, _) Poly.t -> 'ref
+
+val protocol_versions :
+  (_, _, _, _, _, _, _, _, _, 'protocol_versions) Poly.t -> 'protocol_versions
 
 val create_value :
      staged_ledger_hash:Staged_ledger_hash.t
@@ -142,6 +194,7 @@ val create_value :
   -> timestamp:Block_time.t
   -> body_reference:Consensus.Body_reference.t
   -> ledger_proof_statement:Snarked_ledger_state.t
+  -> protocol_versions:Protocol_versions.Value.t
   -> Value.t
 
 val negative_one :
@@ -167,7 +220,8 @@ val set_timestamp :
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
-     , 'sok_digest )
+     , 'sok_digest
+     , 'protocol_versions )
      Poly.t
   -> 'time
   -> ( 'staged_ledger_hash
@@ -178,7 +232,8 @@ val set_timestamp :
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
-     , 'sok_digest )
+     , 'sok_digest
+     , 'protocol_versions )
      Poly.t
 
 val to_input : Value.t -> Field.t Random_oracle.Input.Chunked.t
@@ -194,7 +249,8 @@ type display =
   , string
   , string
   , string
-  , unit )
+  , unit
+  , string )
   Poly.t
 [@@deriving yojson]
 

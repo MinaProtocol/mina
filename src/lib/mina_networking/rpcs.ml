@@ -57,7 +57,9 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
 
     let invalid_next_versions =
       List.filter headers ~f:(fun header ->
-          Mina_block.Header.proposed_protocol_version_opt header
+          (Mina_state.Protocol_state.protocol_versions
+             (Mina_block.Header.protocol_state header) )
+            .proposed
           |> Option.for_all ~f:Protocol_version.is_valid
           |> not )
     in
@@ -81,7 +83,9 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
           Mina_block.Header.current_protocol_version header
         in
         let proposed_protocol_version =
-          Mina_block.Header.proposed_protocol_version_opt header
+          (Mina_state.Protocol_state.protocol_versions
+             (Mina_block.Header.protocol_state header) )
+            .proposed
         in
         let action, error_msg, error_metadata =
           match version_error with

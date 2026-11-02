@@ -395,6 +395,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     ~genesis_ledger_hash
                     ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
                     ~ledger_proof_statement
+                    ~protocol_versions:(Protocol_versions.of_daemon ())
                 in
                 let current_time =
                   Block_time.now time_controller

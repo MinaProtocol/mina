@@ -25,8 +25,6 @@ module type Full = sig
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
     -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
-    -> ?proposed_protocol_version_opt:Protocol_version.t
-    -> ?current_protocol_version:Protocol_version.t
     -> unit
     -> t
 
@@ -37,8 +35,6 @@ module type Full = sig
   val delta_block_chain_proof : t -> State_hash.t * State_body_hash.t list
 
   val current_protocol_version : t -> Protocol_version.t
-
-  val proposed_protocol_version_opt : t -> Protocol_version.t option
 
   type protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }

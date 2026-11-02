@@ -106,7 +106,15 @@
             "sok_digest":null
           },
           "timestamp":"1718806860000",
-          "body_reference":"1acc58830c4208a9b29f65f7b368f7cbf64d7fb5f06f36e22456d751de446425"
+          "body_reference":"1acc58830c4208a9b29f65f7b368f7cbf64d7fb5f06f36e22456d751de446425",
+          "protocol_versions":{
+            "current":{
+              "transaction":3,
+              "network":0,
+              "patch":0
+            },
+            "proposed":null
+          }
         },
         "consensus_state":{
           "blockchain_length":"319281",

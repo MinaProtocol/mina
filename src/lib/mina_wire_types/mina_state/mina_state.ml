@@ -1,5 +1,6 @@
 module Registers = Mina_state_registers
 module Local_state = Mina_state_local_state
+module Protocol_versions = Mina_state_protocol_versions
 module Blockchain_state = Mina_state_blockchain_state
 module Protocol_state = Mina_state_protocol_state
 module Snarked_ledger_state = Mina_state_snarked_ledger_state

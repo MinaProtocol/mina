@@ -81,7 +81,9 @@ let sample_block_sexp =
          (sok_digest ())))
        (timestamp 1690219472442)
        (body_reference
-        "\130h\232\132\244\205\245\213\210an\175CO\200v\238\197\218R\031[\232\180Jb\152\223\148/CE")))
+        "\130h\232\132\244\205\245\213\210an\175CO\200v\238\197\218R\031[\232\180Jb\152\223\148/CE")
+       (protocol_versions
+        ((current ((transaction 1) (network 1) (patch 0))) (proposed ())))))
      (consensus_state
       ((blockchain_length 2) (epoch_count 0) (min_window_density 6)
        (sub_window_densities (1 0 0))
@@ -588,7 +590,15 @@ let sample_block_json =
             "sok_digest": null
           },
           "timestamp": "1690219472442",
-          "body_reference": "8268e884f4cdf5d5d2616eaf434fc876eec5da521f5be8b44a6298df942f4345"
+          "body_reference": "8268e884f4cdf5d5d2616eaf434fc876eec5da521f5be8b44a6298df942f4345",
+          "protocol_versions": {
+            "current": {
+              "transaction": 1,
+              "network": 1,
+              "patch": 0
+            },
+            "proposed": null
+          }
         },
         "consensus_state": {
           "blockchain_length": "2",

@@ -156,6 +156,7 @@ module type Full = sig
            , _
            , _
            , _
+           , _
            , _ )
            Blockchain_state.Poly.t
          , _
@@ -168,6 +169,12 @@ module type Full = sig
     state_hash:State_hash.var -> var -> State_hash.var Checked.t
 
   val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
+
+  (** The protocol versions recorded in the state's blockchain state. *)
+  val protocol_versions : Value.t -> Protocol_versions.Value.t
+
+  (** Replace the protocol versions recorded in the blockchain state. *)
+  val with_protocol_versions : Value.t -> Protocol_versions.Value.t -> Value.t
 
   val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
