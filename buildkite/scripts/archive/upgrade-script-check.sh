@@ -6,6 +6,11 @@
 # upgrade script exists. This ensures database schema changes are properly handled
 # in production deployments.
 #
+# It also checks the release headers of the migration scripts (see
+# src/app/archive/README.md): upgrade.sql must have exactly one
+# "-- upgrades: <tag>" line, downgrade.sql exactly one "-- restores: <tag>"
+# line, both must name the same tag, and the tag must exist in git.
+#
 # USAGE:
 #   upgrade-script-check.sh [OPTIONS]
 #
@@ -13,22 +18,25 @@
 #   -m, --mode MODE                 Execution mode: 'default' or 'verbose' (default: default)
 #                                   default: Returns exit code 0/1 without error messages
 #                                   verbose: Prints error messages and fails with descriptive output
-#   -b, --comparison-branch BRANCH  Target branch for comparison (default: develop)
+#   -b, --comparison-branch BRANCH  Target branch for comparison
+#                                   (default: $BUILDKITE_PULL_REQUEST_BASE_BRANCH, else compatible)
 #   -h, --help                      Show this help message
 #
 # EXIT CODES:
 #   0: Success (no schema changes or upgrade script exists)
-#   1: Failure (schema changes detected but upgrade script missing)
+#   1: Failure (schema changes detected but upgrade script missing,
+#      or a missing or wrong release header)
 #
 # FILES MONITORED:
 #   - src/app/archive/create_schema.sql
-#   - src/app/archive/drop_table.sql
+#   - src/app/archive/drop_tables.sql
 #   - src/app/archive/upgrade.sql (required when above files change)
+#   - src/app/archive/downgrade.sql (required when above files change)
 
 set -euo pipefail
 
 MODE="default"
-COMPARISION_BRANCH="develop"
+COMPARISION_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}"
 source "$(dirname "$0")/../export-git-env-vars.sh"
 
 # Parse command line arguments
@@ -131,13 +139,57 @@ has_changes() {
 }
 
 
+# header_tag FILE KEY prints the tag of the "-- KEY: <tag>" line in FILE.
+header_tag() {
+    local file="$1"
+    local key="$2"
+    local tag
+    tag=$(sed -n -E "s/^-- ${key}: ([^[:space:]]+)[[:space:]]*$/\1/p" "$REPO_ROOT/$file")
+    if [[ -z "$tag" || "$(wc -l <<< "$tag")" -ne 1 ]]; then
+        if [[ "$MODE" == "verbose" ]]; then
+            echo "Error: $file must have exactly one '-- ${key}: <tag>' line" >&2
+        fi
+        return 1
+    fi
+    echo "$tag"
+}
+
+# Check the release headers of upgrade.sql and downgrade.sql
+check_release_headers() {
+    local upgrades restores
+    upgrades=$(header_tag "src/app/archive/upgrade.sql" upgrades) || return 1
+    restores=$(header_tag "src/app/archive/downgrade.sql" restores) || return 1
+
+    if [[ "$upgrades" != "$restores" ]]; then
+        if [[ "$MODE" == "verbose" ]]; then
+            echo "Error: upgrade.sql upgrades $upgrades, but downgrade.sql restores $restores" >&2
+        fi
+        return 1
+    fi
+
+    # CI checkouts do not always carry tags.
+    if ! git rev-parse --verify --quiet "refs/tags/${upgrades}" >/dev/null \
+        && ! git fetch origin "refs/tags/${upgrades}:refs/tags/${upgrades}" >/dev/null 2>&1; then
+        if [[ "$MODE" == "verbose" ]]; then
+            echo "Error: release tag $upgrades of the migration headers does not exist" >&2
+        fi
+        return 1
+    fi
+
+    if [[ "$MODE" == "verbose" ]]; then
+        echo "✓ Migration headers name release $upgrades"
+    fi
+}
+
 # Main execution
 main() {
     parse_args "$@"
 
+    check_release_headers || exit 1
+
     local monitored_scripts=(
         "src/app/archive/create_schema.sql"
-        "src/app/archive/drop_table.sql"
+        "src/app/archive/drop_tables.sql"
     )
 
     local scripts=(

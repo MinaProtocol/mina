@@ -7,14 +7,11 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Multiple_transfers_spec
 open Mina_base
 
-let%test_module "Zkapp payments tests" =
-  ( module struct
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
-
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
+let suite () =
+  Transaction_snark_test_suite.make ~name:"zkapp_payments"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
     [@@@warning "-32"]
@@ -120,7 +117,9 @@ let%test_module "Zkapp payments tests" =
         ; memo
         }
 
-    let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
+    let () =
+      test "merkle_root_after_zkapp_command_exn_immutable"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -153,7 +152,9 @@ let%test_module "Zkapp payments tests" =
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post ) )
 
-    let%test_unit "zkapps-based payment" =
+    let () =
+      test "zkapps-based payment"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 (Test_spec.mk_gen ~num_transactions:3 ())
         ~f:(fun { init_ledger; specs } ->
@@ -165,7 +166,9 @@ let%test_module "Zkapp payments tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "Consecutive zkapps-based payments" =
+    let () =
+      test "Consecutive zkapps-based payments"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -181,7 +184,9 @@ let%test_module "Zkapp payments tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger zkapp_commands ) ) )
 
-    let%test_unit "multiple transfers from one account" =
+    let () =
+      test "multiple transfers from one account"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -235,7 +240,9 @@ let%test_module "Zkapp payments tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
-    let%test_unit "zkapps payments failed due to insufficient funds" =
+    let () =
+      test "zkapps payments failed due to insufficient funds"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -301,11 +308,5 @@ let%test_module "Zkapp payments tests" =
                     ~expected_failure:
                       (Transaction_status.Failure.Overflow, Pass_2)
                     ledger [ zkapp_command ] ) ) )
-
-    let () =
-      match Sys.getenv "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  end )
+  end in
+  ()

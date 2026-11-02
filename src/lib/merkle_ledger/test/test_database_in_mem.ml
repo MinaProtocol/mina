@@ -79,7 +79,7 @@ module Make (Test : Test_intf) = struct
 
   let test_non_existing_account_is_none () =
     Test.with_instance (fun mdb ->
-        Quickcheck.test
+        Quickcheck.test ~trials:200
           (MT.For_tests.gen_account_location ~ledger_depth:(MT.depth mdb))
           ~f:(fun location -> assert (Option.is_none (MT.get mdb location))) )
 
@@ -232,7 +232,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
-            Quickcheck.test
+            Quickcheck.test ~trials:200
               (Mina_stdlib.Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
@@ -258,7 +258,7 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min 5 depth in
             populate_db mdb max_height ;
-            Quickcheck.test
+            Quickcheck.test ~trials:200
               (Mina_stdlib.Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
@@ -356,7 +356,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             populate_db mdb max_height ;
-            Quickcheck.test
+            Quickcheck.test ~trials:200
               (Mina_stdlib.Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
@@ -437,7 +437,8 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
             populate_db mdb max_height ;
-            Quickcheck.test (Mina_stdlib.Direction.gen_list max_height)
+            Quickcheck.test ~trials:200
+              (Mina_stdlib.Direction.gen_list max_height)
               ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
               ~f:(fun directions ->
                 let offset =
@@ -623,6 +624,124 @@ module Make (Test : Test_intf) = struct
             check_holds_exactly mdb
               ~expected:(indexed (List.take accounts 13))
               ~removed:[ List.nth_exn accounts 13 ] ) )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn keeps the entries of accounts it \
+       overwrites with the same identifier" (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            (* Leaves 8-15 hold accounts 8 to 13: overwrite them with new
+               balances, keeping their identifiers. *)
+            let T = Account_id.eq in
+            let updated =
+              List.mapi accounts ~f:(fun i account ->
+                  if i < 8 then account
+                  else
+                    Account.create
+                      (Account.identifier account)
+                      (Balance.of_nanomina_int_exn (i + 1000)) )
+            in
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 1)
+              (List.drop updated 8) ;
+            check_holds_exactly mdb ~expected:(indexed updated) ~removed:[] ;
+            List.iter updated ~f:(fun account ->
+                let account_id = Account.identifier account in
+                [%test_eq: Account_id.t option]
+                  (MT.token_owner mdb
+                     (Account_id.derive_token_id ~owner:account_id) )
+                  (Some account_id) ) ) )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn restores the entries of an account whose \
+       stale copy it overwrites with the same identifier" (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let x = List.nth_exn accounts 2 in
+            let x_id = Account.identifier x in
+            (* Account 2 moves to leaf 8; leaf 2 keeps a stale copy of it. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 1)
+              (x :: List.drop accounts 9) ;
+            (* Leaf 8 gets account 8 back: account 2 is displaced and loses
+               its entries. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 1)
+              (List.drop accounts 8) ;
+            (* Leaf 2 is rewritten with account 2, whose stale copy has the
+               same identifier. *)
+            MT.set_all_accounts_rooted_at_exn mdb
+              (subtree_address mdb ~height:3 0)
+              (List.take accounts 8) ;
+            check_holds_exactly mdb ~expected:(indexed accounts) ~removed:[] ;
+            [%test_eq: MT.Location.t option]
+              (MT.location_of_account mdb x_id)
+              (Some
+                 (MT.Location.Account
+                    (MT.Addr.of_int_exn ~ledger_depth:(MT.depth mdb) 2) ) ) ;
+            [%test_eq: Account_id.t option]
+              (MT.token_owner mdb (Account_id.derive_token_id ~owner:x_id))
+              (Some x_id) ) )
+
+  (* The addresses and hashes of the nodes of the subtree at leaves 12-15. *)
+  let last_subtree_nodes mdb =
+    [ (2, 3); (1, 6); (1, 7); (0, 12); (0, 13); (0, 14); (0, 15) ]
+    |> List.map ~f:(fun (height, index) ->
+           let addr = subtree_address mdb ~height index in
+           (addr, MT.get_inner_hash_at_addr_exn mdb addr) )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn given the subtree's hashes writes the \
+       same ledger" (fun () ->
+        (* Leaves 12-15 hold accounts 12 and 13; keep only account 12. *)
+        let write ?subtree_hashes mdb accounts =
+          MT.set_all_accounts_rooted_at_exn ?subtree_hashes mdb
+            (subtree_address mdb ~height:2 3)
+            [ List.nth_exn accounts 12 ]
+        in
+        with_fourteen_accounts (fun reference accounts ->
+            write reference accounts ;
+            let subtree_hashes = last_subtree_nodes reference in
+            with_fourteen_accounts (fun mdb accounts ->
+                write ~subtree_hashes mdb accounts ;
+                [%test_eq: Md5.t] (MT.merkle_root reference)
+                  (MT.merkle_root mdb) ;
+                [%test_eq: (MT.Addr.t * Md5.t) list] subtree_hashes
+                  (last_subtree_nodes mdb) ;
+                check_holds_exactly mdb
+                  ~expected:(indexed (List.take accounts 13))
+                  ~removed:[ List.nth_exn accounts 13 ] ) ) )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn stores the given hashes rather than \
+       computing them" (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let addr = subtree_address mdb ~height:1 6 in
+            let given = Md5.digest_string "not the hash of leaves 12 and 13" in
+            MT.set_all_accounts_rooted_at_exn
+              ~subtree_hashes:[ (addr, given) ]
+              mdb
+              (subtree_address mdb ~height:2 3)
+              (List.slice accounts 12 14) ;
+            [%test_eq: Md5.t] given (MT.get_inner_hash_at_addr_exn mdb addr) ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn rejects hashes outside the subtree"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let outside = subtree_address mdb ~height:3 1 in
+            let root_before = MT.merkle_root mdb in
+            assert (
+              Exn.does_raise (fun () ->
+                  MT.set_all_accounts_rooted_at_exn
+                    ~subtree_hashes:
+                      [ (outside, MT.get_inner_hash_at_addr_exn mdb outside) ]
+                    mdb
+                    (subtree_address mdb ~height:2 3)
+                    [ List.nth_exn accounts 12 ] ) ) ;
+            [%test_eq: Md5.t] root_before (MT.merkle_root mdb) ) )
 
   let () =
     add_test "set_all_accounts_rooted_at_exn with no accounts empties a subtree"

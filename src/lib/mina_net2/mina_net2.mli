@@ -288,7 +288,7 @@ module Libp2p_stream : sig
   type t
 
   (** [pipes t] returns the reader/writer pipe for our half of the stream. *)
-  val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
+  val pipes : t -> string Pipe.Reader.t * Bigstring.t Pipe.Writer.t
 
   val remote_peer : t -> Peer.t
 

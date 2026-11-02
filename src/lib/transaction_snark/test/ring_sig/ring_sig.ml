@@ -59,7 +59,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
-let%test_unit "1-of-1" =
+let test_1_of_1 () =
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk = Private_key.gen and msg = Field.gen_uniform in
@@ -77,7 +77,7 @@ let%test_unit "1-of-1" =
       |> Checked.map ~f:As_prover.return
       |> run_and_check |> Or_error.ok_exn )
 
-let%test_unit "1-of-2" =
+let test_1_of_2 () =
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk0 = Private_key.gen
@@ -99,12 +99,8 @@ let%test_unit "1-of-2" =
       |> run_and_check |> Or_error.ok_exn )
 
 (* test a snapp tx with a 3-account_update ring *)
-let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
-  let proof_cache =
-    Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-    @@ Yojson.Safe.from_file "proof_cache.json"
-  in
-  Transaction_snark.For_tests.set_proof_cache proof_cache ;
+let test_ring_sig_zkapp_tx () =
+  let proof_cache = Transaction_snark_test_suite.proof_cache in
   let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -136,7 +132,9 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
           ( if debug_mode then
-            Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
+            Binable.to_string
+              (module Side_loaded_verification_key.Stable.Latest)
+              vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
             |> printf "vk:\n%s\n\n" )
           |> fun () ->
@@ -340,9 +338,12 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) ) ;
-  match Sys.getenv "PROOF_CACHE_OUT" with
-  | Some path ->
-      Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-  | None ->
-      ()
+              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+
+let suite () =
+  Transaction_snark_test_suite.make ~name:"ring_sig"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  test "1-of-1" test_1_of_1 ;
+  test "1-of-2" test_1_of_2 ;
+  test "ring-signature zkapp tx with 3 zkapp_command" test_ring_sig_zkapp_tx

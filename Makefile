@@ -725,7 +725,7 @@ debian-download-create-legacy-hardfork: ## Download and create legacy hardfork D
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
 	$(call check_env_var,NETWORK_NAME)
 
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-$(NETWORK_NAME)-prefork-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+	@buildkite-cache-manager read --root legacy/debians/$(CODENAME) "mina-create-$(NETWORK_NAME)-prefork-genesis_*_amd64.deb" _build
 
 .PHONY: debian-reversion
 debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
@@ -745,20 +745,20 @@ cache-get-prefork-debians: ## Download debian packages for prefork genesis creat
 
 	$(call check_env_var,NETWORK_NAME)
 
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-prefork  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+	@buildkite-cache-manager read --root berkeley/debians/$(CODENAME) "mina-$(NETWORK_NAME)-prefork_*_amd64.deb" _build
 
 .PHONY: cache-get-create-prefork-genesis-debians
 cache-get-create-prefork-genesis-debians: ## Download debian packages for prefork genesis creation
 	$(info 📦 Downloading prefork genesis creation Debian packages for debian $(CODENAME))
 	$(call check_env_var,NETWORK_NAME)
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-create-genesis-ledger  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+	@buildkite-cache-manager read --root berkeley/debians/$(CODENAME) "mina-$(NETWORK_NAME)-create-genesis-ledger_*_amd64.deb" _build
 
 .PHONY: cache-put-debian
 cache-put-debian: ## Upload debian packages for prefork genesis creation
 	$(info 📦 Uploading Debian packages for debian $(CODENAME) to CI cache)
 	$(call check_env_var,TARGET)
 	$(call check_env_var,DEB_PATH)
-	@./buildkite/scripts/release/manager.sh persist --codename $(CODENAME)  --target $(TARGET)  --backend hetzner --local-debian-path $(DEB_PATH)
+	@buildkite-cache-manager write --root $(TARGET) $(DEB_PATH) debians/$(CODENAME)/
 
 ########################################
 # Docker images

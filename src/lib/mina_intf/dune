@@ -8,6 +8,7 @@
   core_kernel
   sexplib0
   ;; local libraries
+  bootstrap_status
   mina_net2
   staged_ledger
   consensus

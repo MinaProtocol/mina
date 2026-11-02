@@ -18,6 +18,7 @@
 (package (name block_producer))
 (package (name block_time))
 (package (name bootstrap_controller))
+(package (name bootstrap_status))
 (package (name bowe_gabizon_hash))
 (package (name cache_dir))
 (package (name cache_lib))

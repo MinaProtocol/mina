@@ -344,6 +344,7 @@ module type Transition_router_intf = sig
     -> catchup_mode:[ `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> ledger_backing:Mina_ledger.Root.Config.backing_type
+    -> bootstrap_status:Bootstrap_status.t
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

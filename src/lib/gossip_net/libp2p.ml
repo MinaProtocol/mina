@@ -204,12 +204,14 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       don't_wait_for
         (let%map () =
            Pipe.iter underlying_r ~f:(fun msg ->
-               Pipe.write_without_pushback_if_open read_w msg ;
+               Pipe.write_without_pushback_if_open read_w
+                 (Bigstring.of_string msg) ;
                Deferred.unit )
          in
          Pipe.close read_w ) ;
       let transport =
-        Async_rpc_kernel.Pipe_transport.(create Kind.string read_r underlying_w)
+        Async_rpc_kernel.Pipe_transport.(
+          create Kind.bigstring read_r underlying_w)
       in
       transport
 
