@@ -306,5 +306,23 @@ let suite () =
         ~vk_txn_version:Mina_numbers.Txn_version.current
         ~check:(assert_vk_txn_version Mina_numbers.Txn_version.current)
         [ step ~expected_failure:vk_not_permitted Signature set_vk ]
+
+    let outdated_proof =
+      (Transaction_status.Failure.Proof_with_outdated_verification_key, U.Pass_2)
+
+    let () =
+      test "a proof against a stale key is rejected even when nothing changes"
+      @@ fun () ->
+      run_steps ~permissions:Permissions.user_default
+        ~check:(assert_vk_txn_version older_version)
+        [ step ~expected_failure:outdated_proof Proof keep ]
+
+    let () =
+      test "a proof against a fresh key is accepted"
+      @@ fun () ->
+      run_steps ~permissions:Permissions.user_default
+        ~vk_txn_version:Mina_numbers.Txn_version.current
+        ~check:(assert_vk_txn_version Mina_numbers.Txn_version.current)
+        [ step Proof keep ]
   end in
   ()
