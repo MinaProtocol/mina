@@ -34,6 +34,9 @@ NORM=${NORM:-}
 # Replace top N delegate keys with the specified keys
 REPLACE_TOP=${REPLACE_TOP:-}
 
+# Native MINA token identifier (non-native custom token accounts are excluded)
+NATIVE_TOKEN_ID='wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf'
+
 # Mainnet configuration constants
 MAINNET_START='2024-06-05T00:00:00Z'
 SLOTS_PER_EPOCH=7140
@@ -158,8 +161,8 @@ keys_="${keys_:0:-1}"
 
 tmpfile=$(mktemp)
 
-# jq filter to exclude PKs from the ledger
-if ! <"$ledger_file" jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"; then
+# jq filter to native MINA token accounts only, excluding our new PKs
+if ! <"$ledger_file" jq "[.[] | select(.token == \"$NATIVE_TOKEN_ID\") | select(.pk | IN($keys_) | not)]" >"$tmpfile"; then
   echo "Error: Failed to filter ledger with jq" >&2
   rm "$tmpfile"
   exit 1
@@ -205,6 +208,31 @@ function make_expr(){
 expr=$(for i in "${!KEYS[@]}"; do make_expr $i; done | tr "\n" "|" | head -c -1)
 expr="$expr | [.[] | select(.delegate | IN($keys_)) |= del(.receipt_chain_hash)]"
 
+
+##########################################################
+# Print old keys stake distribution (before transformation)
+##########################################################
+
+old_total_balance=$(<"$tmpfile" jq "[.[].balance | tonumber] | add | round")
+
+if [[ "$REPLACE_TOP" != "" ]] && [[ ${#TOP_KEYS[@]} -gt 0 ]]; then
+  echo "Old keys stake distribution (before replacement):" >&2
+  old_bal_exprs=()
+  for i in "${!TOP_KEYS[@]}"; do
+    old_bal_exprs+=("\"${TOP_KEYS[$i]}\": ([.[] | select(.delegate == \"${TOP_KEYS[$i]}\") | .balance | tonumber] | add // 0)")
+  done
+  old_bal_expr=$(IFS=,; echo "${old_bal_exprs[*]}")
+  if ! <"$tmpfile" jq --argjson total "$old_total_balance" \
+    "{$old_bal_expr} | to_entries | sort_by(.value) | reverse | map({key: .key, value: ((.value | tostring) + \" MINA (\" + (.value / \$total * 10000 | round / 100 | tostring) + \"%)\")} ) | from_entries + {\"__total\": ((\$total | tostring) + \" MINA\")}" 1>&2; then
+    echo "Error: Failed to display old stake distribution with jq" >&2
+    rm "$tmpfile"
+    exit 1
+  fi
+  echo "Key mapping (old -> new):" >&2
+  for i in "${!TOP_KEYS[@]}"; do
+    echo "  ${TOP_KEYS[$i]} -> ${KEYS[$i]}" >&2
+  done
+fi
 
 tmpfile2=$(mktemp)
 if ! <"$tmpfile" jq "$expr" >"$tmpfile2"; then
