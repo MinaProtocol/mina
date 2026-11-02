@@ -1420,23 +1420,6 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   in
   return process_catchup_job
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
-  O1trace.background_thread "perform_super_catchup" (fun () ->
-      let%bind process_catchup_job =
-        create_job_handler
-          ~context:(module Context)
-          ~trust_system ~verifier ~network ~frontier
-          ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
-          ~build_func:
-            (Transition_frontier.Breadcrumb.build
-               ~get_completed_work:(Fn.const None) )
-      in
-      O1trace.thread "handle_super_catchup_jobs" (fun () ->
-          Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-            ~f:process_catchup_job ) )
-
 (* Unit tests *)
 
 (* let run_test_only ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
@@ -1559,10 +1542,18 @@ let%test_module "Ledger_catchup tests" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
           ~cache_exceptions:true
       in
-      run
-        ~context:(module Context)
-        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+      don't_wait_for
+        (let%bind process_catchup_job =
+           create_job_handler
+             ~context:(module Context)
+             ~verifier ~trust_system ~network ~frontier
+             ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+             ~build_func:
+               (Transition_frontier.Breadcrumb.build
+                  ~get_completed_work:(Fn.const None) )
+         in
+         Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+           ~f:process_catchup_job ) ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

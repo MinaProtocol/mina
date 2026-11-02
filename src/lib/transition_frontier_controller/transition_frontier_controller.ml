@@ -157,10 +157,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Transition_handler.Processor.inputs ~primary_transition_reader
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
         ~f:process_message ) ;
-  Ledger_catchup.run
-    ~context:(module Context)
-    ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
+  O1trace.background_thread "perform_super_catchup" (fun () ->
+      Deferred.bind
+        (Ledger_catchup.create_job_handler
+           ~context:(module Context)
+           ~trust_system ~verifier ~network ~frontier
+           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache )
+        ~f:(fun process_catchup_job ->
+          O1trace.thread "handle_super_catchup_jobs" (fun () ->
+              Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+                ~f:process_catchup_job ) ) ) ;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
