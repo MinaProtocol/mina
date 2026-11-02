@@ -45,6 +45,9 @@ func TestMain(m *testing.M) {
 	// _ = logging.SetLogLevel("connmgr", "debug")
 	// _ = logging.SetLogLevel("*", "debug")
 	codanet.WithPrivate = true
+	// Test helpers store almost nothing, but each preallocates badger
+	// memtables sized by MaxTableSize; the default costs ~42 MB per helper.
+	codanet.BadgerMaxTableSize = 1 << 20
 
 	os.Exit(m.Run())
 }
