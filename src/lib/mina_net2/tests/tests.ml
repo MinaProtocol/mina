@@ -144,7 +144,9 @@ let%test_module "Mina network tests" =
         let r, w = Libp2p_stream.pipes stream in
         let rec go2 i =
           if i = 0 then return ()
-          else Pipe.write w (Printf.sprintf "%d" i) >>= fun () -> go2 (i - 1)
+          else
+            Pipe.write w (Bigstring.of_string (Printf.sprintf "%d" i))
+            >>= fun () -> go2 (i - 1)
         in
         let%bind () = go2 1000 in
         Pipe.close w ;
@@ -169,7 +171,7 @@ let%test_module "Mina network tests" =
           open_protocol bob ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Libp2p_stream.pipes stream in
-              let%map () = Pipe.transfer r w ~f:Fn.id in
+              let%map () = Pipe.transfer r w ~f:Bigstring.of_string in
               Pipe.close w ;
               Ivar.fill_if_empty handler_finished () )
           |> Deferred.Or_error.ok_exn
@@ -188,7 +190,7 @@ let%test_module "Mina network tests" =
         in
         (* Send test message from Carol to Bob and close the Carol's writing
             edge of the stream *)
-        let%bind () = Pipe.write w testmsg in
+        let%bind () = Pipe.write w (Bigstring.of_string testmsg) in
         Pipe.close w ;
         let handle_read tmsg = function
           | `Ok chunks ->

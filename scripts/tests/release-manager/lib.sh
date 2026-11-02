@@ -43,7 +43,7 @@ SIGNED_TEST_COMPONENT="test"
 
 DEBIAN_SIGN_KEY=""
 
-# Generate random suffix for promote operations
+# Random suffix so each test run uses fresh target versions
 RANDOM_SUFFIX="test-$(date +%s)-${RANDOM}"
 
 # Test counters
@@ -359,66 +359,6 @@ test_manager_verify() {
     fi
 }
 
-# Test: Test promote operation (dry-run) - unsigned repo
-test_manager_promote_unsigned() {
-    log_info "========================================="
-    log_info "TEST: Test manager.sh promote command (unsigned, dry-run)"
-    log_info "========================================="
-
-    local target_version="3.3.0-alpha1-${RANDOM_SUFFIX}"
-    log_info "Using random target version: ${target_version}"
-
-    # Test promote from ci to test component
-    if "${MANAGER_SCRIPT}" promote \
-        --source-version "3.3.0-alpha1-compatible-918b8c0" \
-        --target-version "${target_version}" \
-        --source-channel "${TEST_COMPONENT_CI}" \
-        --target-channel "${TEST_COMPONENT_TEST}" \
-        --artifacts "mina-daemon" \
-        --networks "devnet" \
-        --codenames "${TEST_CODENAME}" \
-        --arch "${TEST_ARCH}" \
-        --debian-repo "${TEST_BUCKET}" \
-        --only-debians \
-        --skip-cache-invalidation \
-        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/promote_unsigned_dry_run.log"; then
-        assert_success "Manager promote command (unsigned, dry-run)" 0
-    else
-        assert_success "Manager promote command (unsigned, dry-run)" 1
-    fi
-}
-
-# Test: Test promote operation (dry-run) - signed repo
-test_manager_promote_signed() {
-    log_info "========================================="
-    log_info "TEST: Test manager.sh promote command (signed, dry-run)"
-    log_info "========================================="
-
-    local target_version="3.3.0-${RANDOM_SUFFIX}"
-    log_info "Using random target version: ${target_version}"
-    log_info "Using signing key: ${DEBIAN_SIGN_KEY}"
-
-    # Test promote from ci to test component with signing
-    if "${MANAGER_SCRIPT}" promote \
-        --source-version "3.3.0-8c0c2e6" \
-        --target-version "${target_version}" \
-        --source-channel "${TEST_COMPONENT_CI}" \
-        --target-channel "${SIGNED_TEST_COMPONENT}" \
-        --artifacts "mina-archive" \
-        --networks "devnet" \
-        --codenames "${SIGNED_TEST_CODENAME}" \
-        --arch "${SIGNED_TEST_ARCH}" \
-        --debian-repo "${SIGNED_TEST_BUCKET}" \
-        --debian-sign-key "${DEBIAN_SIGN_KEY}" \
-        --skip-cache-invalidation \
-        --only-debians \
-        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/promote_signed_dry_run.log"; then
-        assert_success "Manager promote command (signed, dry-run)" 0
-    else
-        assert_success "Manager promote command (signed, dry-run)" 1
-    fi
-}
-
 # Test: Test publish operation (dry-run) - signed repo
 test_manager_publish_signed() {
     log_info "========================================="
@@ -600,40 +540,6 @@ test_manager_publish_mina_automode() {
     fi
 }
 
-# Test: Test promote operation (dry-run) for the mina-automode docker image
-test_manager_promote_mina_automode() {
-    log_info "========================================="
-    log_info "TEST: Test manager.sh promote mina-automode docker (dry-run)"
-    log_info "========================================="
-
-    local target_version="3.3.0-automode-${RANDOM_SUFFIX}"
-    local expected_image="mina-daemon-auto-hardfork:${target_version}-${TEST_CODENAME}-devnet"
-
-    if "${MANAGER_SCRIPT}" promote \
-        --source-version "3.3.0-alpha1-compatible-918b8c0" \
-        --target-version "${target_version}" \
-        --source-channel "${TEST_COMPONENT_CI}" \
-        --target-channel "${TEST_COMPONENT_TEST}" \
-        --artifacts "mina-automode" \
-        --networks "devnet" \
-        --codenames "${TEST_CODENAME}" \
-        --arch "${TEST_ARCH}" \
-        --debian-repo "${TEST_BUCKET}" \
-        --only-dockers \
-        --skip-cache-invalidation \
-        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/promote_mina_automode_dry_run.log"; then
-
-        if grep -q "${expected_image}" "${TEST_TEMP_DIR}/promote_mina_automode_dry_run.log"; then
-            assert_success "Manager promote mina-automode docker (dry-run)" 0
-        else
-            log_error "Expected docker image ${expected_image} in promote output"
-            assert_success "Manager promote mina-automode docker (dry-run)" 1
-        fi
-    else
-        assert_success "Manager promote mina-automode docker (dry-run)" 1
-    fi
-}
-
 # Test: Test publish with mixed artifacts including mina-config (dry-run)
 test_manager_publish_mixed_with_config() {
     log_info "========================================="
@@ -658,34 +564,6 @@ test_manager_publish_mixed_with_config() {
         assert_success "Manager publish mixed artifacts with mina-config (dry-run)" 0
     else
         assert_success "Manager publish mixed artifacts with mina-config (dry-run)" 1
-    fi
-}
-
-# Test: Test promote operation (dry-run) for mina-config artifact
-test_manager_promote_mina_config() {
-    log_info "========================================="
-    log_info "TEST: Test manager.sh promote mina-config (dry-run)"
-    log_info "========================================="
-
-    local target_version="3.3.0-config-${RANDOM_SUFFIX}"
-    log_info "Using random target version: ${target_version}"
-
-    if "${MANAGER_SCRIPT}" promote \
-        --source-version "3.3.0-alpha1-compatible-918b8c0" \
-        --target-version "${target_version}" \
-        --source-channel "${TEST_COMPONENT_CI}" \
-        --target-channel "${TEST_COMPONENT_TEST}" \
-        --artifacts "mina-config" \
-        --networks "devnet" \
-        --codenames "${TEST_CODENAME}" \
-        --arch "amd64" \
-        --debian-repo "${TEST_BUCKET}" \
-        --only-debians \
-        --skip-cache-invalidation \
-        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/promote_mina_config_dry_run.log"; then
-        assert_success "Manager promote mina-config (dry-run)" 0
-    else
-        assert_success "Manager promote mina-config (dry-run)" 1
     fi
 }
 
@@ -722,15 +600,11 @@ run_dry_run_tests() {
     test_list_packages
     test_verify_test_packages
     test_manager_verify
-    test_manager_promote_unsigned
-    test_manager_promote_signed
     test_manager_publish_signed
     test_manager_publish_mina_config
     test_manager_publish_mina_generic
     test_manager_publish_rosetta_generic
     test_manager_publish_mina_automode
     test_manager_publish_mixed_with_config
-    test_manager_promote_mina_config
-    test_manager_promote_mina_automode
     test_manager_unknown_artifact_rejected
 }

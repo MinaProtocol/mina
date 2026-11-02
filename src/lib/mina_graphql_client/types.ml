@@ -6,6 +6,12 @@ type metrics =
   ; transaction_pool_size : int
   }
 
+type transaction_pool_status =
+  { size : int
+  ; max_size : int
+  ; minimum_fee_per_weight_unit : Currency.Fee_rate.t option
+  }
+
 type best_chain_block =
   { state_hash : string
   ; command_transaction_count : int

@@ -2327,20 +2327,23 @@ module For_tests = struct
             } )
 
     let gen () : t Quickcheck.Generator.t =
-      let tbl = Public_key.Compressed.Hash_set.create () in
       let open Quickcheck.Generator in
       let open Let_syntax in
-      let rec go acc n =
-        if n = 0 then return (Array.of_list acc)
-        else
-          let%bind kp =
-            filter Keypair.gen ~f:(fun kp ->
-                not (Hash_set.mem tbl (Public_key.compress kp.public_key)) )
-          and amount = Int64.gen_incl min_init_balance max_init_balance in
-          Hash_set.add tbl (Public_key.compress kp.public_key) ;
-          go ((kp, amount) :: acc) (n - 1)
-      in
-      go [] num_accounts
+      (* Track the keys used per generated ledger, so that a ledger doesn't
+         depend on the ledgers generated before it. *)
+      of_fun (fun () ->
+          let tbl = Public_key.Compressed.Hash_set.create () in
+          let rec go acc n =
+            if n = 0 then return (Array.of_list acc)
+            else
+              let%bind kp =
+                filter Keypair.gen ~f:(fun kp ->
+                    not (Hash_set.mem tbl (Public_key.compress kp.public_key)) )
+              and amount = Int64.gen_incl min_init_balance max_init_balance in
+              Hash_set.add tbl (Public_key.compress kp.public_key) ;
+              go ((kp, amount) :: acc) (n - 1)
+          in
+          go [] num_accounts )
   end
 
   module Transaction_spec = struct

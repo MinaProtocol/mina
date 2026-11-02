@@ -231,11 +231,6 @@ module Sql = struct
     | Some `Or ->
         ("OR", "AND", "IS NOT")
 
-  let offset_sql offset =
-    Option.value_map offset ~default:"0" ~f:Int64.to_string
-
-  let limit_sql limit = Option.value_map limit ~default:"ALL" ~f:Int64.to_string
-
   let sql_filters ~block_height_field ~txn_hash_field ~account_identifier_fields
       ~op_status_field ~address_fields ~op_type_filters operator =
     let values_for_filter = function
@@ -311,25 +306,44 @@ module Sql = struct
 
   (* [ctes] ends with [id_count], the size of the whole result, and [page]
      selects one page of it with that count on every row. An empty page has no
-     row to carry the count, so the count is then read on its own. *)
-  let collect_page (module Conn : Mina_caqti.CONNECTION) ~logger ~params ~typ
-      ~ctes ~page =
+     row to carry the count, so the count is then read on its own.
+
+     The SQL text depends only on the shape of the filter (operator, operation
+     type, account-driven join), never on a value: the filter values are $1 to
+     $7, the page limit is $8 (NULL is no limit) and the offset is $9. So each
+     row type has a small, fixed set of requests, built once per shape and
+     kept, instead of a new prepared statement per call. *)
+  let page_requests typ =
+    let pages = String.Table.create () in
+    let counts = String.Table.create () in
+    fun ~ctes ~page ->
+      let collect =
+        Hashtbl.find_or_add pages (ctes ^ page) ~default:(fun () ->
+            Mina_caqti.collect_req
+              Caqti_type.(t2 Params.typ (t2 (option int64) int64))
+              Caqti_type.(t2 int64 typ)
+              (ctes ^ page) )
+      in
+      let count =
+        Hashtbl.find_or_add counts ctes ~default:(fun () ->
+            Mina_caqti.find_req Params.typ Caqti_type.int64
+              (ctes ^ " SELECT total_count FROM id_count") )
+      in
+      (collect, count)
+
+  let collect_page (module Conn : Mina_caqti.CONNECTION) ~logger ~requests
+      ~params ~ctes ~page ~offset ~limit =
     let open Deferred.Result.Let_syntax in
-    let query =
-      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) (ctes ^ page)
-    in
+    let collect, count = requests ~ctes ~page in
+    let page_params = (params, (limit, Option.value offset ~default:0L)) in
     [%log debug] "Running SQL query $query"
-      ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
-    match%bind Conn.collect_list query params with
+      ~metadata:
+        [ ("query", `String (request_to_string ~params:page_params collect)) ] ;
+    match%bind Conn.collect_list collect page_params with
     | (total_count, _) :: _ as rows ->
         return (total_count, List.map rows ~f:snd)
     | [] ->
-        let%map total_count =
-          Conn.find
-            (Mina_caqti.find_req Params.typ Caqti_type.int64
-               (ctes ^ " SELECT total_count FROM id_count") )
-            params
-        in
+        let%map total_count = Conn.find count params in
         (total_count, [])
 
   module Block_extras = struct
@@ -521,15 +535,13 @@ module Sql = struct
             )
         |sql}]
 
-    let page ~offset ~limit =
+    let page =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
       [%string
         {sql|
             SELECT %{fields}
             FROM id_count,
-                (SELECT * FROM user_command_info ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) AS u
+                (SELECT * FROM user_command_info ORDER BY block_id, id, sequence_no LIMIT $8 OFFSET $9) AS u
             INNER JOIN public_keys pk_payer
               ON pk_payer.id = u.fee_payer_id
             INNER JOIN public_keys pk_source
@@ -580,13 +592,15 @@ module Sql = struct
       in
       has_account && conjunctive && not has_txn_hash
 
-    let run conn ~logger ~offset ~limit input =
-      collect_page conn ~logger ~params:(Params.of_query input) ~typ
-        ~ctes:
-          (ctes ~by_account:(by_account input)
-             Transaction_query.(input.filter.Filter.op_type)
-             input.operator )
-        ~page:(page ~offset ~limit)
+    let run =
+      let requests = page_requests typ in
+      fun conn ~logger ~offset ~limit input ->
+        collect_page conn ~logger ~requests ~params:(Params.of_query input)
+          ~ctes:
+            (ctes ~by_account:(by_account input)
+               Transaction_query.(input.filter.Filter.op_type)
+               input.operator )
+          ~page ~offset ~limit
 
     let to_info ({ command = { signed_command = uc; _ } as command; _ } as t) =
       let open Result.Let_syntax in
@@ -819,17 +833,15 @@ module Sql = struct
             )
           |sql}]
 
-    let page ~offset ~limit =
+    let page =
       let fields =
         String.concat ~sep:","
           [ "id_count.total_count"; "i.*"; "ac.creation_fee" ]
       in
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
       [%string
         {sql|
             SELECT %{fields}
-            FROM id_count, (SELECT * FROM internal_commands_info ORDER BY block_id, id, sequence_no, secondary_sequence_no LIMIT %{limit} OFFSET %{offset}) i
+            FROM id_count, (SELECT * FROM internal_commands_info ORDER BY block_id, id, sequence_no, secondary_sequence_no LIMIT $8 OFFSET $9) i
             LEFT JOIN account_identifiers ai
               ON ai.public_key_id = receiver_id
             LEFT JOIN accounts_created ac
@@ -854,10 +866,12 @@ module Sql = struct
             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let run conn ~logger ~offset ~limit input =
-      collect_page conn ~logger ~params:(Params.of_query input) ~typ
-        ~ctes:(ctes input.filter.op_type input.operator)
-        ~page:(page ~offset ~limit)
+    let run =
+      let requests = page_requests typ in
+      fun conn ~logger ~offset ~limit input ->
+        collect_page conn ~logger ~requests ~params:(Params.of_query input)
+          ~ctes:(ctes input.filter.op_type input.operator)
+          ~page ~offset ~limit
 
     let to_info ({ internal_command; _ } as t : t) =
       let open Result.Let_syntax in
@@ -983,14 +997,12 @@ module Sql = struct
           WITH %{ctes_string}
         |sql}]
 
-    let page ~offset ~limit =
+    let page =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; "zc.*" ] in
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
       [%string
         {sql|
           SELECT %{fields}
-          FROM id_count, (SELECT * FROM zkapp_commands_ids ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) as ids
+          FROM id_count, (SELECT * FROM zkapp_commands_ids ORDER BY block_id, id, sequence_no LIMIT $8 OFFSET $9) as ids
           INNER JOIN zkapp_commands_info zc ON ids.id = zc.id AND ids.block_id = zc.block_id AND ids.sequence_no = zc.sequence_no
           ORDER BY block_id, id, sequence_no
         |sql}]
@@ -1027,10 +1039,12 @@ module Sql = struct
         ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
         ~op_type_filters operator
 
-    let run conn ~logger ~offset ~limit input =
-      collect_page conn ~logger ~params:(Params.of_query input) ~typ
-        ~ctes:(ctes ~filters:(filters input.filter.op_type input.operator))
-        ~page:(page ~offset ~limit)
+    let run =
+      let requests = page_requests typ in
+      fun conn ~logger ~offset ~limit input ->
+        collect_page conn ~logger ~requests ~params:(Params.of_query input)
+          ~ctes:(ctes ~filters:(filters input.filter.op_type input.operator))
+          ~page ~offset ~limit
 
     include Rosetta_lib_block.Sql.Zkapp_commands.Make_common (struct
       type command = t

@@ -17,6 +17,7 @@
   ppx_inline_test.config
   sexplib0
   ;; local libraries
+  bootstrap_status
   block_time
   child_processes
   coda_genesis_ledger

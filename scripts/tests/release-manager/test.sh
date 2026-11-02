@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Release Manager Test Suite - Quick (Dry-Run Only)
-# Tests publish and promote operations using dry-run mode (no actual AWS uploads)
+# Tests publish and verify operations using dry-run mode (no actual AWS uploads)
 #
 # All tests are safe and do not make actual changes to repositories.
 

@@ -31,9 +31,10 @@ CREATE TABLE tokens
 , owner_token_id       int               REFERENCES tokens(id)
 );
 
+/* value is bytea: a token symbol is any 0..6 bytes, not necessarily UTF-8 */
 CREATE TABLE token_symbols
 ( id          serial PRIMARY KEY
-, value text  NOT NULL
+, value bytea NOT NULL
 );
 
 CREATE INDEX idx_token_symbols_value ON token_symbols(value);
@@ -79,6 +80,12 @@ CREATE TABLE user_commands
 , memo           text                NOT NULL
 , hash           text                NOT NULL UNIQUE
 );
+
+/* account lookups, e.g. Rosetta's /search/transactions; upgrade.sql creates
+   the same indexes on an archive that predates them */
+CREATE INDEX idx_user_commands_fee_payer_id ON user_commands(fee_payer_id);
+CREATE INDEX idx_user_commands_source_id    ON user_commands(source_id);
+CREATE INDEX idx_user_commands_receiver_id  ON user_commands(receiver_id);
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_transfer', 'coinbase');
 
@@ -274,9 +281,10 @@ CREATE TABLE zkapp_timing_info
 , vesting_increment        text    NOT NULL
 );
 
+/* value is bytea: a zkApp URI is any bytes, not necessarily UTF-8 */
 CREATE TABLE zkapp_uris
 ( id                 serial  PRIMARY KEY
-, value              text    NOT NULL UNIQUE
+, value              bytea   NOT NULL UNIQUE
 );
 
 /* NULL convention */

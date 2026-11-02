@@ -17,8 +17,13 @@ module type Input_intf = sig
   val is_non_zkapp_update : bool
 end
 
-module Make (Input : Input_intf) = struct
+module type Test_intf = sig
+  val test : string -> (unit -> unit) -> unit
+end
+
+module Make (Input : Input_intf) (Test : Test_intf) = struct
   open Input
+  open Test
 
   let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
@@ -53,64 +58,84 @@ module Make (Input : Input_intf) = struct
           test_spec ~init_ledger ~vk ~zkapp_prover
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-  let%test_unit "account update using None auth when perm is set to Either" =
+  let () =
+    test "account update using None auth when perm is set to Either"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:None ~account_perm:Either
       ~failure_expected ()
 
-  let%test_unit "account update using None auth when perm is set to Impossible"
-      =
+  let () =
+    test "account update using None auth when perm is set to Impossible"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:None ~account_perm:Impossible
       ~failure_expected ()
 
-  let%test_unit "account update using None auth when perm is set to None" =
-    mk_update_perm_check ~current_auth:None ~account_perm:None ()
+  let () =
+    test "account update using None auth when perm is set to None"
+    @@ fun () -> mk_update_perm_check ~current_auth:None ~account_perm:None ()
 
-  let%test_unit "account update using None auth when perm is set to Proof" =
+  let () =
+    test "account update using None auth when perm is set to Proof"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:None ~account_perm:Proof
       ~failure_expected ()
 
-  let%test_unit "account update using None auth when perm is set to Signature" =
+  let () =
+    test "account update using None auth when perm is set to Signature"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:None ~account_perm:Signature
       ~failure_expected ()
 
-  let%test_unit "account update using Proof auth when perm is set to Either" =
+  let () =
+    test "account update using Proof auth when perm is set to Either"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Proof ~account_perm:Either ()
 
-  let%test_unit "account update using Proof auth when perm is set to Impossible"
-      =
+  let () =
+    test "account update using Proof auth when perm is set to Impossible"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Proof ~account_perm:Impossible
       ~failure_expected ()
 
-  let%test_unit "account update using Proof auth when perm is set to None" =
-    mk_update_perm_check ~current_auth:Proof ~account_perm:None ()
+  let () =
+    test "account update using Proof auth when perm is set to None"
+    @@ fun () -> mk_update_perm_check ~current_auth:Proof ~account_perm:None ()
 
-  let%test_unit "account update using Proof auth when perm is set to Proof" =
-    mk_update_perm_check ~current_auth:Proof ~account_perm:Proof ()
+  let () =
+    test "account update using Proof auth when perm is set to Proof"
+    @@ fun () -> mk_update_perm_check ~current_auth:Proof ~account_perm:Proof ()
 
-  let%test_unit "account update using Proof auth when perm is set to Signature"
-      =
+  let () =
+    test "account update using Proof auth when perm is set to Signature"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Proof ~account_perm:Signature
       ~failure_expected ()
 
-  let%test_unit "account update using Signature auth when perm is set to Either"
-      =
+  let () =
+    test "account update using Signature auth when perm is set to Either"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Signature ~account_perm:Either ()
 
-  let%test_unit "account update using Signature auth when perm is set to \
-                 Impossible" =
+  let () =
+    test "account update using Signature auth when perm is set to Impossible"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
       ~failure_expected ()
 
-  let%test_unit "account update using Signature auth when perm is set to None" =
+  let () =
+    test "account update using Signature auth when perm is set to None"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Signature ~account_perm:None ()
 
-  let%test_unit "account update using Signature auth when perm is set to Proof"
-      =
+  let () =
+    test "account update using Signature auth when perm is set to Proof"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
       ~failure_expected ()
 
-  let%test_unit "account update using Signature auth when perm is set to \
-                 Signature" =
+  let () =
+    test "account update using Signature auth when perm is set to Signature"
+    @@ fun () ->
     mk_update_perm_check ~current_auth:Signature ~account_perm:Signature ()
 
   let test_non_zkapp_to_zkapp ?(new_account = true) test_spec init_ledger
@@ -157,7 +182,9 @@ module Make (Input : Input_intf) = struct
               assert (Option.is_none account.zkapp)
             else assert (Option.is_some account.zkapp) ) )
 
-  let%test_unit "update a new non-zkapp account specified update" =
+  let () =
+    test "update a new non-zkapp account specified update"
+    @@ fun () ->
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, new_kp) ->
         let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -184,8 +211,9 @@ module Make (Input : Input_intf) = struct
         in
         test_non_zkapp_to_zkapp test_spec init_ledger new_kp )
 
-  let%test_unit "Update an existing non-zkapp account with the specified update"
-      =
+  let () =
+    test "Update an existing non-zkapp account with the specified update"
+    @@ fun () ->
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
       ~f:(fun ({ init_ledger; specs }, _new_kp) ->
         let fee = Fee.of_nanomina_int_exn 1_000_000 in

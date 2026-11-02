@@ -10,8 +10,8 @@ This command appends the standard upload teardown (`uploadScript`, run in the
 default toolchain with the InfluxDB credentials from `Benchmarks`), so every
 perf job uploads the same way instead of open-coding the teardown. After the
 upload it runs `buildkite/scripts/bench/memory-gate.sh verdict`, which exits
-with `MemoryGate.exitStatus` if a benchmark recorded a failed memory gate. A job
-can soft-fail on that status alone with `softFail = Some MemoryGate.softFail`.
+with `MemoryGate.exitStatus` if a benchmark recorded a failed memory gate, which
+fails the job.
 
 `runCommands` is intentionally open: a job can run its benchmark however it needs
 (plain toolchain, `RunWithPostgres`, a Docker container, several steps, …) and

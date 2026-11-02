@@ -21,7 +21,6 @@ let Tag
       | Docker
       | Debian
       | Hardfork
-      | Promote
       | Rosetta
       | Devnet
       | Lightnet
@@ -54,7 +53,6 @@ let capitalName =
             , Base = "Base"
             , Hardfork = "Hardfork"
             , Stable = "Stable"
-            , Promote = "Promote"
             , Docker = "Docker"
             , Debian = "Debian"
             , Rosetta = "Rosetta"
@@ -90,7 +88,6 @@ let lowerName =
             , Base = "base"
             , Hardfork = "hardfork"
             , Stable = "stable"
-            , Promote = "promote"
             , Docker = "docker"
             , Debian = "debian"
             , Rosetta = "rosetta"

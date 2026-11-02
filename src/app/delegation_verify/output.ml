@@ -21,11 +21,13 @@ let valid_payload_to_yojson (p : t) : Yojson.Safe.t =
     ]
 
 let valid_payload_to_cassandra_updates (p : t) =
+  let hash_literal h =
+    Delegation_verify_lib.Cql.string_literal @@ State_hash.to_base58_check h
+  in
   [ ("height", Unsigned.UInt32.to_string p.height)
   ; ("slot", Mina_numbers.Global_slot_since_genesis.to_string p.slot)
-  ; ("parent", Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.parent)
-  ; ( "state_hash"
-    , Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.state_hash )
+  ; ("parent", hash_literal p.parent)
+  ; ("state_hash", hash_literal p.state_hash)
   ; ("raw_block", "NULL")
   ; ("snark_work", "NULL")
   ]

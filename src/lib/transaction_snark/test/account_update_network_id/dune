@@ -2,7 +2,6 @@
  (name account_update_network_id)
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
   async
   async_kernel
   async_unix
@@ -32,12 +31,12 @@
   mina_numbers
   sgn
   transaction_snark_tests
+  transaction_snark_test_suite
   test_util
   mina_transaction_logic
   mina_transaction
   mina_stdlib)
  (library_flags -linkall)
- (inline_tests)
  (preprocess
   (pps mina_ppx))
  (instrumentation

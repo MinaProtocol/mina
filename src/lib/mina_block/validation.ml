@@ -468,6 +468,78 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
   | _ ->
       failwith "why can't this be refuted?"
 
+(** The paths at which the leaves of two JSON values differ. *)
+let rec json_diff_paths ~path (expected : Yojson.Safe.t) (actual : Yojson.Safe.t)
+    =
+  match (expected, actual) with
+  | `Assoc xs, `Assoc ys
+    when List.equal String.equal (List.map ~f:fst xs) (List.map ~f:fst ys) ->
+      List.concat
+      @@ List.map2_exn xs ys ~f:(fun (key, x) (_, y) ->
+             json_diff_paths ~path:(path ^ "." ^ key) x y )
+  | `List xs, `List ys when List.length xs = List.length ys ->
+      List.concat_mapi (List.zip_exn xs ys) ~f:(fun i (x, y) ->
+          json_diff_paths ~path:(sprintf "%s[%d]" path i) x y )
+  | _ ->
+      if Yojson.Safe.equal expected actual then [] else [ path ]
+
+(** Rebuild the protocol state of a block from its parent and the result of
+    applying its staged ledger diff, and check that the block's protocol
+    state matches it. Only the inputs private to the block producer are taken
+    from the block (see [Consensus.Hooks.expected_protocol_state]).
+
+    The blockchain SNARK already constrains most of these fields, so this
+    check is redundant while the proof system is sound; it guards the chain
+    if that assumption fails. The genesis ledger hash is not constrained by
+    the SNARK; it is checked against the parent's, which is what
+    [Block_producer.generate_next_state] sets. The timestamp is not
+    constrained either, and is taken from the block: block producers usually
+    set it to the start of the block's slot, but canonical mainnet blocks
+    exist that do not.
+*)
+let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
+    ~parent_state_hash ~ledger_proof_statement ~staged_ledger_hash
+    ~body_reference protocol_state =
+  let parent_blockchain_state =
+    Protocol_state.blockchain_state parent_protocol_state
+  in
+  let ledger_proof_statement, supply_increase =
+    match ledger_proof_statement with
+    | Some (statement : Snarked_ledger_state.t) ->
+        (statement, statement.supply_increase)
+    | None ->
+        ( Blockchain_state.ledger_proof_statement parent_blockchain_state
+        , Currency.Amount.Signed.zero )
+  in
+  let blockchain_state =
+    Blockchain_state.create_value ~staged_ledger_hash
+      ~genesis_ledger_hash:
+        (Blockchain_state.genesis_ledger_hash parent_blockchain_state)
+      ~timestamp:
+        (Blockchain_state.timestamp
+           (Protocol_state.blockchain_state protocol_state) )
+      ~body_reference ~ledger_proof_statement
+  in
+  match
+    Consensus_state_hooks.expected_protocol_state ~constraint_constants
+      ~previous_protocol_state:parent_protocol_state
+      ~previous_protocol_state_hash:parent_state_hash ~blockchain_state
+      ~supply_increase ~candidate:protocol_state ~logger
+  with
+  | Error e ->
+      Error (Error.tag e ~tag:"Could not compute the expected protocol state")
+  | Ok expected ->
+      if Protocol_state.Value.equal expected protocol_state then Ok ()
+      else
+        let fields =
+          json_diff_paths ~path:"protocol_state"
+            (Protocol_state.value_to_yojson expected)
+            (Protocol_state.value_to_yojson protocol_state)
+        in
+        Error
+          (Error.create "Protocol state differs from the expected state at"
+             fields [%sexp_of: string list] )
+
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
     ~parent_protocol_state ?transaction_pool_proxy (t, validation) =
@@ -480,13 +552,14 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
   let body = Block.body block in
   let apply_start_time = Core.Time.now () in
-  let%bind.Deferred.Result () =
+  let%bind.Deferred.Result body_reference =
     match skip_staged_ledger_verification with
     | Some `All ->
         (* Block was already validated before persistence; body reference
            cannot have changed. Skip the expensive proof deserialization
            and hashing. *)
-        Deferred.Result.return ()
+        Deferred.Result.return
+          (Blockchain_state.body_reference blockchain_state)
     | _ ->
         let body_ref_from_header =
           Blockchain_state.body_reference blockchain_state
@@ -497,8 +570,16 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
           @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
         in
         if Blake2.equal body_ref_computed body_ref_from_header then
-          Deferred.Result.return ()
+          Deferred.Result.return body_ref_computed
         else Deferred.Result.fail `Invalid_body_reference
+  in
+  let parent_body_hash =
+    Protocol_state.(Body.hash @@ body parent_protocol_state)
+  in
+  let parent_state_hash =
+    (Protocol_state.hashes_with_body parent_protocol_state
+       ~body_hash:parent_body_hash )
+      .state_hash
   in
   let%bind.Deferred.Result ( `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
@@ -512,13 +593,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       (Staged_ledger_diff.Body.staged_ledger_diff body)
       ~current_state_view:
         Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
-      ~state_and_body_hash:
-        (let body_hash =
-           Protocol_state.(Body.hash @@ body parent_protocol_state)
-         in
-         ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
-             .state_hash
-         , body_hash ) )
+      ~state_and_body_hash:(parent_state_hash, parent_body_hash)
       ~coinbase_receiver:(Consensus_state.coinbase_receiver consensus_state)
       ~supercharge_coinbase:
         (Consensus_state.supercharge_coinbase consensus_state)
@@ -568,12 +643,46 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     then Ok ()
     else Error `Incorrect_target_snarked_ledger_hash
   in
+  let protocol_state_check =
+    let check_start_time = Core.Time.now () in
+    let result =
+      check_protocol_state ~logger
+        ~constraint_constants:
+          precomputed_values.Precomputed_values.constraint_constants
+        ~parent_protocol_state ~parent_state_hash
+        ~ledger_proof_statement:
+          (Option.map proof_opt ~f:Ledger_proof.Cached.statement)
+        ~staged_ledger_hash:
+          (Option.value staged_ledger_hash_opt
+             ~default:(Blockchain_state.staged_ledger_hash blockchain_state) )
+        ~body_reference protocol_state
+    in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float Core.Time.(Span.to_us @@ diff (now ()) check_start_time) )
+        ; ("ok", `Bool (Result.is_ok result))
+        ]
+      "Protocol state check takes $time_elapsed us" ;
+    Result.map_error result ~f:(fun e ->
+        [%log error] "Block's protocol state is not the expected one: $error"
+          ~metadata:
+            [ ("error", Error_json.error_to_yojson e)
+            ; ( "state_hash"
+              , State_hash.to_yojson (State_hash.With_state_hashes.state_hash t)
+              )
+            ] ;
+        `Incorrect_protocol_state e )
+  in
   let hash_errors =
     match staged_ledger_hash_opt with
     | Some hash ->
-        [ staged_ledger_hash_check hash; snarked_ledger_hash_check ]
+        [ staged_ledger_hash_check hash
+        ; snarked_ledger_hash_check
+        ; protocol_state_check
+        ]
     | None ->
-        [ snarked_ledger_hash_check ]
+        [ snarked_ledger_hash_check; protocol_state_check ]
   in
   Deferred.return
   @@

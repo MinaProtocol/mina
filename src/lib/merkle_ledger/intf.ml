@@ -205,7 +205,7 @@ module type Key_value_database = sig
     -> 'b
 end
 
-module type SYNCABLE = sig
+module type SYNC_CANDIDATE = sig
   type root_hash
 
   type hash
@@ -226,15 +226,26 @@ module type SYNCABLE = sig
 
   val get_inner_hash_at_addr_exn : t -> addr -> hash
 
-  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
-
-  val set_batch_accounts : t -> (addr * account) list -> unit
-
   (** Get all of the accounts that are in a subtree of the underlying Merkle
     tree rooted at `address`. The accounts are ordered by their addresses. *)
   val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
 
   val merkle_root : t -> root_hash
+end
+
+module type SYNC_RECIPIENT = sig
+  include SYNC_CANDIDATE
+
+  (** Replace the accounts in the subtree at the given address: the given
+      accounts fill its leftmost leaves, and any accounts in the leaves after
+      them are removed.
+
+      [subtree_hashes] are hashes that nodes in the subtree, the subtree's
+      root included, will have once the accounts are written, for a caller
+      that has already computed them. They are stored as given, without being
+      checked, rather than computed again. *)
+  val set_all_accounts_rooted_at_exn :
+    ?subtree_hashes:(addr * hash) list -> t -> addr -> account list -> unit
 end
 
 module Inputs = struct
@@ -300,13 +311,15 @@ module Ledger = struct
     module Location : LOCATION
 
     include
-      SYNCABLE
+      SYNC_CANDIDATE
         with type root_hash := root_hash
          and type hash := hash
          and type account := account
          and type addr := Addr.t
          and type path = Path.t
          and type t := t
+
+    val set_batch_accounts : t -> (Addr.t * account) list -> unit
 
     (** list of accounts in the ledger *)
     val to_list : t -> account list Async.Deferred.t
@@ -473,6 +486,14 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
+    (** See [SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. *)
+    val set_all_accounts_rooted_at_exn :
+         ?subtree_hashes:(Addr.t * hash) list
+      -> t
+      -> Addr.t
+      -> account list
+      -> unit
+
     val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
 
     (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)
@@ -546,6 +567,15 @@ module Ledger = struct
       include S
 
       module Config : Config
+
+      (** See [SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. Both ledgers are
+          updated. The [subtree_hashes] are those of the primary ledger. *)
+      val set_all_accounts_rooted_at_exn :
+           ?subtree_hashes:(Addr.t * hash) list
+        -> t
+        -> Addr.t
+        -> account list
+        -> unit
 
       val dbs_synced : primary_ledger -> converting_ledger -> bool
 

@@ -24,15 +24,18 @@ struct
   let is_non_zkapp_update = false
 end
 
-let%test_module "Update account verification key" =
-  ( module struct
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
+let suite () =
+  Transaction_snark_test_suite.make ~name:"verification_key"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
+    include
+      Transaction_snark_tests.Test_zkapp_update.Make
+        (Test_input)
+        (struct
+          let test = test
+        end)
 
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-
-    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
     open Currency
     open Signature_lib
     module U = Transaction_snark_tests.Util
@@ -78,29 +81,29 @@ let%test_module "Update account verification key" =
         failwith "already oldest version"
       else oldest
 
-    let%test_unit "account update using Signature auth when perm is set to \
-                   Proof" =
+    let () =
+      test "account update using Signature auth when perm is set to Proof"
+      @@ fun () ->
       mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
         ~txn_version:older_version ()
 
-    let%test_unit "account update using Signature auth when perm is set to \
-                   Impossible" =
+    let () =
+      test "account update using Signature auth when perm is set to Impossible"
+      @@ fun () ->
       mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
         ~txn_version:older_version ()
 
-    let%test_unit "account update using Proof auth when perm is set to Proof" =
+    let () =
+      test "account update using Proof auth when perm is set to Proof"
+      @@ fun () ->
       mk_update_perm_check ~current_auth:Proof ~account_perm:Proof
         ~txn_version:older_version ~failure_expected:Test_input.failure_expected
         ()
 
-    let%test_unit "account update using Proof auth when perm is set to Either" =
+    let () =
+      test "account update using Proof auth when perm is set to Either"
+      @@ fun () ->
       mk_update_perm_check ~current_auth:Proof ~account_perm:Either
         ~txn_version:older_version ()
-
-    let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  end )
+  end in
+  ()

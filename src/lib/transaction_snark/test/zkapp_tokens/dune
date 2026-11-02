@@ -2,7 +2,6 @@
  (name zkapp_tokens_tests)
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
   async
   async_kernel
   async_unix
@@ -24,13 +23,22 @@
   genesis_constants
   sgn
   transaction_snark_tests
+  transaction_snark_test_suite
   test_util
   mina_transaction_logic)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts)
-  (deps proof_cache.json))
  (preprocess
   (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))
+
+(rule
+ (target proof_cache_json.ml)
+ (deps proof_cache.json)
+ (action
+  (with-stdout-to
+   %{target}
+   (progn
+    (echo "let contents = {json|")
+    (cat proof_cache.json)
+    (echo "|json}\n")))))

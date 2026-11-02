@@ -293,6 +293,11 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCidSuffix(root), err)
 		DeleteRoot(bs, root)
 		bs.SendResourceUpdate(ipc.ResourceUpdateType_broken, rps[root].getTag(), root)
+		// A block may be valid at one of its positions in the tree, but not at
+		// another, so children may have been discovered for a malformed root
+		for _, ps := range newParams {
+			delete(ps, root)
+		}
 	}
 
 	blocksToProcess := make([]blocks.Block, 0)
@@ -300,22 +305,30 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	var someRootState *RootDownloadState
 	for link, ps := range newParams {
 		childId := codanet.BlockHashToCid(link)
-		np, has := nodeDownloadParams[childId]
-		if !has {
-			np = make(map[root][]NodeIndex)
-			nodeDownloadParams[childId] = np
-		}
-		for root, ixs := range ps {
-			np[root] = append(np[root], ixs...)
-			rootState, hasRS := rootDownloadStates[root]
+		var np map[root][]NodeIndex
+		for root_, ixs := range ps {
+			rootState, hasRS := rootDownloadStates[root_]
 			if !hasRS {
 				bitswapLogger.Errorf("processDownloadedBlock (2): didn't find root state for %s (root %s)",
-					id, codanet.BlockHashToCidSuffix(root))
+					id, codanet.BlockHashToCidSuffix(root_))
 				continue
 			}
+			if np == nil {
+				var has bool
+				np, has = nodeDownloadParams[childId]
+				if !has {
+					np = make(map[root][]NodeIndex)
+					nodeDownloadParams[childId] = np
+				}
+			}
+			np[root_] = append(np[root_], ixs...)
 			someRootState = rootState
 			rootState.allDescendants.Add(childId)
 			rootState.remainingNodeCounter = rootState.remainingNodeCounter + len(ixs)
+		}
+		if np == nil {
+			// No root is downloading the child
+			continue
 		}
 		var blockBytes []byte
 		err := bs.ViewBlock(link, func(b []byte) error {

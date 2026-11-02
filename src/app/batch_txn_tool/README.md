@@ -104,6 +104,18 @@ Optional Parameters:
 - `--apply-rate-limit TRUE/FALSE`: Whether to apply rate limiting (default: true)
 - `--rate-limit-level NUM`: Maximum transactions in a time interval (default: 200)
 - `--rate-limit-interval NUM_MILLISECONDS`: Rate limit interval (default: 300000)
+- `--pool-backpressure TRUE/FALSE`: Whether to pause sending while the target
+  node's transaction pool is nearly full (default: true)
+- `--pool-high-watermark FRACTION`: Fraction of the pool's capacity at which to
+  pause sending (default: 0.9)
+- `--pool-low-watermark FRACTION`: Fraction of the pool's capacity that the
+  pool must drain to before sending resumes (default: 0.75)
+- `--pool-poll-interval NUM_MILLISECONDS`: How often to poll the pool while
+  paused (default: 1000)
+- `--retry-delay NUM_MILLISECONDS`: How long to wait after a failed submission
+  before resyncing the nonce and retrying (default: 5000)
+- `--max-consecutive-failures NUM`: Number of consecutive failed submissions
+  after which to give up (default: 60)
 - `--origin-sender-sk-pw PASSWORD`: Password for origin sender's private key
 - `--returner-sk-pw PASSWORD`: Password for returner's private key
 - `--graphql-target-node URL`: GraphQL node to send commands to
@@ -146,8 +158,16 @@ Technical Notes
   the origin account to the returner account, then uses those funds to send
   multiple transactions back to the origin account.
 
-- The tool monitors transaction success and provides logging information about
-  transaction status.
+- The tool applies back-pressure from the target node's transaction pool, via
+  the `transactionPoolStatus` GraphQL query. Once the pool exceeds its
+  capacity it evicts its lowest-fee commands, together with every later nonce
+  from the same sender, so the tool pauses before the pool fills rather than
+  having its own commands evicted. The pool is the target node's, so point the
+  tool at a node whose pool resembles the block producers'.
+
+- If a submission fails, for example because the pool evicted some of the
+  tool's earlier commands anyway, the tool resumes from the nonce that the
+  node infers from its ledger and pool, resending any evicted nonces.
 
 - Private key passwords can be provided either as command-line parameters or
   through the `MINA_PRIVKEY_PASS` environment variable.

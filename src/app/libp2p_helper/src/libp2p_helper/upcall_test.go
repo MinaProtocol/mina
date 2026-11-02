@@ -281,6 +281,18 @@ func TestUpcalls(t *testing.T) {
 	testAddPeerImplDo(t, alice, carolInfo, true)
 	testStreamOpenSendClose(t, carol, carolPort, alice, alicePort, 11950, newProtocol, cTrap, aTrap)
 
+	// Carol is not subscribed, so gossipsub only publishes to peers she already
+	// knows to be subscribed, and drops the message if there are none. Alice's
+	// subscription reaches Carol asynchronously after they connect.
+	require.Eventually(t, func() bool {
+		for _, p := range carol.P2p.Pubsub.ListPeers(topic) {
+			if p == aliceInfo.ID {
+				return true
+			}
+		}
+		return false
+	}, time.Minute, 10*time.Millisecond, "carol never learned alice's subscription")
+
 	msg := []byte("bla-bla")
 	testPublishDo(t, carol, topic, msg, 11970)
 

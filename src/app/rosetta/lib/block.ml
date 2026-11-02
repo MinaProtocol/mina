@@ -262,32 +262,32 @@ module Sql = struct
       in
       Int64.( > ) num_canonical_at_height Int64.zero
 
-    let run (module Conn : Mina_caqti.CONNECTION) = function
-      | Some (`This (`Height h)) ->
-          let open Deferred.Result.Let_syntax in
-          let%bind has_canonical_height =
-            run_has_canonical_height (module Conn) ~height:h
-          in
-          if has_canonical_height then Conn.find_opt query_height_canonical h
-          else
-            let%bind max_height =
-              Conn.find
-                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
-                   {sql| SELECT MAX(height) FROM blocks |sql} )
-                ()
+    let run =
+      let query_max_height =
+        Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
+          {sql| SELECT MAX(height) FROM blocks |sql}
+      in
+      fun (module Conn : Mina_caqti.CONNECTION) -> function
+        | Some (`This (`Height h)) ->
+            let open Deferred.Result.Let_syntax in
+            let%bind has_canonical_height =
+              run_has_canonical_height (module Conn) ~height:h
             in
-            let max_queryable_height =
-              Int64.( - ) max_height Network.Sql.max_height_delta
-            in
-            if Int64.( <= ) h max_queryable_height then
-              Conn.find_opt query_height_pending h
-            else return None
-      | Some (`That (`Hash h)) ->
-          Conn.find_opt query_hash h
-      | Some (`Those (`Height height, `Hash hash)) ->
-          Conn.find_opt query_both (hash, height)
-      | None ->
-          Conn.find_opt query_best ()
+            if has_canonical_height then Conn.find_opt query_height_canonical h
+            else
+              let%bind max_height = Conn.find query_max_height () in
+              let max_queryable_height =
+                Int64.( - ) max_height Network.Sql.max_height_delta
+              in
+              if Int64.( <= ) h max_queryable_height then
+                Conn.find_opt query_height_pending h
+              else return None
+        | Some (`That (`Hash h)) ->
+            Conn.find_opt query_hash h
+        | Some (`Those (`Height height, `Hash hash)) ->
+            Conn.find_opt query_both (hash, height)
+        | None ->
+            Conn.find_opt query_best ()
   end
 
   module User_commands = struct
@@ -532,10 +532,12 @@ module Sql = struct
             ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
     |sql}]
 
-    let run (module Conn : Mina_caqti.CONNECTION) id =
-      Conn.collect_list
-        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
-        (id, Mina_base.Token_id.(to_string default))
+    let run =
+      let request =
+        Mina_caqti.collect_req Caqti_type.(t2 int string) typ query
+      in
+      fun (module Conn : Mina_caqti.CONNECTION) id ->
+        Conn.collect_list request (id, Mina_base.Token_id.(to_string default))
 
     let to_info t =
       Cte.to_info ~coinbase_receiver:(coinbase_receiver t) t.command
@@ -1076,24 +1078,6 @@ module Specific = struct
   end
 
   module Real = Impl (Deferred.Result)
-
-  let%test_module "blocks" =
-    ( module struct
-      module Mock = Impl (Result)
-
-      (* This test intentionally fails as there has not been time to implement
-       * it properly yet *)
-      (*
-      let%test_unit "all dummies" =
-        Test.assert_ ~f:Block_response.to_yojson
-          ~expected:
-            (Mock.handle ~env:Env.mock
-               (Block_request.create
-                  (Network_identifier.create "x" "y")
-                  (Partial_block_identifier.create ())))
-          ~actual:(Result.fail (Errors.create (`Json_parse None)))
-    *)
-    end )
 end
 
 let router ~graphql_uri ~minimum_user_command_fee ~logger ~with_db

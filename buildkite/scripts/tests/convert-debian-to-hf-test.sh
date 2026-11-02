@@ -30,7 +30,7 @@ source buildkite/scripts/debian/install.sh "mina-generic" 1
 # Step 1: Get test debian package from cache
 echo ""
 echo "=== Step 1: Downloading test debian package from cache ==="
-./buildkite/scripts/cache/manager.sh read --root test_data mina-daemon-test-package.deb .
+buildkite-cache-manager read --root test_data mina-daemon-test-package.deb .
 
 
 

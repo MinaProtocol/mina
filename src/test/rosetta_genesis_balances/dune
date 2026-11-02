@@ -2,8 +2,6 @@
  (name test_rosetta_genesis_balances)
  (deps
   %{project_root}/app/archive/create_schema.sql
-  %{project_root}/app/archive/upgrade.sql
-  %{project_root}/app/archive/downgrade.sql
   (env_var MINA_TEST_POSTGRES))
  (libraries
   ;; opam libraries

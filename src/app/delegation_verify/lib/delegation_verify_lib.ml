@@ -1,5 +1,29 @@
 open Core
 
+module Cql = struct
+  (** Render [s] as a CQL string literal. CQL has no backslash escapes: a
+      single quote inside a literal is written as two. *)
+  let string_literal s =
+    "'" ^ String.substr_replace_all s ~pattern:"'" ~with_:"''" ^ "'"
+
+  let%test_module "string_literal" =
+    ( module struct
+      let%test "plain text is wrapped in quotes" =
+        String.equal (string_literal "dlog_check") "'dlog_check'"
+
+      let%test "the empty string is an empty literal" =
+        String.equal (string_literal "") "''"
+
+      let%test "embedded single quotes are doubled" =
+        String.equal
+          (string_literal "can't open '/tmp/x'")
+          "'can''t open ''/tmp/x'''"
+
+      let%test "backslashes are not escapes" =
+        String.equal (string_literal "a\\'b") "'a\\''b'"
+    end )
+end
+
 (** The outcome of verifying a submission.
 
     [verified] and [validation_error] are two views of the same fact, so both
@@ -26,7 +50,7 @@ module Verification_status = struct
     | Verified ->
         [ ("verified", "true"); ("validation_error", "NULL") ]
     | Failed e ->
-        [ ("verified", "false"); ("validation_error", sprintf "'%s'" e) ]
+        [ ("verified", "false"); ("validation_error", Cql.string_literal e) ]
 
   let%test_module "verified and validation_error cannot disagree" =
     ( module struct
@@ -77,6 +101,12 @@ module Verification_status = struct
             true
         | _ ->
             false
+
+      let%test "cassandra: quotes in the reason are escaped" =
+        let fields = to_cassandra_updates (Failed "can't read 'block.dat'") in
+        String.equal
+          (field fields "validation_error")
+          "'can''t read ''block.dat'''"
 
       let%test "of_or_error carries the error text through" =
         match of_or_error (Error (Error.of_string "boom")) with

@@ -1,6 +1,9 @@
 -- ============================================================================
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
+-- restores: 4.0.2
 -- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
+-- + token_symbols.value, zkapp_uris.value: bytea -> text
+-- + drop genesis_accounts (4.0.2 does not have it)
 -- + record status in migration_history
 --
 -- Reverse further steps of upgrade.sql here as they are added, and bump
@@ -98,7 +101,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes; token_symbols/zkapp_uris value to text.',
             'starting'::migration_status
         );
     ELSIF
@@ -115,7 +118,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes; token_symbols/zkapp_uris value to text.',
             'starting'::migration_status
         );
     ELSIF
@@ -132,8 +135,8 @@ BEGIN
     END IF;
 END$$;
 
--- 2. Drop genesis_accounts. After the next upgrade it is empty until the
--- genesis ledgers are written to it again.
+-- 2. Drop genesis_accounts: release 4.0.2 does not have it. After the next
+-- upgrade it is empty until the genesis ledgers are written to it again.
 
 DROP TABLE IF EXISTS genesis_accounts;
 
@@ -147,7 +150,29 @@ DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
 DROP INDEX IF EXISTS idx_user_commands_source_id;
 DROP INDEX IF EXISTS idx_user_commands_receiver_id;
 
--- 4. Update schema_history
+-- 4. token_symbols.value and zkapp_uris.value: bytea -> text
+--
+-- convert_from fails on a value that is not valid in the database encoding
+-- (e.g. a 0xff token symbol in a UTF8 database). The script then stops, and
+-- the column stays bytea: text cannot hold that value without loss.
+DO $$
+DECLARE
+    tbl text;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['token_symbols', 'zkapp_uris'] LOOP
+        IF (SELECT data_type FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = tbl
+              AND column_name = 'value') = 'bytea'
+        THEN
+            EXECUTE format(
+              'ALTER TABLE public.%I ALTER COLUMN value TYPE text'
+              ' USING convert_from(value, getdatabaseencoding())', tbl);
+        END IF;
+    END LOOP;
+END $$;
+
+-- 5. Update schema_history
 
 DO $$
 BEGIN
