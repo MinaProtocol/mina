@@ -444,8 +444,8 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
             process_transition ~block_or_header ~valid_cb
               ?transaction_pool_proxy )
 
-let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
-    ~time_controller ~frontier ~get_completed_work
+(** The processor's inputs, each mapped to the message its handler takes. *)
+let inputs
     ~(primary_transition_reader :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -455,37 +455,24 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
-    ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
-    ~catchup_breadcrumbs_writer ~processed_transition_writer
-    ?transaction_pool_proxy =
-  let handle =
-    create_handler
-      ~context:(module Context)
-      ~verifier ~trust_system ~time_controller ~frontier ~get_completed_work
-      ~clean_up_catchup_scheduler ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~processed_transition_writer
-      ?transaction_pool_proxy ()
-  in
-  O1trace.background_thread "process_blocks" (fun () ->
-      Reader.Merge.iter
-        (* It is fine to skip the cache layer on blocks produced by this node
-           * because it is extraordinarily unlikely we would write an internal bug
-           * triggering this case, and the external case (where we received an
-           * identical external transition from the network) can happen iff there
-           * is another node with the exact same private key and view of the
-           * transaction pool. *)
-        [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
-              Mina_metrics.(
-                Gauge.inc_one
-                  Transition_frontier_controller.transitions_being_processed) ;
-              `Local_breadcrumb (Cached.pure breadcrumb) )
-        ; Reader.map catchup_breadcrumbs_reader
-            ~f:(fun (cb, catchup_breadcrumbs_callback) ->
-              `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback) )
-        ; Reader.map primary_transition_reader ~f:(fun vt ->
-              `Partially_valid_transition vt )
-        ]
-        ~f:handle )
+    ~catchup_breadcrumbs_reader =
+  (* It is fine to skip the cache layer on blocks produced by this node
+     * because it is extraordinarily unlikely we would write an internal bug
+     * triggering this case, and the external case (where we received an
+     * identical external transition from the network) can happen iff there
+     * is another node with the exact same private key and view of the
+     * transaction pool. *)
+  [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
+        Mina_metrics.(
+          Gauge.inc_one
+            Transition_frontier_controller.transitions_being_processed) ;
+        `Local_breadcrumb (Cached.pure breadcrumb) )
+  ; Reader.map catchup_breadcrumbs_reader
+      ~f:(fun (cb, catchup_breadcrumbs_callback) ->
+        `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback) )
+  ; Reader.map primary_transition_reader ~f:(fun vt ->
+        `Partially_valid_transition vt )
+  ]
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -585,14 +572,20 @@ let%test_module "Transition_handler.Processor tests" =
                   Unprocessed_transition_cache.create ~logger
                     ~cache_exceptions:true
                 in
-                run
-                  ~context:(module Context)
-                  ~time_controller ~verifier ~get_completed_work:(Fn.const None)
-                  ~trust_system ~clean_up_catchup_scheduler ~frontier
-                  ~primary_transition_reader:valid_transition_reader
-                  ~producer_transition_reader ~catchup_job_writer
-                  ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ?transaction_pool_proxy:None ;
+                let handle =
+                  create_handler
+                    ~context:(module Context)
+                    ~time_controller ~verifier
+                    ~get_completed_work:(Fn.const None) ~trust_system
+                    ~clean_up_catchup_scheduler ~frontier ~catchup_job_writer
+                    ~catchup_breadcrumbs_writer ~processed_transition_writer
+                    ?transaction_pool_proxy:None ()
+                in
+                don't_wait_for
+                  (Strict_pipe.Reader.Merge.iter
+                     (inputs ~primary_transition_reader:valid_transition_reader
+                        ~producer_transition_reader ~catchup_breadcrumbs_reader )
+                     ~f:handle ) ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
                       downcast_breadcrumb breadcrumb
