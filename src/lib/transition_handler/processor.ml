@@ -33,12 +33,6 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
     |> Int64.of_int )
   |> Block_time.Span.min (Block_time.Span.of_ms (Int64.of_int 5000))
 
-let cached_transform_deferred_result ~transform_cached ~transform_result cached
-    =
-  Cached.transform cached ~f:transform_cached
-  |> Cached.sequence_deferred
-  >>= Fn.compose transform_result Cached.sequence_result
-
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
@@ -265,34 +259,41 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             return x
       in
       let%bind breadcrumb =
-        cached_transform_deferred_result cached_initially_validated_transition
-          ~transform_cached:(fun _ ->
-            Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-              ~verifier ~get_completed_work ~trust_system
-              ~transition_receipt_time ~sender:(Some sender)
-              ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
-          ~transform_result:(function
-            | Error (`Invalid_staged_ledger_hash error)
-            | Error (`Invalid_staged_ledger_diff error) ->
-                Internal_tracing.with_state_hash state_hash
-                @@ fun () ->
-                [%log internal] "Failure"
-                  ~metadata:[ ("reason", `String (Error.to_string_hum error)) ] ;
-                [%log error]
-                  ~metadata:
-                    (metadata @ [ ("error", Error_json.error_to_yojson error) ])
-                  "Error while building breadcrumb in the transition handler \
-                   processor: $error" ;
-                Deferred.return (Error ())
-            | Error (`Fatal_error exn) ->
-                Internal_tracing.with_state_hash state_hash
-                @@ fun () ->
-                [%log internal] "Failure"
-                  ~metadata:[ ("reason", `String "Fatal error") ] ;
-                raise exn
-            | Ok breadcrumb ->
-                Deferred.return (Ok breadcrumb) )
+        let%bind.Deferred result =
+          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
+            ~verifier ~get_completed_work ~trust_system ~transition_receipt_time
+            ~sender:(Some sender) ~parent:parent_breadcrumb
+            ~transition:mostly_validated_transition ?transaction_pool_proxy
+            (* TODO: Can we skip here? *) ()
+        in
+        match result with
+        | Error (`Invalid_staged_ledger_hash error)
+        | Error (`Invalid_staged_ledger_diff error) ->
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String (Error.to_string_hum error)) ] ;
+            [%log error]
+              ~metadata:
+                (metadata @ [ ("error", Error_json.error_to_yojson error) ])
+              "Error while building breadcrumb in the transition handler \
+               processor: $error" ;
+            Deferred.return (Error ())
+        | Error (`Fatal_error exn) ->
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Fatal error") ] ;
+            raise exn
+        | Ok breadcrumb ->
+            Deferred.return
+              (Ok
+                 (Cached.transform cached_initially_validated_transition
+                    ~f:(fun _ -> breadcrumb) ) )
       in
       Mina_metrics.(
         Counter.inc_one
