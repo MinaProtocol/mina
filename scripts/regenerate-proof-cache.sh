@@ -5,18 +5,35 @@ if [[ $# -ne 1 ]]; then
 fi
 export MINA_PROFILE=$1
 
+set -e
+
+# The transaction snark test suites run in a single runner, and are named after
+# their directories.
+TESTS=src/lib/transaction_snark/test
+RUNNER=$TESTS/runner
+
 # state in _build can cause non-determinism in proof_caches
 rm -rf _build
-while IFS= read -r DIR; do
-  # I'm not sure why but using proof_cache.json directly causes non-determinism
-  # Initialize the target file
-  echo [] > $DIR/proof_cache_new.json
-  # Generate the cache file by running the tests
-  PROOF_CACHE_OUT=$PWD/$DIR/proof_cache_new.json dune runtest $DIR
-  mv $PWD/$DIR/proof_cache_new.json $PWD/$DIR/proof_cache.json
+
+# Start each cache from empty, so that it only keeps the proofs its tests use.
+for CACHE in "$TESTS"/*/proof_cache.json; do
+  echo [] > "$CACHE"
+done
+
+OUT=$(mktemp -d)
+dune build "$RUNNER/main.exe"
+# Generate the caches by running the tests; each suite with a cache writes it
+# to $OUT/<suite>.json.
+(cd "_build/default/$RUNNER" && PROOF_CACHE_OUT=$OUT ./main.exe)
+
+for CACHE in "$OUT"/*.json; do
+  SUITE=$(basename "$CACHE" .json)
+  mv "$CACHE" "$TESTS/$SUITE/proof_cache.json"
   # Stage the new file for a git commit
-  git add $PWD/$DIR/proof_cache.json
-  # Re-run the tests using the cache. Throws an error if the test is
-  # non-deterministic and caused a cache miss.
-  ERROR_ON_PROOF=true dune runtest $DIR
-done < <(find ./src -name proof_cache.json -exec dirname {} \;)
+  git add "$TESTS/$SUITE/proof_cache.json"
+done
+rmdir "$OUT"
+
+# Re-run the tests using the caches. Throws an error if a test is
+# non-deterministic and caused a cache miss.
+ERROR_ON_PROOF=true dune build "@$RUNNER/runtest"

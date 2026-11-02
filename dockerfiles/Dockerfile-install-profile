@@ -27,12 +27,13 @@ WORKDIR /root/
 
 # The profile tent package is staged into the build context's _debs/ directory by
 # scripts/docker/build.sh (DownloadOnly mode via read_all_from_cache.sh) and
-# installed directly from the local filesystem (no apt repo / no apt index).
+# installed directly from the local filesystem (no apt repo / no apt index); the
+# directory is bind-mounted for the install step only, never copied into a layer.
 # Devnet/Mainnet ship as mina-${deb_profile}-generic; Lightnet and Dev ship as
 # mina-${deb_profile} (no -generic suffix).
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
-COPY _debs /opt/mina-local-debs
-RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+RUN --mount=type=bind,source=_debs,target=/opt/mina-local-debs \
+  chmod +x /usr/local/bin/install-mina-debs.sh \
   && case "${deb_profile}" in \
        lightnet|dev) profile_pkg="mina-${deb_profile}"; PROFILE_DEB="${profile_pkg}" ;; \
        *) profile_pkg="mina-${deb_profile}-generic"; PROFILE_DEB="mina-${deb_profile}-profile" ;; \

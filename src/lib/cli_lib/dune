@@ -49,7 +49,7 @@
   gossip_net
   mina_runtime_config)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Library to communicate with Mina as cli as the front-end"))

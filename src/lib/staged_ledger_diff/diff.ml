@@ -286,6 +286,8 @@ module Diff = struct
         ( Pre_diff_with_at_most_two_coinbase.Stable.V3.to_latest two
         , Option.map one
             ~f:Pre_diff_with_at_most_one_coinbase.Stable.V3.to_latest )
+
+      let coinbase = coinbase
     end
   end]
 

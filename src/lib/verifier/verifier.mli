@@ -28,4 +28,15 @@ module For_tests : sig
     -> ?commit_id:string
     -> unit
     -> t Async.Deferred.t
+
+  (** A verifier for tests that verify commands, including zkApp proofs at
+      [Full], but never blockchain or transaction snarks. Under inline tests
+      it skips generating the keys for those snarks, so verifying one with it
+      fails. *)
+  val commands_only :
+       logger:Logger.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> proof_level:Genesis_constants.Proof_level.t
+    -> unit
+    -> t Async.Deferred.t
 end

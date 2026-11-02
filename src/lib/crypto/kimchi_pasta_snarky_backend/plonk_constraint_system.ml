@@ -804,7 +804,7 @@ type 'f runtime_tables_cfg =
 type ('f, 'rust_gates) t =
   { (* Map of cells that share the same value (enforced by to the
        permutation). *)
-    equivalence_classes : Row.t Position.t list V.Table.t
+    mutable equivalence_classes : Row.t Position.t list V.Table.t
   ; (* How to compute each internal variable (as a linear combination of other
        variables). *)
     internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
@@ -838,7 +838,7 @@ type ('f, 'rust_gates) t =
   ; (* V.t's corresponding to constant values. We reuse them so we don't need to
        use a fresh generic constraint each time to create a constant.
     *)
-    cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
+    mutable cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
         (* The [equivalence_classes] field keeps track of the positions which must be
            enforced to be equivalent due to the fact that they correspond to
            the same V.t value.
@@ -850,7 +850,7 @@ type ('f, 'rust_gates) t =
            their equivalence classes in the [equivalence_classes] table into a
            single equivalence class, so that the permutation argument enforces
            these desired equalities as well. *)
-  ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
+  ; mutable union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
 let get_public_input_size sys = sys.public_input_size
@@ -1372,6 +1372,12 @@ end = struct
 
         (* drop the gates, we don't need them anymore *)
         sys.gates <- Compiled (md5_digest, rust_gates) ;
+
+        (* The wiring tables and the constant cache are only used while adding
+           constraints and finalizing, so release them now. *)
+        sys.equivalence_classes <- V.Table.create () ;
+        sys.union_finds <- V.Table.create () ;
+        sys.cached_constants <- Hashtbl.create (module Fp) ;
 
         (* return the gates *)
         (rust_gates, fixed_lookup_tables, runtime_tables_cfg)

@@ -882,7 +882,9 @@ let docker_commands
                                   DebianChannel.effective spec.channel
                               , docker_repo =
                                   DockerRepo.effective spec.docker_repo
-                              , docker_publish = DockerPublish.Type.Disabled
+                              , docker_publish =
+                                  DockerPublish.effective
+                                    DockerPublish.Type.Disabled
                               , build_cache_dir = Some ownBuildCacheDir
                               }
                         )

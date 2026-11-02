@@ -8,6 +8,10 @@
   ;; local libraries
   logger)
  (preprocess
-  (pps ppx_mina ppx_version))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx)))

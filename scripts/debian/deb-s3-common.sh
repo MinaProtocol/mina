@@ -13,7 +13,7 @@
 #
 # The release-manager test suite sets DEB_S3_ENDPOINT to a throwaway MinIO
 # container. That is what lets those tests run with no AWS credentials and no
-# live bucket. See buildkite/scripts/tests/release-manager/mock-repo.sh.
+# live bucket. See scripts/tests/release-manager/mock-repo.sh.
 #
 # --force-path-style is required with MinIO: deb-s3 otherwise addresses the
 # bucket as a subdomain (bucket.host), which only AWS resolves.

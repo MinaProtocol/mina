@@ -201,6 +201,18 @@ module Query_metrics =
   }
 |}]
 
+module Query_transaction_pool_status =
+[%graphql
+{|
+  query {
+    transactionPoolStatus {
+      size
+      maxSize
+      minimumFeePerWeightUnit
+    }
+  }
+|}]
+
 module Query_sync_status = [%graphql {|
   query {
     syncStatus

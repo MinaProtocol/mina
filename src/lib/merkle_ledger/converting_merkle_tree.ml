@@ -88,11 +88,6 @@ end)
   let get_inner_hash_at_addr_exn t addr =
     Primary_ledger.get_inner_hash_at_addr_exn t.primary_ledger addr
 
-  let set_all_accounts_rooted_at_exn t addr accounts =
-    Primary_ledger.set_all_accounts_rooted_at_exn t.primary_ledger addr accounts ;
-    Converting_ledger.set_all_accounts_rooted_at_exn t.converting_ledger addr
-      (List.map ~f:convert accounts)
-
   let set_batch_accounts t addressed_accounts =
     Primary_ledger.set_batch_accounts t.primary_ledger addressed_accounts ;
     Converting_ledger.set_batch_accounts t.converting_ledger
@@ -263,6 +258,11 @@ end)
 struct
   include Make (Inputs) (Primary_db) (Converting_db)
   module Config = With_database_config
+
+  let set_all_accounts_rooted_at_exn t addr accounts =
+    Primary_db.set_all_accounts_rooted_at_exn (primary_ledger t) addr accounts ;
+    Converting_db.set_all_accounts_rooted_at_exn (converting_ledger t) addr
+      (List.map ~f:convert accounts)
 
   let dbs_synced db1 db2 =
     Primary_db.num_accounts db1 = Converting_db.num_accounts db2

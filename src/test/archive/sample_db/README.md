@@ -8,6 +8,22 @@ mina-replayer --archive-uri {connection_string} --input-file input.json
 
 It expects success
 
+### Genesis block
+
+`genesis_block.json` is the genesis block of `genesis.json` under the devnet
+profile, as a versioned precomputed block, and its state hash is the parent
+hash of the height 2 blocks in `precomputed_blocks.tar.xz`. Tests send it to
+the archive ahead of those blocks, so that their chain reaches genesis even
+when the archive, built from newer code, hashes the genesis block it computes
+from `genesis.json` differently. It holds no accounts, so a change to the
+account format does not affect it.
+
+It must be regenerated along with `precomputed_blocks.tar.xz`, by code whose
+latest precomputed block version is the one those blocks were produced at:
+build `Mina_block.genesis` from `genesis.json`, convert it with
+`Mina_block.Precomputed.of_block`, and print it with
+`Mina_block.Precomputed.Versioned.to_yojson`.
+
 ### Regenerate data
 
 The data can be regenerated with the script `./scripts/regenerate-archive.sh`

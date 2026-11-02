@@ -8,8 +8,6 @@ let Docker = ../../Constants/Docker/Package.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
-let ContainerImages = ../../Constants/ContainerImages.dhall
-
 let Spec =
       { Type = { service : Docker.Type, arch : Arch.Type, imageRefFile : Text }
       , default = {=}
@@ -18,8 +16,7 @@ let Spec =
 let verify
     : Spec.Type -> Text
     =     \(spec : Spec.Type)
-      ->      "RELEASE_TOOLKIT_VERSION=${ContainerImages.minaReleaseToolkitVersion} "
-          ++  "./buildkite/scripts/release/release-manager.sh docker verify "
+      ->      "release-manager docker verify "
           ++  "--image \\\$(cat ${spec.imageRefFile}) "
           ++  "--package ${Docker.dockerName spec.service} "
           ++  "--check-scripts-dir scripts/verify "

@@ -4,7 +4,11 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 ; Generate the verification key JSON file for the current dune profile, which also sets MINA_PROFILE.
 ; The output file name includes the profile to allow profile-specific regression testing.

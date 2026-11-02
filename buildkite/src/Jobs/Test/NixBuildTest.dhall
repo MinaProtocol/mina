@@ -1,5 +1,7 @@
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -41,14 +43,15 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image = ContainerImages.nixos
-                  , privileged = True
-                  , useBash = False
-                  }
-                  "./buildkite/scripts/nix/test.sh \$BUILDKITE_BRANCH"
-              ]
+                  RunInToolchain.submodulesInit True
+                # [ Cmd.runInDocker
+                      Cmd.Docker::{
+                      , image = ContainerImages.nixos
+                      , privileged = True
+                      , useBash = False
+                      }
+                      "./buildkite/scripts/nix/test.sh \$BUILDKITE_BRANCH"
+                  ]
             , label = "nix build tests"
             , key = "nix-build-tests"
             , target = Size.Small

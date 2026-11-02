@@ -1,19 +1,10 @@
 open Base
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-
-let within_mask l ~f =
-  let mask =
-    Ledger.register_mask l (Ledger.Mask.create ~depth:(Ledger.depth l) ())
-  in
-  let r = f mask in
-  if Result.is_ok r then Ledger.commit mask ;
-  ignore
-    (Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask : Ledger.unattached_mask) ;
-  r
+module Non_hashing_ledger = Ledger.Non_hashing_ledger
 
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =
-  within_mask l ~f:(fun l' ->
+  Non_hashing_ledger.within_mask l ~f:(fun l' ->
       Result.map
         ~f:(fun applied_txn ->
           applied_txn
@@ -21,14 +12,15 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
              .common
             .user_command
             .status )
-        (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc) )
+        (Non_hashing_ledger.apply_user_command l' ~constraint_constants
+           ~txn_global_slot uc ) )
 
 let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view
     ~signature_kind l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      within_mask l ~f:(fun l' ->
-          Ledger.apply_transactions ~signature_kind ~constraint_constants
-            ~global_slot ~txn_state_view l' t ) )
+      Non_hashing_ledger.within_mask l ~f:(fun l' ->
+          Non_hashing_ledger.apply_transactions ~signature_kind
+            ~constraint_constants ~global_slot ~txn_state_view l' t ) )
 
 let apply_transactions ~constraint_constants ~global_slot ~txn_state_view
     ~signature_kind l txn =
@@ -37,10 +29,10 @@ let apply_transactions ~constraint_constants ~global_slot ~txn_state_view
 
 let apply_transaction_first_pass ~constraint_constants ~global_slot
     ~txn_state_view ~signature_kind l txn :
-    Ledger.Transaction_partially_applied.t Or_error.t =
+    Non_hashing_ledger.Transaction_partially_applied.t Or_error.t =
   O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
-      within_mask l ~f:(fun l' ->
-          Ledger.apply_transaction_first_pass ~signature_kind l'
+      Non_hashing_ledger.within_mask l ~f:(fun l' ->
+          Non_hashing_ledger.apply_transaction_first_pass ~signature_kind l'
             ~constraint_constants ~global_slot ~txn_state_view txn ) )
 
 let%test_unit "invalid transactions do not dirty the ledger" =
@@ -98,6 +90,7 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   in
   Ledger.create_new_account_exn ledger sender_id sender_account ;
   Ledger.create_new_account_exn ledger receiver_id receiver_account ;
+  let ledger = Non_hashing_ledger.of_ledger ledger in
   ( match
       apply_user_command ~constraint_constants
         ~txn_global_slot:Global_slot_since_genesis.one ledger invalid_command
@@ -115,7 +108,7 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   let account_after_apply =
     Option.value_exn
       (Option.bind
-         (Ledger.location_of_account ledger sender_id)
-         ~f:(Ledger.get ledger) )
+         (Non_hashing_ledger.location_of_account ledger sender_id)
+         ~f:(Non_hashing_ledger.get ledger) )
   in
   assert (Account_nonce.equal account_after_apply.nonce Account_nonce.zero)

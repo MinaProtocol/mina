@@ -33,11 +33,13 @@
   mina_base.import
   mina_block
   mina_caqti
+  mina_ledger
   mina_numbers
   mina_state
   mina_transaction
   mina_wire_types
   one_or_two
+  precomputed_values
   protocol_version
   runtime_config
   signature_lib
@@ -48,14 +50,10 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_compare
-   ppx_hash
-   ppx_let
-   ppx_mina
-   ppx_sexp_conv
-   ppx_string
-   ppx_deriving_yojson
-   ppx_version)))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (executable
  (package archive_hardfork_toolbox)
@@ -109,10 +107,7 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_compare
-   ppx_hash
-   ppx_let
-   ppx_mina
-   ppx_sexp_conv
-   ppx_string
-   ppx_version)))
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

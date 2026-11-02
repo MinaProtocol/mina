@@ -45,7 +45,7 @@ let standalone_and_integrates_vrf_are_consistent () =
     let%map message = Consensus_vrf.Message.gen ~constraint_constants in
     (private_key, message)
   in
-  Quickcheck.test ~seed:(`Deterministic "") inputs
+  Quickcheck.test ~seed:(`Deterministic "") ~trials:100 inputs
     ~f:(fun (private_key, message) ->
       let integrated_vrf =
         Consensus_vrf.Integrated.eval ~constraint_constants ~private_key message

@@ -218,7 +218,7 @@ Previously observed examples include:
 - Test: `HardForkTestMixed`, `HardForkTestLegacy`, `TestnetIntegrationTests`, `TestnetIntegrationTestsLocalApps`, `TestnetIntegrationTestsLong`, `SingleNodeTest`, `RosettaIntegrationTests`, `ArchiveNodeTest`, `DaemonUnitTest`, `Libp2pUnitTest`, `ZkappsExamplesTest`, `MonorepoTest`, `NixBuildTest`, `VersionLint`.
 - Lint: `OCaml`, `Rust`, `Dhall`, `Docker`, `Bash`, `Changelog`, `Fast`, `Merge`, `Xrefcheck`, `ArchiveUpgrade`.
 - Bench: `ArchiveStable`, `ArchiveUnstable`, `HeapUsageStable`, `HeapUsageUnstable`, `LedgerApplyStable`, `LedgerApplyUnstable`, `MinaBaseStable`, `MinaBaseUnstable`, `SnarkProfilerStable`, `SnarkProfilerUnstable`, `ZkappLimitsStable`, `ZkappLimitsUnstable`.
-- Release: `MinaArtifactBookworm`, `MinaArtifactBookwormArm64`, `MinaArtifactBullseye`, `MinaArtifactBullseyeApps`, `MinaArtifactBullseyeInstrumented`, `MinaArtifactMainnetBullseye`, `MinaArtifactNoble`, `MinaToolchainArtifactBookworm`, `MinaToolchainArtifactNoble`, `Minimina`, `TraceTool`.
+- Release: `MinaArtifactBookworm`, `MinaArtifactBookwormArm64`, `MinaArtifactBullseye`, `MinaArtifactBullseyeApps`, `MinaArtifactBullseyeInstrumented`, `MinaArtifactMainnetBullseye`, `MinaArtifactNoble`, `MinaToolchainArtifactBookworm`, `MinaToolchainArtifactNoble`, `TraceTool`.
 - TearDown: `Coverage`.
 
 Release names are especially dynamic because they are derived from Dhall constants such as network, Debian codename, build flags, and architecture.

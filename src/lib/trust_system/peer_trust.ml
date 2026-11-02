@@ -152,10 +152,11 @@ module Make0 (Inputs : Input_intf) = struct
 
   let reset_ip ({ db; _ } as t) ip =
     Option.value_map db ~default:() ~f:(fun db' ->
-        List.map
-          ~f:(fun (id, _status) -> Db.remove db' ~key:id)
-          (lookup_ip t ip)
-        |> ignore ) ;
+        ignore
+          ( List.map
+              ~f:(fun (id, _status) -> Db.remove db' ~key:id)
+              (lookup_ip t ip)
+            : unit list ) ) ;
     lookup_ip t ip
 
   let close { db; upcall_writer; _ } =

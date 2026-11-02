@@ -100,7 +100,11 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_version ppx_inline_test)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (library
  (public_name pasta_bindings)
@@ -112,7 +116,11 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_version ppx_inline_test)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (library
  (public_name kimchi_bindings)
@@ -124,7 +132,11 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_version ppx_inline_test)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (library
  (public_name pasta_bindings.backend.native)
@@ -141,7 +153,11 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_version ppx_inline_test))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (implements pasta_bindings.backend))
 
 ;;

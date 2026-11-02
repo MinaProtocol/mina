@@ -1,9 +1,12 @@
 -- ============================================================================
 -- Mina rollback: from protocol version 5.0.0 to 4.0.0
+-- restores: 4.0.2
+-- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
+-- + token_symbols.value, zkapp_uris.value: bytea -> text
+-- + drop genesis_accounts (4.0.2 does not have it)
 -- + record status in migration_history
 --
--- 5.0.0 has no schema change yet, so there is nothing to undo. Reverse the
--- steps of upgrade.sql here as they are added, and bump
+-- Reverse further steps of upgrade.sql here as they are added, and bump
 -- archive.migration_version below.
 -- ============================================================================
 
@@ -23,7 +26,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.1';
+SET archive.migration_version = '0.0.3';
 
 -- TODO: put below in a common script
 
@@ -98,7 +101,24 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Rollback from protocol version 5.0.0 to 4.0.0. No schema change.',
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes; token_symbols/zkapp_uris value to text.',
+            'starting'::migration_status
+        );
+    ELSIF
+        latest_protocol_version = target_protocol_version AND
+        latest_migration_version < target_migration_version
+    THEN
+        -- An earlier revision of this script already ran. Its steps are
+        -- idempotent, so record a new attempt and apply them again.
+        RAISE NOTICE
+          'Advancing migration version % -> % for protocol version %',
+          latest_migration_version, target_migration_version, target_protocol_version;
+        INSERT INTO migration_history(
+            protocol_version, migration_version, description, status
+        ) VALUES (
+            target_protocol_version,
+            target_migration_version,
+            'Rollback from protocol version 5.0.0 to 4.0.0. Drop genesis_accounts and the user_commands account indexes; token_symbols/zkapp_uris value to text.',
             'starting'::migration_status
         );
     ELSIF
@@ -115,9 +135,44 @@ BEGIN
     END IF;
 END$$;
 
---
+-- 2. Drop genesis_accounts: release 4.0.2 does not have it. After the next
+-- upgrade it is empty until the genesis ledgers are written to it again.
 
--- 2. Update schema_history
+DROP TABLE IF EXISTS genesis_accounts;
+
+-- 3. Drop the user_commands account indexes added by upgrade.sql
+--
+-- DROP INDEX takes an ACCESS EXCLUSIVE lock on user_commands. lock_timeout
+-- above bounds how long it waits for that lock (it can queue behind running
+-- reads until then), not how long it is held. On a live archive,
+-- DROP INDEX CONCURRENTLY outside this script avoids the wait entirely.
+DROP INDEX IF EXISTS idx_user_commands_fee_payer_id;
+DROP INDEX IF EXISTS idx_user_commands_source_id;
+DROP INDEX IF EXISTS idx_user_commands_receiver_id;
+
+-- 4. token_symbols.value and zkapp_uris.value: bytea -> text
+--
+-- convert_from fails on a value that is not valid in the database encoding
+-- (e.g. a 0xff token symbol in a UTF8 database). The script then stops, and
+-- the column stays bytea: text cannot hold that value without loss.
+DO $$
+DECLARE
+    tbl text;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['token_symbols', 'zkapp_uris'] LOOP
+        IF (SELECT data_type FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = tbl
+              AND column_name = 'value') = 'bytea'
+        THEN
+            EXECUTE format(
+              'ALTER TABLE public.%I ALTER COLUMN value TYPE text'
+              ' USING convert_from(value, getdatabaseencoding())', tbl);
+        END IF;
+    END LOOP;
+END $$;
+
+-- 5. Update schema_history
 
 DO $$
 BEGIN

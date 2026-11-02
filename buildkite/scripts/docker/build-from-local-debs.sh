@@ -79,8 +79,8 @@ if [[ -z "$DOCKER_REGISTRY_ARG" ]]; then
 fi
 
 # scripts/docker/build.sh picks up every *.deb sitting in the docker build
-# context and stages it under _debs/, which the Dockerfiles COPY into the image
-# for install-mina-debs.sh -- no apt repo involved.
+# context and stages it under _debs/, which the Dockerfiles bind-mount for
+# install-mina-debs.sh -- no apt repo involved, nothing copied into a layer.
 DEB_STAGE="dockerfiles"
 
 echo "--- Staging locally built debian packages into ${DEB_STAGE}"
@@ -103,7 +103,7 @@ cp "${built_debs[@]}" "${DEB_STAGE}/"
 LEGACY_ARG=()
 if [[ -n "$LEGACY_VERSION" ]]; then
   echo "--- Reading legacy (prefork) debian packages from the CI cache"
-  ./buildkite/scripts/cache/manager.sh read --root legacy/debians \
+  buildkite-cache-manager read --root legacy/debians \
     "${MINA_DEB_CODENAME}/*" "${DEB_STAGE}"
   LEGACY_ARG=(--deb-legacy-version "$LEGACY_VERSION")
 fi

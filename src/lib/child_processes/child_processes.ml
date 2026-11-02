@@ -236,13 +236,28 @@ let start_custom :
     get_project_root ()
     |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
   in
+  (* On Linux [mina_binary_path] is the symlink /proc/PID/exe, whose directory
+     is not where mina is installed: look next to the file it points to. *)
+  let%bind.Deferred mina_binary_dir =
+    match%map.Deferred
+      Monitor.try_with (fun () -> Unix.readlink mina_binary_path)
+    with
+    | Ok target ->
+        Filename.dirname target
+    | Error _ ->
+        Filename.dirname mina_binary_path
+  in
   let%bind process =
     keep_trying
-      (* TODO: remove coda-, eventually *)
+      (* Packages install the helper next to mina with a prefix
+         (coda-libp2p_helper), so look for the prefixed names there before
+         falling back to PATH. TODO: remove coda-, eventually *)
       (List.filter_opt
          [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
-         ; Some (Filename.dirname mina_binary_path ^/ name)
+         ; Some (mina_binary_dir ^/ name)
+         ; Some (mina_binary_dir ^/ "mina-" ^ name)
+         ; Some (mina_binary_dir ^/ "coda-" ^ name)
          ; Some ("mina-" ^ name)
          ; Some ("coda-" ^ name)
          ] )

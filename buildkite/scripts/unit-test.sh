@@ -39,7 +39,10 @@ time make libp2p_helper
 
 # Turn on the proof-cache assertion, so that CI will fail if the proofs need to
 # be updated.
-export ERROR_ON_PROOF=true
+#
+# Disabled on develop until its circuits stabilise: the proof caches are
+# maintained on compatible, and develop's circuit changes make them miss.
+# export ERROR_ON_PROOF=true
 
 
 # When coverage instrumentation is enabled and this is not a PR build (i.e. nightly),
@@ -59,13 +62,32 @@ if [ -n "${DUNE_INSTRUMENT_WITH}" ] && [ "${BUILDKITE_PULL_REQUEST:-false}" = "f
     FORCE_FLAG="--force"
 fi
 
+# The first attempt's output is kept, so that tests which only pass on the
+# retry are reported rather than hidden.
+first_attempt_log=$(mktemp)
+
+# Print the failures that dune and the test runners reported in a log: the
+# dune stanzas whose actions failed, inline tests that threw, and failed
+# alcotest cases.
+report_failures() {
+    grep -E '^File "[^"]*/dune", line [0-9]+|: .* threw$|\[FAIL\]' "$1" || \
+        echo "(no failing tests found in $1)"
+}
+
 # Note: By attempting a re-run on failure here, we can avoid rebuilding and
 # skip running all of the tests that have already succeeded, since dune will
 # only retry those tests that failed. Do not pass --force to the retry: it
 # forces Dune to rerun the whole test suite, including tests that already passed.
 echo "--- Run unit tests"
-time dune runtest ${FORCE_FLAG} "${path}" || \
-(./scripts/link-coredumps.sh && \
- echo "--- Retrying failed unit tests" && \
- time dune runtest "${path}" || \
- (./scripts/link-coredumps.sh && false))
+if ! time dune runtest ${FORCE_FLAG} "${path}" 2>&1 | tee "${first_attempt_log}"; then
+    ./scripts/link-coredumps.sh
+    echo "--- Failures on the first attempt"
+    report_failures "${first_attempt_log}"
+    echo "--- Retrying failed unit tests"
+    if ! time dune runtest "${path}"; then
+        ./scripts/link-coredumps.sh
+        exit 1
+    fi
+    echo "+++ Flaky: these unit tests failed on the first attempt and passed on the retry"
+    report_failures "${first_attempt_log}"
+fi

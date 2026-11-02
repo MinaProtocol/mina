@@ -140,7 +140,7 @@ module Sql = struct
 
   let find_current_balance (module Conn : Mina_caqti.CONNECTION)
       ~requested_block_global_slot_since_genesis ~last_relevant_command_info
-      ?timing_id () =
+      ?timing_id ?timing_info () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
     let ( _
@@ -150,11 +150,15 @@ module Sql = struct
       last_relevant_command_info
     in
     let%bind timing_info_opt =
-      match timing_id with
-      | Some timing_id ->
+      (* [timing_info] comes from a genesis ledger, whose schedule is stored
+         with the account rather than behind a timing_info row. *)
+      match (timing_info, timing_id) with
+      | Some _, _ ->
+          return timing_info
+      | None, Some timing_id ->
           Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
           |> Errors.Lift.sql ~context:"Finding timing info"
-      | None ->
+      | None, None ->
           return None
     in
     let end_slot =
@@ -231,18 +235,69 @@ module Sql = struct
       ; hash = requested_block_hash
       }
     in
+    (* An account untouched since its era's genesis appears in no block, only
+       in that era's genesis ledger. None as well when the archive has no
+       genesis_accounts table yet: then blocks are the only source. *)
+    let%bind genesis_opt =
+      Archive_lib.Processor.Genesis_accounts.latest
+        (module Conn)
+        ~public_key:address ~token:token_id ~height:requested_block_height
+      |> Errors.Lift.sql ~context:"Finding the account in a genesis ledger"
+    in
     let%bind balance_info, nonce =
-      match last_relevant_command_info_opt with
-      | None ->
-          (* account doesn' exist yet at the request block, return zero balance *)
-          let nonce = Unsigned.UInt64.of_int 0 in
-          Deferred.Result.return
-            ({ Balance_info.liquid_balance = 0L; total_balance = 0L }, nonce)
-      | Some (last_relevant_command_info, timing_id) ->
+      (* Both sources hold the most recent known state at or below the
+         requested height, so the later one wins; a later era's genesis
+         supersedes an earlier era's blocks. At equal heights the block wins:
+         the genesis block itself records the same ledger. *)
+      let genesis_is_later =
+        match (genesis_opt, last_relevant_command_info_opt) with
+        | Some _, None ->
+            true
+        | Some genesis, Some ((block_height, _, _, _), _) ->
+            Int64.( > ) genesis.genesis_height block_height
+        | None, _ ->
+            false
+      in
+      match (genesis_opt, last_relevant_command_info_opt) with
+      | Some genesis, _ when genesis_is_later ->
+          let row = genesis.row in
+          let timing_info =
+            Option.map row.timing
+              ~f:(fun (t : Archive_lib.Processor.Genesis_accounts.timing) ->
+                { Archive_lib.Processor.Timing_info.account_identifier_id = 0
+                ; initial_minimum_balance = t.initial_minimum_balance
+                ; cliff_time = t.cliff_time
+                ; cliff_amount = t.cliff_amount
+                ; vesting_period = t.vesting_period
+                ; vesting_increment = t.vesting_increment
+                } )
+          in
+          (* Vesting counts from the genesis block's slot, as it would from
+             the block that last touched the account. *)
+          let genesis_slot =
+            Option.value genesis.genesis_slot
+              ~default:requested_block_global_slot_since_genesis
+          in
+          find_current_balance
+            (module Conn)
+            ~requested_block_global_slot_since_genesis
+            ~last_relevant_command_info:
+              ( genesis.genesis_height
+              , genesis_slot
+              , Int64.of_string row.balance
+              , row.nonce )
+            ?timing_info ()
+      | _, Some (last_relevant_command_info, timing_id) ->
           find_current_balance
             (module Conn)
             ~requested_block_global_slot_since_genesis
             ~last_relevant_command_info ~timing_id ()
+      | _, None ->
+          (* In no block and in no genesis ledger at or below this height: the
+             account did not exist yet. *)
+          let nonce = Unsigned.UInt64.of_int 0 in
+          Deferred.Result.return
+            ({ Balance_info.liquid_balance = 0L; total_balance = 0L }, nonce)
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end

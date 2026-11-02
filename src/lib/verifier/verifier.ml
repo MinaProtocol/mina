@@ -41,18 +41,41 @@ let get_verification_keys_eagerly ~signature_kind ~constraint_constants
   (`Blockchain blockchain_vk, `Transaction transaction_vk)
 
 module For_tests = struct
-  let default ~logger ~constraint_constants ?enable_internal_tracing
-      ?internal_trace_filename ~proof_level
+  let create_for_tests ~need_snark_keys ~logger ~constraint_constants
+      ?enable_internal_tracing ?internal_trace_filename ~proof_level
       ?(pids = Child_processes.Termination.create_pid_table ())
       ?(conf_dir = None) ?(commit_id = "not specified for unit tests") () =
     let open Async.Deferred.Let_syntax in
     let signature_kind = Mina_signature_kind.Testnet in
     let%bind ( `Blockchain blockchain_verification_key
              , `Transaction transaction_verification_key ) =
-      get_verification_keys_eagerly ~constraint_constants ~proof_level
-        ~signature_kind
+      if Base__Import.am_testing && not need_snark_keys then
+        let vk = Lazy.force Pickles.Verification_key.dummy in
+        return (`Blockchain vk, `Transaction vk)
+      else
+        get_verification_keys_eagerly ~constraint_constants ~proof_level
+          ~signature_kind
     in
     create ~logger ?enable_internal_tracing ?internal_trace_filename
       ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
       ~transaction_verification_key ~signature_kind ()
+
+  let default ~logger ~constraint_constants ?enable_internal_tracing
+      ?internal_trace_filename ~proof_level ?pids ?conf_dir ?commit_id () =
+    (* The dummy verifier only uses its keys at [Full], so skip generating
+       them otherwise. *)
+    let need_snark_keys =
+      match proof_level with
+      | Genesis_constants.Proof_level.Full ->
+          true
+      | Check | No_check ->
+          false
+    in
+    create_for_tests ~need_snark_keys ~logger ~constraint_constants
+      ?enable_internal_tracing ?internal_trace_filename ~proof_level ?pids
+      ?conf_dir ?commit_id ()
+
+  let commands_only ~logger ~constraint_constants ~proof_level () =
+    create_for_tests ~need_snark_keys:false ~logger ~constraint_constants
+      ~proof_level ()
 end

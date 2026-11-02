@@ -282,6 +282,25 @@ module Make_str (A : Wire_types.Concrete) = struct
         failwith
           "Snarked_ledger_state.Stable.V2.to_latest: no source or target \
            registers for the fee excess and total currency"
+
+      let to_input
+          ({ source
+           ; target
+           ; connecting_ledger_left
+           ; connecting_ledger_right
+           ; supply_increase
+           ; fee_excess
+           ; sok_digest = _
+           } :
+            t ) =
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+          [| Registers.Stable.V1.to_input source
+           ; Registers.Stable.V1.to_input target
+           ; Frozen_ledger_hash.to_input connecting_ledger_left
+           ; Frozen_ledger_hash.to_input connecting_ledger_right
+           ; Amount.Signed.to_input supply_increase
+           ; Fee_excess.Stable.V1.to_input fee_excess
+          |]
     end
   end]
 

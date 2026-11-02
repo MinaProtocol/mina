@@ -561,46 +561,46 @@ struct
 
             let f (T b : _ Branch_data.t) =
               let open Impls.Step in
-              let k_p =
-                lazy
-                  (let (T (typ, _conv, conv_inv)) = etyp in
-                   let%bind.Promise main =
-                     b.main ~step_domains:all_step_domains
-                   in
-                   run_in_sequence (fun () ->
-                       let main () () =
-                         let%map.Promise res = main () in
-                         Impls.Step.with_label "conv_inv" (fun () ->
-                             conv_inv res )
-                       in
-                       let constraint_builder =
-                         Impl.constraint_system_manual ~input_typ:Typ.unit
-                           ~return_typ:typ
-                       in
-                       let%map.Promise res =
-                         constraint_builder.run_circuit main
-                       in
-                       let cs = constraint_builder.finish_computation res in
-                       let cs_hash =
-                         Md5.to_hex (R1CS_constraint_system.digest cs)
-                       in
-                       ( Type_equal.Id.uid self.id
-                       , snark_keys_header
-                           { type_ = "step-proving-key"
-                           ; identifier = name ^ "-" ^ b.rule.identifier
-                           }
-                           cs_hash
-                       , b.index
-                       , cs ) ) )
+              let build_k_p () =
+                let (T (typ, _conv, conv_inv)) = etyp in
+                let%bind.Promise main = b.main ~step_domains:all_step_domains in
+                run_in_sequence (fun () ->
+                    let main () () =
+                      let%map.Promise res = main () in
+                      Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                    in
+                    let constraint_builder =
+                      Impl.constraint_system_manual ~input_typ:Typ.unit
+                        ~return_typ:typ
+                    in
+                    let%map.Promise res = constraint_builder.run_circuit main in
+                    let cs = constraint_builder.finish_computation res in
+                    let cs_hash =
+                      Md5.to_hex (R1CS_constraint_system.digest cs)
+                    in
+                    ( Type_equal.Id.uid self.id
+                    , snark_keys_header
+                        { type_ = "step-proving-key"
+                        ; identifier = name ^ "-" ^ b.rule.identifier
+                        }
+                        cs_hash
+                    , b.index
+                    , cs ) )
               in
+              let k_p = lazy (build_k_p ()) in
               let k_v =
                 match disk_keys with
                 | Some ks ->
                     Lazy.return (Promise.return ks.(b.index))
                 | None ->
                     lazy
+                      (* Unless the proving key has already been asked for,
+                         build the constraint system just for its digest, so
+                         that a process that only needs the verification key
+                         does not keep it. *)
                       (let%map.Promise id, _header, index, cs =
-                         Lazy.force k_p
+                         if Lazy.is_val k_p then Lazy.force k_p
+                         else build_k_p ()
                        in
                        let digest = R1CS_constraint_system.digest cs in
                        ( id
@@ -666,27 +666,31 @@ struct
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
       let self_id = Type_equal.Id.uid self.id in
-      let disk_key_prover =
-        lazy
-          (let%map.Promise wrap_main = Lazy.force wrap_main in
-           let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
-           let main x () = wrap_main (conv x) in
-           let cs =
-             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
-               main
-           in
-           let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-           ( self_id
-           , snark_keys_header
-               { type_ = "wrap-proving-key"; identifier = name }
-               cs_hash
-           , cs ) )
+      let build_disk_key_prover () =
+        let%map.Promise wrap_main = Lazy.force wrap_main in
+        let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+        let main x () = wrap_main (conv x) in
+        let cs =
+          constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit main
+        in
+        let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+        ( self_id
+        , snark_keys_header
+            { type_ = "wrap-proving-key"; identifier = name }
+            cs_hash
+        , cs )
       in
+      let disk_key_prover = lazy (build_disk_key_prover ()) in
       let disk_key_verifier =
         match disk_keys with
         | None ->
             lazy
-              (let%map.Promise id, _header, cs = Lazy.force disk_key_prover in
+              (* As for the step keys: don't keep the constraint system just
+                 for the verification key's digest. *)
+              (let%map.Promise id, _header, cs =
+                 if Lazy.is_val disk_key_prover then Lazy.force disk_key_prover
+                 else build_disk_key_prover ()
+               in
                let digest = R1CS_constraint_system.digest cs in
                ( id
                , snark_keys_header
@@ -1234,187 +1238,3 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
     done
   in
   (requests, Lazy.return @@ Promise.return @@ wrap_main)
-
-module Make_adversarial_test (M : sig
-  val tweak_statement :
-       ( Import.Challenge.Constant.t
-       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-       , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-         , bool )
-         Import.Types.Opt.t
-       , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , bool )
-         Import.Types.Opt.t
-       , bool
-       , 'max_proofs_verified
-         Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , Import.Types.Digest.Constant.t
-       , ( 'b
-         , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
-           , 'actual_proofs_verified )
-           Pickles_types.Vector.t
-         , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-               Import.Bulletproof_challenge.t
-             , 'e )
-             Pickles_types.Vector.t
-           , 'actual_proofs_verified )
-           Pickles_types.Vector.t )
-         Proof.Base.Messages_for_next_proof_over_same_field.Step.t
-       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         Import.Types.Bulletproof_challenge.t
-         Import.Types.Step_bp_vec.t
-       , Import.Types.Branch_data.t )
-       Import.Types.Wrap.Statement.In_circuit.t
-    -> ( Import.Challenge.Constant.t
-       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-       , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-         , bool )
-         Import.Types.Opt.t
-       , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         , bool )
-         Import.Types.Opt.t
-       , bool
-       , 'max_proofs_verified
-         Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-       , Import.Types.Digest.Constant.t
-       , ( 'b
-         , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
-           , 'actual_proofs_verified )
-           Pickles_types.Vector.t
-         , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-               Import.Bulletproof_challenge.t
-             , 'e )
-             Pickles_types.Vector.t
-           , 'actual_proofs_verified )
-           Pickles_types.Vector.t )
-         Proof.Base.Messages_for_next_proof_over_same_field.Step.t
-       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-         Import.Types.Bulletproof_challenge.t
-         Import.Types.Step_bp_vec.t
-       , Import.Types.Branch_data.t )
-       Import.Types.Wrap.Statement.In_circuit.t
-
-  val check_verifier_error : Error.t -> unit
-end) =
-struct
-  open Impls.Step
-
-  let rule self : _ Inductive_rule.Promise.t =
-    { identifier = "main"
-    ; prevs = [ self; self ]
-    ; main =
-        (fun { public_input = () } ->
-          let dummy_proof =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
-          in
-          Promise.return
-            { Inductive_rule.previous_proof_statements =
-                [ { public_input = ()
-                  ; proof = dummy_proof
-                  ; proof_must_verify = Boolean.false_
-                  }
-                ; { public_input = ()
-                  ; proof = dummy_proof
-                  ; proof_must_verify = Boolean.false_
-                  }
-                ]
-            ; public_output = ()
-            ; auxiliary_output = ()
-            } )
-    ; feature_flags = Plonk_types.Features.none_bool
-    }
-
-  let override_wrap_main =
-    { wrap_main = wrap_main_dummy_override
-    ; tweak_statement = M.tweak_statement
-    }
-
-  let tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
-    compile_with_wrap_main_override_promise () ~override_wrap_main
-      ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
-      ~max_proofs_verified:(module Nat.N2)
-      ~name:"blockchain-snark"
-      ~choices:(fun ~self -> [ rule self ])
-
-  module Proof = (val p)
-
-  let proof_with_stmt =
-    let (), (), p = Promise.block_on_async_exn (fun () -> step ()) in
-    ((), p)
-
-  let%test "should not be able to verify invalid proof" =
-    match
-      Promise.block_on_async_exn (fun () ->
-          Proof.verify_promise [ proof_with_stmt ] )
-    with
-    | Ok () ->
-        false
-    | Error err ->
-        M.check_verifier_error err ; true
-
-  module Recurse_on_bad_proof = struct
-    open Impls.Step
-
-    type _ Snarky_backendless.Request.t +=
-      | Proof : Proof.t Snarky_backendless.Request.t
-
-    let handler (proof : Proof.t)
-        (Snarky_backendless.Request.With { request; respond }) =
-      match request with
-      | Proof ->
-          respond (Provide proof)
-      | _ ->
-          respond Unhandled
-
-    let _tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
-      Common.time "compile" (fun () ->
-          compile_with_wrap_main_override_promise ()
-            ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
-            ~max_proofs_verified:(module Nat.N2)
-            ~name:"recurse-on-bad"
-            ~choices:(fun ~self:_ ->
-              [ { identifier = "main"
-                ; feature_flags = Plonk_types.Features.none_bool
-                ; prevs = [ tag; tag ]
-                ; main =
-                    (fun { public_input = () } ->
-                      let proof =
-                        exists (Typ.prover_value ()) ~request:(fun () -> Proof)
-                      in
-                      Promise.return
-                        { Inductive_rule.previous_proof_statements =
-                            [ { public_input = ()
-                              ; proof
-                              ; proof_must_verify = Boolean.true_
-                              }
-                            ; { public_input = ()
-                              ; proof
-                              ; proof_must_verify = Boolean.true_
-                              }
-                            ]
-                        ; public_output = ()
-                        ; auxiliary_output = ()
-                        } )
-                }
-              ] ) )
-
-    module Proof = (val p)
-  end
-
-  let%test "should not be able to create a recursive proof from an invalid \
-            proof" =
-    try
-      let (), (), proof =
-        Promise.block_on_async_exn (fun () ->
-            Recurse_on_bad_proof.step
-              ~handler:(Recurse_on_bad_proof.handler (snd proof_with_stmt))
-              () )
-      in
-      Or_error.is_error
-      @@ Promise.block_on_async_exn (fun () ->
-             Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
-    with _ -> true
-end

@@ -36,6 +36,7 @@
   logger
   transaction_snark_work
   parallel_scan
+  mina_metrics
   sgn
   ledger_proof
   genesis_constants
@@ -45,16 +46,7 @@
   mina_wire_types
   internal_tracing)
  (preprocess
-  (pps
-   ppx_base
-   ppx_mina
-   ppx_version
-   ppx_let
-   ppx_sexp_conv
-   ppx_bin_prot
-   ppx_custom_printf
-   ppx_compare
-   ppx_deriving_yojson))
+  (pps mina_ppx.no_pipebang))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Transaction-snark specialization of the parallel scan state"))

@@ -161,9 +161,6 @@ end = struct
            (1 lsl Addr.height ~ledger_depth:t.depth addr)
            ~f:(Fn.const Account.empty) ))
 
-  let set_all_accounts_rooted_at_exn _t =
-    failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
-
   let set_batch_accounts _t =
     failwith "set_batch_accounts: null ledgers cannot be mutated"
 

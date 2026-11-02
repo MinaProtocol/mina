@@ -16,5 +16,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_deriving_yojson ppx_jane ppx_version))
+  (pps mina_ppx))
  (synopsis "Extension of Yojson to make it easy for a type to derive yojson"))

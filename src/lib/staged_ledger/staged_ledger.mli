@@ -45,11 +45,21 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
+  (** Per-tree counts of free space and outstanding work. *)
+  module Tree_metrics : sig
+    type t =
+      { available_space : int; base_jobs_todo : int; merge_jobs_todo : int }
+    [@@deriving equal, sexp]
+  end
+
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   (** Statements of the required snark work *)
   val snark_job_list_json : t -> string
+
+  (** Per-tree counts of free space and outstanding work, oldest tree first *)
+  val tree_metrics : t -> Tree_metrics.t list
 
   (** Statements of all the pending work. Fails if there are any invalid
       statements in the scan state [t] *)

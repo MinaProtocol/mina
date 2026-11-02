@@ -28,15 +28,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   graphql_ppx
-   ppx_mina
-   ppx_deriving.show
-   ppx_deriving_yojson
-   ppx_base
-   ppx_let
-   ppx_version
-   ppx_compare)))
+  (pps mina_ppx.graphql.no_pipebang)))
 
 (executable
  (package signer)
@@ -48,15 +40,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   graphql_ppx
-   ppx_mina
-   ppx_deriving.show
-   ppx_deriving_yojson
-   ppx_base
-   ppx_let
-   ppx_version
-   ppx_compare)))
+  (pps mina_ppx.graphql.no_pipebang)))
 
 (executable
  (package signer)
@@ -68,15 +52,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   graphql_ppx
-   ppx_mina
-   ppx_deriving.show
-   ppx_deriving_yojson
-   ppx_base
-   ppx_let
-   ppx_version
-   ppx_compare)))
+  (pps mina_ppx.graphql.no_pipebang)))
 
 (executable
  (package signer)
@@ -88,12 +64,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   graphql_ppx
-   ppx_mina
-   ppx_deriving.show
-   ppx_deriving_yojson
-   ppx_base
-   ppx_let
-   ppx_version
-   ppx_compare)))
+  (pps mina_ppx.graphql.no_pipebang)))

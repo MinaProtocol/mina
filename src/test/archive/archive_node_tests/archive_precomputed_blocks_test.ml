@@ -131,7 +131,9 @@ let test_case (test_data : t) =
       let%bind () =
         Daemon.archive_blocks_from_files daemon.executor
           ~archive_address:test_data.archive.config.server_port
-          ~format:`Precomputed precomputed_blocks
+          ~format:`Precomputed
+          ( Network_data.genesis_block_path test_data.network_data
+          :: precomputed_blocks )
       in
 
       let%bind () =
