@@ -157,7 +157,7 @@ val combined_inner_product :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t
        , bool )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
   -> xi:Backend.Tick.Field.t
   -> zeta:Backend.Tick.Field.t
   -> zetaw:Backend.Tick.Field.t

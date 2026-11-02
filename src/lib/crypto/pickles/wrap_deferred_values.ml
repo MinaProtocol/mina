@@ -54,7 +54,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   in
   let zetaw = Tick.Field.mul zeta w in
   let tick_plonk_minimal :
-      _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
+      _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t =
     let chal = Challenge.Constant.to_tick_field in
     { zeta
     ; alpha
