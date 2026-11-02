@@ -2,11 +2,12 @@
 
 # Reject a release variable that is set to something Dhall will quietly ignore.
 #
-# MINA_RELEASE_DOCKER_REPO and MINA_RELEASE_DEBIAN_REPOS carry Dhall values,
-# and the expressions that read them end in `? None` so that an unset variable
-# means "use what the job declares". That fallback cannot tell "unset" from
-# "set to something that does not resolve", because Dhall collapses both into
-# the same None:
+# MINA_RELEASE_DOCKER_REPO, MINA_RELEASE_DEBIAN_REPO and
+# MINA_RELEASE_DEBIAN_MIRROR carry Dhall values, and the expressions that read
+# them end in `? None` so that an unset variable means "use what the job
+# declares" (or, for a mirror, "no second target"). That fallback cannot tell
+# "unset" from "set to something that does not resolve", because Dhall
+# collapses both into the same None:
 #
 #   '< Internal | InternalEurope | Public >.Public'  -> Some .Public
 #   '< Internal | InternalEurope | Public >.Pubic'   -> None   (typo)
@@ -18,12 +19,13 @@
 # direction is at least the safe one -- a typo always falls back to the job
 # default, which is internal, never public -- but "the images never reached
 # docker.io and nothing said so" is the kind of quiet failure this pipeline is
-# meant to be free of. The debian list is the same story: a typo in it
-# publishes to packages.o1test.net alone and says nothing.
+# meant to be free of. The debian variables are the same story: a typo in the
+# mirror publishes to one repository and says nothing about the second.
 #
 # Dhall cannot make the difference itself: it has no Text equality, so the
 # variable cannot be matched against a list of accepted spellings there. Here
-# it can.
+# it can. The same goes for a mirror that names the primary: Dhall would
+# render two publishes of the same files to the same place.
 
 set -euo pipefail
 
@@ -46,15 +48,9 @@ DEBIAN_ACCEPTED=(
   "${DEBIAN_UNION}.O1Test"
 )
 
-# is_accepted <value> <accepted>...
-is_accepted() {
-  local value="$1" accepted
-  shift
-  for accepted in "$@"; do
-    [[ "$value" == "$accepted" ]] && return 0
-  done
-  return 1
-}
+# What Jobs/Release/PublishDebians.dhall declares, and so where the packages
+# go when MINA_RELEASE_DEBIAN_REPO is unset.
+DEBIAN_DEFAULT="${DEBIAN_UNION}.O1Test"
 
 # reject <variable> <value> <what went wrong> <accepted>...
 reject() {
@@ -77,50 +73,37 @@ reject() {
   exit 1
 }
 
-# One alternative: the whole value is one accepted spelling.
-value="${MINA_RELEASE_DOCKER_REPO:-}"
-if [[ -n "$value" ]]; then
-  if is_accepted "$value" "${DOCKER_ACCEPTED[@]}"; then
-    echo -e "${GREEN}✅ MINA_RELEASE_DOCKER_REPO accepted${CLEAR}"
-    echo "    ${value}"
-  else
-    reject MINA_RELEASE_DOCKER_REPO "$value" "not an accepted spelling" "${DOCKER_ACCEPTED[@]}"
-  fi
-fi
-
-# A list of alternatives: `[ a, b ]`, each element one accepted spelling, at
-# least one element, no element twice. An empty list would publish nowhere
-# and a repeated one would publish the same files twice; neither is a release
-# anyone means to run, so both stop here.
-value="${MINA_RELEASE_DEBIAN_REPOS:-}"
-if [[ -n "$value" ]]; then
-  flat="$(tr '\n' ' ' <<< "$value")"
-  flat="${flat#"${flat%%[![:space:]]*}"}"
-  flat="${flat%"${flat##*[![:space:]]}"}"
-  if [[ "$flat" != "["* || "$flat" != *"]" ]]; then
-    reject MINA_RELEASE_DEBIAN_REPOS "$value" "not a list: expected '[ <element>, ... ]'" "${DEBIAN_ACCEPTED[@]}"
-  fi
-  inner="${flat#\[}"
-  inner="${inner%\]}"
-  elements=()
-  seen=()
-  IFS=',' read -ra parts <<< "$inner"
-  for part in "${parts[@]}"; do
-    element="${part#"${part%%[![:space:]]*}"}"
-    element="${element%"${element##*[![:space:]]}"}"
-    [[ -z "$element" ]] && continue
-    if ! is_accepted "$element" "${DEBIAN_ACCEPTED[@]}"; then
-      reject MINA_RELEASE_DEBIAN_REPOS "$value" "element '${element}' is not an accepted spelling" "${DEBIAN_ACCEPTED[@]}"
+# check <variable> <accepted>...: the variable is unset, or exactly one of the
+# accepted spellings. Unset is a real answer: every job keeps the target it
+# declares, which is what nightly and pull request CI want.
+check() {
+  local name="$1" value accepted
+  shift
+  value="${!name:-}"
+  [[ -z "$value" ]] && return 0
+  for accepted in "$@"; do
+    if [[ "$value" == "$accepted" ]]; then
+      echo -e "${GREEN}✅ ${name} accepted${CLEAR}"
+      echo "    ${value}"
+      return 0
     fi
-    if is_accepted "$element" "${seen[@]+"${seen[@]}"}"; then
-      reject MINA_RELEASE_DEBIAN_REPOS "$value" "element '${element}' is listed twice" "${DEBIAN_ACCEPTED[@]}"
-    fi
-    seen+=("$element")
-    elements+=("$element")
   done
-  if [[ ${#elements[@]} -eq 0 ]]; then
-    reject MINA_RELEASE_DEBIAN_REPOS "$value" "the list is empty, so nothing would be published" "${DEBIAN_ACCEPTED[@]}"
-  fi
-  echo -e "${GREEN}✅ MINA_RELEASE_DEBIAN_REPOS accepted${CLEAR}"
-  printf '    %s\n' "${elements[@]}"
+  reject "$name" "$value" "not an accepted spelling" "$@"
+}
+
+check MINA_RELEASE_DOCKER_REPO "${DOCKER_ACCEPTED[@]}"
+check MINA_RELEASE_DEBIAN_REPO "${DEBIAN_ACCEPTED[@]}"
+check MINA_RELEASE_DEBIAN_MIRROR "${DEBIAN_ACCEPTED[@]}"
+
+# A mirror is a second target. The same repository twice is not a release
+# anyone means to run, and Dhall would render it without a word.
+primary="${MINA_RELEASE_DEBIAN_REPO:-${DEBIAN_DEFAULT}}"
+if [[ -n "${MINA_RELEASE_DEBIAN_MIRROR:-}" && "${MINA_RELEASE_DEBIAN_MIRROR}" == "$primary" ]]; then
+  echo -e "${RED}❌ MINA_RELEASE_DEBIAN_MIRROR names the repository the packages already go to.${CLEAR}" >&2
+  echo "" >&2
+  echo "    primary:  ${primary}$([[ -z "${MINA_RELEASE_DEBIAN_REPO:-}" ]] && echo '  (the job default; MINA_RELEASE_DEBIAN_REPO is unset)')" >&2
+  echo "    mirror:   ${MINA_RELEASE_DEBIAN_MIRROR}" >&2
+  echo "" >&2
+  echo "    A mirror is a second repository. Leave it unset to publish to one." >&2
+  exit 1
 fi

@@ -9,13 +9,15 @@
 -- other pipeline.
 --
 -- The channel and the repositories are read from the environment, via
--- DebianChannel.effective and DebianRepo.effective, so the release pipelines
--- share this one job and differ only in what they set. One step per
--- repository: a release that goes to packages.o1test.net and to the signed
--- stable repository is two publishes of the same files, and a failure in one
--- must not hide the other. Unset, MINA_RELEASE_DEBIAN_REPOS means
--- packages.o1test.net alone, which is what every release did before the
--- variable existed.
+-- DebianChannel.effective and DebianRepo.targets, so the release pipelines
+-- share this one job and differ only in what they set. MINA_RELEASE_DEBIAN_REPO
+-- replaces the repository declared here, MINA_RELEASE_DEBIAN_MIRROR adds a
+-- second one, in the same pair as MINA_RELEASE_DOCKER_REPO and
+-- MINA_RELEASE_DOCKER_MIRROR. One step per repository: a release that goes to
+-- packages.o1test.net and to the signed stable repository is two publishes of
+-- the same files, and a failure in one must not hide the other. With both
+-- unset the job publishes to packages.o1test.net alone, which is what every
+-- release did before the variables existed.
 
 let Prelude = ../../External/Prelude.dhall
 
@@ -39,7 +41,7 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
-let repos = DebianRepo.effective [ DebianRepo.Type.O1Test ]
+let repos = DebianRepo.targets DebianRepo.Type.O1Test
 
 let step =
           \(repo : DebianRepo.Type)

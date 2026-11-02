@@ -135,39 +135,56 @@ let lowerName =
             repo
 
 let envOverride
-    : Optional (List DebianRepo)
+    : Optional DebianRepo
     =
-      -- The repositories a release pipeline publishes its debians to, if it
-      -- says. A list, because one release can go to more than one: the
-      -- unsigned packages.o1test.net that every consumer still reads, and the
-      -- signed repository of the channel.
+      -- The repository a release pipeline publishes its debians to, if it
+      -- says. An environment variable rather than a field on the job, for the
+      -- same reason as MINA_RELEASE_DOCKER_REPO (see DockerRepo.dhall): the
+      -- job is shared by every release pipeline, and only the environment of
+      -- the render can tell them apart. The value is a Dhall alternative,
+      -- spelled out in full:
       --
-      -- An environment variable rather than a field on the job, for the same
-      -- reason as MINA_RELEASE_DOCKER_REPO (see DockerRepo.dhall): the job is
-      -- shared by every release pipeline, and only the environment of the
-      -- render can tell them apart. The value is a Dhall list, spelled out in
-      -- full, one element per repository:
-      --
-      --   MINA_RELEASE_DEBIAN_REPOS='[ < Unstable | Nightly | Stable | O1Test >.O1Test, < Unstable | Nightly | Stable | O1Test >.Stable ]'
+      --   MINA_RELEASE_DEBIAN_REPO='< Unstable | Nightly | Stable | O1Test >.Stable'
       --
       -- Verbose for the reason given in DockerRepo.dhall: a plain word cannot
       -- be turned into an alternative, and a typo must fail the type check
-      -- rather than pass as a string. A value that does not resolve at all
-      -- collapses into None here, the same as unset, which the ? cannot tell
-      -- apart; validate-release-env.sh checks the spelling before the render
-      -- so that case stops the build instead of publishing to the default.
+      -- rather than pass as a string. A value that does not resolve collapses
+      -- into None here, the same as unset, which the ? cannot tell apart;
+      -- validate-release-env.sh checks the spelling before the render so that
+      -- case stops the build instead of publishing to the default.
       --
       -- WARNING: do not write an import here (see DockerRepo.dhall).
-        Some (env:MINA_RELEASE_DEBIAN_REPOS : List DebianRepo)
-      ? None (List DebianRepo)
+      Some (env:MINA_RELEASE_DEBIAN_REPO : DebianRepo) ? None DebianRepo
+
+let mirror
+    : Optional DebianRepo
+    =
+      -- A second repository that gets the same packages, if the pipeline
+      -- names one. A release goes to the unsigned packages.o1test.net that
+      -- every consumer still reads and to the signed repository of its
+      -- channel, so the publish stage needs two targets, not one; the mirror
+      -- is the second. Same form as MINA_RELEASE_DEBIAN_REPO:
+      --
+      --   MINA_RELEASE_DEBIAN_MIRROR='< Unstable | Nightly | Stable | O1Test >.Stable'
+      --
+      -- Unset means no second publish.
+      Some (env:MINA_RELEASE_DEBIAN_MIRROR : DebianRepo) ? None DebianRepo
 
 let effective
-    : List DebianRepo -> List DebianRepo
+    : DebianRepo -> DebianRepo
     =
-      -- The repositories to publish to: what the pipeline asked for, else
-      -- what the job declares.
-          \(declared : List DebianRepo)
-      ->  Optional/default (List DebianRepo) declared envOverride
+      -- The repository to publish to: what the pipeline asked for, else what
+      -- the job declares.
+          \(declared : DebianRepo)
+      ->  Optional/default DebianRepo declared envOverride
+
+let targets
+    : DebianRepo -> List DebianRepo
+    =
+      -- Every repository the publish stage writes to: the effective one, then
+      -- the mirror when there is one.
+          \(declared : DebianRepo)
+      ->  [ effective declared ] # Optional/toList DebianRepo mirror
 
 in  { Type = DebianRepo
     , keyIdEnvList = keyIdEnvList
@@ -182,5 +199,7 @@ in  { Type = DebianRepo
     , isSigned = isSigned
     , lowerName = lowerName
     , envOverride = envOverride
+    , mirror = mirror
     , effective = effective
+    , targets = targets
     }
