@@ -10,7 +10,7 @@ module Stable : sig
           { statement : Transaction_snark.Statement.With_sok.Stable.V3.t
           ; witness :
               Transaction_snark.Zkapp_command_segment.Witness.Stable.V3.t
-          ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+          ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V2.t
           }
       | Merge of
           { proof1 : Ledger_proof.Stable.V3.t

@@ -171,7 +171,12 @@ module Transaction_key = struct
         | Opt_signed ->
             { acc with signed_single = signed_single + 1 }
         | Opt_signed_opt_signed ->
-            { acc with signed_pair = signed_pair + 1 } )
+            { acc with signed_pair = signed_pair + 1 }
+        | Opt_signed_batch n ->
+            { acc with
+              signed_pair = signed_pair + (n / 2)
+            ; signed_single = signed_single + (n mod 2)
+            } )
 end
 
 module Time_values = struct

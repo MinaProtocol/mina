@@ -149,11 +149,25 @@ module type Full = sig
     module Basic : sig
       [%%versioned:
       module Stable : sig
+        module V2 : sig
+          type t =
+            | Opt_signed_opt_signed
+            | Opt_signed
+            | Proved
+            | Opt_signed_batch of int
+          [@@deriving sexp, yojson]
+        end
+
         module V1 : sig
           type t = Opt_signed_opt_signed | Opt_signed | Proved
           [@@deriving sexp, yojson]
+
+          val to_latest : t -> V2.t
         end
       end]
+
+      (** The number of slots in an [Opt_signed_batch] segment. *)
+      val opt_signed_batch_size : int
 
       val to_single_list : t -> Spec.single list
     end

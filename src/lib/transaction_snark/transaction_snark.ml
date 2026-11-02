@@ -137,17 +137,47 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Basic = struct
+      (** The number of slots in an [Opt_signed_batch] segment. *)
+      let opt_signed_batch_size = 6
+
       [%%versioned
       module Stable = struct
-        module V1 = struct
-          type t = Opt_signed_opt_signed | Opt_signed | Proved
+        module V2 = struct
+          type t =
+            | Opt_signed_opt_signed
+            | Opt_signed
+            | Proved
+            | Opt_signed_batch of int
+                (** Between 1 and [opt_signed_batch_size] non-proof account
+                    updates, in a segment with [opt_signed_batch_size] slots.
+                *)
           [@@deriving sexp, yojson]
 
           let to_latest = Fn.id
         end
+
+        module V1 = struct
+          type t = Opt_signed_opt_signed | Opt_signed | Proved
+          [@@deriving sexp, yojson]
+
+          let to_latest : t -> V2.t = function
+            | Opt_signed_opt_signed ->
+                Opt_signed_opt_signed
+            | Opt_signed ->
+                Opt_signed
+            | Proved ->
+                Proved
+        end
       end]
 
-      let of_controls = function
+      let of_controls controls =
+        let is_proof = function
+          | Control.Poly.Proof _ ->
+              true
+          | Signature _ | None_given ->
+              false
+        in
+        match controls with
         | [ Control.Poly.Proof _ ] ->
             Proved
         | [ (Control.Poly.Signature _ | Control.Poly.None_given) ] ->
@@ -156,6 +186,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; Control.Poly.(Signature _ | None_given)
           ] ->
             Opt_signed_opt_signed
+        | _
+          when List.length controls <= opt_signed_batch_size
+               && not (List.exists controls ~f:is_proof) ->
+            Opt_signed_batch (List.length controls)
         | _ ->
             failwith
               "Zkapp_command_segment.Basic.of_controls: Unsupported combination"
@@ -174,9 +208,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             [ opt_signed ]
         | Proved ->
             [ { auth_type = Proof; is_start = `No } ]
-
-      (** The number of slots in an [Opt_signed_batch] segment. *)
-      let opt_signed_batch_size = 6
+        | Opt_signed_batch n ->
+            List.init n ~f:(fun _ -> opt_signed)
 
       type (_, _, _, _) t_typed =
         | Opt_signed_batch : (unit, unit, unit, unit) t_typed
@@ -4293,6 +4326,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             opt_signed statement
         | Opt_signed_opt_signed ->
             opt_signed_opt_signed statement
+        | Opt_signed_batch _ ->
+            failwith
+              "of_zkapp_command_segment_exn: Opt_signed_batch segments are not \
+               supported yet"
         | Proved -> (
             match snapp_proof_data ~witness with
             | None ->
