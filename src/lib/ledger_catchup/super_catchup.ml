@@ -861,45 +861,42 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         : 'a.
              Node.t
           -> ('a, [ `Finished ]) Deferred.Result.t
-          -> ('a, [ `Finished ]) Deferred.Result.t =
-   fun node d ->
+          -> f:('a -> unit)
+          -> unit =
+   fun node d ~f ->
     (* TODO: See if the bail out is happening. *)
-    Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ]
+    upon
+      (Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ])
+      (function Ok x -> f x | Error `Finished -> ())
   and retry node =
-    let open Deferred.Result.Let_syntax in
-    let%bind () =
-      step node (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
-    in
-    run_node node
+    step node
+      (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
+      ~f:(fun () -> run_node node)
   and run_node (node : Node.t) =
     let state_hash = node.state_hash in
-    let step d = step node d in
-    let open Deferred.Result.Let_syntax in
+    let step d ~f = step node d ~f in
     match node.state with
     | Failed | Finished | Root _ ->
-        return ()
+        ()
     | To_download download_job ->
         let start_time = Time.now () in
-        let%bind external_block, attempts =
-          step (Downloader.Job.result download_job)
-        in
-        on_downloaded node ~start_time (external_block, attempts)
+        step
+          (Downloader.Job.result download_job)
+          ~f:(on_downloaded node ~start_time)
     | To_initial_validate external_block ->
         let start_time = Time.now () in
-        let%bind result =
-          step
-            ( initial_validate
-                ~context:(module Context)
-                ~trust_system ~batcher:initial_validation_batcher ~frontier
-                ~unprocessed_transition_cache
-                { external_block with
-                  data =
-                    { With_hash.data = external_block.data; hash = state_hash }
-                }
-            |> Deferred.map ~f:(fun x -> Ok x) )
-        in
-        on_initial_validated node ~start_time ~sender:external_block.sender
-          result
+        step
+          ( initial_validate
+              ~context:(module Context)
+              ~trust_system ~batcher:initial_validation_batcher ~frontier
+              ~unprocessed_transition_cache
+              { external_block with
+                data =
+                  { With_hash.data = external_block.data; hash = state_hash }
+              }
+          |> Deferred.map ~f:(fun x -> Ok x) )
+          ~f:
+            (on_initial_validated node ~start_time ~sender:external_block.sender)
     | To_verify (tv, valid_cb) ->
         [%log debug] "To_verify $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
@@ -907,38 +904,34 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         let start_time = Time.now () in
         let iv = Cached.peek tv in
         (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
-        let%bind result =
-          step
-            (* TODO: give the batch verifier a way to somehow throw away stuff if
-               this node gets removed from the tree. *)
-            ( Verify_work_batcher.verify verify_work_batcher iv
-            |> Deferred.map ~f:Result.return )
-        in
-        on_verified node ~start_time ~sender:iv.sender (tv, valid_cb) result
+        step
+          (* TODO: give the batch verifier a way to somehow throw away stuff if
+             this node gets removed from the tree. *)
+          ( Verify_work_batcher.verify verify_work_batcher iv
+          |> Deferred.map ~f:Result.return )
+          ~f:(on_verified node ~start_time ~sender:iv.sender (tv, valid_cb))
     | Wait_for_parent (av, valid_cb) ->
         [%log debug] "Wait_for_parent $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
-        let%bind parent =
-          step
-            (let parent = Hashtbl.find_exn t.nodes node.parent in
-             match%map.Async.Deferred Ivar.read parent.result with
-             | Ok `Added_to_frontier ->
-                 Ok parent.state_hash
-             | Error _ ->
-                 (* TODO consider rejecting the callback in some cases,
-                    see https://github.com/MinaProtocol/mina/issues/11087 *)
-                 Option.value_map valid_cb ~default:ignore
-                   ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                   `Ignore ;
-                 if not (Cached.was_consumed av) then
-                   ignore
-                     ( Cached.invalidate_with_failure av
-                       : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-                 finish t node ~is_error:true ;
-                 Error `Finished )
-        in
-        on_parent_added node (av, valid_cb) parent
+        step
+          (let parent = Hashtbl.find_exn t.nodes node.parent in
+           match%map.Async.Deferred Ivar.read parent.result with
+           | Ok `Added_to_frontier ->
+               Ok parent.state_hash
+           | Error _ ->
+               (* TODO consider rejecting the callback in some cases,
+                  see https://github.com/MinaProtocol/mina/issues/11087 *)
+               Option.value_map valid_cb ~default:ignore
+                 ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                 `Ignore ;
+               if not (Cached.was_consumed av) then
+                 ignore
+                   ( Cached.invalidate_with_failure av
+                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+               finish t node ~is_error:true ;
+               Error `Finished )
+          ~f:(on_parent_added node (av, valid_cb))
     | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) ->
         [%log debug] "To_build_breadcrumb $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
@@ -946,26 +939,26 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         let start_time = Time.now () in
         let transition_receipt_time = Some start_time in
         let av = Cached.peek c in
-        let%bind result =
-          let s =
-            let open Deferred.Result.Let_syntax in
-            let%bind parent =
-              Deferred.return
-                ( match Transition_frontier.find frontier parent_hash with
-                | None ->
-                    Error `Parent_breadcrumb_not_found
-                | Some breadcrumb ->
-                    Ok breadcrumb )
-            in
-            build_func ~logger ~skip_staged_ledger_verification:`Proofs
-              ~precomputed_values ~verifier ~trust_system ~parent
-              ~transition:av.data ~sender:(Some av.sender)
-              ~transition_receipt_time ()
+        let s =
+          let open Deferred.Result.Let_syntax in
+          let%bind parent =
+            Deferred.return
+              ( match Transition_frontier.find frontier parent_hash with
+              | None ->
+                  Error `Parent_breadcrumb_not_found
+              | Some breadcrumb ->
+                  Ok breadcrumb )
           in
-          step (Deferred.map ~f:Result.return s)
+          build_func ~logger ~skip_staged_ledger_verification:`Proofs
+            ~precomputed_values ~verifier ~trust_system ~parent
+            ~transition:av.data ~sender:(Some av.sender)
+            ~transition_receipt_time ()
         in
-        on_built node ~start_time ~sender:av.sender ~parent_hash (c, valid_cb)
-          result
+        step
+          (Deferred.map ~f:Result.return s)
+          ~f:
+            (on_built node ~start_time ~sender:av.sender ~parent_hash
+               (c, valid_cb) )
   and on_downloaded node ~start_time (external_block, attempts) =
     let state_hash = node.state_hash in
     [%log' debug t.logger]
@@ -1023,8 +1016,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                   (State_hash.to_base58_check hash)
                   ()
             | Some _ ->
-                finish t node ~is_error:false ;
-                Deferred.return (Ok ()) )
+                finish t node ~is_error:false )
         | `Building_path tv ->
             (* To_initial_validate may only occur for a downloaded block,
                hence there is no validation callback *)
@@ -1082,7 +1074,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     run_node node
   and on_built node ~start_time ~sender ~parent_hash (c, valid_cb) result =
     let failed = failed node in
-    let open Deferred.Result.Let_syntax in
     match result with
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
@@ -1114,10 +1105,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         Mina_metrics.(
           Gauge.set Catchup.build_breadcrumb_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-        let%bind () = Scheduler.yield () |> Deferred.map ~f:Result.return in
-        on_yielded node (c, valid_cb) breadcrumb
+        upon (Scheduler.yield ()) (fun () ->
+            on_yielded node (c, valid_cb) breadcrumb )
   and on_yielded node (c, valid_cb) breadcrumb =
-    let open Deferred.Result.Let_syntax in
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
     Strict_pipe.Writer.write catchup_breadcrumbs_writer
@@ -1125,15 +1115,13 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
         ]
       , `Ledger_catchup finished ) ;
-    let%bind () =
-      (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
-      step node (Deferred.map (Ivar.read finished) ~f:Result.return)
-    in
-    on_handed_off node
+    (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
+    step node
+      (Deferred.map (Ivar.read finished) ~f:Result.return)
+      ~f:(fun () -> on_handed_off node)
   and on_handed_off node =
     Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
-    set_state t node Finished ;
-    Deferred.Result.return ()
+    set_state t node Finished
   in
   run_node
 
@@ -1431,9 +1419,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                        create_node ~logger ~downloader t
                          (`Initial_validated b_and_c)
                      in
-                     ignore
-                       ( run_state_machine node
-                         : (unit, [ `Finished ]) Deferred.Result.t ) ) ) ;
+                     run_state_machine node ) ) ;
             ignore
               ( List.fold state_hashes
                   ~init:(root.state_hash, root.blockchain_length)
@@ -1443,7 +1429,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                       let node =
                         create_node ~logger t ~downloader (`Hash (h, l, parent))
                       in
-                      don't_wait_for (run_state_machine node >>| ignore) ) ;
+                      run_state_machine node ) ;
                     (h, l) )
                 : State_hash.t * Length.t ) )
   in
