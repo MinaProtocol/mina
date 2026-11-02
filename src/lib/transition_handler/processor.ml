@@ -63,21 +63,29 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
   [%log internal] "Add_and_finalize" ;
-  let%map () =
+  let%map added =
     if only_if_present then (
       let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
       match Transition_frontier.find frontier parent_hash with
       | Some _ ->
-          Transition_frontier.add_breadcrumb_exn frontier breadcrumb
+          let%map () =
+            Transition_frontier.add_breadcrumb_exn frontier breadcrumb
+          in
+          true
       | None ->
           [%log internal] "Parent_breadcrumb_not_found" ;
           [%log warn]
             !"When trying to add breadcrumb, its parent had been removed from \
               transition frontier: %{sexp: State_hash.t}"
             parent_hash ;
-          Deferred.unit )
-    else Transition_frontier.add_breadcrumb_exn frontier breadcrumb
+          Deferred.return false )
+    else
+      let%map () = Transition_frontier.add_breadcrumb_exn frontier breadcrumb in
+      true
   in
+  Block_outcome_log.record (fun () ->
+      Frontier_add
+        { state_hash; source = (source :> Block_outcome_log.source); added } ) ;
   ( match source with
   | `Internal ->
       ()
@@ -547,8 +555,10 @@ let%test_module "Transition_handler.Processor tests" =
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
            ~verifier ~max_length ~frontier_size ~branch_size () )
         ~f:(fun (frontier, branch) ->
-          assert (
+          let added_in_order, outcomes =
             Thread_safe.block_on_async_exn (fun () ->
+                Block_outcome_log.For_tests.recording_deferred
+                @@ fun () ->
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
                     (Buffered
@@ -633,5 +643,24 @@ let%test_module "Transition_handler.Processor tests" =
                 | `Ok (`Eof _) ->
                     failwith "pipe closed unexpectedly"
                 | `Ok (`Terminated x) ->
-                    x ) ) )
+                    x )
+          in
+          assert added_in_order ;
+          List.iter branch ~f:(fun breadcrumb ->
+              let state_hash =
+                Transition_frontier.Breadcrumb.state_hash breadcrumb
+              in
+              List.iter
+                [ Block_outcome_log.Frontier_add
+                    { state_hash; source = `Gossip; added = true }
+                ; Cache_removed { state_hash; outcome = `Consumed }
+                ]
+                ~f:(fun expected ->
+                  if
+                    not
+                      (List.mem outcomes expected
+                         ~equal:Block_outcome_log.equal_event )
+                  then
+                    failwiths ~here:[%here] "Missing block outcome" expected
+                      Block_outcome_log.sexp_of_event ) ) )
   end )
