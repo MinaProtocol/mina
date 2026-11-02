@@ -46,20 +46,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     | `Header _ ->
         ()
   in
-  let valid_transition_reader, valid_transition_writer =
-    let name = "valid transitions" in
-    Strict_pipe.create ~name
-      (Buffered
-         ( `Capacity valid_transition_pipe_capacity
-         , `Overflow
-             (Drop_head
-                (fun (head, `Valid_cb vc) ->
-                  Mina_metrics.(
-                    Counter.inc_one
-                      Pipe.Drop_on_overflow
-                      .transition_frontier_valid_transitions) ;
-                  f_drop_head name head vc ) ) ) )
-  in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
   in
@@ -133,18 +119,22 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true ) ) ;
+  let dispatcher =
+    Transition_handler.Block_dispatcher.create
+      ~on_validated:(Strict_pipe.Writer.write primary_transition_writer)
+  in
   let validate_transition =
     Transition_handler.Validator.create_handler
       ~context:(module Context)
-      ~trust_system ~time_controller ~frontier ~valid_transition_writer
+      ~trust_system ~time_controller ~frontier
+      ~on_valid:(fun transition ->
+        Transition_handler.Block_dispatcher.submit dispatcher
+          (Validated transition) )
       ~unprocessed_transition_cache
   in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Pipe_lib.Choosable_synchronous_pipe.iter network_transition_reader
         ~f:validate_transition ) ;
-  Strict_pipe.Reader.iter_without_pushback valid_transition_reader
-    ~f:(Strict_pipe.Writer.write primary_transition_writer)
-  |> don't_wait_for ;
   let catchup_scheduler =
     Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
       ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
@@ -161,19 +151,24 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Transition_handler.Processor.inputs ~primary_transition_reader
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
         ~f:process_message ) ;
+  Strict_pipe.Reader.iter_without_pushback catchup_job_reader ~f:(fun job ->
+      Transition_handler.Block_dispatcher.submit dispatcher (Catchup_job job) )
+  |> don't_wait_for ;
   O1trace.background_thread "perform_super_catchup" (fun () ->
-      Deferred.bind
+      Deferred.map
         (Ledger_catchup.create_job_handler
            ~context:(module Context)
            ~trust_system ~verifier ~network ~frontier
-           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache )
-        ~f:(fun process_catchup_job ->
-          O1trace.thread "handle_super_catchup_jobs" (fun () ->
-              Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-                ~f:process_catchup_job ) ) ) ;
+           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+           ~schedule:(fun resume ->
+             Transition_handler.Block_dispatcher.submit dispatcher
+               (Resume_catchup resume) ) )
+        ~f:(fun process ->
+          Transition_handler.Block_dispatcher.submit dispatcher
+            (Catchup_ready process) ) ) ;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
+      Transition_handler.Block_dispatcher.clear dispatcher ;
       let open Strict_pipe.Writer in
-      kill valid_transition_writer ;
       kill primary_transition_writer ;
       kill processed_transition_writer ;
       kill catchup_job_writer ;

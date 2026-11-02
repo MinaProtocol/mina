@@ -799,21 +799,16 @@ let forest_pick forest =
       List.iter forest ~f:(Mina_stdlib.Rose_tree.iter ~f:return) ;
       assert false )
 
-(** Start a loop that runs resumptions one at a time, in the order they are
-    queued, and return the function that queues one. A resumption is dropped
-    if its node's [finished] has been filled by the time it would run: the
-    node has been removed or has finished, and whatever it was resuming with
-    has been released. *)
-let create_resumption_queue () =
-  let resumptions_r, resumptions_w = Pipe.create () in
-  don't_wait_for
-    (Pipe.iter_without_pushback resumptions_r ~f:(fun (finished, resumption) ->
-         if Ivar.is_empty finished then resumption () ) ) ;
-  fun ~finished resumption ->
-    Pipe.write_without_pushback resumptions_w (finished, resumption)
+(** Return the function that queues a node's resumption with [schedule],
+    which runs what it is given one at a time, in order. A resumption is
+    dropped if its node's [finished] has been filled by the time it would run:
+    the node has been removed or has finished, and whatever it was resuming
+    with has been released. *)
+let create_resumption_queue ~schedule ~finished resumption =
+  schedule (fun () -> if Ivar.is_empty finished then resumption ())
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
-    ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
+    ~schedule ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -850,7 +845,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "set_state $exn"
   in
-  let resume = create_resumption_queue () in
+  let resume = create_resumption_queue ~schedule in
   let rec failed (node : Node.t) ?error ~sender failure_reason =
     [%log' debug t.logger] "failed with $error"
       ~metadata:
@@ -1144,6 +1139,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     one catchup job. *)
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~network ~frontier ~build_func ~unprocessed_transition_cache
+    ~schedule
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
@@ -1246,7 +1242,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
         "Catchup states $states") ;
   *)
   let run_state_machine =
-    setup_state_machine_runner ~t ~verifier ~downloader
+    setup_state_machine_runner ~t ~verifier ~schedule ~downloader
       ~context:(module Context)
       ~trust_system ~frontier ~unprocessed_transition_cache
       ~catchup_breadcrumbs_writer ~build_func
@@ -1453,7 +1449,10 @@ let%test_module "Resuming catchup nodes" =
     let resumed_by_queue f =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let resumed = ref [] in
-          f (create_resumption_queue ()) (fun i () -> resumed := i :: !resumed) ;
+          let loop = Otp_lib.Event_loop.create ~handle:(fun run -> run ()) in
+          f
+            (create_resumption_queue ~schedule:(Otp_lib.Event_loop.submit loop))
+            (fun i () -> resumed := i :: !resumed) ;
           let%map () = Scheduler.yield_until_no_jobs_remain () in
           List.rev !resumed )
 
@@ -1609,6 +1608,9 @@ let%test_module "Ledger_catchup tests" =
              ~build_func:
                (Transition_frontier.Breadcrumb.build
                   ~get_completed_work:(Fn.const None) )
+             ~schedule:
+               (Otp_lib.Event_loop.submit
+                  (Otp_lib.Event_loop.create ~handle:(fun run -> run ())) )
          in
          Strict_pipe.Reader.iter_without_pushback catchup_job_reader
            ~f:process_catchup_job ) ;
