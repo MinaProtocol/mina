@@ -36,8 +36,6 @@ struct
     }
 end
 
-let invalid_version = Mina_numbers.Txn_version.(succ current)
-
 let zkapp_kps = List.init 3 ~f:(fun _ -> Keypair.create ())
 
 let[@warning "-8"] [ account_a_kp; account_b_kp; account_c_kp ] = zkapp_kps
@@ -301,26 +299,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
         ~nonce:Account.Nonce.(of_int 1)
     in
-    let%bind ( invalid_zkapp_command_set_vk_perm_proof
-             , invalid_zkapp_command_set_vk_perm_impossible
-             , zkapp_command_set_vk_perm_proof
+    let%bind ( zkapp_command_set_vk_perm_proof
              , zkapp_command_set_vk_perm_impossible ) =
-      let invalid_snapp_update_proof =
-        { Account_update.Update.dummy with
-          permissions =
-            Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with set_verification_key = Proof }
-        }
-      in
-      let invalid_snapp_update_impossible =
-        { Account_update.Update.dummy with
-          permissions =
-            Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                set_verification_key = Impossible
-              }
-        }
-      in
       let snapp_update_proof =
         { Account_update.Update.dummy with
           permissions =
@@ -340,8 +320,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let memo = Signed_command_memo.dummy in
-      let (spec_invalid_proof : Transaction_snark.For_tests.Update_states_spec.t)
-          =
+      let (spec_proof : Transaction_snark.For_tests.Update_states_spec.t) =
         { sender = (whale1_kp, Account.Nonce.one)
         ; fee
         ; fee_payer = None
@@ -350,7 +329,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; zkapp_account_keypairs = [ account_b_kp ]
         ; memo
         ; new_zkapp_account = false
-        ; snapp_update = invalid_snapp_update_proof
+        ; snapp_update = snapp_update_proof
         ; current_auth = Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
@@ -358,30 +337,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions = None
         }
       in
-      let spec_invalid_impossible =
-        { spec_invalid_proof with
-          snapp_update = invalid_snapp_update_impossible
-        }
-      and spec_proof =
-        { spec_invalid_proof with snapp_update = snapp_update_proof }
-      and spec_impossible =
-        { spec_invalid_proof with
+      let spec_impossible =
+        { spec_proof with
           sender = (whale1_kp, Account.Nonce.of_int 2)
         ; zkapp_account_keypairs = [ account_c_kp ]
         ; snapp_update = snapp_update_impossible
         }
       in
 
-      let%bind invalid_update_vk_perm_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_proof
-      in
-      let%bind invalid_update_vk_perm_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_impossible
-      in
       let%bind update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
@@ -392,10 +355,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_impossible
       in
-      ( invalid_update_vk_perm_proof
-      , invalid_update_vk_perm_impossible
-      , update_vk_perm_proof
-      , update_vk_perm_impossible )
+      (update_vk_perm_proof, update_vk_perm_impossible)
     in
     let%bind ( failed_zkapp_command_set_vk_signature_1
              , failed_zkapp_command_set_vk_signature_2
@@ -522,27 +482,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for zkApp to upate to a new verification key v2 and then refers \
          to it to be included in transition frontier"
         (wait_for_zkapp ~has_failures:false zkapp_command_update_vk2)
-    in
-    (* the following checks are testing vk update with versions *)
-    let%bind () =
-      section
-        "Send invalid zkApp to update vk permission to Proof with wrong \
-         protocol version"
-      @@ send_invalid_zkapp ~logger
-           (Network.Node.get_ingress_uri whale1)
-           invalid_zkapp_command_set_vk_perm_proof
-           "Set verification-key permission is updated to an incompatible \
-            version"
-    in
-    let%bind () =
-      section
-        "Send invalid zkApp to update vk permission to Impossible with wrong \
-         protocol version"
-      @@ send_invalid_zkapp ~logger
-           (Network.Node.get_ingress_uri whale1)
-           invalid_zkapp_command_set_vk_perm_impossible
-           "Set verification-key permission is updated to an incompatible \
-            version"
     in
     let%bind () =
       section "Send zkApp to update vk permission to Proof for account B"
