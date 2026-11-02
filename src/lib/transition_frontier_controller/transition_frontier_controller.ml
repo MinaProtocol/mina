@@ -155,7 +155,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let validate_transition =
     Transition_handler.Validator.create_handler
       ~context:(module Context)
-      ~trust_system ~time_controller ~frontier ~valid_transition_writer
+      ~trust_system ~time_controller ~frontier
+      ~on_valid:(Strict_pipe.Writer.write valid_transition_writer)
       ~unprocessed_transition_cache
   in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
