@@ -837,6 +837,14 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "set_state $exn"
   in
+  (* Nodes resume one at a time, in the order their awaited results arrive. *)
+  let resume =
+    let resumptions_r, resumptions_w = Pipe.create () in
+    don't_wait_for
+      (Pipe.iter_without_pushback resumptions_r ~f:(fun resumption ->
+           resumption () ) ) ;
+    Pipe.write_without_pushback resumptions_w
+  in
   let rec failed (node : Node.t) ?error ~sender failure_reason =
     [%log' debug t.logger] "failed with $error"
       ~metadata:
@@ -867,7 +875,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     (* TODO: See if the bail out is happening. *)
     upon
       (Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ])
-      (function Ok x -> f x | Error `Finished -> ())
+      (function Ok x -> resume (fun () -> f x) | Error `Finished -> ())
   and retry node =
     step node
       (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
@@ -1106,7 +1114,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           Gauge.set Catchup.build_breadcrumb_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         upon (Scheduler.yield ()) (fun () ->
-            on_yielded node (c, valid_cb) breadcrumb )
+            resume (fun () -> on_yielded node (c, valid_cb) breadcrumb) )
   and on_yielded node (c, valid_cb) breadcrumb =
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
