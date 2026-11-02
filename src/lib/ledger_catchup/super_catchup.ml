@@ -837,40 +837,46 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "set_state $exn"
   in
-  let rec run_node (node : Node.t) =
-    let state_hash = node.state_hash in
-    let failed ?error ~sender failure_reason =
-      [%log' debug t.logger] "failed with $error"
-        ~metadata:
-          [ ( "error"
-            , Option.value_map ~default:`Null error ~f:(fun e ->
-                  `String (Error.to_string_hum e) ) )
-          ; ("reason", Attempt_history.Attempt.reason_to_yojson failure_reason)
-          ] ;
-      node.attempts <-
-        ( match sender with
-        | Envelope.Sender.Local ->
-            node.attempts
-        | Remote peer ->
-            Map.set node.attempts ~key:peer ~data:{ failure_reason } ) ;
-      set_state t node
-        (To_download
-           (download "failed" downloader
-              ~key:(state_hash, node.blockchain_length)
-              ~attempts:node.attempts ) ) ;
-      run_node node
-    in
-    let step d : (_, [ `Finished ]) Deferred.Result.t =
-      (* TODO: See if the bail out is happening. *)
-      Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ]
-    in
+  let rec failed (node : Node.t) ?error ~sender failure_reason =
+    [%log' debug t.logger] "failed with $error"
+      ~metadata:
+        [ ( "error"
+          , Option.value_map ~default:`Null error ~f:(fun e ->
+                `String (Error.to_string_hum e) ) )
+        ; ("reason", Attempt_history.Attempt.reason_to_yojson failure_reason)
+        ] ;
+    node.attempts <-
+      ( match sender with
+      | Envelope.Sender.Local ->
+          node.attempts
+      | Remote peer ->
+          Map.set node.attempts ~key:peer ~data:{ failure_reason } ) ;
+    set_state t node
+      (To_download
+         (download "failed" downloader
+            ~key:(node.state_hash, node.blockchain_length)
+            ~attempts:node.attempts ) ) ;
+    run_node node
+  and step
+        : 'a.
+             Node.t
+          -> ('a, [ `Finished ]) Deferred.Result.t
+          -> ('a, [ `Finished ]) Deferred.Result.t =
+   fun node d ->
+    (* TODO: See if the bail out is happening. *)
+    Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ]
+  and retry node =
     let open Deferred.Result.Let_syntax in
-    let retry () =
-      let%bind () =
-        step (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
-      in
-      run_node node
+    let%bind () =
+      step node (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
     in
+    run_node node
+  and run_node (node : Node.t) =
+    let state_hash = node.state_hash in
+    let failed = failed node in
+    let step d = step node d in
+    let retry () = retry node in
+    let open Deferred.Result.Let_syntax in
     match node.state with
     | Failed | Finished | Root _ ->
         return ()
