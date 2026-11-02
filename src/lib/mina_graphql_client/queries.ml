@@ -272,9 +272,7 @@ module Account =
                     setPermissions
                     setZkappUri
                     setTokenSymbol
-                    setVerificationKey { auth
-                                         txnVersion
-                                       }
+                    setVerificationKey
                     setVotingFor
                     setTiming
                   }

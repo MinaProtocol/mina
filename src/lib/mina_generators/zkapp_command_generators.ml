@@ -1283,9 +1283,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                       permissions =
                         Set_or_keep.Set
                           { perm with
-                            set_verification_key =
-                              ( Auth_required.from ~auth_tag
-                              , Mina_numbers.Txn_version.current )
+                            set_verification_key = Auth_required.from ~auth_tag
                           }
                     }
                 | `Zkapp_uri ->

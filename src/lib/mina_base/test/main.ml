@@ -5,14 +5,8 @@ let () =
   run "Test mina_base."
     [ Verification_key_permission_test.
         ( "verification-key-permission"
-        , [ test_case
-              "Update verification key permission with a different version \
-               should be accepted."
-              `Quick update_vk_perm_with_different_version
-          ; test_case
-              "Update verification key permission with current version should \
-               be accepted."
-              `Quick update_vk_perm_with_current_version
+        , [ test_case "Update verification key permission should be accepted."
+              `Quick update_vk_perm
           ] )
     ; Zkapp_account_test.
         ( "zkapp-accounts"

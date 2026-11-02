@@ -72,9 +72,9 @@ module Accounts = struct
                 { Runtime_config.Accounts.Single.Permissions
                   .Verification_key_perm
                   .auth
-                ; txn_version
+                ; txn_version = _
                 } =
-              (auth_required auth, txn_version)
+              auth_required auth
             in
             { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
             ; access = auth_required access
@@ -235,10 +235,10 @@ module Accounts = struct
             } =
           account.permissions
         in
-        let verification_key_perm (auth, txn_version) =
+        let verification_key_perm auth =
           { Runtime_config.Accounts.Single.Permissions.Verification_key_perm
             .auth = auth_required auth
-          ; txn_version
+          ; txn_version = Mina_numbers.Txn_version.current
           }
         in
         Some

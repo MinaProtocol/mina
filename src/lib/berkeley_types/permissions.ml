@@ -63,7 +63,7 @@ let to_mesa
   ; receive
   ; set_delegate
   ; set_permissions
-  ; set_verification_key
+  ; set_verification_key = fst set_verification_key
   ; set_zkapp_uri
   ; edit_action_state
   ; set_token_symbol

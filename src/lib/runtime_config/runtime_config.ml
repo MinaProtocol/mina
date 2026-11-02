@@ -188,12 +188,8 @@ module Json_layout = struct
                 [@default
                   { auth =
                       Auth_required.of_account_perm
-                        (fst
-                           Mina_base.Permissions.user_default
-                             .set_verification_key )
-                  ; txn_version =
-                      snd
                         Mina_base.Permissions.user_default.set_verification_key
+                  ; txn_version = Mina_numbers.Txn_version.current
                   }]
           ; set_zkapp_uri : Auth_required.t
                 [@default
@@ -251,8 +247,9 @@ module Json_layout = struct
           ; set_delegate = Auth_required.of_account_perm perm.set_delegate
           ; set_permissions = Auth_required.of_account_perm perm.set_permissions
           ; set_verification_key =
-              (let auth, txn_version = perm.set_verification_key in
-               { auth = Auth_required.of_account_perm auth; txn_version } )
+              { auth = Auth_required.of_account_perm perm.set_verification_key
+              ; txn_version = Mina_numbers.Txn_version.current
+              }
           ; set_token_symbol =
               Auth_required.of_account_perm perm.set_token_symbol
           ; access = Auth_required.of_account_perm perm.access
@@ -696,9 +693,8 @@ module Accounts = struct
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.set_permissions
           ; set_verification_key =
-              ( Json_layout.Accounts.Single.Permissions.Auth_required
-                .to_account_perm perms.set_verification_key.auth
-              , perms.set_verification_key.txn_version )
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.set_verification_key.auth
           ; set_zkapp_uri =
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.set_zkapp_uri

@@ -261,7 +261,7 @@ module Binable_arg = struct
         ; delegate : Public_key.Compressed.Stable.V1.t option
         ; voting_for : State_hash.Stable.V1.t
         ; timing : Timing.Stable.V2.t
-        ; permissions : Permissions.Stable.V2.t
+        ; permissions : Permissions.Stable.V3.t
         ; zkapp : Zkapp_account.Stable.V4.t option
         }
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -288,7 +288,7 @@ module Stable = struct
       ; delegate : Public_key.Compressed.Stable.V1.t option
       ; voting_for : State_hash.Stable.V1.t
       ; timing : Timing.Stable.V2.t
-      ; permissions : Permissions.Stable.V2.t
+      ; permissions : Permissions.Stable.V3.t
       ; zkapp : Zkapp_account.Stable.V4.t option
       }
     [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]

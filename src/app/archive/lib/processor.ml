@@ -784,9 +784,9 @@ module Zkapp_permissions = struct
         ; access = perms.access
         ; set_delegate = perms.set_delegate
         ; set_permissions = perms.set_permissions
-        ; set_verification_key_auth = fst perms.set_verification_key
+        ; set_verification_key_auth = perms.set_verification_key
         ; set_verification_key_txn_version =
-            Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
+            Mina_numbers.Txn_version.(to_int current)
         ; set_zkapp_uri = perms.set_zkapp_uri
         ; edit_action_state = perms.edit_action_state
         ; set_token_symbol = perms.set_token_symbol

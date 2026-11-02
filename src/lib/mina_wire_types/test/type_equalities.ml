@@ -193,7 +193,7 @@ module Mina_base = struct
       (O.Zkapp_basic.Set_or_keep.Stable)
       (W.Zkapp_basic.Set_or_keep)
   include Assert_equal0V1 (O.Zkapp_basic.F.Stable) (W.Zkapp_basic.F)
-  include Assert_equal0V2 (O.Permissions.Stable) (W.Permissions)
+  include Assert_equal0V3 (O.Permissions.Stable) (W.Permissions)
   include
     Assert_equal0V1 (O.Account.Token_symbol.Stable) (W.Account.Token_symbol)
   include

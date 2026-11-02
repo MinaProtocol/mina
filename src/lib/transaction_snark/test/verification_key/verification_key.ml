@@ -211,8 +211,7 @@ let suite () =
       run_steps
         ~permissions:
           { Permissions.user_default with
-            set_verification_key =
-              (Permissions.Auth_required.Proof, Mina_numbers.Txn_version.current)
+            set_verification_key = Permissions.Auth_required.Proof
           }
         ~check:(assert_vk_txn_version Mina_numbers.Txn_version.current)
         [ (* An unauthorized update paying into the account. *)
@@ -235,9 +234,7 @@ let suite () =
       @@ fun () ->
       run_steps
         ~permissions:
-          { Permissions.user_default with
-            set_verification_key = (Impossible, Mina_numbers.Txn_version.current)
-          }
+          { Permissions.user_default with set_verification_key = Impossible }
         ~check:(assert_vk_txn_version Mina_numbers.Txn_version.current)
         [ step Signature set_vk
         ; step ~expected_failure:vk_not_permitted Signature set_vk
@@ -260,8 +257,7 @@ let suite () =
       @@ fun () ->
       let permissions =
         { Permissions.user_default with
-          set_verification_key =
-            (Permissions.Auth_required.Proof, Mina_numbers.Txn_version.current)
+          set_verification_key = Permissions.Auth_required.Proof
         }
       in
       run_steps ~permissions
@@ -282,7 +278,7 @@ let suite () =
         ~permissions:
           { Permissions.user_default with
             access = Proof
-          ; set_verification_key = (Impossible, Mina_numbers.Txn_version.current)
+          ; set_verification_key = Impossible
           }
         ~no_verification_key:true
         ~check:(fun account ->
@@ -296,8 +292,7 @@ let suite () =
       run_steps
         ~permissions:
           { Permissions.user_default with
-            set_verification_key =
-              (Permissions.Auth_required.Proof, Mina_numbers.Txn_version.current)
+            set_verification_key = Permissions.Auth_required.Proof
           }
         ~vk_txn_version:Mina_numbers.Txn_version.current
         ~check:(assert_vk_txn_version Mina_numbers.Txn_version.current)

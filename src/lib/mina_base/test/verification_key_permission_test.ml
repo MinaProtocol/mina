@@ -1,8 +1,6 @@
 open Core_kernel
 open Mina_base
 
-let different_version = Mina_numbers.Txn_version.(succ current)
-
 let update_vk_perm_to_be ~auth : Zkapp_command.t =
   let signature_kind = Mina_signature_kind.Testnet in
   let account_update : Account_update.t =
@@ -36,27 +34,12 @@ let auth_gen =
   Quickcheck.Generator.of_list
     [ Permissions.Auth_required.Either; Impossible; None; Proof; Signature ]
 
-let update_vk_perm_with_different_version () =
+let update_vk_perm () =
   Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
       match
         User_command.check_well_formedness
           ~genesis_constants:Genesis_constants.For_unit_tests.t
-          (Zkapp_command (update_vk_perm_to_be ~auth:(auth, different_version)))
-      with
-      | Ok () ->
-          ()
-      | Error _ ->
-          raise
-            (Failure "Well-formedness check was expected to pass, but didn't") )
-
-let update_vk_perm_with_current_version () =
-  Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
-      match
-        User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.For_unit_tests.t
-          (Zkapp_command
-             (update_vk_perm_to_be
-                ~auth:(auth, Mina_numbers.Txn_version.current) ) )
+          (Zkapp_command (update_vk_perm_to_be ~auth))
       with
       | Ok () ->
           ()

@@ -285,7 +285,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -302,7 +302,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -319,7 +319,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -336,7 +336,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -353,7 +353,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -370,7 +370,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -387,7 +387,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -404,7 +404,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -421,7 +421,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -438,7 +438,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -455,7 +455,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -472,7 +472,7 @@ let sample_block_sexp =
      (permissions
       ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
-       (set_verification_key (Signature 2)) (set_zkapp_uri Signature)
+       (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_action_state Signature) (set_token_symbol Signature)
        (increment_nonce Signature) (set_voting_for Signature)
        (set_timing Signature)))
@@ -902,7 +902,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -960,7 +960,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1018,7 +1018,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "3"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1076,7 +1076,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1134,7 +1134,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1192,7 +1192,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1250,7 +1250,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1308,7 +1308,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1366,7 +1366,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1424,7 +1424,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1482,7 +1482,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"
@@ -1540,7 +1540,7 @@ let sample_block_json =
               "Signature"
             ],
             "set_verification_key": [
-              ["Signature"], "2"
+              "Signature"
             ],
             "set_zkapp_uri": [
               "Signature"

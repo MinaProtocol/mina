@@ -679,7 +679,7 @@ module Update = struct
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
-        ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Stable.V3.t Set_or_keep.Stable.V1.t
         ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
