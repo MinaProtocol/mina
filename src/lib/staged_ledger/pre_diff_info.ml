@@ -38,13 +38,13 @@ module type S = sig
     -> (Transaction.Stable.Latest.t With_status.t list, Error.t) result
 
   (** The transactions of a diff of the version that precomputed blocks of
-      version 4 carry. *)
+      version 4 carry, by the rules of that version. *)
   val get_transactions_stable_v3 :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
     -> supercharge_coinbase:bool
     -> Staged_ledger_diff.Stable.V3.t
-    -> (Transaction.Stable.Latest.t With_status.t list, Error.t) result
+    -> (Transaction.Stable.V3.t With_status.t list, Error.t) result
 
   val get_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -553,21 +553,269 @@ let get_transactions_stable ~constraint_constants ~coinbase_receiver
   in
   transactions
 
-module Transaction_data_getter_stable_v2 =
-  Transaction_data_getter (Transaction_snark_work.Stable.V2)
+(* The transactions of a V3 diff, the diff V4 precomputed blocks carry, by
+   the rules of the version that made it: the first pre-diff may split its
+   coinbase in two, the coinbases come before the fee transfers, and the
+   fees the provers don't take go to the coinbase receiver by a fee
+   transfer. Every type is pinned at the version the diff carries, so that a
+   change to a later version stops this compiling rather than changing how
+   an older block is read. *)
+module V3 = struct
+  module Work = Transaction_snark_work.Stable.V2
 
-let get_transactions_stable_v3 ~constraint_constants ~coinbase_receiver
-    ~supercharge_coinbase ({ diff } : Staged_ledger_diff.Stable.V3.t) =
-  let open Result.Let_syntax in
-  let open Transaction_data_getter_stable_v2 in
-  let%map transactions, _, _, _ =
-    get_impl ~get_transaction_data ~constraint_constants
-      ~to_user_command:With_status.data ~diff ~coinbase_receiver
-      ~coinbase_amount:
-        (Staged_ledger_diff.Diff.Stable.V3.coinbase ~constraint_constants
-           ~supercharge_coinbase diff )
-  in
-  transactions
+  type command = User_command.Stable.V3.t With_status.Stable.V2.t
+
+  type transaction = Transaction.Stable.V3.t
+
+  let create_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      coinbase_parts ~(receiver : Public_key.Compressed.t) ~coinbase_amount :
+      (Coinbase.Stable.V1.t list, Error.t) result =
+    let open Result.Let_syntax in
+    let coinbase_or_error = function
+      | Ok x ->
+          Ok x
+      | Error e ->
+          Error (Error.Coinbase_error (Core.Error.to_string_hum e))
+    in
+    let underflow_err a1 a2 =
+      Option.value_map
+        ~default:
+          (Error
+             (Error.Coinbase_error
+                (sprintf
+                   !"underflow when splitting coinbase: Minuend: %{sexp: \
+                     Currency.Amount.t} Subtrahend: %{sexp: Currency.Amount.t} \n"
+                   a1 a2 ) ) )
+        (Currency.Amount.sub a1 a2)
+        ~f:(fun x -> Ok x)
+    in
+    let two_parts amt ft1 (ft2 : Coinbase.Fee_transfer.Stable.V1.t option) =
+      let%bind rem_coinbase = underflow_err coinbase_amount amt in
+      let%bind _ =
+        underflow_err rem_coinbase
+          (Option.value_map ~default:Currency.Amount.zero ft2
+             ~f:(fun { fee; _ } -> Currency.Amount.of_fee fee) )
+      in
+      let%bind cb1 =
+        coinbase_or_error
+          (Coinbase.create_v1 ~amount:amt ~receiver ~fee_transfer:ft1)
+      in
+      let%map cb2 =
+        Coinbase.create_v1 ~amount:rem_coinbase ~receiver ~fee_transfer:ft2
+        |> coinbase_or_error
+      in
+      [ cb1; cb2 ]
+    in
+    match coinbase_parts with
+    | `Zero ->
+        return []
+    | `One x ->
+        let%map cb =
+          Coinbase.create_v1 ~amount:coinbase_amount ~receiver ~fee_transfer:x
+          |> coinbase_or_error
+        in
+        [ cb ]
+    | `Two None ->
+        two_parts
+          (Currency.Amount.of_fee constraint_constants.account_creation_fee)
+          None None
+    | `Two (Some (({ Coinbase.Fee_transfer.fee; _ } as ft1), ft2)) ->
+        let%bind amount =
+          let%map fee =
+            Currency.Fee.add constraint_constants.account_creation_fee fee
+            |> Option.value_map
+                 ~default:
+                   (Error
+                      (Error.Coinbase_error
+                         (sprintf
+                            !"Overflow when trying to add account_creation_fee \
+                              %{sexp: Currency.Fee.t} to a fee transfer \
+                              %{sexp: Currency.Fee.t}"
+                            constraint_constants.account_creation_fee fee ) ) )
+                 ~f:(fun v -> Ok v)
+          in
+          Currency.Amount.of_fee fee
+        in
+        two_parts amount (Some ft1) ft2
+
+  let create_fee_transfers (completed_works : Work.t list) delta public_key
+      (coinbase_fts : Coinbase.Fee_transfer.Stable.V1.t list) :
+      (Fee_transfer.Stable.V2.t list, Error.t) result =
+    let open Result.Let_syntax in
+    let singles =
+      (if Currency.Fee.(equal zero delta) then [] else [ (public_key, delta) ])
+      @ List.filter_map completed_works ~f:(fun w ->
+            let fee = Work.fee w in
+            if Currency.Fee.equal fee Currency.Fee.zero then None
+            else Some (Work.prover w, fee) )
+    in
+    let%bind singles_map =
+      Or_error.try_with (fun () ->
+          Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+              Option.value_exn (Currency.Fee.add f1 f2) ) )
+      |> to_staged_ledger_or_error
+    in
+    Or_error.try_with (fun () ->
+        List.fold coinbase_fts ~init:singles_map
+          ~f:(fun accum { Coinbase.Fee_transfer.receiver_pk; fee = cb_fee } ->
+            match Public_key.Compressed.Map.find accum receiver_pk with
+            | None ->
+                accum
+            | Some fee ->
+                let new_fee = Option.value_exn (Currency.Fee.sub fee cb_fee) in
+                if Currency.Fee.(new_fee > Currency.Fee.zero) then
+                  Public_key.Compressed.Map.update accum receiver_pk
+                    ~f:(fun _ -> new_fee)
+                else Public_key.Compressed.Map.remove accum receiver_pk )
+        |> Map.to_alist ~key_order:`Increasing
+        |> List.map ~f:(fun (receiver_pk, fee) ->
+               Fee_transfer.Single.create ~receiver_pk ~fee
+                 ~fee_token:Token_id.default )
+        |> One_or_two.group_list
+        |> List.map ~f:Fee_transfer.of_singles
+        |> Or_error.all )
+    |> Or_error.join |> to_staged_ledger_or_error
+
+  let fee_remainder (commands : command list) (completed_works : Work.t list)
+      coinbase_fee =
+    let open Result.Let_syntax in
+    let%bind budget =
+      sum_fees commands ~f:(fun t -> User_command.fee (With_status.data t))
+      |> to_staged_ledger_or_error
+    in
+    let%bind work_fee =
+      sum_fees completed_works ~f:Work.fee |> to_staged_ledger_or_error
+    in
+    let total_work_fee =
+      Option.value ~default:Currency.Fee.zero
+        (Currency.Fee.sub work_fee coinbase_fee)
+    in
+    Option.value_map
+      ~default:(Error (Error.Insufficient_fee (budget, total_work_fee)))
+      ~f:(fun x -> Ok x)
+      (Currency.Fee.sub budget total_work_fee)
+
+  let transactions_of_pre_diff ~constraint_constants coinbase_parts ~receiver
+      ~coinbase_amount (commands : command list) (completed_works : Work.t list)
+      ~(internal_command_statuses : Transaction_status.Stable.V2.t list) :
+      (transaction With_status.t list, Error.t) result =
+    let open Result.Let_syntax in
+    let%bind coinbases =
+      create_coinbase ~constraint_constants coinbase_parts ~receiver
+        ~coinbase_amount
+    in
+    let coinbase_fts =
+      List.concat_map coinbases ~f:(fun (cb : Coinbase.Stable.V1.t) ->
+          Option.to_list cb.fee_transfer )
+    in
+    let coinbase_work_fees =
+      sum_fees ~f:Coinbase.Fee_transfer.fee coinbase_fts |> Or_error.ok_exn
+    in
+    let txn_works_others =
+      List.filter completed_works ~f:(fun w ->
+          not (Public_key.Compressed.equal receiver (Work.prover w)) )
+    in
+    let%bind delta =
+      fee_remainder commands txn_works_others coinbase_work_fees
+    in
+    let%bind fee_transfers =
+      create_fee_transfers txn_works_others delta receiver coinbase_fts
+    in
+    let internal_commands : transaction list =
+      List.map coinbases ~f:(fun t -> Transaction.Poly.Stable.V2.Coinbase t)
+      @ List.map fee_transfers ~f:(fun t ->
+            Transaction.Poly.Stable.V2.Fee_transfer t )
+    in
+    let%map internal_commands_with_statuses =
+      Or_error.try_with (fun () ->
+          List.map2_exn internal_commands internal_command_statuses
+            ~f:(fun data status -> { With_status.data; status }) )
+      |> Result.map_error ~f:(fun _ -> Error.Internal_command_status_mismatch)
+    in
+    List.map commands
+      ~f:(With_status.map ~f:(fun t -> Transaction.Poly.Stable.V2.Command t))
+    @ internal_commands_with_statuses
+
+  let check_coinbase ((two, one) : Staged_ledger_diff.Diff.Stable.V3.t) =
+    match
+      ( two.Staged_ledger_diff.Pre_diff_two.Stable.V2.coinbase
+      , Option.value_map one
+          ~default:Staged_ledger_diff.At_most_one.Stable.V1.Zero ~f:(fun d ->
+            d.Staged_ledger_diff.Pre_diff_one.Stable.V2.coinbase ) )
+    with
+    | Zero, Zero | Zero, One _ | One _, Zero | Two _, Zero ->
+        Ok ()
+    | x, y ->
+        Error
+          (Error.Coinbase_error
+             (sprintf
+                !"Invalid coinbase value in staged ledger prediffs \
+                  %{sexp:Coinbase.Fee_transfer.t \
+                  Staged_ledger_diff.At_most_two.t} and \
+                  %{sexp:Coinbase.Fee_transfer.t \
+                  Staged_ledger_diff.At_most_one.t}"
+                x y ) )
+
+  let get_transactions
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~coinbase_receiver ~supercharge_coinbase
+      ({ diff } : Staged_ledger_diff.Stable.V3.t) :
+      (transaction With_status.t list, Error.t) result =
+    let open Result.Let_syntax in
+    let%bind coinbase_amount =
+      Staged_ledger_diff.Diff.Stable.V3.coinbase ~constraint_constants
+        ~supercharge_coinbase diff
+      |> Option.value_map
+           ~default:
+             (Error
+                (Error.Coinbase_error
+                   (sprintf
+                      !"Overflow when calculating coinbase amount: \
+                        Supercharged coinbase factor (%d) x coinbase amount \
+                        (%{sexp: Currency.Amount.t})"
+                      constraint_constants.supercharged_coinbase_factor
+                      constraint_constants.coinbase_amount ) ) )
+           ~f:(fun x -> Ok x)
+    in
+    let%bind () = check_coinbase diff in
+    let two, one = diff in
+    let%bind two_transactions =
+      let { Staged_ledger_diff.Pre_diff_two.Stable.V2.coinbase
+          ; commands
+          ; completed_works
+          ; internal_command_statuses
+          } =
+        two
+      in
+      let coinbase_parts =
+        match coinbase with Zero -> `Zero | One x -> `One x | Two x -> `Two x
+      in
+      transactions_of_pre_diff ~constraint_constants coinbase_parts
+        ~receiver:coinbase_receiver ~coinbase_amount commands completed_works
+        ~internal_command_statuses
+    in
+    let%map one_transactions =
+      match one with
+      | None ->
+          Ok []
+      | Some
+          { Staged_ledger_diff.Pre_diff_one.Stable.V2.coinbase
+          ; commands
+          ; completed_works
+          ; internal_command_statuses
+          } ->
+          let coinbase_parts =
+            match coinbase with Zero -> `Zero | One x -> `One x
+          in
+          transactions_of_pre_diff ~constraint_constants coinbase_parts
+            ~receiver:coinbase_receiver ~coinbase_amount commands
+            completed_works ~internal_command_statuses
+    in
+    two_transactions @ one_transactions
+end
+
+let get_transactions_stable_v3 = V3.get_transactions
 
 let get_transactions ~constraint_constants ~coinbase_receiver
     ~supercharge_coinbase ({ diff } : Staged_ledger_diff.t) =
