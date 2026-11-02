@@ -142,13 +142,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
+  let catchup_scheduler =
+    Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
+      ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
+  in
   let process_message =
     Transition_handler.Processor.create_handler
       ~context:(module Context)
       ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
-      ~clean_up_catchup_scheduler ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~processed_transition_writer
-      ?transaction_pool_proxy ()
+      ~catchup_scheduler ~processed_transition_writer ?transaction_pool_proxy ()
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Strict_pipe.Reader.Merge.iter
