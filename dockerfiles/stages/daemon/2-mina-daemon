@@ -60,6 +60,14 @@ COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
 RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
   && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
+# A cached base can contain Noble libraries older than the security updates.
+RUN . /etc/os-release && if [ "$ID" = ubuntu ] && [ "$VERSION_CODENAME" = noble ]; then \
+      apt-get update --quiet \
+      && apt-get install --yes --only-upgrade --no-install-recommends \
+           libbrotli1 libssl3t64 libssl-dev openssl \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 RUN --mount=type=bind,source=_debs,target=/opt/mina-local-debs \
   echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
