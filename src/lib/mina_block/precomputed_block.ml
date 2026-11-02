@@ -184,7 +184,10 @@ let of_block ~logger
   in
   let header = Block.header block in
   let protocol_version = Header.current_protocol_version header in
-  let proposed_protocol_version = Header.proposed_protocol_version_opt header in
+  let proposed_protocol_version =
+    (Mina_state.Protocol_state.protocol_versions (Header.protocol_state header))
+      .proposed
+  in
   let accounts_accessed_time = Time.now () in
   [%log debug]
     "Precomputed block for $state_hash: accounts-accessed took $time ms"

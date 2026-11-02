@@ -3562,7 +3562,9 @@ module Block = struct
            ~protocol_version:
              (Header.current_protocol_version @@ Mina_block.header t)
            ~proposed_protocol_version:
-             (Header.proposed_protocol_version_opt @@ Mina_block.header t) )
+             (Mina_state.Protocol_state.protocol_versions
+                (Header.protocol_state @@ Mina_block.header t) )
+               .proposed )
       ~v1_transaction_hash:false
 
   let add_from_precomputed conn ~proof_cache_db ~constraint_constants

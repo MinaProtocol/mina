@@ -111,13 +111,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     , t_of_sexp
     , to_yojson )]
 
-  let protocol_versions t =
-    Protocol_state.blockchain_state (protocol_state t)
-    |> Blockchain_state.protocol_versions
-
-  let current_protocol_version t = (protocol_versions t).current
-
-  let proposed_protocol_version_opt t = (protocol_versions t).proposed
+  let current_protocol_version t =
+    (Protocol_state.protocol_versions (protocol_state t)).current
 
   type protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
@@ -128,7 +123,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let valid_next =
       Option.for_all
-        (proposed_protocol_version_opt body)
+        (Protocol_state.protocol_versions (protocol_state body)).proposed
         ~f:Protocol_version.is_valid
     in
     let matches_daemon =

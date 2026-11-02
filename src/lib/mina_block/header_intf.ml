@@ -34,12 +34,7 @@ module type Full = sig
 
   val delta_block_chain_proof : t -> State_hash.t * State_body_hash.t list
 
-  (** The protocol versions recorded in the block's blockchain state. *)
-  val protocol_versions : t -> Protocol_versions.Value.t
-
   val current_protocol_version : t -> Protocol_version.t
-
-  val proposed_protocol_version_opt : t -> Protocol_version.t option
 
   type protocol_version_status =
     { valid_current : bool; valid_next : bool; matches_daemon : bool }

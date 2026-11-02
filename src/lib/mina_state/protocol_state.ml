@@ -279,6 +279,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       { Poly.Stable.Latest.body = { Body.Poly.consensus_state; _ }; _ } =
     consensus_state
 
+  let protocol_versions (t : Value.t) =
+    Blockchain_state.protocol_versions (blockchain_state t)
+
   let with_protocol_versions (t : Value.t) protocol_versions : Value.t =
     { t with
       body =
