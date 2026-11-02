@@ -71,7 +71,12 @@ struct
 
        q * y = x - r
     *)
-    assert_r1cs q y (Field.Var.sub x r)
+    let%bind () = assert_r1cs q y (Field.Var.sub x r) in
+    (* r < y, i.e. y - r - 1 does not underflow. Since r >= 0, this also
+       forces y <> 0; together these make (q, r) the unique Euclidean
+       quotient and remainder.
+    *)
+    range_check Field.Var.(sub (sub y r) (constant Field.one))
 
   let div_mod (x : var) (y : var) =
     let%bind q, r =
