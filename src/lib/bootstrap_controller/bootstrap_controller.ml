@@ -201,8 +201,9 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let open Context in
   let query_reader = Sync_ledger.Root.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Root.answer_writer root_sync_ledger in
-  Mina_networking.glue_sync_ledger ~preferred t.network query_reader
-    response_writer ;
+  Mina_networking.glue_sync_ledger ~preferred t.network
+    ~target:(Sync_ledger.Root.target root_sync_ledger)
+    query_reader response_writer ;
   Pipe_lib.Choosable_synchronous_pipe.iter sync_ledger_reader
     ~f:(fun (b_or_h, `Valid_cb vc) ->
       let header_with_hash, sender, transition_cache_element =
@@ -264,7 +265,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
     ~f:(With_hash.map ~f:get_consensus_state)
 
 let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
-    ~sync_ledger_reader ~context t temp_snarked_ledger =
+    ~sync_ledger_reader ~context ~bootstrap_status t temp_snarked_ledger =
   time_deferred
     (let root_sync_ledger =
        Sync_ledger.Root.create temp_snarked_ledger ~context ~trust_system
@@ -275,7 +276,14 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
      (* We ignore the resulting ledger returned here since it will always
         * be the same as the ledger we started with because we are syncing
         * a db ledger. *)
-     let%map _, data = Sync_ledger.Root.valid_tree root_sync_ledger in
+     let%map _, data =
+       Bootstrap_status.with_ledger_sync bootstrap_status Root_snarked
+         ~target:(fun () ->
+           Pipe_lib.Broadcast_pipe.Reader.peek
+             (Sync_ledger.Root.target root_sync_ledger) )
+         ~progress:(fun () -> Sync_ledger.Root.progress root_sync_ledger)
+         ~f:(fun () -> Sync_ledger.Root.valid_tree root_sync_ledger)
+     in
      Sync_ledger.Root.destroy root_sync_ledger ;
      data )
 
@@ -406,8 +414,9 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    previous_cycles =
+    ~bootstrap_status previous_cycles =
   let open Context in
+  Bootstrap_status.start_bootstrap_attempt bootstrap_status ;
   (* The short-lived pipe allocated here will be closed
      when a follow-up pipe is allocated: in the next cycle of bootstrap
      or when controll is passed to the transition frontier controller.staged_ledger_construction_time
@@ -441,11 +450,12 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
       temp_persistent_root_instance
   in
   (* step 1. download snarked_ledger *)
+  Bootstrap_status.set_phase bootstrap_status Syncing_root_ledger ;
   let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
     download_snarked_ledger
       ~context:(module Context)
-      ~trust_system ~preferred_peers ~transition_graph ~sync_ledger_reader t
-      temp_snarked_ledger
+      ~trust_system ~preferred_peers ~transition_graph ~sync_ledger_reader
+      ~bootstrap_status t temp_snarked_ledger
   in
   Mina_metrics.(
     Counter.inc Bootstrap.root_snarked_ledger_sync_ms
@@ -454,6 +464,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
       (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
   (* step 2. Download scan state and pending coinbases. *)
+  Bootstrap_status.set_phase bootstrap_status Downloading_scan_state ;
   let%bind ( staged_ledger_data_download_time
            , (staged_ledger_construction_time, staged_ledger_aux_result) ) =
     let%bind ( staged_ledger_data_download_time
@@ -466,6 +477,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     | Error err ->
         Deferred.return (staged_ledger_data_download_time, (None, Error err))
     | Ok result ->
+        Bootstrap_status.set_phase bootstrap_status Building_staged_ledger ;
         let%map res =
           handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
             ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind
@@ -505,6 +517,8 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
         ; local_state_sync_time = None
         }
       in
+      Bootstrap_status.fail_bootstrap_attempt bootstrap_status
+        ~reason:this_cycle.cycle_result ;
       `Repeat (this_cycle :: previous_cycles)
   | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
       let%bind () =
@@ -543,12 +557,13 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               Deferred.return (false, Or_error.return ())
           | Some sync_jobs ->
               [%log info] "Synchronizing consensus local state" ;
+              Bootstrap_status.set_phase bootstrap_status Syncing_epoch_ledgers ;
               let%map result =
                 Consensus.Hooks.sync_local_state
                   ~context:(module Context)
                   ~local_state:consensus_local_state ~trust_system
                   ~glue_sync_ledger:(Mina_networking.glue_sync_ledger t.network)
-                  sync_jobs
+                  ~bootstrap_status sync_jobs
               in
               (true, result) )
       in
@@ -566,9 +581,12 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
             ; local_state_sync_time = Some local_state_sync_time
             }
           in
+          Bootstrap_status.fail_bootstrap_attempt bootstrap_status
+            ~reason:this_cycle.cycle_result ;
           Deferred.return (`Repeat (this_cycle :: previous_cycles))
       | Ok () ->
           (* step 5. Close the old frontier and reload a new one from disk. *)
+          Bootstrap_status.set_phase bootstrap_status Loading_frontier ;
           let new_root_data : Transition_frontier.Root_data.Limited.t =
             Transition_frontier.Root_data.Limited.create
               ~transition:(Mina_block.Validated.lift new_root)
@@ -681,7 +699,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    =
+    ~bootstrap_status =
   let open Context in
   let run_cycle =
     run_cycle
@@ -689,6 +707,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~trust_system ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
       ~persistent_frontier ~initial_root_transition ~catchup_mode
+      ~bootstrap_status
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
@@ -886,7 +905,8 @@ let%test_module "Bootstrap_controller tests" =
             (E.Set.of_list saved_transitions)
             ~expect:(E.Set.of_list expected_transitions) )
 
-    let run_bootstrap ~timeout_duration ~my_net ~network_transition_pipe =
+    let run_bootstrap ?(bootstrap_status = Bootstrap_status.create ())
+        ~timeout_duration ~my_net ~network_transition_pipe () =
       let open Fake_network in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
@@ -909,7 +929,7 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition )
+           ~catchup_mode:`Super ~initial_root_transition ~bootstrap_status )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
@@ -966,11 +986,12 @@ let%test_module "Bootstrap_controller tests" =
               (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
           in
           Swappable.write network_transition_pipe (`Block block, `Valid_cb None) ;
+          let bootstrap_status = Bootstrap_status.create () in
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
-                run_bootstrap
+                run_bootstrap ~bootstrap_status
                   ~timeout_duration:(Block_time.Span.of_ms 30_000L)
-                  ~my_net ~network_transition_pipe )
+                  ~my_net ~network_transition_pipe () )
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
@@ -981,7 +1002,28 @@ let%test_module "Bootstrap_controller tests" =
             ~expect:
               ( Root_ledger.merkle_root
               @@ Transition_frontier.root_snarked_ledger peer_net.state.frontier
-              ) )
+              ) ;
+          let { Bootstrap_status.Snapshot.phase
+              ; bootstrap_attempts
+              ; ledger_syncs
+              ; _
+              } =
+            Bootstrap_status.snapshot bootstrap_status
+          in
+          assert (Bootstrap_status.Phase.equal phase Loading_frontier) ;
+          assert (bootstrap_attempts >= 1) ;
+          match ledger_syncs with
+          | [ { ledger = Root_snarked; target; active; progress } ] ->
+              assert (not active) ;
+              assert progress.synced ;
+              [%test_result: Ledger_hash.t option] target
+                ~expect:
+                  (Some
+                     ( Root_ledger.merkle_root
+                     @@ Transition_frontier.root_snarked_ledger new_frontier )
+                  )
+          | _ ->
+              failwith "expected only the root snarked ledger's sync" )
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =

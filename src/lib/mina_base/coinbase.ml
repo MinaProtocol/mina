@@ -117,6 +117,26 @@ module Make_str (A : Wire_types.Concrete) = struct
       Ok { t with fee_transfer = adjusted_fee_transfer }
     else Or_error.error_string "Coinbase.create: invalid coinbase"
 
+  let create_v1 ~amount ~receiver ~fee_transfer : Stable.V1.t Or_error.t =
+    let is_valid =
+      match fee_transfer with
+      | None ->
+          true
+      | Some { Fee_transfer.fee; _ } ->
+          Currency.Amount.(of_fee fee <= amount)
+    in
+    if is_valid then
+      let fee_transfer =
+        Option.bind fee_transfer ~f:(fun fee_transfer ->
+            Option.some_if
+              (not
+                 (Public_key.Compressed.equal receiver
+                    (Fee_transfer.receiver_pk fee_transfer) ) )
+              fee_transfer )
+      in
+      Ok { receiver; amount; fee_transfer }
+    else Or_error.error_string "Coinbase.create: invalid coinbase"
+
   (* Only the minted [amount] adds to the supply; the fee remainder is currency
      that already exists, moved out of the unsettled fee excess. *)
   let expected_supply_increase ({ amount; fee_transfer; _ } as t) =

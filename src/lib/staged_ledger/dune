@@ -65,18 +65,9 @@
   (backend bisect_ppx))
  (preprocess
   (pps
+   mina_ppx
    lens.ppx_deriving
-   ppx_assert
-   ppx_bin_prot
-   ppx_compare
-   ppx_custom_printf
-   ppx_deriving.make
-   ppx_deriving_yojson
-   ppx_fields_conv
-   ppx_inline_test
-   ppx_let
-   ppx_mina
-   ppx_pipebang
-   ppx_sexp_conv
-   ppx_version))
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (synopsis "Staged Ledger updates the current ledger with new transactions"))

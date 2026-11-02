@@ -5,8 +5,6 @@ set -eu
 cd src/lib/snarky
 
 CURR=$(git rev-parse HEAD)
-# skip SSL verification for this fetch only (for CI)
-git -c http.sslVerify=false fetch origin
 
 function in_branch {
   if git merge-base --is-ancestor "${CURR}" origin/"$1"; then
@@ -16,6 +14,31 @@ function in_branch {
     false
   fi
 }
+
+# snarky's master only moves forward, so a commit that is an ancestor of the
+# local copy of origin/master is an ancestor of the remote one too. The pin
+# rarely changes, so this usually answers without touching the network.
+if git rev-parse --verify -q origin/master >/dev/null && in_branch "master"; then
+  exit 0
+fi
+
+FETCH_ATTEMPTS="${FETCH_ATTEMPTS:-5}"
+FETCH_RETRY_DELAY="${FETCH_RETRY_DELAY:-15}"
+
+# GitHub resets connections from the CI agents in episodes, which surfaces
+# here as `gnutls_handshake() failed: Error in the pull function`.
+for attempt in $(seq 1 "${FETCH_ATTEMPTS}"); do
+  # skip SSL verification for this fetch only (for CI)
+  if git -c http.sslVerify=false fetch origin; then
+    break
+  fi
+  if [[ "${attempt}" -eq "${FETCH_ATTEMPTS}" ]]; then
+    echo "ERROR: could not fetch snarky's origin after ${FETCH_ATTEMPTS} attempts" >&2
+    exit 1
+  fi
+  echo "Fetching snarky's origin failed (attempt ${attempt}/${FETCH_ATTEMPTS}), retrying in ${FETCH_RETRY_DELAY}s" >&2
+  sleep "${FETCH_RETRY_DELAY}"
+done
 
 if (! in_branch "master"); then
   cat >&2 <<EOF

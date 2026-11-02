@@ -95,7 +95,6 @@ let dirtyWhen =
       , S.exactly "buildkite/src/Jobs/Test/DebianAutomodeTransitionTest" "dhall"
       , S.exactly "buildkite/scripts/tests/debian-automode-transition-test" "sh"
       , S.strictlyStart (S.contains "scripts/debian")
-      , S.exactly "buildkite/scripts/cache/manager" "sh"
       , S.exactly "buildkite/scripts/debian/fetch_debs" "sh"
       , S.exactly "buildkite/scripts/debian/build-from-cache" "sh"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"

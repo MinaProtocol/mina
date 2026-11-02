@@ -21,7 +21,7 @@
   sgn
   ppx_version.runtime)
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Transaction protocol state library"))

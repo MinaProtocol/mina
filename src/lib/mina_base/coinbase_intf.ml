@@ -70,6 +70,14 @@ module type Full = sig
     -> fee_remainder:Currency.Fee.t
     -> t Or_error.t
 
+  (** [create], for a coinbase of version 1, as the blocks of an earlier
+      version carry. *)
+  val create_v1 :
+       amount:Currency.Amount.t
+    -> receiver:Public_key.Compressed.t
+    -> fee_transfer:Fee_transfer.t option
+    -> Stable.V1.t Or_error.t
+
   val expected_supply_increase : t -> Currency.Amount.t Or_error.t
 
   val fee_excess : t -> Fee_excess.t Or_error.t

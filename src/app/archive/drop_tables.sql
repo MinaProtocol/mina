@@ -4,6 +4,8 @@
     containing the indexed column
 */
 
+DROP TABLE genesis_accounts;
+
 DROP TABLE blocks_internal_commands;
 
 DROP TABLE blocks_user_commands;

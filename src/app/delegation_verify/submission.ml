@@ -164,6 +164,8 @@ module Cassandra = struct
 
   let comma_sep ~to_str l = List.map ~f:to_str l |> String.concat ~sep:", "
 
+  let quote = Delegation_verify_lib.Cql.string_literal
+
   let load_submissions { conf; period_start; period_end } =
     let start_time = Time.of_string period_start in
     let end_time = Time.of_string period_end in
@@ -176,12 +178,12 @@ module Cassandra = struct
     let shards = shards_range start_time end_time in
     let partition =
       if List.length partition_keys = 1 then
-        sprintf "submitted_at_date = '%s' and shard in (%s)"
-          (List.hd_exn partition_keys)
+        sprintf "submitted_at_date = %s and shard in (%s)"
+          (quote @@ List.hd_exn partition_keys)
           (comma_sep ~to_str:Int.to_string shards)
       else
         sprintf "submitted_at_date IN (%s) and shard in (%s)"
-          (comma_sep ~to_str:(sprintf "'%s'") partition_keys)
+          (comma_sep ~to_str:quote partition_keys)
           (comma_sep ~to_str:Int.to_string shards)
     in
     Cassandra.select ~conf ~parse:submission_of_yojson
@@ -198,8 +200,8 @@ module Cassandra = struct
         ; "raw_block"
         ]
       ~where:
-        (sprintf "%s AND submitted_at >= '%s' AND submitted_at < '%s'" partition
-           period_start period_end )
+        (sprintf "%s AND submitted_at >= %s AND submitted_at < %s" partition
+           (quote period_start) (quote period_end) )
       "submissions"
 
   let load_from_s3 ~block_hash =
@@ -233,27 +235,29 @@ module Cassandra = struct
         Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
-               "submitted_at_date = '%s' and shard = %d and submitted_at = \
-                '%s' and submitter = '%s'"
-               (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               "submitted_at_date = %s and shard = %d and submitted_at = %s \
+                and submitter = %s"
+               ( quote @@ List.hd_exn
+               @@ String.split ~on:' ' submission.submitted_at )
                (shard @@ Time.of_string submission.submitted_at)
-               submission.submitted_at submission.submitter )
+               (quote submission.submitted_at)
+               (quote submission.submitter) )
           Output.(valid_payload_to_cassandra_updates payload)
     | Error e ->
         Output.display_error @@ Error.to_string_hum e ;
         Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
-               "submitted_at_date = '%s' and shard = %d and submitted_at = \
-                '%s' and submitter = '%s'"
-               (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               "submitted_at_date = %s and shard = %d and submitted_at = %s \
+                and submitter = %s"
+               ( quote @@ List.hd_exn
+               @@ String.split ~on:' ' submission.submitted_at )
                (shard @@ Time.of_string submission.submitted_at)
-               submission.submitted_at submission.submitter )
-          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
-          ; ("raw_block", "NULL")
-          ; ("snark_work", "NULL")
-          ; ("verified", "true")
-          ]
+               (quote submission.submitted_at)
+               (quote submission.submitter) )
+          ( [ ("raw_block", "NULL"); ("snark_work", "NULL") ]
+          @ Delegation_verify_lib.Verification_status.(
+              to_cassandra_updates (Failed (Error.to_string_hum e))) )
 end
 
 module Stdin = struct
@@ -297,7 +301,7 @@ module Stdin = struct
      attached. So here we extract the data from the payload and combine it with the
      submission JSON. *)
   let output () submission output =
-    let results =
+    let payload_fields =
       match output with
       | Ok (payload : Output.t) ->
           [ ( "state_hash"
@@ -309,17 +313,20 @@ module Stdin = struct
           ; ( "slot"
             , `Int (Mina_numbers.Global_slot_since_genesis.to_int payload.slot)
             )
-          ; ("verified", `Bool true)
-          ; ("validation_error", `Null)
           ]
-      | Error e ->
+      | Error _ ->
           [ ("state_hash", `Null)
           ; ("parent", `Null)
           ; ("height", `Null)
           ; ("slot", `Null)
-          ; ("verified", `Bool true)
-          ; ("validation_error", `String (Error.to_string_hum e))
           ]
+    in
+    (* Derived from the same [output] as the payload above, so [verified] and
+       [validation_error] cannot disagree. *)
+    let results =
+      payload_fields
+      @ Delegation_verify_lib.Verification_status.(
+          to_json_fields (of_or_error output))
     in
     Json.json_update results submission
     |> Yojson.Safe.to_channel Out_channel.stdout ;

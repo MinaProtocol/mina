@@ -139,9 +139,6 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
     let get_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.get_all_accounts_rooted_at_exn t
 
-    let set_all_accounts_rooted_at_exn (T ((module Base), t)) =
-      Base.set_all_accounts_rooted_at_exn t
-
     let set_batch_accounts (T ((module Base), t)) = Base.set_batch_accounts t
 
     let get_inner_hash_at_addr_exn (T ((module Base), t)) =

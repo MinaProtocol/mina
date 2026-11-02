@@ -11,8 +11,9 @@
   async_kernel
   alcotest
   alcotest-async
-  cmdliner)
+  cmdliner
+  mina_automation.synthetic_archive)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_string ppx_deriving.make)))
+  (pps mina_ppx)))

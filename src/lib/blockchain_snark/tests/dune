@@ -1,5 +1,5 @@
 (tests
- (names test_blockchain_snark test_blockchain_step_ledger_proof)
+ (names test_blockchain_step_ledger_proof)
  (libraries
   alcotest
   blockchain_snark
@@ -16,4 +16,4 @@
   staged_ledger_diff
   transaction_snark)
  (preprocess
-  (pps ppx_jane)))
+  (pps mina_ppx)))

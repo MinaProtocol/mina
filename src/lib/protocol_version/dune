@@ -15,12 +15,10 @@
   mina_node_config.version)
  (preprocess
   (pps
-   ppx_version
-   ppx_bin_prot
-   ppx_fields_conv
-   ppx_sexp_conv
-   ppx_compare
-   ppx_deriving_yojson))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Protocol version representation"))

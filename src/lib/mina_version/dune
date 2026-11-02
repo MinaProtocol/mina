@@ -4,7 +4,11 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (public_name mina_version)
  (virtual_modules mina_version)
  (default_implementation mina_version.normal))

@@ -52,6 +52,8 @@ module type Full = sig
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
           val to_latest : t -> V4.t
+
+          val hash : t -> State_body_hash.t
         end
       end]
     end
@@ -100,6 +102,8 @@ module type Full = sig
         [@@deriving sexp, compare, equal, yojson]
 
         val to_latest : t -> V4.t
+
+        val hashes : t -> State_hash.State_hashes.t
       end
     end]
 

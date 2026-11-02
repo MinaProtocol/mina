@@ -6,15 +6,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_version
-   ppx_let
-   ppx_custom_printf
-   ppx_base
-   ppx_deriving_yojson
-   ppx_inline_test
-   ppx_assert
-   ppx_mina))
+  (pps mina_ppx.no_pipebang))
  (libraries
   ;; opam libraries
   rocks

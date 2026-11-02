@@ -13,6 +13,6 @@
   mina_stdlib
   ppx_version.runtime)
  (preprocess
-  (pps ppx_jane ppx_version ppx_deriving.std ppx_base ppx_let ppx_assert))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

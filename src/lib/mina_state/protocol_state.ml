@@ -96,6 +96,23 @@ module Make_str (A : Wire_types.Concrete) = struct
               blockchain_state =
                 Blockchain_state.Value.Stable.V2.to_latest t.blockchain_state
             }
+
+          let hash
+              ({ Poly.genesis_state_hash : State_hash.t
+               ; blockchain_state
+               ; consensus_state
+               ; constants
+               } :
+                t ) =
+            Random_oracle.Input.Chunked.(
+              append
+                (Blockchain_state.Value.Stable.V2.to_input blockchain_state)
+                (Consensus.Data.Consensus_state.to_input consensus_state)
+              |> append (field (genesis_state_hash :> Field.t))
+              |> append (Protocol_constants_checked.to_input constants))
+            |> Random_oracle.pack_input
+            |> Random_oracle.hash ~init:Hash_prefix.protocol_state_body
+            |> State_body_hash.of_hash
         end
       end]
     end
@@ -218,6 +235,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let to_latest (t : t) : Latest.t =
           { t with body = Body.Value.Stable.V3.to_latest t.body }
+
+        let hashes = hashes_abstract ~hash_body:Body.Value.Stable.V3.hash
       end
     end]
 

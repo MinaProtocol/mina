@@ -11,11 +11,9 @@
   sgn)
  (preprocess
   (pps
-   ppx_version
-   ppx_assert
-   ppx_compare
-   ppx_inline_test
-   ppx_let
-   ppx_sexp_conv))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx)))

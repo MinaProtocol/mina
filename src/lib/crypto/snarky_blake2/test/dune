@@ -12,4 +12,8 @@
   snarky.backendless
   snarky_blake2)
  (preprocess
-  (pps ppx_let ppx_sexp_conv ppx_version)))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

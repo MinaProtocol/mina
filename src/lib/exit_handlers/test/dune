@@ -11,4 +11,8 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_assert ppx_let ppx_version)))
+  (pps
+   mina_ppx.no_pipebang
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

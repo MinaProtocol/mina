@@ -11,8 +11,10 @@ open Mina_base
 
    This module tests that checked and unchecked computations for timed
    accounts always yield the same results. *)
-let%test_module "account timing check" =
-  ( module struct
+let suite () =
+  Transaction_snark_test_suite.make ~name:"account_timing"
+  @@ fun ~test ->
+  let module _ = struct
     open Mina_ledger.Ledger.For_tests
 
     let signature_kind = Mina_signature_kind.Testnet
@@ -89,7 +91,9 @@ let%test_module "account timing check" =
        cliff time has not yet passed, but which still has 20_000 mina
        available. Since the deduced amount is less than available
        funds, this transaction is expected to succeed. *)
-    let%test "before_cliff_time" =
+    let () =
+      test "before_cliff_time" @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let txn_amount = Currency.Amount.of_mina_int_exn 100 in
       let txn_global_slot = Mina_numbers.Global_slot_since_genesis.of_int 45 in
       let account =
@@ -120,7 +124,10 @@ let%test_module "account timing check" =
        timed. The account's funds are far more than sufficient to make
        a transaction of 100 mina, even disregarding the vesting
        schedule. *)
-    let%test "positive min balance" =
+    let () =
+      test "positive min balance"
+      @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let account =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 100_000)
       in
@@ -151,7 +158,10 @@ let%test_module "account timing check" =
        2,000 the account is untimed. The funds are far more than
        sufficient to perform the transaction of 100 mina, even
        disregarding the vesting schedule. *)
-    let%test "curr min balance of zero" =
+    let () =
+      test "curr min balance of zero"
+      @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let account =
         account_with_default_vesting_schedule
           ~cliff_amount:(Amount.of_nanomina_int_exn 900_000_000)
@@ -179,7 +189,10 @@ let%test_module "account timing check" =
        the total balance of 10,000 mina also this means at slot 1,010
        the account has only 100 mina available. Therefore a
        transaction of 101 mina is expected to fail. *)
-    let%test "below calculated min balance" =
+    let () =
+      test "below calculated min balance"
+      @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let account =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 10_000)
       in
@@ -203,7 +216,10 @@ let%test_module "account timing check" =
        From a timed account with balance of 100,000 mina make a transaction
        of 100,001 mina. This cannot succeed, even if the vesting schedule was
        over. *)
-    let%test "insufficient balance" =
+    let () =
+      test "insufficient balance"
+      @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let account =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 100_000)
       in
@@ -229,7 +245,9 @@ let%test_module "account timing check" =
        slots, this means that all funds become available at slot 2,000.
        Verify that at slot 3,000 all 100,000 mina of the account's balance
        may be spent successfully. *)
-    let%test "past full vesting" =
+    let () =
+      test "past full vesting" @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let account =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 100_000)
       in
@@ -267,7 +285,10 @@ let%test_module "account timing check" =
 
        Assert that before the cliff, the neither cliff_amount nor
        any vesting increments are released from the timed account. *)
-    let%test "before cliff, cliff_amount doesn't affect min balance" =
+    let () =
+      test "before cliff, cliff_amount doesn't affect min balance"
+      @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let txn_amount, txn_global_slot, account = make_cliff_amount_test 999 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
@@ -284,7 +305,10 @@ let%test_module "account timing check" =
 
        At the cliff_time slot, the cliff_amount and only the cliff_amount
        is released and can be spent.*)
-    let%test "at exactly cliff time, cliff amount allows spending" =
+    let () =
+      test "at exactly cliff time, cliff amount allows spending"
+      @@ Transaction_snark_test_suite.assert_true
+      @@ fun () ->
       let txn_amount, txn_global_slot, account = make_cliff_amount_test 1000 in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
@@ -471,7 +495,9 @@ let%test_module "account timing check" =
        Generate a bunch of transactions of 10 mina (see amount below) from accounts
        with 10,000 mina balance and 50 mina minimum balance. Use real key pairs
        to sign transactions (see ~sign_type:`Real below) so that they succeed. *)
-    let%test_unit "user commands, before cliff time, sufficient balance" =
+    let () =
+      test "user commands, before cliff time, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -531,7 +557,9 @@ let%test_module "account timing check" =
        We expect these transactions to fail, so we use fake signatures,
        but still we check the error to make sure transactions failed
        because of the balance issue. *)
-    let%test_unit "user command, before cliff time, min balance violation" =
+    let () =
+      test "user command, before cliff time, min balance violation"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         (* high init min balance, payment amount enough to violate *)
@@ -591,7 +619,9 @@ let%test_module "account timing check" =
        having only 5 mina available. Because it's slot 9_999, while the cliff
        time is 10,000, this results in
        Source_minimum_balance_violation error. Using fake signatures. *)
-    let%test_unit "user command, just before cliff time, insufficient balance" =
+    let () =
+      test "user command, just before cliff time, insufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -642,7 +672,9 @@ let%test_module "account timing check" =
        Transactions of 100 mina from accounts having 10,000 mina, 9,995
        of which is vested immediately at cliff time. Therefore these
        transactions made at cliff slot are expected to succeed. *)
-    let%test_unit "user command, at cliff time, sufficient balance" =
+    let () =
+      test "user command, at cliff time, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -689,7 +721,9 @@ let%test_module "account timing check" =
                 (Mina_numbers.Global_slot_since_genesis.of_int 10000)
                 [ user_command ] ) )
 
-    let%test_unit "user command, while vesting, sufficient balance" =
+    let () =
+      test "user command, while vesting, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let init_min_bal_int = 9_995_000_000_000 in
@@ -750,7 +784,9 @@ let%test_module "account timing check" =
                 (Mina_numbers.Global_slot_since_genesis.of_int 10100)
                 [ user_command ] ) )
 
-    let%test_unit "user command, after vesting, sufficient balance" =
+    let () =
+      test "user command, after vesting, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -798,7 +834,9 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot_since_genesis.(of_int 20_000)
                 [ user_command ] ) )
 
-    let%test_unit "user command, after vesting, insufficient balance" =
+    let () =
+      test "user command, after vesting, insufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -842,7 +880,9 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_unit "Payment- fee more than available min balance" =
+    let () =
+      test "Payment- fee more than available min balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -887,7 +927,9 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_unit "Payment- amount more than available min balance" =
+    let () =
+      test "Payment- amount more than available min balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -931,8 +973,11 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_unit "Payment- sufficient amount; fee payer goes from timed to \
-                   untimed; receiver remains untimed" =
+    let () =
+      test
+        "Payment- sufficient amount; fee payer goes from timed to untimed; \
+         receiver remains untimed"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let sender_index = 0 in
@@ -981,8 +1026,11 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_unit "Payment- sufficient amount; receiver goes from timed to \
-                   untimed; fee payer remains untimed" =
+    let () =
+      test
+        "Payment- sufficient amount; receiver goes from timed to untimed; fee \
+         payer remains untimed"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let receiver_index = 1 in
@@ -1031,8 +1079,8 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_module "test user commands on timed accounts" =
-      ( module struct
+    let () =
+      let module _ = struct
         (* This represents the initial conditions of a test
            scenario. Defines the account's timing and the transaction
            details. This is generally randomised by Quickcheck, but
@@ -1319,10 +1367,13 @@ let%test_module "account timing check" =
                       "Unexpected transaction error: %s.\nExpected error: %s"
                       err_str expected_err_str () )
 
-        let%test_unit "generic user transaction" =
+        let () =
+          test "generic user transaction"
+          @@ fun () ->
           Quickcheck.test ~seed:(`Deterministic "generic, timed account")
             ~sexp_of:sexp_of_t ~examples ~trials:1000 (gen ()) ~f:execute_test
-      end )
+      end in
+      ()
 
     (* zkApps with timings *)
     let apply_zkapp_commands_at_slot ledger slot
@@ -1378,7 +1429,9 @@ let%test_module "account timing check" =
           let err_str = Error.to_string_hum err in
           failwithf "Unexpected transaction error: %s" err_str ()
 
-    let%test_unit "zkApp command, before cliff time, sufficient balance" =
+    let () =
+      test "zkApp command, before cliff time, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1448,7 +1501,9 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot_since_genesis.(succ zero)
                 [ txn ] ) )
 
-    let%test_unit "zkApp command, before cliff time, min balance violation" =
+    let () =
+      test "zkApp command, before cliff time, min balance violation"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1527,7 +1582,9 @@ let%test_module "account timing check" =
                 Transaction_status.Failure.Source_minimum_balance_violation
                 result ) )
 
-    let%test_unit "zkApp command, before cliff time, fee payer fails" =
+    let () =
+      test "zkApp command, before cliff time, fee payer fails"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1684,8 +1741,9 @@ let%test_module "account timing check" =
         ( ledger_init_state
         , Async.Thread_safe.block_on_async_exn (fun () -> zkapp_command) )
 
-    let%test_unit "zkApp command, timed account creation, min_balance > balance"
-        =
+    let () =
+      test "zkApp command, timed account creation, min_balance > balance"
+      @@ fun () ->
       Quickcheck.test
         ~seed:
           (`Deterministic
@@ -1711,7 +1769,9 @@ let%test_module "account timing check" =
                 Transaction_status.Failure.Source_minimum_balance_violation
                 result ) )
 
-    let%test_unit "zkApp command, account creation, min_balance = balance" =
+    let () =
+      test "zkApp command, account creation, min_balance = balance"
+      @@ fun () ->
       Quickcheck.test
         ~seed:
           (`Deterministic
@@ -1729,7 +1789,9 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot_since_genesis.(succ zero)
                 [ zkapp_command ] ) )
 
-    let%test_unit "zkApp command, account creation, min_balance < balance" =
+    let () =
+      test "zkApp command, account creation, min_balance < balance"
+      @@ fun () ->
       Quickcheck.test
         ~seed:
           (`Deterministic
@@ -1747,8 +1809,9 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot_since_genesis.(succ zero)
                 [ zkapp_command ] ) )
 
-    let%test_unit "zkApp command, just before cliff time, insufficient balance"
-        =
+    let () =
+      test "zkApp command, just before cliff time, insufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1836,7 +1899,9 @@ let%test_module "account timing check" =
     (* this test is same as last one, except it's exactly at the cliff, and we expect it to succeed
        because the cliff amount makes the whole balance liquid
     *)
-    let%test_unit "zkApp command, at cliff time, sufficient balance" =
+    let () =
+      test "zkApp command, at cliff time, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1905,7 +1970,9 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot_since_genesis.(of_int 10000)
                 [ zkapp_command ] ) )
 
-    let%test_unit "zkApp command, while vesting, sufficient balance" =
+    let () =
+      test "zkApp command, while vesting, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -1982,7 +2049,9 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot_since_genesis.(of_int 10_100)
                 [ zkapp_command ] ) )
 
-    let%test_unit "zkApp command, while vesting, insufficient balance" =
+    let () =
+      test "zkApp command, while vesting, insufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -2068,7 +2137,9 @@ let%test_module "account timing check" =
                 Transaction_status.Failure.Source_minimum_balance_violation
                 result ) )
 
-    let%test_unit "zkApp command, after vesting, sufficient balance" =
+    let () =
+      test "zkApp command, after vesting, sufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -2143,7 +2214,9 @@ let%test_module "account timing check" =
                 [ zkapp_command ] ) )
 
     (* same as previous test, amount is incremented by 1 *)
-    let%test_unit "zkApp command, after vesting, insufficient balance" =
+    let () =
+      test "zkApp command, after vesting, insufficient balance"
+      @@ fun () ->
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -2223,8 +2296,9 @@ let%test_module "account timing check" =
               in
               check_zkapp_failure Transaction_status.Failure.Overflow result ) )
 
-    let%test_unit "zkApp command, create timed account with wrong authorization"
-        =
+    let () =
+      test "zkApp command, create timed account with wrong authorization"
+      @@ fun () ->
       let ledger_init_state =
         List.map keypairs ~f:(fun keypair ->
             let balance = Currency.Amount.of_mina_int_exn 100_000 in
@@ -2302,7 +2376,9 @@ let%test_module "account timing check" =
                 ledger
                 [ create_timed_account_zkapp_command ] ) )
 
-    let%test_unit "zkApp command, change untimed account to timed" =
+    let () =
+      test "zkApp command, change untimed account to timed"
+      @@ fun () ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           Backtrace.elide := false ;
           let ledger_init_state =
@@ -2373,7 +2449,9 @@ let%test_module "account timing check" =
                 ledger
                 [ update_timing_zkapp_command ] ) )
 
-    let%test_unit "zkApp command, invalid update for timed account" =
+    let () =
+      test "zkApp command, invalid update for timed account"
+      @@ fun () ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           let ledger_init_state =
             List.mapi keypairs ~f:(fun i keypair ->
@@ -2463,4 +2541,5 @@ let%test_module "account timing check" =
                       , Pass_2 )
                     ledger
                     [ update_timing_zkapp_command ] ) ) )
-  end )
+  end in
+  ()

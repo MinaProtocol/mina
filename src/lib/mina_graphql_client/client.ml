@@ -875,6 +875,32 @@ let get_metrics ~logger node_uri =
       ; transaction_pool_size
       }
 
+let get_transaction_pool_status ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  let query_obj = Queries.Query_transaction_pool_status.make () in
+  let%bind query_result_obj =
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"query_transaction_pool_status" query_obj
+  in
+  let status = query_result_obj.transactionPoolStatus in
+  let%map minimum_fee_per_weight_unit =
+    Option.value_map status.minimumFeePerWeightUnit ~default:(return None)
+      ~f:(fun fee_rate ->
+        Deferred.return
+          (let open Or_error.Let_syntax in
+          let%bind q = Or_error.try_with (fun () -> Q.of_string fee_rate) in
+          Currency.Fee_rate.of_q q
+          |> Result.of_option
+               ~error:
+                 (Error.createf "Invalid minimumFeePerWeightUnit %s" fee_rate)
+          >>| Option.some) )
+  in
+  Types.
+    { size = status.size
+    ; max_size = status.maxSize
+    ; minimum_fee_per_weight_unit
+    }
+
 let start_filtered_log node_uri ~logger ~log_filter ~retry_delay_sec =
   let open Deferred.Let_syntax in
   let query_obj =

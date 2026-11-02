@@ -5,7 +5,7 @@
   (backend bisect_ppx))
  (flags -warn-error -22)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   integers

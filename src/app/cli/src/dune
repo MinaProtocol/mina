@@ -10,7 +10,11 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (executable
  (package cli)
@@ -20,11 +24,15 @@
  (modes native)
  (flags
   (:standard -warn-error +a))
- (libraries mina_cli_entrypoint mina_signature_kind.testnet disk_cache.lmdb)
+ (libraries mina_cli_entrypoint disk_cache.lmdb)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
 
 (executable
  (package cli)
@@ -34,8 +42,12 @@
  (modes native)
  (flags
   (:standard -warn-error +a))
- (libraries mina_cli_entrypoint mina_signature_kind.mainnet disk_cache.lmdb)
+ (libraries mina_cli_entrypoint disk_cache.lmdb)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

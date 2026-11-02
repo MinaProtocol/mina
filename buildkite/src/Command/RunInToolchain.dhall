@@ -76,15 +76,16 @@ let submodulesInit
 
           else  [] : List Cmd.Type
 
+let submoduleInit =
+    -- one submodule, not recursive, with full history (for ancestry checks)
+      \(path : Text) -> Cmd.run "git submodule update --init -- ${path}"
+
 let runInToolchain
     : Config.Type -> List Cmd.Type
     =     \(c : Config.Type)
       ->    submodulesInit c.submodules
           # binfmtSetup c.arch
-          # [ Cmd.run
-                "./buildkite/scripts/docker/load_from_cache.sh ${c.image} || docker pull ${c.image}"
-            , FixPermissions.command c.arch
-            ]
+          # [ FixPermissions.command c.arch ]
           # [ Cmd.runInDocker
                 Cmd.Docker::{
                 , image = c.image
@@ -104,4 +105,6 @@ let runInDefaultToolchain
 in  { Config = Config
     , runInToolchain = runInToolchain
     , runInDefaultToolchain = runInDefaultToolchain
+    , submodulesInit = submodulesInit
+    , submoduleInit = submoduleInit
     }

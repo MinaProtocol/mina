@@ -259,16 +259,36 @@ wait_for_new_blocks() {
   exit 1
 }
 
+# upgrade.sql / downgrade.sql SET lock_timeout = '10s' and abort rather than
+# queue behind the archive's in-flight block inserts: their CREATE INDEX / DROP
+# INDEX on user_commands need locks that conflict with those writes. On a live
+# archive that abort is the scripts' intended behaviour and they are idempotent,
+# so a lock timeout is re-run here instead of failing the test.
+SQL_LOCK_RETRIES=6
+SQL_LOCK_RETRY_WAIT=10
+
 execute_script() {
   local script_path=$1
   local script_name=$2
+  local attempt output
 
-  if psql "$PG_CONN" -f "$script_path"; then
-    echo "$script_name completed successfully."
-  else
-    echo -e "${RED}$script_name failed.${CLEAR}"
-    exit 1
-  fi
+  output=$(mktemp)
+  for (( attempt = 1; attempt <= SQL_LOCK_RETRIES; attempt++ )); do
+    if psql "$PG_CONN" -f "$script_path" 2>&1 | tee "$output"; then
+      rm -f "$output"
+      echo "$script_name completed successfully."
+      return 0
+    fi
+    if ! grep -q "canceling statement due to lock timeout" "$output"; then
+      break
+    fi
+    echo "$script_name hit a lock timeout (attempt $attempt/$SQL_LOCK_RETRIES); retrying in ${SQL_LOCK_RETRY_WAIT}s"
+    sleep "$SQL_LOCK_RETRY_WAIT"
+  done
+
+  rm -f "$output"
+  echo -e "${RED}$script_name failed.${CLEAR}"
+  exit 1
 }
 
 echo "========================= ROSETTA SANITY TEST ==========================="

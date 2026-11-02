@@ -381,6 +381,7 @@ func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
 	h.SetBannedPeers(gs.BannedPeers)
 	h.SetTrustedAddrFilters(gs.TrustedAddrFilters)
 	h.SetBannedAddrFilters(gs.BannedAddrFilters)
+	h.forgetBannedPeers()
 	for _, c := range h.Host.Network().Conns() {
 		pid := c.RemotePeer()
 		maddr := c.RemoteMultiaddr()
@@ -389,7 +390,39 @@ func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
 				if err := h.Host.Network().ClosePeer(pid); err != nil {
 					h.gatingState.logger.Infof("failed to close banned peer %v: %v", pid, err)
 				}
+				// The DHT may have re-added the peer over the connection
+				// while it was still open.
+				if h.gatingState.checkAllowedPeer(pid).isDeny() {
+					h.forgetPeer(pid)
+				}
 			}()
+		}
+	}
+}
+
+// forgetPeer drops what the helper would otherwise pass on about a peer: its
+// routing table entries, which answer DHT FIND_NODE queries, and its
+// peerstore addresses, which fill in those answers.
+func (h *Helper) forgetPeer(p peer.ID) {
+	if h.Dht != nil {
+		h.Dht.LAN.RoutingTable().RemovePeer(p)
+		h.Dht.WAN.RoutingTable().RemovePeer(p)
+	}
+	h.Host.Peerstore().ClearAddrs(p)
+}
+
+// forgetBannedPeers forgets every peer that is banned by ID and not trusted.
+func (h *Helper) forgetBannedPeers() {
+	h.gatingState.bannedPeersMutex.RLock()
+	banned := make([]peer.ID, 0, len(h.gatingState.bannedPeers))
+	for p := range h.gatingState.bannedPeers {
+		banned = append(banned, p)
+	}
+	h.gatingState.bannedPeersMutex.RUnlock()
+
+	for _, p := range banned {
+		if h.gatingState.checkAllowedPeer(p).isDeny() {
+			h.forgetPeer(p)
 		}
 	}
 }
@@ -784,6 +817,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			wanPatcher.Heartbeat(p)
 		},
 	}
+
+	// The peerstore persists across restarts, so it may still hold
+	// addresses for peers banned in the initial gating config.
+	h.forgetBannedPeers()
 
 	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil

@@ -5,4 +5,8 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_deriving.show ppx_deriving_yojson ppx_version)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

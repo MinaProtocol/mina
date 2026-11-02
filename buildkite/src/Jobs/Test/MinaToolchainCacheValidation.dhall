@@ -33,7 +33,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "MinaToolchainCacheValidation"
-        , scope = [ PipelineScope.Type.MainlineNightly ]
+        , scope = [ PipelineScope.Type.PullRequest, PipelineScope.Type.Weekly ]
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

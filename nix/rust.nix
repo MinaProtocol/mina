@@ -304,16 +304,4 @@ in {
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
   };
 
-  minimina = defaultRustPlatform.buildRustPackage rec {
-    pname = "minimina";
-    version = "0.2.0";
-    src = ../src/app/minimina;
-    cargoLock.lockFile = ../src/app/minimina/Cargo.lock;
-    nativeBuildInputs = [ final.pkg-config ];
-    buildInputs = with final;
-      [ openssl ] ++ lib.optionals stdenv.isDarwin [
-        darwin.apple_sdk.frameworks.Security
-        libiconv
-      ];
-  };
 }

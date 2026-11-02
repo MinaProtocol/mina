@@ -13,6 +13,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
@@ -357,6 +358,53 @@ func TestSetGatingConfig(t *testing.T) {
 
 	ok = testApp.P2p.GatingState().InterceptAddrDial(allowedPid, allowedMultiaddr)
 	require.True(t, ok)
+}
+
+func TestSetGatingConfigForgetsBannedPeers(t *testing.T) {
+	appA, _ := newTestApp(t, nil, true)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	appB, _ := newTestApp(t, appAInfos, true)
+	require.NoError(t, appB.P2p.Host.Connect(appB.Ctx, appAInfos[0]))
+	bannedPid := appB.P2p.Host.ID()
+
+	inRoutingTable := func(app *app, p peer.ID) bool {
+		return app.P2p.Dht.LAN.RoutingTable().Find(p) != "" ||
+			app.P2p.Dht.WAN.RoutingTable().Find(p) != ""
+	}
+
+	withTimeout(t, func() {
+		for !inRoutingTable(appA, bannedPid) {
+			time.Sleep(time.Millisecond * 100)
+		}
+	}, "A did not add B to its routing table")
+	require.NotEmpty(t, appA.P2p.Host.Peerstore().Addrs(bannedPid))
+
+	setGatingConfigImpl(t, appA, nil, nil, nil, []string{bannedPid.String()})
+
+	withTimeout(t, func() {
+		for appA.P2p.Host.Network().Connectedness(bannedPid) == network.Connected {
+			time.Sleep(time.Millisecond * 100)
+		}
+	}, "A did not disconnect from B")
+	require.False(t, inRoutingTable(appA, bannedPid))
+	require.Empty(t, appA.P2p.Host.Peerstore().Addrs(bannedPid))
+
+	// A peer that joins after the ban must not learn of B through A.
+	appC, _ := newTestApp(t, appAInfos, true)
+	require.NoError(t, appC.P2p.Host.Connect(appC.Ctx, appAInfos[0]))
+	withTimeout(t, func() {
+		for !inRoutingTable(appC, appA.P2p.Host.ID()) {
+			time.Sleep(time.Millisecond * 100)
+		}
+	}, "C did not add A to its routing table")
+
+	ctx, cancel := context.WithTimeout(appC.Ctx, testTimeout)
+	defer cancel()
+	_, err = appC.P2p.Dht.FindPeer(ctx, bannedPid)
+	require.Error(t, err)
+	require.Empty(t, appC.P2p.Host.Peerstore().Addrs(bannedPid))
 }
 
 func TestSetNodeStatus(t *testing.T) {

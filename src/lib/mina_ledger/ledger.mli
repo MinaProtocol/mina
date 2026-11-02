@@ -235,6 +235,77 @@ val apply_initial_ledger_state : t -> init_state -> unit
 module Ledger_inner :
   Ledger_intf.S with type t = t and type location = Location.t
 
+(** A ledger that does not maintain its merkle hashes, for applying
+    transactions whose effect on the ledger is thrown away -- deciding which
+    candidates fit in a block, and nothing else.
+
+    Its type is abstract because the hashes it reports are meaningless: it
+    must not be possible to hand one to code that expects a real ledger. *)
+module Non_hashing_ledger : sig
+  type t
+
+  (** Open a non-hashing ledger over [ledger]. Writes are held in a mask of
+      its own and are never committed, so [ledger] is left untouched. *)
+  val of_ledger : Mask.Attached.t -> t
+
+  val location_of_account : t -> Account_id.t -> Location.t option
+
+  val get : t -> Location.t -> Account.t option
+
+  (** Apply [f] to a sub-ledger of [t], committing its writes into [t] only if
+      [f] returns [Ok]. *)
+  val within_mask : t -> f:(t -> ('a, 'e) Result.t) -> ('a, 'e) Result.t
+
+  module Transaction_partially_applied : sig
+    (** Left abstract: it holds a ledger, and a non-hashing ledger must not
+        escape as a real one. *)
+    module Zkapp_command_partially_applied : sig
+      type t
+    end
+
+    type 'applied fully_applied =
+      { previous_hash : Ledger_hash.t; applied : 'applied }
+
+    type t =
+      | Signed_command of
+          Mina_transaction_logic.Transaction_applied.Signed_command_applied.t
+          fully_applied
+      | Zkapp_command of Zkapp_command_partially_applied.t
+      | Fee_transfer of
+          Mina_transaction_logic.Transaction_applied.Fee_transfer_applied.t
+          fully_applied
+      | Coinbase of
+          Mina_transaction_logic.Transaction_applied.Coinbase_applied.t
+          fully_applied
+  end
+
+  val apply_user_command :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> t
+    -> Signed_command.With_valid_signature.t
+    -> Mina_transaction_logic.Transaction_applied.Signed_command_applied.t
+       Or_error.t
+
+  val apply_transaction_first_pass :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+    -> t
+    -> Mina_transaction.Transaction.t
+    -> Transaction_partially_applied.t Or_error.t
+
+  val apply_transactions :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+    -> t
+    -> Mina_transaction.Transaction.t list
+    -> Mina_transaction_logic.Transaction_applied.t list Or_error.t
+end
+
 module For_tests : sig
   open Currency
   open Mina_numbers

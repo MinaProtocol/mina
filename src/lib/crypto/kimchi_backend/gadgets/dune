@@ -6,7 +6,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps mina_ppx))
  (libraries
   ;; opam libraries
   bignum.bigint
