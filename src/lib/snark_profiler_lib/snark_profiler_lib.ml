@@ -104,10 +104,7 @@ let create_ledger_and_transactions ~signature_kind
 module Transaction_key = struct
   module T = struct
     type t =
-      { proof_segments : int
-      ; non_proof_segments : int
-      ; non_proof_updates : int
-      }
+      { proof_segments : int; non_proof_segments_by_updates : (int * int) list }
     [@@deriving hash, sexp, compare]
   end
 
@@ -164,27 +161,29 @@ module Transaction_key = struct
     ignore
     @@ Mina_ledger.Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
          second_pass_ledger ;
-    let add_non_proof_segment ~updates (t : t) =
-      { t with
-        non_proof_segments = t.non_proof_segments + 1
-      ; non_proof_updates = t.non_proof_updates + updates
-      }
+    let proof_segments, non_proof_segments_by_updates =
+      List.fold segments ~init:(0, Int.Map.empty)
+        ~f:(fun (proof_segments, by_updates) (_, segment, _) ->
+          let add_non_proof_segment updates =
+            ( proof_segments
+            , Int.Map.update by_updates updates
+                ~f:(Option.value_map ~default:1 ~f:Int.succ) )
+          in
+          match segment with
+          | Transaction_snark.Zkapp_command_segment.Basic.Proved ->
+              (proof_segments + 1, by_updates)
+          | Opt_signed ->
+              add_non_proof_segment 1
+          | Opt_signed_opt_signed ->
+              add_non_proof_segment 2
+          | Opt_signed_batch updates ->
+              add_non_proof_segment updates )
     in
-    List.fold
-      ~init:
-        ( { proof_segments = 0; non_proof_segments = 0; non_proof_updates = 0 }
-          : t )
-      segments
-      ~f:(fun acc (_, segment, _) ->
-        match segment with
-        | Transaction_snark.Zkapp_command_segment.Basic.Proved ->
-            { acc with proof_segments = acc.proof_segments + 1 }
-        | Opt_signed ->
-            add_non_proof_segment ~updates:1 acc
-        | Opt_signed_opt_signed ->
-            add_non_proof_segment ~updates:2 acc
-        | Opt_signed_batch updates ->
-            add_non_proof_segment ~updates acc )
+    ( { proof_segments
+      ; non_proof_segments_by_updates =
+          Int.Map.to_alist non_proof_segments_by_updates
+      }
+      : t )
 end
 
 module Time_values = struct
@@ -755,30 +754,25 @@ let profile_zkapps
           (ndx + 1) zkapp_span )
   in
   printf
-    "| No.| Proof updates| Non-proof updates| Non-proof segments| Mempool \
+    "| No.| Proof updates| Non-proof segments (updates:segments)| Mempool \
      verification time (sec)| Transaction proving time (sec)|Permutation|\n\
-    \ |--|--|--|--|--|--|--|\n" ;
+    \ |--|--|--|--|--|--|\n" ;
   List.iteri
     ( Transaction_key.Table.to_alist transaction_combinations
     |> List.sort ~compare:(fun (k1, _) (k2, _) ->
            let total_updates (k : Transaction_key.t) =
-             k.proof_segments + k.non_proof_updates
+             List.fold k.non_proof_segments_by_updates ~init:k.proof_segments
+               ~f:(fun total (updates, segments) ->
+                 total + (updates * segments) )
            in
-           let total_compare =
-             Int.compare (total_updates k1) (total_updates k2)
-           in
-           let proof_compare =
-             Int.compare k1.proof_segments k2.proof_segments
-           in
-           let non_proof_segments_compare =
-             Int.compare k1.non_proof_segments k2.non_proof_segments
-           in
-           if total_compare <> 0 then total_compare
-           else if proof_compare <> 0 then proof_compare
-           else non_proof_segments_compare ) )
+           [%compare: int * Transaction_key.t]
+             (total_updates k1, k1)
+             (total_updates k2, k2) ) )
     ~f:(fun i (k, (_, t, perm)) ->
-      printf "| %d| %d| %d| %d| %f| %f| %s|\n" (i + 1) k.proof_segments
-        k.non_proof_updates k.non_proof_segments
+      printf "| %d| %d| %s| %f| %f| %s|\n" (i + 1) k.proof_segments
+        ( List.map k.non_proof_segments_by_updates
+            ~f:(fun (updates, segments) -> sprintf "%d:%d" updates segments)
+        |> String.concat ~sep:" " )
         (Time.Span.to_sec t.verification_time)
         (Time.Span.to_sec t.proving_time)
         perm ) ;
