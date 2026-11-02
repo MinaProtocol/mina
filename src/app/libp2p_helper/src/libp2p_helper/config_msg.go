@@ -73,7 +73,13 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) (*capnp.Message, f
 
 	// report discovery peers local and remote
 	go func() {
-		for discovery := range foundPeerCh {
+		for {
+			var discovery peerDiscovery
+			select {
+			case discovery = <-foundPeerCh:
+			case <-app.Ctx.Done():
+				return
+			}
 			if validPeer(discovery.info.ID) {
 				app.P2p.Logger.Debugf("discovered peer %v via %v; processing", discovery.info.ID, discovery.source)
 				app.P2p.Host.Peerstore().AddAddrs(discovery.info.ID, discovery.info.Addrs, peerstore.ConnectedAddrTTL)
