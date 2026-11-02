@@ -133,7 +133,9 @@ let validate_transition_or_header_is_relevant
            ~slot_tx_end ~slot_chain_end ~frontier ~block_registry ~valid_cb b
   | `Header h ->
       let header_with_hash, _ = Envelope.Incoming.data h in
-      Result.map ~f:(fun () -> `Header h)
+      Result.map ~f:(fun () ->
+          Block_registry.register_header block_registry h ~valid_cb ;
+          `Header h )
       @@ validate_header_is_relevant
            ~context:(module Context)
            ~slot_chain_end ~frontier header_with_hash

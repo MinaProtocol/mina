@@ -89,7 +89,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  (Network_peer.Envelope.Incoming.map ~f:(const b) t)
                  ~valid_cb:vc )
         | `Header h ->
-            `Header (Network_peer.Envelope.Incoming.map ~f:(const h) t)
+            let header = Network_peer.Envelope.Incoming.map ~f:(const h) t in
+            Transition_handler.Block_registry.register_header block_registry
+              header ~valid_cb:vc ;
+            `Header header
       in
       Strict_pipe.Writer.write primary_transition_writer (b_or_h, `Valid_cb vc) ) ;
   let initial_state_hashes =
