@@ -8,6 +8,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.PackagingSpec::{
@@ -22,6 +24,8 @@ in  Pipeline.build
             ]
           , generic = True
           , buildFlags = BuildFlags.Type.Instrumented
+          , scope =
+            [ PipelineScope.Type.PullRequest, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Generic

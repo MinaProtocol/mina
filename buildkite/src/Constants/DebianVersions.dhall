@@ -73,7 +73,16 @@ let dependsOn =
               , { name = "${spec.prefix}Generic${suffix}", key = key }
               ]
 
-let minimalDirtyWhen =
+let packagingInputs =
+    -- read by packaging only; an app build that a packaging job needs is pulled
+    -- in by monorepo.sh dependency resolution, so app builds do not list these
+      [ S.strictlyStart (S.contains "dockerfiles/toolchain")
+      , S.strictlyStart (S.contains "dockerfiles")
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
+      ]
+
+let compileDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
@@ -83,10 +92,6 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "buildkite/scripts/bench")
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
-      , S.strictlyStart (S.contains "dockerfiles/toolchain")
-      , S.strictlyStart (S.contains "dockerfiles")
-      , S.strictlyStart (S.contains "scripts/debian")
-      , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "buildkite/scripts/apps/write_to_cache" "sh"
@@ -100,16 +105,19 @@ let minimalDirtyWhen =
           "sh"
       ]
 
-let bookwormDirtyWhen =
-        [ S.strictlyStart (S.contains "src")
-        , S.strictly (S.contains "Makefile")
-        , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-        , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
-        , S.exactly "scripts/patch-archive-test" "sh"
-        , S.exactly "buildkite/scripts/single-node-tests" "sh"
-        , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
-        ]
-      # minimalDirtyWhen
+let minimalDirtyWhen = compileDirtyWhen # packagingInputs
+
+let bookwormExtraDirtyWhen =
+      [ S.strictlyStart (S.contains "src")
+      , S.strictly (S.contains "Makefile")
+      , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
+      , S.exactly "scripts/patch-archive-test" "sh"
+      , S.exactly "buildkite/scripts/single-node-tests" "sh"
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
+      ]
+
+let bookwormDirtyWhen = bookwormExtraDirtyWhen # minimalDirtyWhen
 
 let dirtyWhen =
           \(debVersion : DebVersion)
@@ -119,6 +127,17 @@ let dirtyWhen =
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             , Noble = minimalDirtyWhen
+            }
+            debVersion
+
+let appsDirtyWhen =
+          \(debVersion : DebVersion)
+      ->  merge
+            { Bookworm = bookwormExtraDirtyWhen # compileDirtyWhen
+            , Bullseye = compileDirtyWhen
+            , Jammy = compileDirtyWhen
+            , Focal = compileDirtyWhen
+            , Noble = compileDirtyWhen
             }
             debVersion
 
@@ -178,6 +197,7 @@ in  { DebVersion = DebVersion
     , dependsOn = dependsOn
     , appDependsOn = appDependsOn
     , dirtyWhen = dirtyWhen
+    , appsDirtyWhen = appsDirtyWhen
     , packageDirtyWhen = packageDirtyWhen
     , DepsSpec = DepsSpec
     , overrideEnvs = overrideEnvs

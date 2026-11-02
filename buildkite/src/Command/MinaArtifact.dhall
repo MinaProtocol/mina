@@ -922,7 +922,7 @@ let appsPipeline
     =     \(spec : AppsSpec.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
-            , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , dirtyWhen = DebianVersions.appsDirtyWhen spec.debVersion
             , path = "Release"
             , name =
                 "${spec.prefix}${spec.nameSegment}${DebianVersions.capitalName

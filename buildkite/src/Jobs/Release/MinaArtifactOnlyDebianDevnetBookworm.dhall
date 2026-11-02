@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -26,6 +28,8 @@ in  Pipeline.build
             , Artifacts.Type.TxTools
             , Artifacts.Type.TestExecutive
             ]
+          , scope =
+            [ PipelineScope.Type.PullRequest, PipelineScope.Type.Release ]
           , tags = [ PipelineTag.Type.Packaging, PipelineTag.Type.Docker ]
           , channel = DebianChannel.Type.Experimental
           , prefix = "MinaArtifactOnlyDebian"
