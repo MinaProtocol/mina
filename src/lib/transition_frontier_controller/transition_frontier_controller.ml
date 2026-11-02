@@ -152,6 +152,27 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true ) ) ;
+  let process_catchup_job = ref None in
+  let catchup_jobs_before_ready = Queue.create () in
+  let cleared = ref false in
+  let dispatcher =
+    O1trace.sync_thread "dispatch_blocks" (fun () ->
+        Otp_lib.Event_loop.create ~handle:(function
+          | Resume_catchup resume ->
+              resume ()
+          | Catchup_job _ when !cleared ->
+              ()
+          | Catchup_job job -> (
+              match !process_catchup_job with
+              | Some process ->
+                  process job
+              | None ->
+                  Queue.enqueue catchup_jobs_before_ready job )
+          | Catchup_ready process ->
+              process_catchup_job := Some process ;
+              Queue.iter catchup_jobs_before_ready ~f:process ;
+              Queue.clear catchup_jobs_before_ready ) )
+  in
   let validate_transition =
     Transition_handler.Validator.create_handler
       ~context:(module Context)
@@ -181,27 +202,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Transition_handler.Processor.inputs ~primary_transition_reader
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
         ~f:process_message ) ;
-  let process_catchup_job = ref None in
-  let catchup_jobs_before_ready = Queue.create () in
-  let cleared = ref false in
-  let dispatcher =
-    O1trace.sync_thread "dispatch_blocks" (fun () ->
-        Otp_lib.Event_loop.create ~handle:(function
-          | Resume_catchup resume ->
-              resume ()
-          | Catchup_job _ when !cleared ->
-              ()
-          | Catchup_job job -> (
-              match !process_catchup_job with
-              | Some process ->
-                  process job
-              | None ->
-                  Queue.enqueue catchup_jobs_before_ready job )
-          | Catchup_ready process ->
-              process_catchup_job := Some process ;
-              Queue.iter catchup_jobs_before_ready ~f:process ;
-              Queue.clear catchup_jobs_before_ready ) )
-  in
   Strict_pipe.Reader.iter_without_pushback catchup_job_reader ~f:(fun job ->
       Otp_lib.Event_loop.submit dispatcher (Catchup_job job) )
   |> don't_wait_for ;
