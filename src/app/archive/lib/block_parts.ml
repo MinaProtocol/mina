@@ -74,10 +74,10 @@ let transaction_of_latest ~command_hash : Transaction.t -> transaction =
 
 (** The parts of a block, from its protocol state, of whatever version, and
     [get_transactions], which gives its transactions from its coinbase
-    receiver and whether its coinbase is supercharged, with the hashes of its
-    commands given by [command_hash]. The blockchain state differs in shape
-    between versions, so the parts taken from it are given separately. *)
-let of_protocol_state ~command_hash ~state_hash ~protocol_state
+    receiver and whether its coinbase is supercharged, each recorded as
+    [transaction_of] gives. The blockchain state differs in shape between
+    versions, so the parts taken from it are given separately. *)
+let of_protocol_state ~transaction_of ~state_hash ~protocol_state
     ~snarked_ledger_hash ~staged_ledger_hash ~timestamp ~get_transactions
     ~protocol_version ~proposed_protocol_version =
   let consensus_state = Protocol_state.consensus_state protocol_state in
@@ -91,8 +91,7 @@ let of_protocol_state ~command_hash ~state_hash ~protocol_state
        in
        match get_transactions ~coinbase_receiver ~supercharge_coinbase with
        | Ok transactions ->
-           List.map transactions
-             ~f:(With_status.map ~f:(transaction_of_latest ~command_hash))
+           List.map transactions ~f:(With_status.map ~f:transaction_of)
        | Error e ->
            Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e) )
   in
@@ -132,7 +131,10 @@ let of_latest ~constraint_constants ~state_hash
     ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
     ~proposed_protocol_version =
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
-  of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
+  of_protocol_state
+    ~transaction_of:
+      (transaction_of_latest
+         ~command_hash:Transaction_hash.hash_command_with_hashes )
     ~state_hash ~protocol_state
     ~snarked_ledger_hash:(Blockchain_state.snarked_ledger_hash blockchain_state)
     ~staged_ledger_hash:(Blockchain_state.staged_ledger_hash blockchain_state)
@@ -144,7 +146,7 @@ let of_latest ~constraint_constants ~state_hash
 
 (** The parts of a block whose protocol state is at the version V4 and V3
     blocks carry, given as for [of_protocol_state]. *)
-let of_protocol_state_v3 ~command_hash ~state_hash
+let of_protocol_state_v3 ~transaction_of ~state_hash
     ~(protocol_state : Protocol_state.Value.Stable.V3.t) =
   let { Blockchain_state.Poly.Stable.V2.staged_ledger_hash
       ; ledger_proof_statement
@@ -153,7 +155,7 @@ let of_protocol_state_v3 ~command_hash ~state_hash
       } =
     Protocol_state.blockchain_state protocol_state
   in
-  of_protocol_state ~command_hash ~state_hash ~protocol_state
+  of_protocol_state ~transaction_of ~state_hash ~protocol_state
     ~snarked_ledger_hash:
       ledger_proof_statement.Snarked_ledger_state.Poly.Stable.V2.target
         .first_pass_ledger
@@ -179,7 +181,10 @@ let of_precomputed_v5 ~constraint_constants ~proof_cache_db
 let of_precomputed_v4 ~constraint_constants ~proof_cache_db
     (t : Mina_block.Precomputed.Stable.V4.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  of_protocol_state_v3 ~command_hash:Transaction_hash.hash_command_with_hashes
+  of_protocol_state_v3
+    ~transaction_of:
+      (transaction_of_latest
+         ~command_hash:Transaction_hash.hash_command_with_hashes )
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
     ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
@@ -228,10 +233,11 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
        |> Transaction_hash.Map.of_alist_exn )
   in
   of_protocol_state_v3
-    ~command_hash:(fun command ->
-      Map.find_exn
-        (Lazy.force berkeley_hashes)
-        (Transaction_hash.hash_command_with_hashes command) )
+    ~transaction_of:
+      (transaction_of_latest ~command_hash:(fun command ->
+           Map.find_exn
+             (Lazy.force berkeley_hashes)
+             (Transaction_hash.hash_command_with_hashes command) ) )
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
     ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
