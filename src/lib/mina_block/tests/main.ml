@@ -123,6 +123,72 @@ let versioned_hashes_v4_by_its_own_rules () =
   | Error err ->
       failwith err
 
+(* A Mesa-era (V4) block lists a zkApp account's verification key and zkApp
+   version side by side; the mainnet sample has no zkApp account, so add one. *)
+let v4_reads_mesa_zkapp_account () =
+  let default = Mina_base.Zkapp_account.default in
+  let zkapp : Mesa_types.Zkapp_account.Stable.V3.t =
+    { app_state = default.app_state
+    ; verification_key =
+        Some
+          { data = Mina_base.Side_loaded_verification_key.dummy
+          ; hash = Mina_base.Verification_key_wire.dummy_vk_hash ()
+          }
+    ; zkapp_version = Mina_numbers.Zkapp_version.of_int 3
+    ; action_state = default.action_state
+    ; last_action_slot = default.last_action_slot
+    ; proved_state = default.proved_state
+    ; zkapp_uri = default.zkapp_uri
+    }
+  in
+  let with_zkapp = function
+    | `List [ index; account ] ->
+        let account =
+          Mesa_types.Account.Stable.V3.of_yojson account
+          |> Result.ok_or_failwith
+        in
+        `List
+          [ index
+          ; Mesa_types.Account.Stable.V3.to_yojson
+              { account with zkapp = Some zkapp }
+          ]
+    | _ ->
+        failwith "unexpected accessed account"
+  in
+  let json =
+    match Yojson.Safe.from_file v4_block_file with
+    | `Assoc [ version; ("data", `Assoc data) ] ->
+        `Assoc
+          [ version
+          ; ( "data"
+            , `Assoc
+                (List.map data ~f:(function
+                  | "accounts_accessed", `List (first :: rest) ->
+                      ("accounts_accessed", `List (with_zkapp first :: rest))
+                  | field ->
+                      field ) ) )
+          ]
+    | _ ->
+        failwith "unexpected V4 block layout"
+  in
+  match Mina_block.Precomputed.Versioned.of_yojson json with
+  | Ok (V4 block as versioned) -> (
+      assert (
+        Yojson.Safe.equal json
+          (Mina_block.Precomputed.Versioned.to_yojson versioned) ) ;
+      let latest = Mina_block.Precomputed.Stable.V4.to_latest block in
+      match latest.accounts_accessed with
+      | (_, { zkapp = Some { verification_key = Some vk; _ }; _ }) :: _ ->
+          [%test_eq: int] 3 (Mina_numbers.Txn_version.to_int vk.txn_version)
+      | _ ->
+          failwith "the zkApp account lost its verification key" )
+  | Ok block ->
+      failwithf "expected a V4 block, read version %d"
+        (Mina_block.Precomputed.Versioned.version block)
+        ()
+  | Error err ->
+      failwith err
+
 let large_precomputed_json_file = "hetzner-itn-1-1795.json"
 
 let _json_serialization_is_stable_from_file () =
@@ -233,6 +299,8 @@ let () =
             versioned_rejects_unknown_version
         ; test_case "hashes a V4 block by V4's rules" `Quick
             versioned_hashes_v4_by_its_own_rules
+        ; test_case "reads a V4 block with a Mesa zkApp account" `Quick
+            v4_reads_mesa_zkapp_account
         ] )
     ; ( "version 3"
       , [ test_case "mainnet blocks roundtrip" `Quick v3_roundtrips

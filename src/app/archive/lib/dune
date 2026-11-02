@@ -25,6 +25,7 @@
   uri
   ;;local libraries
   berkeley_types
+  mesa_types
   archive_health_queries
   block_time
   mina_stdlib

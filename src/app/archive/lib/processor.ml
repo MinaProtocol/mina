@@ -4913,7 +4913,10 @@ let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     | V5 { accounts_accessed; accounts_created; tokens_used; _ } ->
         (accounts_accessed, accounts_created, tokens_used)
     | V4 { accounts_accessed; accounts_created; tokens_used; _ } ->
-        (accounts_accessed, accounts_created, tokens_used)
+        ( List.map accounts_accessed ~f:(fun (index, account) ->
+              (index, Mesa_types.Account.to_current account) )
+        , accounts_created
+        , tokens_used )
     | V3 { accounts_accessed; accounts_created; tokens_used; _ } ->
         ( List.map accounts_accessed ~f:(fun (index, account) ->
               (index, Berkeley_types.Account.to_mesa account) )

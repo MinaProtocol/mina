@@ -18,6 +18,7 @@
   verifier
   staged_ledger_diff
   berkeley_types
+  mesa_types
   protocol_version
   consensus
   precomputed_values

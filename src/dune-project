@@ -89,6 +89,7 @@
 (package (name merkle_list_prover))
 (package (name merkle_list_verifier))
 (package (name merkle_mask))
+(package (name mesa_types))
 (package (name mina_archive_healthcheck))
 (package (name mina_automation))
 (package (name mina_base))
