@@ -35,27 +35,6 @@ let answer outcome valid_cb =
   Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
     (match outcome with `Rejected -> `Reject | `Ignored -> `Ignore)
 
-let finish_added t cached =
-  if Ivar.is_full (Cached.final_state cached) then None
-  else
-    let valid_cb =
-      Hashtbl.find_and_remove t.callbacks (Cached.original cached)
-    in
-    ignore (Cached.invalidate_with_success cached : _) ;
-    valid_cb
-
-let finish t cached outcome =
-  if not (Ivar.is_full (Cached.final_state cached)) then
-    match outcome with
-    | `Added ->
-        ignore (finish_added t cached : Mina_net2.Validation_callback.t option)
-    | (`Rejected | `Ignored) as outcome ->
-        let valid_cb =
-          Hashtbl.find_and_remove t.callbacks (Cached.original cached)
-        in
-        ignore (Cached.invalidate_with_failure cached : _) ;
-        Option.iter valid_cb ~f:(answer outcome)
-
 let header_state_hash header =
   State_hash.With_state_hashes.state_hash
     (fst (Network_peer.Envelope.Incoming.data header))
@@ -68,6 +47,27 @@ let register_header t header ~valid_cb =
 let finish_header t state_hash outcome =
   Hashtbl.find_and_remove t.header_callbacks state_hash
   |> Option.iter ~f:(List.iter ~f:(answer outcome))
+
+let finish_added t cached =
+  if Ivar.is_full (Cached.final_state cached) then None
+  else
+    let state_hash = Cached.original cached in
+    let valid_cb = Hashtbl.find_and_remove t.callbacks state_hash in
+    ignore (Cached.invalidate_with_success cached : _) ;
+    finish_header t state_hash `Ignored ;
+    valid_cb
+
+let finish t cached outcome =
+  if not (Ivar.is_full (Cached.final_state cached)) then
+    match outcome with
+    | `Added ->
+        ignore (finish_added t cached : Mina_net2.Validation_callback.t option)
+    | (`Rejected | `Ignored) as outcome ->
+        let state_hash = Cached.original cached in
+        let valid_cb = Hashtbl.find_and_remove t.callbacks state_hash in
+        ignore (Cached.invalidate_with_failure cached : _) ;
+        Option.iter valid_cb ~f:(answer outcome) ;
+        finish_header t state_hash `Ignored
 
 let%test_module "Block_registry" =
   ( module struct
@@ -171,6 +171,19 @@ let%test_module "Block_registry" =
       [%test_eq: answer list * answer list]
         (!first_answers, !second_answers)
         ([ `Reject ], [ `Reject ])
+
+    let%test_unit "A block's headers are answered Ignore when it finishes" =
+      let header_cb, header_answers = callback_answers () in
+      let handed_over = ref false in
+      let _events, block_answers =
+        finishing (fun t cached ->
+            register_header t header ~valid_cb:(Some header_cb) ;
+            handed_over := Option.is_some (finish_added t cached) )
+      in
+      assert !handed_over ;
+      [%test_eq: answer list * answer list]
+        (block_answers, !header_answers)
+        ([], [ `Ignore ])
 
     let%test_unit "Finishing a transformed block finishes it" =
       [%test_eq: Block_outcome_log.event list * answer list]
