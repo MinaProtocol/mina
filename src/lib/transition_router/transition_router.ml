@@ -610,16 +610,18 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                ~trust_system ~verifier ~initialization_finish_signal
                ~precomputed_values )
         in
+        let initially_validate_transition
+            (b_or_h, `Time_received time_received, `Valid_cb valid_cb) =
+          match%map initial_validate ~b_or_h ~time_received ~valid_cb with
+          | Ok valid_transition ->
+              Pipe_lib.Strict_pipe.Writer.write valid_transition_writer
+                valid_transition
+          | Error () ->
+              ()
+        in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader
-              ~f:(fun (b_or_h, `Time_received time_received, `Valid_cb valid_cb)
-                 ->
-                match%map initial_validate ~b_or_h ~time_received ~valid_cb with
-                | Ok valid_transition ->
-                    Pipe_lib.Strict_pipe.Writer.write valid_transition_writer
-                      valid_transition
-                | Error () ->
-                    () ) )
+              ~f:initially_validate_transition )
       in
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
