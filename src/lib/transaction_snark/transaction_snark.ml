@@ -1926,6 +1926,40 @@ module Make_str (A : Wire_types.Concrete) = struct
         | _ ->
             respond Unhandled
 
+      (** The values underlying [placeholder_local], which depend only on the
+          signature kind and the ledger depth: its call forest, stack frame
+          digest and ledger.
+      *)
+      let placeholder_values =
+        Memo.general ~hashable:Hashtbl.Hashable.poly
+          (fun (signature_kind, ledger_depth) ->
+            let public_key =
+              Signature_lib.Public_key.compress
+                (Inner_curve.to_affine_exn Inner_curve.one)
+            in
+            let account_update : Account_update.t =
+              Account_update.with_aux
+                ~body:{ Account_update.Body.dummy with public_key }
+                ~authorization:Control.Poly.None_given
+            in
+            let calls =
+              Zkapp_command.Call_forest.cons ~signature_kind account_update []
+            in
+            let frame_digest =
+              Mina_base.Stack_frame.Digest.create
+                { caller = Token_id.default
+                ; caller_caller = Token_id.default
+                ; calls
+                }
+            in
+            let ledger =
+              Mina_ledger.Ledger.with_ledger ~depth:ledger_depth
+                ~f:(fun ledger ->
+                  Sparse_ledger.of_ledger_subset_exn ledger
+                    [ Account_id.create public_key Token_id.default ] )
+            in
+            (calls, frame_digest, ledger) )
+
       (** The local state from which an unused slot runs: one in which the
           next step is a valid no-op. Its call forest holds a single account
           update, without authorization, that changes nothing, on an account
@@ -1936,29 +1970,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       *)
       let placeholder_local ~signature_kind ~constraint_constants =
         let open Impl in
-        let public_key =
-          Signature_lib.Public_key.compress
-            (Inner_curve.to_affine_exn Inner_curve.one)
-        in
-        let account_update : Account_update.t =
-          Account_update.with_aux
-            ~body:{ Account_update.Body.dummy with public_key }
-            ~authorization:Control.Poly.None_given
-        in
-        let calls =
-          Zkapp_command.Call_forest.cons ~signature_kind account_update []
-        in
-        let ledger =
-          Mina_ledger.Ledger.with_ledger
-            ~depth:
-              constraint_constants
-                .Genesis_constants.Constraint_constants.ledger_depth
-            ~f:(fun ledger ->
-              Sparse_ledger.of_ledger_subset_exn ledger
-                [ Account_id.create public_key Token_id.default ] )
-        in
-        let frame : _ Mina_base.Stack_frame.t =
-          { caller = Token_id.default; caller_caller = Token_id.default; calls }
+        let calls, frame_digest, ledger =
+          placeholder_values
+            ( signature_kind
+            , constraint_constants
+                .Genesis_constants.Constraint_constants.ledger_depth )
         in
         let stack_frame : Inputs.Stack_frame.t =
           { data =
@@ -1973,8 +1989,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               }
           ; hash =
               Lazy.from_val
-                (Mina_base.Stack_frame.Digest.Checked.constant
-                   (Mina_base.Stack_frame.Digest.create frame) )
+                (Mina_base.Stack_frame.Digest.Checked.constant frame_digest)
           }
         in
         ( { stack_frame
