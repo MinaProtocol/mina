@@ -65,14 +65,6 @@ module type S = sig
 
   type curve_scalar_var
 
-  module Shifted : sig
-    module type S =
-      Snarky_curves.Shifted_intf
-        with type curve_var := curve_var
-         and type boolean_var := Boolean.var
-         and type 'a checked := 'a Checked.t
-  end
-
   module Message :
     Message_intf
       with type boolean_var := Boolean.var
@@ -106,7 +98,6 @@ module type S = sig
 
     val verifies :
          signature_kind:Mina_signature_kind.t
-      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -114,7 +105,6 @@ module type S = sig
 
     val assert_verifies :
          signature_kind:Mina_signature_kind.t
-      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -201,7 +191,6 @@ module Make
      and type curve_var := Curve.var
      and type curve_scalar := Curve.Scalar.t
      and type curve_scalar_var := Scale.scalar_var
-     and module Shifted := Curve.Checked.Shifted
      and module Message := Message = struct
   open Impl
 
@@ -270,8 +259,7 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef_ verifier (type s) ~signature_kind ~equal ~final_check
-        (_ : (module Curve.Checked.Shifted.S with type t = s))
+    let%snarkydef_ verifier ~signature_kind ~equal ~final_check
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
       let%bind e = Message.hash_checked ~signature_kind m ~public_key ~r in
@@ -605,13 +593,7 @@ let%test_unit "schnorr checked + unchecked" =
              Legacy.Signature.typ)
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
-           let open Tick.Checked in
-           let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
-           in
-           Legacy.Checked.verifies ~signature_kind
-             (module Shifted)
-             s public_key msg )
+           Legacy.Checked.verifies ~signature_kind s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
 
@@ -627,13 +609,7 @@ let%test_unit "schnorr checked + unchecked" =
              Chunked.Signature.typ)
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
-           let open Tick.Checked in
-           let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
-           in
-           Chunked.Checked.verifies ~signature_kind
-             (module Shifted)
-             s public_key msg )
+           Chunked.Checked.verifies ~signature_kind s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
 
@@ -667,13 +643,7 @@ let%test_unit "schnorr checked rejects invalid legacy signatures" =
                 Legacy.Signature.typ)
             Tick.Boolean.typ
             (fun (public_key, msg, s) ->
-              let open Tick.Checked in
-              let%bind (module Shifted) =
-                Tick.Inner_curve.Checked.Shifted.create ()
-              in
-              Legacy.Checked.verifies ~signature_kind
-                (module Shifted)
-                s public_key msg )
+              Legacy.Checked.verifies ~signature_kind s public_key msg )
             (fun _ -> false)
             case ) )
 
@@ -696,12 +666,6 @@ let%test_unit "schnorr checked rejects invalid chunked signatures" =
                 Chunked.Signature.typ)
             Tick.Boolean.typ
             (fun (public_key, msg, s) ->
-              let open Tick.Checked in
-              let%bind (module Shifted) =
-                Tick.Inner_curve.Checked.Shifted.create ()
-              in
-              Chunked.Checked.verifies ~signature_kind
-                (module Shifted)
-                s public_key msg )
+              Chunked.Checked.verifies ~signature_kind s public_key msg )
             (fun _ -> false)
             case ) )
