@@ -6,6 +6,7 @@ open Cache_lib
 type t =
   { cache : Unprocessed_transition_cache.t
   ; callbacks : Mina_net2.Validation_callback.t State_hash.Table.t
+  ; header_callbacks : Mina_net2.Validation_callback.t list State_hash.Table.t
   }
 
 type outcome = [ `Added | `Rejected | `Ignored ]
@@ -13,6 +14,7 @@ type outcome = [ `Added | `Rejected | `Ignored ]
 let create ~logger ~cache_exceptions =
   { cache = Unprocessed_transition_cache.create ~logger ~cache_exceptions
   ; callbacks = State_hash.Table.create ()
+  ; header_callbacks = State_hash.Table.create ()
   }
 
 let cache t = t.cache
@@ -29,18 +31,43 @@ let register_exn t block ~valid_cb =
         (fun _ -> Hashtbl.remove t.callbacks state_hash) ) ;
   cached
 
+let answer outcome valid_cb =
+  Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
+    (match outcome with `Rejected -> `Reject | `Ignored -> `Ignore)
+
+let finish_added t cached =
+  if Ivar.is_full (Cached.final_state cached) then None
+  else
+    let valid_cb =
+      Hashtbl.find_and_remove t.callbacks (Cached.original cached)
+    in
+    ignore (Cached.invalidate_with_success cached : _) ;
+    valid_cb
+
 let finish t cached outcome =
   if not (Ivar.is_full (Cached.final_state cached)) then
-    let state_hash = Cached.original cached in
-    let valid_cb = Hashtbl.find_and_remove t.callbacks state_hash in
     match outcome with
     | `Added ->
-        ignore (Cached.invalidate_with_success cached : _)
+        ignore (finish_added t cached : Mina_net2.Validation_callback.t option)
     | (`Rejected | `Ignored) as outcome ->
+        let valid_cb =
+          Hashtbl.find_and_remove t.callbacks (Cached.original cached)
+        in
         ignore (Cached.invalidate_with_failure cached : _) ;
-        Option.iter valid_cb ~f:(fun valid_cb ->
-            Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
-              (match outcome with `Rejected -> `Reject | `Ignored -> `Ignore) )
+        Option.iter valid_cb ~f:(answer outcome)
+
+let header_state_hash header =
+  State_hash.With_state_hashes.state_hash
+    (fst (Network_peer.Envelope.Incoming.data header))
+
+let register_header t header ~valid_cb =
+  Option.iter valid_cb ~f:(fun valid_cb ->
+      Hashtbl.add_multi t.header_callbacks ~key:(header_state_hash header)
+        ~data:valid_cb )
+
+let finish_header t header outcome =
+  Hashtbl.find_and_remove t.header_callbacks (header_state_hash header)
+  |> Option.iter ~f:(List.iter ~f:(answer outcome))
 
 let%test_module "Block_registry" =
   ( module struct
@@ -104,6 +131,46 @@ let%test_module "Block_registry" =
              finish t cached `Ignored ;
              finish t cached `Added ) )
         (removed `Failure, [ `Ignore ])
+
+    let%test_unit "An added block's callback is handed over once" =
+      let handed_over = ref [] in
+      let events, answers =
+        finishing (fun t cached ->
+            let first = finish_added t cached in
+            let second = finish_added t cached in
+            handed_over := List.map [ first; second ] ~f:Option.is_some )
+      in
+      [%test_eq: bool list] !handed_over [ true; false ] ;
+      [%test_eq: Block_outcome_log.event list * answer list] (events, answers)
+        (removed `Consumed, [])
+
+    (* The genesis block's header, validated as far as a header entering the
+       registry is. *)
+    let header =
+      Network_peer.Envelope.Incoming.map block
+        ~f:Mina_block.Validation.to_header
+
+    let callback_answers () =
+      let valid_cb =
+        Mina_net2.Validation_callback.create
+          (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+      in
+      let answers = ref [] in
+      Mina_net2.Validation_callback.set_on_resolve valid_cb (fun answer ->
+          answers := answer :: !answers ) ;
+      (valid_cb, answers)
+
+    let%test_unit "A header is answered through each of its callbacks, once" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let first, first_answers = callback_answers () in
+      let second, second_answers = callback_answers () in
+      register_header t header ~valid_cb:(Some first) ;
+      register_header t header ~valid_cb:(Some second) ;
+      finish_header t header `Rejected ;
+      finish_header t header `Ignored ;
+      [%test_eq: answer list * answer list]
+        (!first_answers, !second_answers)
+        ([ `Reject ], [ `Reject ])
 
     let%test_unit "Finishing a transformed block finishes it" =
       [%test_eq: Block_outcome_log.event list * answer list]

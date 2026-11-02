@@ -1,7 +1,9 @@
 (** The blocks the frontier controller is working on, from when the
     validator registers them until each has a terminal outcome. A block's
     outcome is decided once, by [finish], and finalizing its cache entry and
-    answering its validation callback both follow from that outcome. *)
+    answering its validation callback both follow from that outcome. Headers
+    are registered too, for their callbacks; they have no cache entry, and are
+    never added. *)
 
 open Mina_base
 open Network_peer
@@ -34,3 +36,26 @@ val register_exn :
 (** Finish the block that [cached] holds, or was transformed from, with
     [outcome]. A block that has already finished is left as it is. *)
 val finish : t -> (_, State_hash.t) Cache_lib.Cached.t -> outcome -> unit
+
+(** Finish the block that [cached] holds as added, and return its callback,
+    for whatever handles added blocks to answer. A block that has already
+    finished is left as it is, and has no callback to return. *)
+val finish_added :
+     t
+  -> (_, State_hash.t) Cache_lib.Cached.t
+  -> Mina_net2.Validation_callback.t option
+
+(** Register [header], to be answered through [valid_cb] when it finishes. *)
+val register_header :
+     t
+  -> Mina_block.initial_valid_header Envelope.Incoming.t
+  -> valid_cb:Mina_net2.Validation_callback.t option
+  -> unit
+
+(** Finish [header], answering every callback it was registered with. A
+    header that has already finished is left as it is. *)
+val finish_header :
+     t
+  -> Mina_block.initial_valid_header Envelope.Incoming.t
+  -> [ `Rejected | `Ignored ]
+  -> unit
