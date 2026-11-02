@@ -949,8 +949,9 @@ module Make_update_group (Input : sig
   type connecting_ledger_hash
 
   (** The most consecutive non-proof account updates of one zkApp command to
-      group into a segment. Below 3, only the pairs and singles that every
-      grouping uses are formed.
+      group into a segment. From 3, every run of non-proof account updates
+      within a zkApp command is grouped into segments of up to this many;
+      below 3, non-proof account updates are only paired.
   *)
   val batch_size : int
 
@@ -1084,9 +1085,9 @@ end = struct
           (* We've associated statements with all given zkapp_command. *)
           acc
       | zkapp_command :: zkapp_commands, stmts :: stmtss
-        when batch_length zkapp_command >= 3 ->
-          (* The next account updates are at least 3 non-proof account
-             updates within the same transaction. Batch them.
+        when batch_size >= 3 && batch_length zkapp_command >= 1 ->
+          (* The next account updates are non-proof account updates within
+             the same transaction. Batch up to [batch_size] of them.
           *)
           let segment, zkapp_command, stmts =
             batch ~kind:`Same zkapp_command stmts
@@ -1095,9 +1096,9 @@ end = struct
             (zkapp_command :: zkapp_commands)
             (stmts :: stmtss) (segment :: acc)
       | [] :: zkapp_command :: zkapp_commands, [ _ ] :: stmts :: stmtss
-        when batch_length zkapp_command >= 3 ->
-          (* The next account updates are at least 3 non-proof account
-             updates at the start of a new transaction. Batch them.
+        when batch_size >= 3 && batch_length zkapp_command >= 1 ->
+          (* The next account updates are non-proof account updates at the
+             start of a new transaction. Batch up to [batch_size] of them.
           *)
           let segment, zkapp_command, stmts =
             batch ~kind:`New zkapp_command stmts

@@ -180,14 +180,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         match controls with
         | [ Control.Poly.Proof _ ] ->
             Proved
-        | [ (Control.Poly.Signature _ | Control.Poly.None_given) ] ->
-            Opt_signed
-        | [ Control.Poly.(Signature _ | None_given)
-          ; Control.Poly.(Signature _ | None_given)
-          ] ->
-            Opt_signed_opt_signed
         | _
-          when List.length controls <= opt_signed_batch_size
+          when (not (List.is_empty controls))
+               && List.length controls <= opt_signed_batch_size
                && not (List.exists controls ~f:is_proof) ->
             Opt_signed_batch (List.length controls)
         | _ ->
