@@ -87,8 +87,13 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           (Mina_block.Header.protocol_state header |> Protocol_state.hashes)
             .state_hash
         in
-        Mina_net2.Validation_callback.set_subject cb
-          (lazy (State_hash.to_base58_check state_hash)) ;
+        if Block_outcome_log.is_recording () then
+          Mina_net2.Validation_callback.set_on_resolve cb (fun outcome ->
+              Block_outcome_log.record (fun () ->
+                  Callback_resolved
+                    { state_hash = State_hash.to_base58_check state_hash
+                    ; outcome
+                    } ) ) ;
         Internal_tracing.Context_call.with_call_id ~tag:"block_received"
         @@ fun () ->
         Internal_tracing.with_state_hash state_hash

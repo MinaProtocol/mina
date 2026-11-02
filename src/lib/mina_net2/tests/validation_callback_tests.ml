@@ -2,49 +2,46 @@ open Core
 open Async
 module Validation_callback = Mina_net2.Validation_callback
 
-let%test_module "Recording validation callback outcomes" =
+let%test_module "Observing how validation callbacks resolve" =
   ( module struct
-    let state_hash = "a-state-hash"
+    type resolution = [ `Accept | `Reject | `Ignore | `Expired ]
+    [@@deriving compare, sexp]
 
-    let resolved outcome : Block_outcome_log.event =
-      Callback_resolved { state_hash; outcome }
+    (* Run [f] on a callback that expires after [expires_in] ms, observing how
+       it resolves until [f] finishes. *)
+    let resolutions ~expires_in f =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let resolutions = ref [] in
+          let cb =
+            Validation_callback.create
+              (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_ms expires_in))
+          in
+          Validation_callback.set_on_resolve cb (fun resolution ->
+              resolutions := resolution :: !resolutions ) ;
+          let%map () = f cb in
+          List.rev !resolutions )
 
-    let record f =
-      snd
-        (Async.Thread_safe.block_on_async_exn (fun () ->
-             Block_outcome_log.For_tests.recording_deferred f ) )
-
-    let named_callback ~expires_in =
-      let cb =
-        Validation_callback.create
-          (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_ms expires_in))
-      in
-      Validation_callback.set_subject cb (lazy state_hash) ;
-      cb
-
-    let%test_unit "The first firing is recorded" =
-      [%test_eq: Block_outcome_log.event list]
-        (record (fun () ->
-             let cb = named_callback ~expires_in:10_000. in
+    let%test_unit "Only the first firing is observed" =
+      [%test_eq: resolution list]
+        (resolutions ~expires_in:10_000. (fun cb ->
              Validation_callback.fire_if_not_already_fired cb `Accept ;
              Validation_callback.fire_if_not_already_fired cb `Reject ;
              Deferred.unit ) )
-        [ resolved `Accept ]
+        [ `Accept ]
 
-    let%test_unit "Expiring unfired is recorded" =
-      [%test_eq: Block_outcome_log.event list]
-        (record (fun () ->
-             let cb = named_callback ~expires_in:50. in
+    let%test_unit "Expiring unfired is observed" =
+      [%test_eq: resolution list]
+        (resolutions ~expires_in:50. (fun cb ->
              let%bind () = Validation_callback.await_timeout cb in
-             (* Let the outcome log's own wait on the expiry run. *)
+             (* Let the observer's own wait on the expiry run. *)
              Scheduler.yield_until_no_jobs_remain () ) )
-        [ resolved `Expired ]
+        [ `Expired ]
 
-    let%test_unit "A callback without a subject isn't recorded" =
-      [%test_eq: Block_outcome_log.event list]
-        (record (fun () ->
-             let cb = Validation_callback.create_without_expiration () in
+    let%test_unit "Firing before expiry isn't also observed as expiring" =
+      [%test_eq: resolution list]
+        (resolutions ~expires_in:50. (fun cb ->
              Validation_callback.fire_if_not_already_fired cb `Ignore ;
-             Deferred.unit ) )
-        []
+             let%bind () = Validation_callback.await_timeout cb in
+             Scheduler.yield_until_no_jobs_remain () ) )
+        [ `Ignore ]
   end )
