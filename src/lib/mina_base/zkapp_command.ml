@@ -1047,36 +1047,30 @@ end = struct
                ~of_fee_payer:Account_update.of_fee_payer_no_aux
                ~of_account_update:Account_update.forget_aux zkapp_command )
     in
-    let batch_length account_updates =
-      let non_proof_run =
-        List.take_while account_updates
-          ~f:(fun
-               ({ Account_update.Poly.authorization; _ } :
-                 _ Account_update.Poly.t )
-             ->
-            match authorization with
-            | Control.Poly.Proof _ ->
-                false
-            | Signature _ | None_given ->
-                true )
-        |> List.length
-      in
-      Int.min batch_size non_proof_run
-    in
     let batch ~kind account_updates stmts =
-      let n = batch_length account_updates in
-      let batch, account_updates = List.split_n account_updates n in
-      let before = List.hd_exn stmts in
-      let stmts = List.drop stmts n in
+      let rec take ~length controls_rev account_updates stmts =
+        match (account_updates, stmts) with
+        | ( { Account_update.Poly.authorization =
+                (Control.Poly.Signature _ | None_given) as control
+            ; _
+            }
+            :: account_updates
+          , _ :: stmts )
+          when length < batch_size ->
+            take ~length:(length + 1) (control :: controls_rev) account_updates
+              stmts
+        | _ ->
+            (List.rev controls_rev, account_updates, stmts)
+      in
+      let controls, remaining_account_updates, remaining_stmts =
+        take ~length:0 [] account_updates stmts
+      in
       ( intermediate_state ~kind
-          ~spec:
-            (zkapp_segment_of_controls
-               (List.map batch
-                  ~f:(fun ({ authorization; _ } : _ Account_update.Poly.t) ->
-                    authorization ) ) )
-          ~before ~after:(List.hd_exn stmts)
-      , account_updates
-      , stmts )
+          ~spec:(zkapp_segment_of_controls controls)
+          ~before:(List.hd_exn stmts)
+          ~after:(List.hd_exn remaining_stmts)
+      , remaining_account_updates
+      , remaining_stmts )
     in
     let rec group_by_zkapp_command_rev (zkapp_commands : _ list list) stmtss acc
         =
@@ -1084,8 +1078,14 @@ end = struct
       | ([] | [ [] ]), [ _ ] ->
           (* We've associated statements with all given zkapp_command. *)
           acc
-      | zkapp_command :: zkapp_commands, stmts :: stmtss
-        when batch_size >= 3 && batch_length zkapp_command >= 1 ->
+      | ( ( { Account_update.Poly.authorization =
+                Control.Poly.(Signature _ | None_given)
+            ; _
+            }
+            :: _ as zkapp_command )
+          :: zkapp_commands
+        , stmts :: stmtss )
+        when batch_size >= 3 ->
           (* The next account updates are non-proof account updates within
              the same transaction. Batch up to [batch_size] of them.
           *)
@@ -1095,8 +1095,12 @@ end = struct
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
             (stmts :: stmtss) (segment :: acc)
-      | [] :: zkapp_command :: zkapp_commands, [ _ ] :: stmts :: stmtss
-        when batch_size >= 3 && batch_length zkapp_command >= 1 ->
+      | ( []
+          :: ( { authorization = Control.Poly.(Signature _ | None_given); _ }
+               :: _ as zkapp_command )
+             :: zkapp_commands
+        , [ _ ] :: stmts :: stmtss )
+        when batch_size >= 3 ->
           (* The next account updates are non-proof account updates at the
              start of a new transaction. Batch up to [batch_size] of them.
           *)
