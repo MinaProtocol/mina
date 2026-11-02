@@ -74,7 +74,8 @@ let release_unbuilt (cached_transition, vc) =
     ( Cached.invalidate_with_failure cached_transition
       : Mina_block.initial_valid_block Envelope.Incoming.t )
 
-(** Release every block the scheduler holds, and cancel its timeouts. *)
+(** Release every block the scheduler holds, cancel its timeouts, and forget
+    them, so that nothing later reaches a released block. *)
 let clean_up
     { collected_transitions
     ; validation_callbacks
@@ -95,7 +96,10 @@ let clean_up
              ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
            ignore @@ Cached.invalidate_with_failure b ) ) ;
   Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
-      Block_time.Timeout.cancel time_controller timeout () )
+      Block_time.Timeout.cancel time_controller timeout () ) ;
+  Hashtbl.clear collected_transitions ;
+  Hashtbl.clear parent_root_timeouts ;
+  Hashtbl.clear validation_callbacks
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~catchup_job_writer
@@ -491,6 +495,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 ; outcome = `Failure
                 }
             ] ;
+          assert (is_empty scheduler) ;
+          (* The block's parent arriving now finds nothing to build. *)
+          Or_error.ok_exn
+            (notify scheduler
+               ~hash:
+                 (Transition_frontier.Breadcrumb.parent_hash disjoint_breadcrumb) ) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               match%map
                 Block_time.Timeout.await
