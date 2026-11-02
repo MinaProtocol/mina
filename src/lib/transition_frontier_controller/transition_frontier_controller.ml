@@ -79,9 +79,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let block_registry =
     Transition_handler.Block_registry.create ~logger ~cache_exceptions
   in
-  let unprocessed_transition_cache =
-    Transition_handler.Block_registry.cache block_registry
-  in
   List.iter collected_transitions ~f:(fun (t, vc) ->
       let b_or_h =
         match Network_peer.Envelope.Incoming.data t with
@@ -132,7 +129,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~on_valid:(fun transition ->
         Transition_handler.Block_dispatcher.submit dispatcher
           (Validated transition) )
-      ~unprocessed_transition_cache
+      ~block_registry
   in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Pipe_lib.Choosable_synchronous_pipe.iter network_transition_reader
@@ -161,7 +158,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Ledger_catchup.create_job_handler
            ~context:(module Context)
            ~trust_system ~verifier ~network ~frontier
-           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+           ~catchup_breadcrumbs_writer ~block_registry
            ~schedule:(fun resume ->
              Transition_handler.Block_dispatcher.submit dispatcher
                (Resume_catchup resume) ) )

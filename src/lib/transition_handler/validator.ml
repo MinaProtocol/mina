@@ -73,7 +73,7 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
     ~error:`Disconnected
 
 let validate_transition_is_relevant ~context:(module Context : CONTEXT)
-    ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+    ~frontier ~block_registry ~valid_cb ~slot_tx_end ~slot_chain_end
     enveloped_transition =
   let open Result.Let_syntax in
   [%log' internal Context.logger] "Validate_transition" ;
@@ -106,7 +106,8 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
   [%log' internal Context.logger] "Check_transition_not_in_process" ;
   let%bind () =
     Option.fold
-      (Unprocessed_transition_cache.final_state unprocessed_transition_cache
+      (Unprocessed_transition_cache.final_state
+         (Block_registry.cache block_registry)
          enveloped_transition )
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
@@ -119,19 +120,17 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
   in
   [%log' internal Context.logger] "Register_transition_for_processing" ;
   (* we expect this to be Ok since we just checked the cache *)
-  Unprocessed_transition_cache.register_exn unprocessed_transition_cache
-    enveloped_transition
+  Block_registry.register_exn block_registry enveloped_transition ~valid_cb
 
 let validate_transition_or_header_is_relevant
     ~context:(module Context : CONTEXT) ~slot_tx_end ~slot_chain_end ~frontier
-    ~unprocessed_transition_cache b_or_h =
+    ~block_registry ~valid_cb b_or_h =
   match b_or_h with
   | `Block b ->
       Result.map ~f:(fun cached_block -> `Block cached_block)
       @@ validate_transition_is_relevant
            ~context:(module Context)
-           ~slot_tx_end ~slot_chain_end ~frontier ~unprocessed_transition_cache
-           b
+           ~slot_tx_end ~slot_chain_end ~frontier ~block_registry ~valid_cb b
   | `Header h ->
       let header_with_hash, _ = Envelope.Incoming.data h in
       Result.map ~f:(fun () -> `Header h)
@@ -142,7 +141,7 @@ let validate_transition_or_header_is_relevant
 (** Return the function that validates one incoming block or header against
     [frontier], passing it to [on_valid] if it is relevant. *)
 let create_handler ~context:(module Context : CONTEXT) ~trust_system
-    ~time_controller ~frontier ~on_valid ~unprocessed_transition_cache =
+    ~time_controller ~frontier ~on_valid ~block_registry =
   let open Context in
   let module Lru = Core_extended_cache.Lru in
   let outdated_root_cache = Lru.create ~destruct:None 1000 in
@@ -176,7 +175,7 @@ let create_handler ~context:(module Context : CONTEXT) ~trust_system
     match
       validate_transition_or_header_is_relevant
         ~context:(module Context)
-        ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+        ~frontier ~block_registry ~valid_cb:vc ~slot_tx_end ~slot_chain_end
         b_or_h
     with
     | Ok b_or_h' ->
@@ -351,15 +350,15 @@ let%test_module "Transition_handler.Validator tests" =
     let validate frontier breadcrumb =
       Thread_safe.block_on_async_exn (fun () ->
           let valid = ref [] in
-          let unprocessed_transition_cache =
-            Unprocessed_transition_cache.create ~logger ~cache_exceptions:false
+          let block_registry =
+            Block_registry.create ~logger ~cache_exceptions:false
           in
           let handle =
             create_handler
               ~context:(module Context)
               ~trust_system ~time_controller ~frontier
               ~on_valid:(fun x -> valid := x :: !valid)
-              ~unprocessed_transition_cache
+              ~block_registry
           in
           let vc =
             Mina_net2.Validation_callback.create
