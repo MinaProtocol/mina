@@ -152,6 +152,10 @@ let clean_up
           Mina_stdlib.Rose_tree.iter subtree ~f:(release_unbuilt block_registry) ) ) ;
   Hashtbl.iter collected_transitions
     ~f:(List.iter ~f:(fun b -> Block_registry.finish block_registry b `Ignored)) ;
+  (* Of the callbacks the scheduler holds, those of headers are answered
+     here; those of blocks were answered as their blocks were released. *)
+  Hashtbl.iter_keys validation_callbacks ~f:(fun hash ->
+      Block_registry.finish_header block_registry hash `Ignored ) ;
   Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
       Block_time.Timeout.cancel time_controller timeout () ) ;
   Hashtbl.clear collected_transitions ;

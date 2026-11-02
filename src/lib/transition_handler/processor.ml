@@ -176,8 +176,10 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             ~header_with_hash ;
           return ()
       | Error `Not_selected_over_frontier_root ->
+          Block_registry.finish_header block_registry transition_hash `Ignored ;
           handle_not_selected ()
       | Error `Already_in_frontier ->
+          Block_registry.finish_header block_registry transition_hash `Ignored ;
           [%log internal] "Failure"
             ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
           [%log warn] ~metadata
@@ -647,6 +649,46 @@ let%test_module "Transition_handler.Processor tests" =
                   handle
                     (`Partially_valid_transition
                       (`Block cached, `Valid_cb (Some valid_cb)) )
+                in
+                List.rev !answers )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Ignore ] )
+
+    let%test_unit "A header already in the frontier is answered Ignore" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let answers =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let handle =
+                  handler_for ~block_registry frontier
+                    ~capacity:(List.length chain)
+                in
+                let%bind () =
+                  Deferred.List.iter chain ~f:(fun breadcrumb ->
+                      handle (`Local_breadcrumb (Cached.pure breadcrumb)) )
+                in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let header =
+                  Envelope.Incoming.map
+                    (downcast_breadcrumb (List.hd_exn chain))
+                    ~f:Mina_block.Validation.to_header
+                in
+                Block_registry.register_header block_registry header
+                  ~valid_cb:(Some valid_cb) ;
+                let%map () =
+                  handle
+                    (`Partially_valid_transition
+                      (`Header header, `Valid_cb (Some valid_cb)) )
                 in
                 List.rev !answers )
           in
