@@ -1082,7 +1082,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     run_node node
   and on_built node ~start_time ~sender ~parent_hash (c, valid_cb) result =
     let failed = failed node in
-    let step d = step node d in
     let open Deferred.Result.Let_syntax in
     match result with
     | Error e ->
@@ -1116,20 +1115,25 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           Gauge.set Catchup.build_breadcrumb_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         let%bind () = Scheduler.yield () |> Deferred.map ~f:Result.return in
-        let finished = Ivar.create () in
-        let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
-        Strict_pipe.Writer.write catchup_breadcrumbs_writer
-          ( [ Mina_stdlib.Rose_tree.of_non_empty_list
-                (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
-            ]
-          , `Ledger_catchup finished ) ;
-        let%bind () =
-          (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
-          step (Deferred.map (Ivar.read finished) ~f:Result.return)
-        in
-        Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
-        set_state t node Finished ;
-        return ()
+        on_yielded node (c, valid_cb) breadcrumb
+  and on_yielded node (c, valid_cb) breadcrumb =
+    let open Deferred.Result.Let_syntax in
+    let finished = Ivar.create () in
+    let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
+    Strict_pipe.Writer.write catchup_breadcrumbs_writer
+      ( [ Mina_stdlib.Rose_tree.of_non_empty_list
+            (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
+        ]
+      , `Ledger_catchup finished ) ;
+    let%bind () =
+      (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
+      step node (Deferred.map (Ivar.read finished) ~f:Result.return)
+    in
+    on_handed_off node
+  and on_handed_off node =
+    Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
+    set_state t node Finished ;
+    Deferred.Result.return ()
   in
   run_node
 
