@@ -249,9 +249,81 @@ module Uncompressed = struct
 
   let typ : (var, t) Typ.t = Typ.(field * field)
 
-  let parity_var y =
-    let%map bs = Field.Checked.unpack_full y in
-    List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
+  module Parity = struct
+    (** [x < 2^num_bits], checked 16 bits per row with the EndoMulScalar gate.
+        [num_bits] must be a multiple of 16.
+    *)
+    let range_check ~num_bits (x : Field.Var.t) =
+      let open Run in
+      let _, _, recomposed =
+        Pickles.Scalar_challenge.to_field_checked' ~num_bits
+          (module Run)
+          (Kimchi_backend_common.Scalar_challenge.create x)
+      in
+      Field.Assert.equal recomposed x
+
+    let limb_bits = 128
+
+    let limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
+
+    let field_of_bigint x = Bigint.to_field (Bigint.of_bignum_bigint x)
+
+    let split_limbs x = Bignum_bigint.(x / limb, rem x limb)
+
+    let p_minus_1_hi, p_minus_1_lo =
+      split_limbs (Bigint.to_bignum_bigint (Bigint.of_field Field.(negate one)))
+
+    (** The witness for [var]: [((hi, lo_div_2), odd), borrow]. *)
+    type decomposition = ((Field.t * Field.t) * bool) * bool
+
+    (** The decomposition of the integer [v] that [var] checks. *)
+    let decomposition (v : Bignum_bigint.t) : decomposition =
+      let hi, lo = split_limbs v in
+      let open Bignum_bigint in
+      ( ( (field_of_bigint hi, field_of_bigint (lo / of_int 2))
+        , equal (rem lo (of_int 2)) one )
+      , lo > p_minus_1_lo )
+
+    type _ Snarky_backendless.Request.t +=
+      | Decomposition : Field.t -> decomposition Snarky_backendless.Request.t
+
+    (** The low bit of the canonical representative of [y] in [0, p).
+
+        [y] is decomposed as [2^128 * hi + 2 * lo_div_2 + odd] with [hi] and
+        [lo_div_2] range checked to 128 bits. That alone would admit [y + p],
+        which has the opposite parity, so the decomposition is also checked to
+        be at most [p - 1], by subtracting it from [p - 1] in 128-bit limbs with
+        a borrow and range checking both differences: a negative difference
+        would wrap around to near [p].
+    *)
+    let var (y : Field.Var.t) : Boolean.var Checked.t =
+      make_checked (fun () ->
+          let open Run in
+          let two_to_limb = field_of_bigint limb in
+          let ((hi, lo_div_2), odd), borrow =
+            exists
+              Typ.(Field.typ * Field.typ * Boolean.typ * Boolean.typ)
+              ~request:(fun () -> Decomposition (As_prover.read_var y))
+              ~compute:(fun () ->
+                decomposition
+                  (Bigint.to_bignum_bigint
+                     (Bigint.of_field (As_prover.read_var y)) ) )
+          in
+          let lo = Field.(scale lo_div_2 (Constant.of_int 2) + (odd :> t)) in
+          Field.Assert.equal y Field.(scale hi two_to_limb + lo) ;
+          range_check ~num_bits:limb_bits hi ;
+          range_check ~num_bits:limb_bits lo_div_2 ;
+          let borrow = (borrow :> Field.t) in
+          range_check ~num_bits:limb_bits
+            Field.(
+              constant (field_of_bigint p_minus_1_lo)
+              - lo + scale borrow two_to_limb) ;
+          range_check ~num_bits:limb_bits
+            Field.(constant (field_of_bigint p_minus_1_hi) - hi - borrow) ;
+          odd )
+  end
+
+  let parity_var = Parity.var
 
   let decompress_var ({ x; is_odd } as c : Compressed.var) =
     let open Let_syntax in
@@ -274,3 +346,55 @@ module Uncompressed = struct
 end
 
 include Uncompressed
+
+let%test_module "parity_var" =
+  ( module struct
+    let check y =
+      Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal Typ.field
+        Boolean.typ parity_var parity y
+
+    let two_to n = Fn.apply_n_times ~n (fun x -> Field.(x + x)) Field.one
+
+    let%test_unit "agrees with parity on random field elements" =
+      Quickcheck.test ~trials:100 Field.gen ~f:check
+
+    (** Whether [parity_var y] is satisfiable with the decomposition of the
+        integer [v] as its witness. *)
+    let satisfiable_with ~(v : unit -> Parity.decomposition) y =
+      Or_error.is_ok
+        (Snark_params.Tick.check
+           (Snark_params.Tick.handle
+              (fun () ->
+                let%bind y = exists Typ.field ~compute:(As_prover.return y) in
+                parity_var y )
+              (fun (With { request; respond }) ->
+                match request with
+                | Parity.Decomposition _ ->
+                    respond (Provide (v ()))
+                | _ ->
+                    respond Unhandled ) ) )
+
+    let%test_unit "rejects non-canonical decompositions" =
+      let p = Field.size in
+      Quickcheck.test ~trials:20 Field.gen ~f:(fun y ->
+          let y_int = Bigint.to_bignum_bigint (Bigint.of_field y) in
+          assert (satisfiable_with y ~v:(fun () -> Parity.decomposition y_int)) ;
+          List.iter [ 1; 2 ] ~f:(fun k ->
+              let v = Bignum_bigint.(y_int + (of_int k * p)) in
+              let ((hi, lo_div_2), odd), _ = Parity.decomposition v in
+              List.iter [ false; true ] ~f:(fun borrow ->
+                  if
+                    satisfiable_with y ~v:(fun () ->
+                        (((hi, lo_div_2), odd), borrow) )
+                  then failwithf "y + %dp accepted (borrow %b)" k borrow () ) ) )
+
+    let%test_unit "agrees with parity at boundaries" =
+      let p_minus k = Field.(negate (of_int k)) in
+      List.iter ~f:check
+        ( List.map [ 0; 1; 2; 3 ] ~f:Field.of_int
+        @ List.map [ 1; 2; 3; 4 ] ~f:p_minus
+        @ List.concat_map [ 128; 254 ] ~f:(fun n ->
+              [ Field.(two_to n - one); two_to n; Field.(two_to n + one) ] )
+        @ List.map [ -1; 0; 1; 2 ] ~f:(fun k ->
+              Field.(p_minus 1 - two_to 128 + of_int k) ) )
+  end )
