@@ -873,7 +873,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     run_node node
   and run_node (node : Node.t) =
     let state_hash = node.state_hash in
-    let failed = failed node in
     let step d = step node d in
     let open Deferred.Result.Let_syntax in
     match node.state with
@@ -939,16 +938,15 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                  finish t node ~is_error:true ;
                  Error `Finished )
         in
-        set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
-        run_node node
-    | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) -> (
+        on_parent_added node (av, valid_cb) parent
+    | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) ->
         [%log debug] "To_build_breadcrumb $state_hash %s callback"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         let start_time = Time.now () in
         let transition_receipt_time = Some start_time in
         let av = Cached.peek c in
-        match%bind
+        let%bind result =
           let s =
             let open Deferred.Result.Let_syntax in
             let%bind parent =
@@ -965,52 +963,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               ~transition_receipt_time ()
           in
           step (Deferred.map ~f:Result.return s)
-        with
-        | Error e ->
-            (* TODO consider rejecting the callback in some cases,
-               see https://github.com/MinaProtocol/mina/issues/11087 *)
-            Option.value_map valid_cb ~default:ignore
-              ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
-            ignore
-              ( Cached.invalidate_with_failure c
-                : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-            let e =
-              match e with
-              | `Exn e ->
-                  Error.tag (Error.of_exn e) ~tag:"exn"
-              | `Fatal_error e ->
-                  Error.tag (Error.of_exn e) ~tag:"fatal"
-              | `Invalid_staged_ledger_diff e ->
-                  Error.tag e ~tag:"invalid staged ledger diff"
-              | `Invalid_staged_ledger_hash e ->
-                  Error.tag e ~tag:"invalid staged ledger hash"
-              | `Parent_breadcrumb_not_found ->
-                  Error.tag
-                    (Error.of_string
-                       (sprintf "Parent breadcrumb with state_hash %s not found"
-                          (State_hash.to_base58_check parent_hash) ) )
-                    ~tag:"parent breadcrumb not found"
-            in
-            failed ~error:e ~sender:av.sender `Build_breadcrumb
-        | Ok breadcrumb ->
-            Mina_metrics.(
-              Gauge.set Catchup.build_breadcrumb_time
-                Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-            let%bind () = Scheduler.yield () |> Deferred.map ~f:Result.return in
-            let finished = Ivar.create () in
-            let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer
-              ( [ Mina_stdlib.Rose_tree.of_non_empty_list
-                    (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
-                ]
-              , `Ledger_catchup finished ) ;
-            let%bind () =
-              (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
-              step (Deferred.map (Ivar.read finished) ~f:Result.return)
-            in
-            Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
-            set_state t node Finished ;
-            return () )
+        in
+        on_built node ~start_time ~sender:av.sender ~parent_hash (c, valid_cb)
+          result
   and on_downloaded node ~start_time (external_block, attempts) =
     let state_hash = node.state_hash in
     [%log' debug t.logger]
@@ -1122,6 +1077,59 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             let av = Cached.transform tv ~f:(fun _ -> av) in
             set_state t node (Wait_for_parent (av, valid_cb)) ;
             run_node node )
+  and on_parent_added node (av, valid_cb) parent =
+    set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
+    run_node node
+  and on_built node ~start_time ~sender ~parent_hash (c, valid_cb) result =
+    let failed = failed node in
+    let step d = step node d in
+    let open Deferred.Result.Let_syntax in
+    match result with
+    | Error e ->
+        (* TODO consider rejecting the callback in some cases,
+           see https://github.com/MinaProtocol/mina/issues/11087 *)
+        Option.value_map valid_cb ~default:ignore
+          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
+        ignore
+          ( Cached.invalidate_with_failure c
+            : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+        let e =
+          match e with
+          | `Exn e ->
+              Error.tag (Error.of_exn e) ~tag:"exn"
+          | `Fatal_error e ->
+              Error.tag (Error.of_exn e) ~tag:"fatal"
+          | `Invalid_staged_ledger_diff e ->
+              Error.tag e ~tag:"invalid staged ledger diff"
+          | `Invalid_staged_ledger_hash e ->
+              Error.tag e ~tag:"invalid staged ledger hash"
+          | `Parent_breadcrumb_not_found ->
+              Error.tag
+                (Error.of_string
+                   (sprintf "Parent breadcrumb with state_hash %s not found"
+                      (State_hash.to_base58_check parent_hash) ) )
+                ~tag:"parent breadcrumb not found"
+        in
+        failed ~error:e ~sender `Build_breadcrumb
+    | Ok breadcrumb ->
+        Mina_metrics.(
+          Gauge.set Catchup.build_breadcrumb_time
+            Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+        let%bind () = Scheduler.yield () |> Deferred.map ~f:Result.return in
+        let finished = Ivar.create () in
+        let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
+        Strict_pipe.Writer.write catchup_breadcrumbs_writer
+          ( [ Mina_stdlib.Rose_tree.of_non_empty_list
+                (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
+            ]
+          , `Ledger_catchup finished ) ;
+        let%bind () =
+          (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
+          step (Deferred.map (Ivar.read finished) ~f:Result.return)
+        in
+        Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
+        set_state t node Finished ;
+        return ()
   in
   run_node
 
