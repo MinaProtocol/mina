@@ -824,6 +824,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
        -> ( Breadcrumb.t
           , [> `Invalid_staged_ledger_diff of Error.t
             | `Invalid_staged_ledger_hash of Error.t
+            | `Invalid_body_reference
             | `Fatal_error of exn ] )
           Result.t
           Deferred.t ) =
@@ -1075,7 +1076,16 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
            see https://github.com/MinaProtocol/mina/issues/11087 *)
-        Transition_handler.Block_registry.finish block_registry c `Ignored ;
+        Transition_handler.Block_registry.finish block_registry c
+          ( match e with
+          | `Invalid_body_reference ->
+              `Ignored
+          | `Exn _
+          | `Fatal_error _
+          | `Invalid_staged_ledger_diff _
+          | `Invalid_staged_ledger_hash _
+          | `Parent_breadcrumb_not_found ->
+              `Ignored ) ;
         let e =
           match e with
           | `Exn e ->
@@ -1086,6 +1096,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               Error.tag e ~tag:"invalid staged ledger diff"
           | `Invalid_staged_ledger_hash e ->
               Error.tag e ~tag:"invalid staged ledger hash"
+          | `Invalid_body_reference ->
+              Error.of_string "invalid body reference"
           | `Parent_breadcrumb_not_found ->
               Error.tag
                 (Error.of_string

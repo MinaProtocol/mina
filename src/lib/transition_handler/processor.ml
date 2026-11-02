@@ -289,6 +289,17 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               "Error while building breadcrumb in the transition handler \
                processor: $error" ;
             Deferred.return (Error ())
+        | Error `Invalid_body_reference ->
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Ignored ;
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Invalid body reference") ] ;
+            [%log error] ~metadata
+              "Error while building breadcrumb in the transition handler \
+               processor: invalid body reference" ;
+            Deferred.return (Error ())
         | Error (`Fatal_error exn) ->
             Block_registry.finish block_registry
               cached_initially_validated_transition `Ignored ;

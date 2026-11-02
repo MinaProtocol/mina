@@ -159,6 +159,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                         | `Invalid_staged_ledger_diff error ->
                             trust_system_record_invalid
                               "invalid staged ledger diff" error
+                        | `Invalid_body_reference ->
+                            trust_system_record_invalid "invalid body reference"
+                              (Error.of_string "invalid body reference")
                         | `Fatal_error exn ->
                             Deferred.return (Or_error.of_exn exn) ) ) )
             |> Cached.sequence_deferred

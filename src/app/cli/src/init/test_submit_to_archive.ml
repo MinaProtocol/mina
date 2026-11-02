@@ -399,6 +399,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
             | `Invalid_staged_ledger_diff err | `Invalid_staged_ledger_hash err
               ->
                 Error.to_string_hum err
+            | `Invalid_body_reference ->
+                "invalid body reference"
           in
           [%log error] "failed to build breadcrumb: $error"
             ~metadata:[ ("error", `String msg) ] ;
