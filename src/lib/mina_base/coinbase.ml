@@ -89,6 +89,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       Ok { t with fee_transfer = adjusted_fee_transfer }
     else Or_error.error_string "Coinbase.create: invalid coinbase"
 
+  let create_v1 = create
+
   let expected_supply_increase { receiver = _; amount; fee_transfer } =
     match fee_transfer with
     | None ->
