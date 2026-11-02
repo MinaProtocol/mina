@@ -52,10 +52,7 @@ val register_header :
   -> valid_cb:Mina_net2.Validation_callback.t option
   -> unit
 
-(** Finish [header], answering every callback it was registered with. A
-    header that has already finished is left as it is. *)
-val finish_header :
-     t
-  -> Mina_block.initial_valid_header Envelope.Incoming.t
-  -> [ `Rejected | `Ignored ]
-  -> unit
+(** Finish the header with [state_hash], answering every callback it was
+    registered with. A header that has already finished, or was never
+    registered, is left as it is. *)
+val finish_header : t -> State_hash.t -> [ `Rejected | `Ignored ] -> unit

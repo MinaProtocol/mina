@@ -65,8 +65,8 @@ let register_header t header ~valid_cb =
       Hashtbl.add_multi t.header_callbacks ~key:(header_state_hash header)
         ~data:valid_cb )
 
-let finish_header t header outcome =
-  Hashtbl.find_and_remove t.header_callbacks (header_state_hash header)
+let finish_header t state_hash outcome =
+  Hashtbl.find_and_remove t.header_callbacks state_hash
   |> Option.iter ~f:(List.iter ~f:(answer outcome))
 
 let%test_module "Block_registry" =
@@ -166,8 +166,8 @@ let%test_module "Block_registry" =
       let second, second_answers = callback_answers () in
       register_header t header ~valid_cb:(Some first) ;
       register_header t header ~valid_cb:(Some second) ;
-      finish_header t header `Rejected ;
-      finish_header t header `Ignored ;
+      finish_header t state_hash `Rejected ;
+      finish_header t state_hash `Ignored ;
       [%test_eq: answer list * answer list]
         (!first_answers, !second_answers)
         ([ `Reject ], [ `Reject ])
