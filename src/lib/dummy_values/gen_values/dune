@@ -24,7 +24,7 @@
   logger.fake)
  (forbidden_libraries mina_node_config protocol_version)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot))
+  (pps mina_ppx ppxlib.metaquot))
  (instrumentation
   (backend bisect_ppx))
  (modes native))

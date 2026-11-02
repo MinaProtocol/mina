@@ -16,7 +16,7 @@
   graphql_basic_scalars
   block_time)
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Definitions required for graphql implementation"))

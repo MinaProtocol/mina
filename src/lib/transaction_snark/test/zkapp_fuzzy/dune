@@ -43,6 +43,6 @@
   mina_stdlib)
  (link_flags (-linkall))
  (preprocess
-  (pps ppx_mina ppx_snarky ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

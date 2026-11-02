@@ -10,45 +10,7 @@
     - {b blockchain-step}: Proves a single step of the blockchain state
       transition. Each step verifies that the protocol state was correctly
       updated from the previous state by applying a valid block (including
-      its transaction snark proof).
-
-    Constraint counts vary by profile due to different configuration parameters
-    (e.g., ledger depth).
-
-    Note: These values are measured with proof_level=Full, which generates the
-    actual constraint system used in production. See {!Genesis_constants.Proof_level}
-    for details on proof levels.
-
-    {b Dev profile:}
-    {v
-    | Circuit         | Constraints | Public Input | Auxiliary Input |
-    |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 9,266       | 1            | 31,987          |
-    v}
-
-    {b Devnet profile:}
-    {v
-    | Circuit         | Constraints | Public Input | Auxiliary Input |
-    |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 10,322      | 1            | 39,459          |
-    v}
-
-    {b Lightnet profile:}
-    {v
-    | Circuit         | Constraints | Public Input | Auxiliary Input |
-    |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 10,224      | 1            | 38,421          |
-    v}
-
-    {b Mainnet profile:}
-    {v
-    | Circuit         | Constraints | Public Input | Auxiliary Input |
-    |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 10,322      | 1            | 39,459          |
-    v}
-
-    If these values change, update the tables above and the expected values in
-    [tests/test_blockchain_snark.ml]. *)
+      its transaction snark proof). *)
 
 open Mina_base
 open Mina_state

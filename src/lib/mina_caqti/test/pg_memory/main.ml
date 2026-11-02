@@ -40,22 +40,34 @@
 open Core
 open Async
 
+(* The exit status of a failed --assert-no-growth. It differs from the status of
+   every other failure, so a leak can be told apart from a broken run. *)
+let memory_gate_exit_status = 42
+
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
 let exec_oneshot sql =
   Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) ~oneshot:true sql
 
-(* Both signals in one round trip. [sum] is deliberately NOT coalesced: a NULL
-   means "nothing to measure" and stays distinguishable from a genuine zero.
-   Cached query plans live under CacheMemoryContext as child contexts
-   (CachedPlanSource / CachedPlan), so the backend total tracks the same growth
-   as a secondary, corroborating signal to the deterministic prepared-statement
-   count. *)
+(* Both signals in one round trip, read on the connection doing the work --
+   [pg_prepared_statements] and [pg_backend_memory_contexts] are both
+   session-local, so no outside observer can obtain either.
+
+   The byte figure sums the plan cache alone: every prepared statement adds one
+   [CachedPlanSource] context and one [CachedPlanQuery] context under
+   CacheMemoryContext, and nothing else does. Summing every context instead
+   would fold in roughly a megabyte of execution-time contexts that come and go
+   with each query and would swamp a small leak; measured on PostgreSQL 17, the
+   filtered figure is exact and perfectly linear, while the unfiltered one is
+   not. The parent CacheMemoryContext block is excluded too, being a constant
+   512 KiB that only dilutes the rate. The sum is coalesced because an
+   unprepared session legitimately matches no context at all. *)
 let sample_req =
   Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.(t2 int (option int)))
     ~oneshot:true
     "SELECT (SELECT count(*)::int FROM pg_prepared_statements), (SELECT \
-     sum(total_bytes)::bigint FROM pg_backend_memory_contexts)"
+     coalesce(sum(total_bytes), 0)::bigint FROM pg_backend_memory_contexts \
+     WHERE name LIKE 'Cached%')"
 
 (* [pg_backend_memory_contexts] only exists on PostgreSQL 14+; on older servers
    the query above fails to parse, and this is all we can measure. *)
@@ -85,7 +97,7 @@ module Sampler = struct
           t.backend_memory <- false ;
           printf
             "   (note: pg_backend_memory_contexts unavailable on this server \
-             (<PG14); backend_KiB not measured)\n" ;
+             (<PG14); plan-cache bytes not measured)\n" ;
           prepared_only t.conn >>| fun prepared -> (prepared, None) )
     else prepared_only t.conn >>| fun prepared -> (prepared, None)
 end
@@ -93,9 +105,16 @@ end
 type result =
   { name : string
   ; prepared_final : int
+  ; prepared_growth : int
+        (* rise in the count over the second half of the calls: a request that
+           is built once, or [~oneshot], adds no statement after its first call,
+           so anything above zero is the leak *)
+  ; calls_per_s : float
   ; per_call : float
-  ; backend_kib_final : int option
+  ; plan_cache_kib_final : int option
         (* [None] on servers without [pg_backend_memory_contexts] (<PG14) *)
+  ; plan_cache_growth_kib : int option
+  ; plan_cache_bytes_per_call : float option
   ; iterations : int
   }
 
@@ -105,31 +124,28 @@ type scenario =
   ; setup : table:string -> string
         (* ONE statement, so the table either exists complete or not at all *)
   ; teardown : table:string -> string
-  ; step :
+  ; make_step :
       table:string -> (module Mina_caqti.CONNECTION) -> int -> unit Deferred.t
-        (* one unit of work exercising a single helper, using a fresh request *)
+        (* called once per run: builds the helper's [Mina_caqti.prepared] for
+           [table], and returns one unit of work that runs it *)
   }
 
 (* --- generated table shapes and payloads -----------------------------------
 
    A shape is a list of columns, each with a generated name and a generated
-   type (text or int). The heterogeneous row value is packed into a nested
-   [Caqti_type.t2] product built at runtime and hidden behind an existential,
-   so the same code drives helpers over tables of any generated width.
+   type (text or int). The row type is a nested [Caqti_type.t2] product built
+   once per shape and hidden behind an existential ([codec]), so the same code
+   drives helpers over tables of any generated width.
 
-   [insert_multi_into_col] renders its values into the SQL text as
-   single-quoted literals without escaping, so generated tokens stay
-   alphanumeric. The iteration index is prefixed to every value that must be
-   unique: a collision would silently turn an INSERT into a SELECT hit and
-   change what is being measured. *)
+   The iteration index is prefixed to every value that must be unique: a
+   collision would silently turn an INSERT into a SELECT hit and change what is
+   being measured. *)
 
 type col_ty = Text | Int
 
 type col = { col_name : string; col_ty : col_ty }
 
 type cell = Cell_text of string | Cell_int of int
-
-type packed_row = Pack : 'a Caqti_type.t * 'a -> packed_row
 
 let gen_token =
   let open Quickcheck.Generator.Let_syntax in
@@ -170,22 +186,37 @@ let generate ~scenario ~iteration gen =
     ~seed:(`Deterministic (sprintf "%s:%d" scenario iteration))
     gen
 
-(* helpers under test take typed params, so ints go through as ints *)
-let pack_cell = function
-  | Cell_text s ->
-      Pack (Caqti_type.string, s)
-  | Cell_int i ->
-      Pack (Caqti_type.int, i)
+(* The row type of a shape, built once, with the function that turns a
+   generated row of that shape into a value of the type. Helpers under test
+   take typed params, so ints go through as ints. *)
+type codec = Codec : 'a Caqti_type.t * (cell list -> 'a) -> codec
 
-let rec pack_row = function
+let codec_of_col = function
+  | { col_ty = Text; _ } ->
+      Codec
+        ( Caqti_type.string
+        , function [ Cell_text s ] -> s | _ -> failwith "codec: expected text"
+        )
+  | { col_ty = Int; _ } ->
+      Codec
+        ( Caqti_type.int
+        , function [ Cell_int i ] -> i | _ -> failwith "codec: expected int" )
+
+let rec codec_of_cols = function
   | [] ->
-      failwith "pack_row: empty row"
-  | [ cell ] ->
-      pack_cell cell
-  | cell :: rest ->
-      let (Pack (t, v)) = pack_cell cell in
-      let (Pack (t', v')) = pack_row rest in
-      Pack (Caqti_type.t2 t t', (v, v'))
+      failwith "codec_of_cols: empty shape"
+  | [ col ] ->
+      codec_of_col col
+  | col :: rest ->
+      let (Codec (t, f)) = codec_of_col col in
+      let (Codec (t', f')) = codec_of_cols rest in
+      Codec
+        ( Caqti_type.t2 t t'
+        , function
+          | cell :: cells ->
+              (f [ cell ], f' cells)
+          | [] ->
+              failwith "codec: short row" )
 
 (* calls that must never collide with an earlier call's row get the iteration
    index stamped into their first cell; shapes generate the first column as
@@ -241,21 +272,23 @@ let select_insert_scenario ~shape_idx =
           (col_defs cols)
           (String.concat ~sep:", " (col_names cols)) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        (* distinct key each call -> SELECT miss then INSERT: exercises BOTH
-           of the requests this helper builds per call *)
-        let (Pack (typ, value)) =
+  ; make_step =
+      (fun ~table ->
+        let (Codec (typ, of_cells)) = codec_of_cols cols in
+        let select_insert =
+          Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+            ~table_name:table
+            ~cols:(col_names cols, typ)
+            ()
+        in
+        fun conn i ->
+          (* distinct key each call -> SELECT miss then INSERT: exercises BOTH
+             of the helper's requests *)
           generate ~scenario:name ~iteration:i (gen_row cols)
           |> stamp_first ~tag:(sprintf "k-%d" i)
-          |> pack_row
-        in
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+          |> of_cells |> select_insert.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let insert_multi_scenario ~shape_idx =
@@ -283,19 +316,19 @@ let insert_multi_scenario ~shape_idx =
           "CREATE TABLE %s (id serial PRIMARY KEY, v text UNIQUE NOT NULL%s)"
           table distractor_defs )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        (* a varying number of values per call: the rendered VALUES list is a
-           different length every time, which is the realistic shape and keeps
-           the SQL text varying independently of request identity *)
-        let values =
+  ; make_step =
+      (fun ~table ->
+        let insert_multi =
+          Mina_caqti.insert_multi_into_col ~table_name:table ~col:"v" ()
+        in
+        fun conn i ->
+          (* a varying number of values per call, which is the realistic
+             shape *)
           generate ~scenario:name ~iteration:i gen_tokens
           |> List.mapi ~f:(fun j v -> sprintf "v-%d-%d-%s" i j v)
-        in
-        Mina_caqti.insert_multi_into_col ~table_name:table
-          ~col:("v", Caqti_type.string) conn values
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+          |> insert_multi.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let upsert_scenario ~shape_idx =
@@ -322,26 +355,103 @@ let upsert_scenario ~shape_idx =
           (col_defs cols)
           (String.concat ~sep:", " (col_names keys)) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
-  ; step =
-      (fun ~table conn i ->
-        (* every second call reuses the previous key, so the ON CONFLICT DO
-           UPDATE branch is exercised as well as the plain insert *)
-        let key_index = if i % 2 = 0 then i - 1 else i in
-        let key_cells =
-          generate ~scenario:(name ^ ":key") ~iteration:key_index (gen_row keys)
-          |> stamp_first ~tag:(sprintf "k-%d" key_index)
+  ; make_step =
+      (fun ~table ->
+        let (Codec (typ, of_cells)) = codec_of_cols cols in
+        let upsert =
+          Mina_caqti.upsert_into_cols_returning
+            ~on_conflict:(String.concat ~sep:"," (col_names keys))
+            ~returning:("id", Caqti_type.int) ~table_name:table
+            ~cols:(col_names cols, typ)
+            ()
         in
-        let payload_cells =
-          generate ~scenario:(name ^ ":payload") ~iteration:i (gen_row payload)
+        fun conn i ->
+          (* every second call reuses the previous key, so the ON CONFLICT DO
+             UPDATE branch is exercised as well as the plain insert *)
+          let key_index = if i % 2 = 0 then i - 1 else i in
+          let key_cells =
+            generate ~scenario:(name ^ ":key") ~iteration:key_index
+              (gen_row keys)
+            |> stamp_first ~tag:(sprintf "k-%d" key_index)
+          in
+          let payload_cells =
+            generate ~scenario:(name ^ ":payload") ~iteration:i
+              (gen_row payload)
+          in
+          of_cells (key_cells @ payload_cells)
+          |> upsert.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
+  }
+
+let insert_into_returning_scenario ~shape_idx =
+  let name = sprintf "insert_into_cols_returning_s%d" shape_idx in
+  let cols =
+    generate ~scenario:"shape:insert_into_cols_returning" ~iteration:shape_idx
+      (gen_cols ~min_cols:2 ~max_cols:6)
+    |> force_first_text
+  in
+  { name
+  ; describe = describe_cols cols
+  ; setup =
+      (fun ~table ->
+        sprintf "CREATE TABLE %s (id serial PRIMARY KEY, %s)" table
+          (col_defs cols) )
+  ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
+  ; make_step =
+      (fun ~table ->
+        let (Codec (typ, of_cells)) = codec_of_cols cols in
+        let insert_returning =
+          Mina_caqti.insert_into_cols_returning
+            ~returning:("id", Caqti_type.int) ~table_name:table
+            ~cols:(col_names cols, typ)
+            ()
         in
-        let (Pack (typ, value)) = pack_row (key_cells @ payload_cells) in
-        Mina_caqti.upsert_into_cols_returning
-          ~on_conflict:(String.concat ~sep:"," (col_names keys))
-          ~returning:("id", Caqti_type.int) ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+        fun conn i ->
+          generate ~scenario:name ~iteration:i (gen_row cols)
+          |> stamp_first ~tag:(sprintf "k-%d" i)
+          |> of_cells |> insert_returning.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
+  }
+
+(* [insert_int_arrays_no_dedup] has neither ON CONFLICT nor a SELECT-back, so
+   the [int[]] column carries no UNIQUE constraint. Each call inserts a varying
+   number of ragged arrays. *)
+let insert_multi_no_dedup_scenario ~shape_idx =
+  let name = sprintf "insert_int_arrays_no_dedup_s%d" shape_idx in
+  let distractors =
+    generate ~scenario:"shape:insert_multi_into_col_no_dedup"
+      ~iteration:shape_idx
+      (gen_cols ~min_cols:0 ~max_cols:4)
+  in
+  let distractor_defs =
+    List.map distractors ~f:(fun c ->
+        sprintf ", %s %s NOT NULL DEFAULT %s" c.col_name (sql_ty c.col_ty)
+          (match c.col_ty with Text -> "''" | Int -> "0") )
+    |> String.concat ~sep:""
+  in
+  { name
+  ; describe =
+      ( if List.is_empty distractors then "v int[] (no distractor columns)"
+      else sprintf "v int[]; distractors: %s" (describe_cols distractors) )
+  ; setup =
+      (fun ~table ->
+        sprintf "CREATE TABLE %s (id serial PRIMARY KEY, v int[] NOT NULL%s)"
+          table distractor_defs )
+  ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
+  ; make_step =
+      (fun ~table ->
+        let insert_int_arrays =
+          Mina_caqti.insert_int_arrays_no_dedup ~table_name:table ~col:"v" ()
+        in
+        fun conn i ->
+          generate ~scenario:name ~iteration:i gen_tokens
+          |> List.mapi ~f:(fun j v ->
+                 Array.init (1 + (String.length v % 4)) ~f:(fun k -> i + j + k) )
+          |> insert_int_arrays.run conn
+          >>| Mina_caqti.ok_exn ~ctx:name
+          >>| ignore )
   }
 
 let scenarios ~shapes : scenario list =
@@ -351,6 +461,8 @@ let scenarios ~shapes : scenario list =
       [ select_insert_scenario ~shape_idx
       ; insert_multi_scenario ~shape_idx
       ; upsert_scenario ~shape_idx
+      ; insert_into_returning_scenario ~shape_idx
+      ; insert_multi_no_dedup_scenario ~shape_idx
       ] )
 
 (* A UUID table name per run: the benchmark only ever drops what it created in
@@ -374,42 +486,82 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
     >>| Mina_caqti.ok_exn ~ctx:(sprintf "setup[%s]" s.name)
   in
   let sampler = Sampler.create conn in
+  let step = s.make_step ~table in
   printf "\n== scenario: %s (table %s) ==\n" s.name table ;
   printf "   shape: %s\n" s.describe ;
-  printf "   %-10s %-12s %-14s\n" "calls" "prepared" "backend_KiB" ;
+  printf "   %-10s %-12s %-16s\n" "calls" "prepared" "plancache_KiB" ;
   let sample_and_print calls =
     let%map prepared, bytes = Sampler.sample sampler in
-    printf "   %-10d %-12d %-14s\n" calls prepared
+    printf "   %-10d %-12d %-16s\n" calls prepared
       (Option.value_map bytes ~default:"n/a" ~f:(fun b ->
            Int.to_string (b / 1024) ) ) ;
     (prepared, bytes)
   in
-  let%bind prepared0, _ = sample_and_print 0 in
+  let%bind prepared0, bytes0 = sample_and_print 0 in
+  let midpoint = iterations / 2 in
+  let prepared_mid = ref prepared0 in
+  let elapsed = ref Time_ns.Span.zero in
   let%bind final_prepared, final_bytes =
     Deferred.List.fold
       (List.range 1 (iterations + 1))
-      ~init:(prepared0, None)
+      ~init:(prepared0, bytes0)
       ~f:(fun acc i ->
-        let%bind () = s.step ~table conn i in
-        if i % sample_every = 0 || i = iterations then sample_and_print i
+        let started = Time_ns.now () in
+        let%bind () = step conn i in
+        (elapsed :=
+           Time_ns.Span.(!elapsed + Time_ns.diff (Time_ns.now ()) started) ) ;
+        if i % sample_every = 0 || i = iterations || i = midpoint then (
+          let%map ((prepared, _) as sample) = sample_and_print i in
+          if i = midpoint then prepared_mid := prepared ;
+          sample )
         else return acc )
+  in
+  let prepared_growth = final_prepared - !prepared_mid in
+  (* sampling is outside the timed region, so this is the helper alone *)
+  let calls_per_s =
+    Float.of_int iterations /. Float.max 1e-9 (Time_ns.Span.to_sec !elapsed)
   in
   let%bind () =
     C.exec (exec_oneshot (s.teardown ~table)) ()
     >>| Mina_caqti.ok_exn ~ctx:(sprintf "teardown[%s]" s.name)
   in
   let per_call = Float.of_int final_prepared /. Float.of_int iterations in
-  let backend_kib_final = Option.map final_bytes ~f:(fun b -> b / 1024) in
+  let plan_cache_kib_final = Option.map final_bytes ~f:(fun b -> b / 1024) in
+  (* growth against the zero-call baseline, so a session that starts with a
+     warm cache does not read as a leak *)
+  let plan_cache_growth =
+    match (bytes0, final_bytes) with
+    | Some before, Some after ->
+        Some (after - before)
+    | _ ->
+        None
+  in
+  let plan_cache_growth_kib =
+    Option.map plan_cache_growth ~f:(fun b -> b / 1024)
+  in
+  let plan_cache_bytes_per_call =
+    Option.map plan_cache_growth ~f:(fun b ->
+        Float.of_int b /. Float.of_int iterations )
+  in
   printf
     "   RESULT scenario=%s iterations=%d prepared_final=%d \
-     prepared_per_call=%.3f backend_KiB_final=%s\n"
-    s.name iterations final_prepared per_call
-    (Option.value_map backend_kib_final ~default:"n/a" ~f:Int.to_string) ;
+     prepared_per_call=%.3f prepared_growth=%d calls_per_s=%.1f \
+     plan_cache_KiB_final=%s plan_cache_KiB_growth=%s \
+     plan_cache_bytes_per_call=%s\n"
+    s.name iterations final_prepared per_call prepared_growth calls_per_s
+    (Option.value_map plan_cache_kib_final ~default:"n/a" ~f:Int.to_string)
+    (Option.value_map plan_cache_growth_kib ~default:"n/a" ~f:Int.to_string)
+    (Option.value_map plan_cache_bytes_per_call ~default:"n/a"
+       ~f:(sprintf "%.1f") ) ;
   let%map () = C.disconnect () in
   { name = s.name
   ; prepared_final = final_prepared
+  ; prepared_growth
+  ; calls_per_s
   ; per_call
-  ; backend_kib_final
+  ; plan_cache_kib_final
+  ; plan_cache_growth_kib
+  ; plan_cache_bytes_per_call
   ; iterations
   }
 
@@ -426,17 +578,23 @@ let influx_lines ~measurement ~tags (results : result list) =
     List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
     |> String.concat ~sep:","
   in
-  (* [backend_kib_final] is omitted rather than sent as 0 where the server has no
-     [pg_backend_memory_contexts]: a constant-zero series charts as a real
-     measurement, whereas a missing one is visibly missing. *)
+  (* the plan-cache fields are omitted rather than sent as 0 where the server
+     has no [pg_backend_memory_contexts]: a constant-zero series charts as a
+     real measurement, whereas a missing one is visibly missing. *)
   List.map results ~f:(fun r ->
       let fields =
         [ sprintf "prepared_final=%di" r.prepared_final
         ; sprintf "prepared_per_call=%.6f" r.per_call
+        ; sprintf "prepared_growth=%di" r.prepared_growth
+        ; sprintf "calls_per_s=%.3f" r.calls_per_s
         ; sprintf "iterations=%di" r.iterations
         ]
-        @ Option.value_map r.backend_kib_final ~default:[] ~f:(fun kib ->
-              [ sprintf "backend_kib_final=%di" kib ] )
+        @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
+              [ sprintf "plan_cache_kib_final=%di" kib ] )
+        @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
+              [ sprintf "plan_cache_growth_kib=%di" kib ] )
+        @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
+            ~f:(fun bytes -> [ sprintf "plan_cache_bytes_per_call=%.6f" bytes ])
       in
       sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
         (sanitize r.name)
@@ -444,7 +602,7 @@ let influx_lines ~measurement ~tags (results : result list) =
         ts_ns )
 
 let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
-    ~influxdb_file ~measurement ~tags () =
+    ~assert_no_growth ~influxdb_file ~measurement ~tags () =
   printf "mina_caqti postgres memory-usage benchmark\n" ;
   printf "uri=%s iterations=%d sample_every=%d shapes=%d\n" (Uri.to_string uri)
     iterations sample_every shapes ;
@@ -454,8 +612,12 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
   in
   printf "\n== summary ==\n" ;
   List.iter results ~f:(fun r ->
-      printf "   %-32s prepared_final=%-8d per_call=%.3f\n" r.name
-        r.prepared_final r.per_call ) ;
+      printf
+        "   %-36s prepared_final=%-8d per_call=%-8.3f growth=%-6d \
+         calls/s=%-8.1f bytes_per_call=%s\n"
+        r.name r.prepared_final r.per_call r.prepared_growth r.calls_per_s
+        (Option.value_map r.plan_cache_bytes_per_call ~default:"n/a"
+           ~f:(sprintf "%.1f") ) ) ;
   let lines = influx_lines ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
@@ -479,8 +641,20 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
           (List.length offenders) limit ;
         List.iter offenders ~f:(fun r ->
             eprintf "   %s: prepared_final=%d\n" r.name r.prepared_final ) ;
-        Core.exit 1 )
+        Shutdown.shutdown 1 )
       else printf "\nOK: all scenarios <= --assert-max-prepared=%d\n" limit ) ;
+  ( if assert_no_growth then
+    let offenders = List.filter results ~f:(fun r -> r.prepared_growth > 0) in
+    if not (List.is_empty offenders) then (
+      eprintf
+        "\n\
+         FAIL: %d scenario(s) kept preparing statements over the second half \
+         of their calls (memory leak):\n"
+        (List.length offenders) ;
+      List.iter offenders ~f:(fun r ->
+          eprintf "   %s: +%d prepared\n" r.name r.prepared_growth ) ;
+      Shutdown.shutdown memory_gate_exit_status )
+    else printf "\nOK: no scenario grew its prepared-statement count\n" ) ;
   return ()
 
 let () =
@@ -505,6 +679,11 @@ let () =
      and assert_max_prepared =
        flag "--assert-max-prepared" (optional int)
          ~doc:"K fail if any scenario's final prepared count exceeds K"
+     and assert_no_growth =
+       flag "--assert-no-growth" no_arg
+         ~doc:
+           " fail if any scenario's prepared count rises over the second half \
+            of its calls"
      and influxdb_file =
        flag "--influxdb-file" (optional string)
          ~doc:"PATH write InfluxDB line protocol (one point per scenario) here"
@@ -566,5 +745,6 @@ let () =
              @ opt_tag "network" network
            in
            main ~uri:(Uri.of_string u) ~iterations ~sample_every ~shapes
-             ~assert_max_prepared ~influxdb_file ~measurement ~tags () )
+             ~assert_max_prepared ~assert_no_growth ~influxdb_file ~measurement
+             ~tags () )
   |> Command_unix.run

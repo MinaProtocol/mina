@@ -24,61 +24,7 @@
       may have an optional signature.
 
     - {b zkapp-proved}: Proves a zkApp command where authorization comes from a
-      side-loaded proof (the zkApp's own proof).
-
-    Constraint counts vary by profile due to different configuration parameters
-    (e.g., ledger depth).
-
-    Note: These values are measured with proof_level=Full, which generates the
-    actual constraint system used in production. See {!Genesis_constants.Proof_level}
-    for details on proof levels.
-
-    {b Dev profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 12,877      | 298          | 37,511          |
-    | zkapp-opt_signed-opt_signed | 16,334      | 298          | 73,489          |
-    | zkapp-opt_signed            | 8,926       | 298          | 40,599          |
-    | zkapp-proved                | 5,149       | 298          | 39,165          |
-    v}
-
-    {b Devnet profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 15,357      | 298          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
-    | zkapp-proved                | 5,106       | 298          | 39,736          |
-    v}
-
-    {b Lightnet profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 15,357      | 298          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
-    | zkapp-proved                | 5,106       | 298          | 39,736          |
-    v}
-
-    {b Mainnet profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 568         | 298          | 1,843           |
-    | transaction-base            | 15,357      | 298          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
-    | zkapp-proved                | 5,106       | 298          | 39,736          |
-    v}
-
-    If these values change, update the tables above and the expected values in
-    [test/constraint_count/test_constraint_count.ml]. *)
+      side-loaded proof (the zkApp's own proof). *)
 
 module type Full = sig
   open Core

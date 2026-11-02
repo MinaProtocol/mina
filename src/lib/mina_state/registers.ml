@@ -39,6 +39,19 @@ module Stable = struct
       ; local_state : 'local_state
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
+
+    let to_input
+        { first_pass_ledger
+        ; second_pass_ledger
+        ; pending_coinbase_stack
+        ; local_state
+        } =
+      Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+        [| Frozen_ledger_hash.to_input first_pass_ledger
+         ; Frozen_ledger_hash.to_input second_pass_ledger
+         ; Pending_coinbase.Stack.to_input pending_coinbase_stack
+         ; Local_state.to_input local_state
+        |]
   end
 end]
 

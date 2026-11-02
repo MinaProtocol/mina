@@ -39,6 +39,10 @@
   staged_ledger_diff
   mina_stdlib)
  (preprocess
-  (pps ppx_version))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx)))

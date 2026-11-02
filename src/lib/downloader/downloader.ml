@@ -101,6 +101,13 @@ end) : sig
 
   val mark_preferred : t -> Peer.t -> now:Time.t -> unit
 
+  (** Forget what each peer has claimed to know, which jobs it has failed, and
+      any temporary ignore placed on it for failing them. For use when the
+      knowledge context moves to one in which this information no longer
+      holds, so that peers which failed the old context's jobs because they
+      have moved on are not passed over for the new one. *)
+  val forget_peer_state : t -> unit
+
   val add_knowledge : t -> Peer.t -> Key.t list -> unit
 
   val update_knowledge : t -> Peer.t -> Key.t Claimed_knowledge.t -> unit
@@ -495,6 +502,7 @@ end = struct
           * [ `Unsuccessful of Key.t list ]
       | Download_starting of Peer.t
       | Job_cancelled of Key.t
+      | Forget_peer_state
       | Add_knowledge of
           { peer : Peer.t; claimed : Key.t list; out_of_band : bool }
       | Knowledge_request_starting of Peer.t
@@ -564,6 +572,13 @@ end = struct
               jobs_no_longer_needed t [ h ] ;
               Hashtbl.iter t.knowledge ~f:(fun s ->
                   Hash_set.remove s.tried_and_failed h )
+          | Forget_peer_state ->
+              Hashtbl.iter t.temporary_ignores ~f:(fun e ->
+                  Clock.Event.abort_if_possible e () ) ;
+              Hashtbl.clear t.temporary_ignores ;
+              Hashtbl.map_inplace t.knowledge ~f:(fun k ->
+                  Hash_set.clear k.tried_and_failed ;
+                  { k with claimed = None } )
           | Download_starting peer ->
               Hash_set.add t.downloading_peers peer
           | Download_finished (peer0, `Successful succs, `Unsuccessful unsuccs)
@@ -571,18 +586,21 @@ end = struct
               (let cancel =
                  Option.iter ~f:(fun e -> Clock.Event.abort_if_possible e ())
                in
-               if List.is_empty succs then
-                 Hashtbl.update t.temporary_ignores peer0 ~f:(fun x ->
-                     cancel x ;
-                     Clock.Event.run_after t.ignore_period
-                       (fun () ->
-                         Hashtbl.remove t.temporary_ignores peer0 ;
-                         if not (Strict_pipe.Writer.is_closed t.w) then
-                           Strict_pipe.Writer.write t.w () )
-                       () )
-               else (
-                 Hashtbl.find_and_remove t.temporary_ignores peer0 |> cancel ;
-                 Preferred_heap.add t.all_preferred (peer0, Time.now ()) ) ) ;
+               match (succs, unsuccs) with
+               | [], [] ->
+                   ()
+               | [], _ :: _ ->
+                   Hashtbl.update t.temporary_ignores peer0 ~f:(fun x ->
+                       cancel x ;
+                       Clock.Event.run_after t.ignore_period
+                         (fun () ->
+                           Hashtbl.remove t.temporary_ignores peer0 ;
+                           if not (Strict_pipe.Writer.is_closed t.w) then
+                             Strict_pipe.Writer.write t.w () )
+                         () )
+               | _ :: _, _ ->
+                   Hashtbl.find_and_remove t.temporary_ignores peer0 |> cancel ;
+                   Preferred_heap.add t.all_preferred (peer0, Time.now ()) ) ;
               Hash_set.remove t.downloading_peers peer0 ;
               jobs_no_longer_needed t succs ;
               match Hashtbl.find t.knowledge peer0 with
@@ -806,10 +824,12 @@ end = struct
               ; ("keys", f xs)
               ] ;
           List.iter xs ~f:(fun x ->
-              enqueue_exn t
-                { x with
-                  attempts = Map.set x.attempts ~key:peer ~data:Attempt.download
-                } )
+              if not (Ivar.is_full x.res) then
+                enqueue_exn t
+                  { x with
+                    attempts =
+                      Map.set x.attempts ~key:peer ~data:Attempt.download
+                  } )
         in
         List.iter xs ~f:(fun x ->
             Hashtbl.set t.downloading ~key:x.key ~data:(peer, x, Time.now ()) ) ;
@@ -830,6 +850,17 @@ end = struct
                   in
                   List.iter succ ~f:(Hash_set.remove all) ;
                   (succ, Hash_set.to_list all)
+            in
+            (* A job cancelled while it was being downloaded is no evidence
+               against the peer, which may well have stopped serving it for
+               the same reason that we stopped wanting it. *)
+            let unsuccs =
+              let cancelled =
+                List.filter_map xs ~f:(fun x ->
+                    Option.some_if (Ivar.is_full x.J.res) x.key )
+                |> Key.Hash_set.of_list
+              in
+              List.filter unsuccs ~f:(Fn.non (Hash_set.mem cancelled))
             in
             Useful_peers.update t.useful_peers
               (Download_finished (peer, `Successful succs, `Unsuccessful unsuccs)
@@ -882,11 +913,14 @@ end = struct
                 (* Anything left in jobs, we did not get results for :( *)
                 Hashtbl.iter jobs ~f:(fun x ->
                     Hashtbl.remove t.downloading x.J.key ;
-                    enqueue_exn t
-                      { x with
-                        attempts =
-                          Map.set x.attempts ~key:peer ~data:Attempt.download
-                      } ) ) )
+                    (* A job cancelled while its download was in progress
+                       already has its result, and must not be resurrected. *)
+                    if not (Ivar.is_full x.res) then
+                      enqueue_exn t
+                        { x with
+                          attempts =
+                            Map.set x.attempts ~key:peer ~data:Attempt.download
+                        } ) ) )
 
   let to_yojson t : Yojson.Safe.t =
     check_invariant t ;
@@ -1000,6 +1034,8 @@ end = struct
     Useful_peers.update t.useful_peers
       (Knowledge
          { peer; claimed; active_jobs = active_jobs t; out_of_band = true } )
+
+  let forget_peer_state t = Useful_peers.update t.useful_peers Forget_peer_state
 
   let mark_preferred t peer ~now =
     Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)

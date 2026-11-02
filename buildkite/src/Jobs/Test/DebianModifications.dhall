@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let DebianModifications = ../../Command/DebianModifications.dhall
 
 in  Pipeline.build
@@ -13,11 +15,13 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "scripts/debian/session")
+          , S.strictlyStart (S.contains "scripts/tests/deb-session")
           , S.exactly "buildkite/src/Jobs/Test/DebianModifications" "dhall"
           , S.exactly "buildkite/src/Command/DebianModifications" "dhall"
           ]
         , path = "Test"
         , name = "DebianModifications"
+        , scope = PipelineScope.InfraOnly
         , tags =
           [ PipelineTag.Type.Fast
           , PipelineTag.Type.Test

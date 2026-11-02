@@ -1,7 +1,7 @@
 opam-version: "2.0"
 compiler: ["ocaml-base-compiler.4.14.2"]
 roots: [
-  "alcotest-async.1.1.0"
+  "alcotest-async.1.2.3"
   "angstrom.0.15.0"
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
@@ -45,8 +45,8 @@ roots: [
   "yojson.1.7.0"
 ]
 installed: [
-  "alcotest.1.1.0"
-  "alcotest-async.1.1.0"
+  "alcotest.1.2.3"
+  "alcotest-async.1.2.3"
   "angstrom.0.15.0"
   "asetmap.0.8.1"
   "astring.0.8.5"
@@ -123,13 +123,13 @@ installed: [
   "extlib.1.7.8"
   "fieldslib.v0.14.0"
   "fix.20201120"
-  "fmt.0.8.6"
+  "fmt.0.8.7"
   "fpath.0.7.3"
   "graphql.0.13.0"
   "graphql-async.0.13.0"
   "graphql-cohttp.0.13.0"
   "graphql-lwt.0.13.0"
-  "graphql_parser.0.12.2"
+  "graphql_parser.0.13.0"
   "graphql_ppx.1.2.2"
   "hex.1.5.0"
   "incremental.v0.14.0"

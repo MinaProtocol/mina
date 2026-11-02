@@ -26,10 +26,14 @@ let%test_module "Archive node unit tests" =
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let archive_uri =
-      Uri.of_string
-        (Option.value
-           (Sys.getenv "MINA_TEST_POSTGRES")
-           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
+      match Sys.getenv "MINA_TEST_POSTGRES" with
+      | Some uri ->
+          Uri.of_string uri
+      | None ->
+          failwith
+            "MINA_TEST_POSTGRES is not set: the archive tests need a \
+             PostgreSQL database with the archive schema (CI sets it up with \
+             buildkite/scripts/setup-database-for-archive-node.sh)"
 
     let conn_lazy =
       lazy
@@ -143,7 +147,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
               Processor.User_command.add_if_doesn't_exist conn ~logger
-                ~v1_transaction_hash:false user_command
+                ~transaction_hash ~v1_transaction_hash:false user_command
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
@@ -204,7 +208,7 @@ let%test_module "Archive node unit tests" =
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
                   Processor.User_command.add_if_doesn't_exist conn ~logger
-                    ~v1_transaction_hash:false user_command
+                    ~transaction_hash ~v1_transaction_hash:false user_command
                 in
                 let%map result =
                   Processor.User_command.find conn ~transaction_hash
@@ -268,10 +272,14 @@ let%test_module "Archive node unit tests" =
                 let%bind id1 =
                   Processor.For_test.add_zkapp_command_without_find_opt ~logger
                     conn p
+                    ~transaction_hash:
+                      (Transaction_hash.hash_zkapp_command_with_hashes p)
                 in
                 let%map id2 =
                   Processor.For_test.add_zkapp_command_without_find_opt ~logger
                     conn p
+                    ~transaction_hash:
+                      (Transaction_hash.hash_zkapp_command_with_hashes p)
                 in
                 [%test_result: int] ~expect:id1 id2
               with
@@ -301,6 +309,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
+                ~transaction_hash
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
@@ -326,6 +335,7 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind coinbase_id =
               Processor.Coinbase.add_if_doesn't_exist conn coinbase
+                ~transaction_hash
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
@@ -410,6 +420,50 @@ let%test_module "Archive node unit tests" =
               ()
           | Error e ->
               failwith @@ Caqti_error.show e )
+
+    (* A token symbol (at most 6 bytes) and a zkApp URI are any bytes on chain,
+       not necessarily UTF-8. Each value can break a different layer: invalid
+       UTF-8 (lone 0xff, a cut multi-byte sequence), NUL (text cannot hold it;
+       a C-string parameter is cut there), text that bytea's own input syntax
+       would decode (backslash-x, quotes), and valid multi-byte UTF-8. *)
+    let any_byte_token_symbols =
+      [ ""
+      ; "MINA"
+      ; "\xff"
+      ; "a\xc3"
+      ; "\x00"
+      ; "a\x00b"
+      ; "\x00\xfe"
+      ; "\\x41"
+      ; "'\"\\"
+      ; "\xc3\xa9"
+      ; "\xf0\x9f\xa6\x8a"
+      ; "\x80\x9f\xc0\xf5\xfe\xff"
+      ]
+
+    let any_byte_round_trip ~what ~values ~add ~load conn =
+      Deferred.List.iter values ~how:`Sequential ~f:(fun value ->
+          let ctx = sprintf "%s %S" what value in
+          let%bind id = add conn value >>| Mina_caqti.ok_exn ~ctx in
+          let%bind id_again = add conn value >>| Mina_caqti.ok_exn ~ctx in
+          [%test_eq: int] ~message:(ctx ^ ": stored once") id id_again ;
+          let%map loaded = load conn id >>| Mina_caqti.ok_exn ~ctx in
+          [%test_eq: string] ~message:(ctx ^ ": read back exactly") value loaded )
+
+    let%test_unit "Token_symbols, Zkapp_uri: any bytes round trip" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%bind () =
+        any_byte_round_trip ~what:"token symbol" ~values:any_byte_token_symbols
+          ~add:Processor.Token_symbols.add_if_doesn't_exist
+          ~load:Processor.Token_symbols.load conn
+      in
+      (* a zkApp URI is at most 255 bytes: 0x00..0xfe at once (0xff is above) *)
+      any_byte_round_trip ~what:"zkApp URI"
+        ~values:(any_byte_token_symbols @ [ String.init 255 ~f:Char.of_int_exn ])
+        ~add:Processor.Zkapp_uri.add_if_doesn't_exist
+        ~load:Processor.Zkapp_uri.load conn
 
     (* A test that [Processor.Token.add_all_if_don't_exist] will succeed for an
        arbitrary tree of token IDs, and that calling it makes it safe for

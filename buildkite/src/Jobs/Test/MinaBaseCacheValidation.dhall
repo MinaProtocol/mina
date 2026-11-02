@@ -21,11 +21,12 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.exactly "buildkite/scripts/docker/verify-toolchain-cache" "sh"
+          , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
           , S.exactly "buildkite/src/Jobs/Test/MinaBaseCacheValidation" "dhall"
           ]
         , path = "Test"
         , name = "MinaBaseCacheValidation"
-        , scope = [ PipelineScope.Type.MainlineNightly ]
+        , scope = [ PipelineScope.Type.PullRequest, PipelineScope.Type.Weekly ]
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

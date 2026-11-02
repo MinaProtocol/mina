@@ -25,7 +25,7 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
           , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
-              (S.contains "buildkite/scripts/run-test-executive-local")
+              (S.contains "buildkite/scripts/run-test-executive-docker")
           , S.strictlyStart (S.contains "buildkite/scripts/apps")
           ]
         , path = "Test"
@@ -37,5 +37,5 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           ]
         }
-      , steps = [ TestExecutive.executeLocal "post-hard-fork" dependsOn ]
+      , steps = [ TestExecutive.executeDocker "post-hard-fork" dependsOn ]
       }

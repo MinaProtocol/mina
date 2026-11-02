@@ -2,7 +2,10 @@
 
 # Load a docker image from the shared CI cache on the Hetzner storagebox.
 #
-# Usage: ./buildkite/scripts/docker/load_from_cache.sh <full-image>
+# Usage: ./buildkite/scripts/docker/load_from_cache.sh [--if-present] <full-image>
+#
+# --if-present: exit 0 when the cache has no copy of the image, so the caller
+# falls through to a registry pull (Cmds.inDocker uses this before docker run).
 #
 # Example:
 #   ./buildkite/scripts/docker/load_from_cache.sh \
@@ -16,8 +19,14 @@
 
 set -euo pipefail
 
+IF_PRESENT=0
+if [[ "${1:-}" == "--if-present" ]]; then
+  IF_PRESENT=1
+  shift
+fi
+
 if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 <full-image>" >&2
+  echo "Usage: $0 [--if-present] <full-image>" >&2
   exit 1
 fi
 
@@ -43,6 +52,10 @@ SERVICE="${REPO##*/}"
 CACHE_FILE="${CACHE_ROOT}/${SERVICE}/${TAG}.tar.zst"
 
 if [[ ! -f "$CACHE_FILE" ]]; then
+  if [[ "$IF_PRESENT" == "1" ]]; then
+    echo "${IMAGE} is not in the CI cache, docker will pull it"
+    exit 0
+  fi
   echo "ERROR: cached image not found at ${CACHE_FILE}" >&2
   exit 1
 fi

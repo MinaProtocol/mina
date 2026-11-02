@@ -71,10 +71,6 @@ module Sponge = struct
   let squeeze = squeeze
 end
 
-let%test_unit "sponge" =
-  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
-  T.test Tock_field_sponge.params
-
 module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Vesta
 

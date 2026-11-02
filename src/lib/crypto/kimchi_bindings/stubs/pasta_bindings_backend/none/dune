@@ -6,5 +6,9 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_version ppx_inline_test))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (implements pasta_bindings.backend))

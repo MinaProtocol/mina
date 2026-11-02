@@ -141,6 +141,28 @@ let isProfiled =
             }
             package
 
+let pinnedByHashTag =
+    -- CI pins this image by its short hash tag (ContainerImages.dhall) and
+    -- pulls it from the registry, so the push keeps that tag even on the
+    -- public registry, which otherwise gets only the version tag.
+          \(package : Package)
+      ->  merge
+            { DaemonGeneric = False
+            , DaemonProfiled = \(args : { profile : Profile.Type }) -> False
+            , Daemon = \(args : { network : Network.Type }) -> False
+            , DaemonLegacyHardfork =
+                \(args : { network : Network.Type }) -> False
+            , DaemonAutoHardfork = \(args : { network : Network.Type }) -> False
+            , Archive = \(args : { network : Network.Type }) -> False
+            , RosettaGeneric = False
+            , Rosetta = \(args : { network : Network.Type }) -> False
+            , TxTools = False
+            , DelegationVerifier = False
+            , Toolchain = True
+            , Base = False
+            }
+            package
+
 let serviceName =
           \(package : Package)
       ->  merge
@@ -378,6 +400,7 @@ in  { Type = Package
     , isGeneric = isGeneric
     , isNetworked = isNetworked
     , isProfiled = isProfiled
+    , pinnedByHashTag = pinnedByHashTag
     , dockerName = dockerName
     , dockerNames = dockerNames
     , dockerTag = dockerTag

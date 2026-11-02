@@ -2,7 +2,6 @@
  (name account_timing_tests)
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
   async
   async_kernel
   async_unix
@@ -39,6 +38,7 @@
   mina_numbers
   sgn
   transaction_snark_tests
+  transaction_snark_test_suite
   test_util
   consensus
   one_or_two
@@ -47,9 +47,7 @@
   mina_transaction_logic
   mina_wire_types)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane))
+  (pps mina_ppx))
  (instrumentation
   (backend bisect_ppx)))

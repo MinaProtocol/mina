@@ -29,6 +29,7 @@ for database-dependent operations.
 **Process Management:**
 - Uses host PID namespace (`--pid=host`) for the PostgreSQL container to enable proper process visibility and management
 - Allows containers to interact with host system processes for debugging and monitoring purposes
+- Starts the PostgreSQL container with `--init`, so that PID 1 of the shared PID namespace is an init process rather than the postmaster. A process orphaned there, such as a child of a daemon a test stops, is then reaped by the init process; the postmaster would take it for a crashed backend and restart into recovery
 
 **Database Configuration:**
 - Port: 5432
@@ -136,7 +137,7 @@ let runInDockerWithPostgresConn
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
                     , "./buildkite/scripts/docker/disk-cleanup.sh || true"
-                    , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
+                    , "docker run --init --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "timeout 120 docker exec ${postgresDockerName} sh -c 'until pg_isready -h localhost -p ${port} -U ${user} -q; do sleep 1; done'"
                     ]
                   # runInitScript
@@ -234,7 +235,7 @@ let runInToolchainWithPostgresAndDebs
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
                     , "./buildkite/scripts/docker/disk-cleanup.sh || true"
-                    , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
+                    , "docker run --init --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "timeout 120 docker exec ${postgresDockerName} sh -c 'until pg_isready -h localhost -p ${port} -U ${user} -q; do sleep 1; done'"
                     ]
                   # runInitScript

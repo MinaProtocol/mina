@@ -88,7 +88,7 @@ Make sure you have the following critical tools installed on the machine which y
 If you were to run Lucy's test executive directly in the terminal, the command line would look something like this:
 
 ```
-mina-test-executive local $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
+mina-test-executive docker $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
 ```
 
 Running it directly in the terminal is not the most recommended method, but it is technologically speaking the simplest method (even if not practically the most streamlined) and all the other methods are based on it eventually, and so before moving on, it's worth breaking down the command line arguments and options for `mina-test-executive`.
@@ -133,7 +133,7 @@ export $TEST_NAME=<test>
 export $MINA_IMAGE="<url to mina daemon image>"
 export $ARCHIVE_IMAGE="<url to mina archiver image>"
 
-mina-test-executive local $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
+mina-test-executive docker $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
 ```
 
 If you prefer, it is also idiomatic to just manually edit and execute the `mina-test-executive` line instead of exporting the env vars.

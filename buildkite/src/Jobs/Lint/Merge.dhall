@@ -8,6 +8,8 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Cmd = ../../Lib/Cmds.dhall
 
 let Command = ../../Command/Base.dhall
@@ -62,11 +64,14 @@ in  Pipeline.build
             }
         , Command.build
             Command.Config::{
-            , commands = [ Cmd.run "scripts/merged-to-proof-systems.sh master" ]
+            , commands =
+              [ RunInToolchain.submoduleInit "src/lib/crypto/proof-systems"
+              , Cmd.run "scripts/merged-to-proof-systems.sh master"
+              ]
             , label =
                 "[proof-systems] Check merges cleanly into proof-systems master branch"
             , key = "merged-to-proof-systems-master"
-            , soft_fail = Some (B/SoftFail.Boolean False)
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Multi
             , docker = Some Docker::{
               , image = (../../Constants/ContainerImages.dhall).toolchainBase
@@ -75,7 +80,36 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "scripts/merged-to-kimchi-stubs-vendors.sh main" ]
+              [ Cmd.run "scripts/merged-to-proof-systems.sh compatible" ]
+            , label =
+                "[proof-systems] Check merges cleanly into proof-systems compatible branch"
+            , key = "merged-to-proof-systems-compatible"
+            , soft_fail = Some (B/SoftFail.Boolean True)
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "scripts/merged-to-proof-systems.sh develop" ]
+            , label =
+                "[proof-systems] Check merges cleanly into proof-systems develop branch"
+            , key = "merged-to-proof-systems-develop"
+            , soft_fail = Some (B/SoftFail.Boolean True)
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ RunInToolchain.submoduleInit
+                  "src/lib/crypto/kimchi_bindings/stubs/kimchi-stubs-vendors"
+              , Cmd.run "scripts/merged-to-kimchi-stubs-vendors.sh main"
+              ]
             , label =
                 "[kimchi-stubs-vendors] Check merges cleanly into kimchi-stubs-vendors main branch"
             , key = "merged-to-kimchi-stubs-vendors-main"

@@ -17,12 +17,10 @@
   pickles)
  (preprocess
   (pps
-   ppx_custom_printf
-   ppx_snarky
-   ppx_version
-   ppx_inline_test
-   ppx_compare
-   ppx_deriving_yojson))
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (instrumentation
   (backend bisect_ppx))
  (synopsis

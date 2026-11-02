@@ -37,6 +37,15 @@ module type S = sig
     -> Staged_ledger_diff.Stable.Latest.t
     -> (Transaction.Stable.Latest.t With_status.t list, Error.t) result
 
+  (** The transactions of a diff of the version that precomputed blocks of
+      version 4 carry. *)
+  val get_transactions_stable_v3 :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> coinbase_receiver:Public_key.Compressed.t
+    -> supercharge_coinbase:bool
+    -> Staged_ledger_diff.Stable.V3.t
+    -> (Transaction.Stable.Latest.t With_status.t list, Error.t) result
+
   val get_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
@@ -540,6 +549,22 @@ let get_transactions_stable ~constraint_constants ~coinbase_receiver
       ~to_user_command:With_status.data ~diff ~coinbase_receiver
       ~coinbase_amount:
         (Staged_ledger_diff.Diff.Stable.Latest.coinbase ~constraint_constants
+           ~supercharge_coinbase diff )
+  in
+  transactions
+
+module Transaction_data_getter_stable_v2 =
+  Transaction_data_getter (Transaction_snark_work.Stable.V2)
+
+let get_transactions_stable_v3 ~constraint_constants ~coinbase_receiver
+    ~supercharge_coinbase ({ diff } : Staged_ledger_diff.Stable.V3.t) =
+  let open Result.Let_syntax in
+  let open Transaction_data_getter_stable_v2 in
+  let%map transactions, _, _, _ =
+    get_impl ~get_transaction_data ~constraint_constants
+      ~to_user_command:With_status.data ~diff ~coinbase_receiver
+      ~coinbase_amount:
+        (Staged_ledger_diff.Diff.Stable.V3.coinbase ~constraint_constants
            ~supercharge_coinbase diff )
   in
   transactions

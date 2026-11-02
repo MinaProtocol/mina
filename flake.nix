@@ -224,7 +224,7 @@
             { with-archive ? false }: {
               command =
                 runInEnv self.devShells.x86_64-linux.integration-tests ''
-                  test_executive local ${test} \
+                  test_executive docker ${test} \
                   --mina-image=${
                     dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
                   } \
@@ -405,7 +405,7 @@
           granular = ocamlPackages.default;
           default = ocamlPackages.mina;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool minimina
+            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
             zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full

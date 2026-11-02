@@ -46,6 +46,18 @@ module type S = sig
           raise a [Failure].
       *)
       val enable_setting_offset : unit -> unit
+
+      module For_tests : sig
+        (** [manual ~start] is a controller whose time stays at [start] until
+            it is moved forward by the returned function, so that tests can
+            pass time without waiting for it.
+
+            Reading the time still goes through the system clock, so it can
+            differ from the time set by a few milliseconds; tests should keep
+            it away from slot boundaries.
+        *)
+        val manual : start:Time.t -> t * (Time.Span.t -> unit)
+      end
     end
 
     [%%versioned:

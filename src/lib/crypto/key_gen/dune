@@ -4,5 +4,9 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (libraries core_kernel signature_lib))

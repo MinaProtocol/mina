@@ -81,6 +81,7 @@ let main ~db_uri ~network_data_folder () =
     Sys.ls_dir output_folder
     >>= Deferred.List.map ~f:(fun e ->
             Deferred.return (output_folder ^ "/" ^ e) )
+    >>| Utils.sort_archive_files
   in
 
   let%bind () =

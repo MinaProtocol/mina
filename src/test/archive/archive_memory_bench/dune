@@ -1,0 +1,24 @@
+(executable
+ (name archive_memory_bench)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  core_unix
+  core_unix.command_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  async
+  async_kernel
+  async_unix
+  uri
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  ;; local libraries
+  influxdb_line_protocol
+  mina_caqti)
+ (preprocess
+  (pps mina_ppx))
+ (instrumentation
+  (backend bisect_ppx)))

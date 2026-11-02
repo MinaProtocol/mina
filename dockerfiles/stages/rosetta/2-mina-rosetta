@@ -46,15 +46,15 @@ ENV MINA_ROSETTA_GENERIC_DEB=mina-rosetta-generic${BUILD_FLAGS_SUFFIX}
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
 # Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
-# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
-# and install-mina-debs.sh installs the resolved .deb files with a single apt-get
-# call (no apt repo / no apt index). Since there is no repo to resolve the mina
+# the freshly-built .deb files under _debs, bind-mounted at /opt/mina-local-debs for
+# the install step only, and install-mina-debs.sh installs the resolved .deb files
+# with a single apt-get call (no apt repo / no apt index). Since there is no repo to resolve the mina
 # dependency closure, the daemon metapackage's dependencies (mina-logproc and
 # mina-${network}-config) are requested explicitly as local files too.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
-COPY _debs /opt/mina-local-debs
-RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+RUN --mount=type=bind,source=_debs,target=/opt/mina-local-debs \
+    echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
     && chmod +x /usr/local/bin/install-mina-debs.sh \
     && case "${deb_profile}" in lightnet|dev) PROFILE_DEB="mina-${deb_profile}" ;; *) PROFILE_DEB="mina-${deb_profile}-profile" ;; esac \
     && if echo "${SUFFIX}" | grep -q -- '-generic'; then \

@@ -10,6 +10,10 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal))
  (virtual_modules cache_dir)
  (default_implementation cache_dir.native))

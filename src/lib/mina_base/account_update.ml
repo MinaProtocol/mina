@@ -850,7 +850,8 @@ module Update = struct
       ; Set_or_keep.to_input
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
-      ; Set_or_keep.to_input permissions ~dummy:Permissions.empty
+      ; Set_or_keep.to_input permissions
+          ~dummy:Permissions.dummy_value_for_set_or_keep_placeholder_only
           ~f:Permissions.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
@@ -891,7 +892,9 @@ module Update = struct
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
                    } ) )
-      ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
+      ; Set_or_keep.typ
+          ~dummy:Permissions.dummy_value_for_set_or_keep_placeholder_only
+          Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.lazy_optional_typ ~hash:Zkapp_account.hash_zkapp_uri
              ~non_preimage:(lazy (Zkapp_account.hash_zkapp_uri_opt None))

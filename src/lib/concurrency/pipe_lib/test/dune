@@ -9,4 +9,8 @@
   ;; Local libraries
   pipe_lib)
  (preprocess
-  (pps ppx_let)))
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))

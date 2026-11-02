@@ -155,21 +155,18 @@ let user_commands conn ~logger (query : Query.t) () =
   >>| ok_exn ~ctx:"user commands"
   >>| fst
 
-(* line-protocol tag values must not contain unescaped spaces/commas/= *)
-let sanitize = String.map ~f:(function ' ' | ',' | '=' -> '_' | c -> c)
-
-let influx_lines ~measurement ~tags results =
-  let ts = Time_ns.now () |> Time_ns.to_int_ns_since_epoch in
-  let tags =
-    List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
-    |> String.concat ~sep:","
-  in
+let influx_points ~measurement ~tags results =
   List.map results ~f:(fun r ->
-      sprintf
-        "%s,%s,shape=%s,scope=%s \
-         median_ms=%.3f,min_ms=%.3f,max_ms=%.3f,total_count=%Ldi,runs=%di %d"
-        measurement tags r.shape r.scope r.median_ms r.min_ms r.max_ms
-        r.total_count r.runs ts )
+      Influxdb_line_protocol.(
+        create
+          ~tags:(tags @ [ ("shape", r.shape); ("scope", r.scope) ])
+          ~measurement
+          [ ("median_ms", Float r.median_ms)
+          ; ("min_ms", Float r.min_ms)
+          ; ("max_ms", Float r.max_ms)
+          ; ("total_count", Int (Int64.to_int_exn r.total_count))
+          ; ("runs", Int r.runs)
+          ]) )
 
 let main ~uri ~runs ~influxdb_file ~measurement ~tags () =
   let logger = Logger.null () in
@@ -191,7 +188,8 @@ let main ~uri ~runs ~influxdb_file ~measurement ~tags () =
             r ) )
   in
   Option.iter influxdb_file ~f:(fun path ->
-      Out_channel.write_lines path (influx_lines ~measurement ~tags results) ;
+      Influxdb_line_protocol.write_file path
+        (influx_points ~measurement ~tags results) ;
       printf "wrote %d points to %s\n" (List.length results) path ) ;
   let (module Conn : Mina_caqti.CONNECTION) = conn in
   Conn.disconnect ()

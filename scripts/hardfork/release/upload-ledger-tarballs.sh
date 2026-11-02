@@ -2,7 +2,8 @@
 
 # upload_ledger_tarballs.sh
 # -------------------------
-# This script uploads ledger tarball files from a specified folder to an AWS S3 bucket (snark-keys.o1test.net).
+# This script uploads ledger tarball files from a specified folder to the AWS S3 bucket that
+# MINA_LEDGER_S3_BUCKET (https://s3-<region>.amazonaws.com/<bucket>) points the daemon at.
 #
 # For each file in the input folder:
 #   - If the file already exists in the S3 bucket, it downloads the existing file, computes its hash,
@@ -25,7 +26,15 @@ set -euox pipefail
 
 INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
 NEW_CONFIG=${2:-new_config.json}  # Path to the new_config.json file to update with new hashes
-LEDGER_S3_BUCKET=${LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
+
+# MINA_LEDGER_S3_BUCKET is the single source of the bucket and is kept in https form
+# everywhere, because the daemon and mina-verify-packaged-fork-config curl it as is.
+# The s3:// URI the aws CLI needs is derived here; do not pass s3:// values around.
+if [[ ! "${MINA_LEDGER_S3_BUCKET:-}" =~ ^https://s3-[a-z0-9-]+\.amazonaws\.com/([^/]+)/?$ ]]; then
+  echo "❌ Error: MINA_LEDGER_S3_BUCKET must be https://s3-<region>.amazonaws.com/<bucket> (got '${MINA_LEDGER_S3_BUCKET:-}')"
+  exit 1
+fi
+LEDGER_S3_BUCKET="s3://${BASH_REMATCH[1]}"
 
 check_aws_cli() {
   echo "--- Checking for AWS CLI installation"

@@ -35,7 +35,7 @@ val protocol : t -> string
 
 val remote_peer : t -> Peer.t
 
-val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
+val pipes : t -> string Pipe.Reader.t * Core_kernel.Bigstring.t Pipe.Writer.t
 
 val data_received : t -> string -> unit
 

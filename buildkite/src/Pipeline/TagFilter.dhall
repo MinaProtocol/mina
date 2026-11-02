@@ -14,7 +14,6 @@ let Filter
       | BaseDockersOnly
       | AllTests
       | Release
-      | Promote
       | DebianBuild
       | DockerBuild
       | Packaging
@@ -74,7 +73,6 @@ let tags
               [ Tag.Type.Packaging, Tag.Type.Generic, Tag.Type.Amd64 ]
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
-            , Promote = [ Tag.Type.Promote ]
             , Rosetta = [ Tag.Type.Rosetta ]
             , Hardfork = [ Tag.Type.Hardfork ]
             , AllDockersAndDebians =
@@ -223,7 +221,6 @@ let show
             , TearDownOnly = "TearDownOnly"
             , AllTests = "AllTests"
             , Release = "Release"
-            , Promote = "Promote"
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , Packaging = "Packaging"
