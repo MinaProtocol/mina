@@ -10,9 +10,12 @@ type source = [ `Gossip | `Catchup | `Internal ]
 [@@deriving sexp, equal, compare]
 
 type event =
-  | Cache_removed of { state_hash : string; outcome : cache_outcome }
-  | Callback_resolved of { state_hash : string; outcome : callback_outcome }
-  | Frontier_add of { state_hash : string; source : source; added : bool }
+  | Cache_removed of
+      { state_hash : Data_hash_lib.State_hash.t; outcome : cache_outcome }
+  | Callback_resolved of
+      { state_hash : Data_hash_lib.State_hash.t; outcome : callback_outcome }
+  | Frontier_add of
+      { state_hash : Data_hash_lib.State_hash.t; source : source; added : bool }
 [@@deriving sexp, equal, compare]
 
 (* The events recorded so far, newest first, while a test is recording. *)
@@ -56,18 +59,23 @@ end
 
 let%test_module "Block_outcome_log" =
   ( module struct
-    let cache_removed state_hash =
-      Cache_removed { state_hash; outcome = `Consumed }
+    let state_hashes =
+      Quickcheck.random_value ~seed:(`Deterministic "block outcome log")
+        (Quickcheck.Generator.list_with_length 4 Data_hash_lib.State_hash.gen)
+
+    let cache_removed i =
+      Cache_removed
+        { state_hash = List.nth_exn state_hashes i; outcome = `Consumed }
 
     let%test_unit "Only events recorded while recording are returned" =
-      record (fun () -> cache_removed "before") ;
+      record (fun () -> cache_removed 0) ;
       let (), events =
         For_tests.recording (fun () ->
-            record (fun () -> cache_removed "a") ;
-            record (fun () -> cache_removed "b") )
+            record (fun () -> cache_removed 1) ;
+            record (fun () -> cache_removed 2) )
       in
-      record (fun () -> cache_removed "after") ;
-      [%test_eq: event list] events [ cache_removed "a"; cache_removed "b" ]
+      record (fun () -> cache_removed 3) ;
+      [%test_eq: event list] events [ cache_removed 1; cache_removed 2 ]
 
     let%test_unit "Events aren't built unless recording" =
       record (fun () -> failwith "built an event while not recording")

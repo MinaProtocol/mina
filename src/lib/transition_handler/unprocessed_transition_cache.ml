@@ -35,9 +35,7 @@ module Registry = struct
       Gauge.inc_one Transition_frontier_controller.transitions_being_processed)
 
   let element_removed outcome state_hash =
-    Block_outcome_log.record (fun () ->
-        Cache_removed
-          { state_hash = State_hash.to_base58_check state_hash; outcome } ) ;
+    Block_outcome_log.record (fun () -> Cache_removed { state_hash; outcome }) ;
     Mina_metrics.(
       Gauge.dec_one Transition_frontier_controller.transitions_being_processed)
 end
@@ -59,7 +57,6 @@ let%test_module "Recording block outcomes" =
       State_hash.With_state_hashes.state_hash
         (Mina_block.Validation.block_with_hash
            (Envelope.Incoming.data initial_valid_block) )
-      |> State_hash.to_base58_check
 
     let outcome_of ~finish =
       let cache = create ~logger:(Logger.null ()) ~cache_exceptions:false in

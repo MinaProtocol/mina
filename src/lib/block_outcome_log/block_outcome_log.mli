@@ -19,9 +19,12 @@ type source = [ `Gossip | `Catchup | `Internal ]
 [@@deriving sexp, equal, compare]
 
 type event =
-  | Cache_removed of { state_hash : string; outcome : cache_outcome }
-  | Callback_resolved of { state_hash : string; outcome : callback_outcome }
-  | Frontier_add of { state_hash : string; source : source; added : bool }
+  | Cache_removed of
+      { state_hash : Data_hash_lib.State_hash.t; outcome : cache_outcome }
+  | Callback_resolved of
+      { state_hash : Data_hash_lib.State_hash.t; outcome : callback_outcome }
+  | Frontier_add of
+      { state_hash : Data_hash_lib.State_hash.t; source : source; added : bool }
       (** [added] is false when the add was skipped because the block's parent
           had left the frontier. *)
 [@@deriving sexp, equal, compare]
