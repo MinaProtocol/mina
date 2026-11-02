@@ -1886,8 +1886,133 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Boolean.Assert.all
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
-      let main ~signature_kind ?(witness : Witness.t option) (spec : Spec.t)
-          ~constraint_constants (statement : Statement.With_sok.var) =
+      type _ Snarky_backendless.Request.t +=
+        | Slot_active : int -> bool Snarky_backendless.Request.t
+
+      (** The local state from which an unused slot runs: one in which the
+          next step is a valid no-op. Its call forest holds a single account
+          update, without authorization, that changes nothing, on an account
+          that is new in an otherwise empty ledger. The account update's public
+          key is the compressed curve generator rather than the empty public
+          key, which does not decompress: signature verification decompresses
+          it, and an account that is new admits any public key.
+      *)
+      let placeholder_local ~signature_kind ~constraint_constants =
+        let open Impl in
+        let public_key =
+          Signature_lib.Public_key.compress
+            (Inner_curve.to_affine_exn Inner_curve.one)
+        in
+        let account_update : Account_update.t =
+          Account_update.with_aux
+            ~body:{ Account_update.Body.dummy with public_key }
+            ~authorization:Control.Poly.None_given
+        in
+        let calls =
+          Zkapp_command.Call_forest.cons ~signature_kind account_update []
+        in
+        let ledger =
+          Mina_ledger.Ledger.with_ledger
+            ~depth:
+              constraint_constants
+                .Genesis_constants.Constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Sparse_ledger.of_ledger_subset_exn ledger
+                [ Account_id.create public_key Token_id.default ] )
+        in
+        let frame : _ Mina_base.Stack_frame.t =
+          { caller = Token_id.default; caller_caller = Token_id.default; calls }
+        in
+        let stack_frame : Inputs.Stack_frame.t =
+          { data =
+              { caller = Token_id.(Checked.constant default)
+              ; caller_caller = Token_id.(Checked.constant default)
+              ; calls =
+                  { hash =
+                      exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
+                          Zkapp_command.Call_forest.hash calls )
+                  ; data = Prover_value.create (fun () -> calls)
+                  }
+              }
+          ; hash =
+              lazy
+                (exists Mina_base.Stack_frame.Digest.typ ~compute:(fun () ->
+                     Mina_base.Stack_frame.Digest.create frame ) )
+          }
+        in
+        ( { stack_frame
+          ; call_stack = Inputs.Call_stack.empty ()
+          ; transaction_commitment = Field.zero
+          ; full_transaction_commitment = Field.zero
+          ; excess = Amount.Signed.(Checked.constant zero)
+          ; supply_increase = Amount.Signed.(Checked.constant zero)
+          ; ledger =
+              ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root ledger)
+              , Prover_value.create (fun () -> ledger) )
+          ; success = Boolean.true_
+          ; account_update_index =
+              Mina_numbers.Index.Checked.constant Mina_numbers.Index.zero
+          ; failure_status_tbl = ()
+          ; will_succeed = Boolean.true_
+          }
+          : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t )
+
+      let select_ledger b ~then_:(h1, v1) ~else_:(h2, v2) =
+        ( Impl.run_checked (Ledger_hash.if_ b ~then_:h1 ~else_:h2)
+        , Prover_value.if_ b ~then_:v1 ~else_:v2 )
+
+      let select_local b
+          ~(then_ : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t)
+          ~(else_ : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t)
+          : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
+        let open Impl in
+        { stack_frame =
+            Inputs.Stack_frame.if_ b ~then_:then_.stack_frame
+              ~else_:else_.stack_frame
+        ; call_stack =
+            Inputs.Call_stack.if_ b ~then_:then_.call_stack
+              ~else_:else_.call_stack
+        ; transaction_commitment =
+            Field.if_ b ~then_:then_.transaction_commitment
+              ~else_:else_.transaction_commitment
+        ; full_transaction_commitment =
+            Field.if_ b ~then_:then_.full_transaction_commitment
+              ~else_:else_.full_transaction_commitment
+        ; excess =
+            Inputs.Amount.Signed.if_ b ~then_:then_.excess ~else_:else_.excess
+        ; supply_increase =
+            Inputs.Amount.Signed.if_ b ~then_:then_.supply_increase
+              ~else_:else_.supply_increase
+        ; ledger = select_ledger b ~then_:then_.ledger ~else_:else_.ledger
+        ; success = Boolean.if_ b ~then_:then_.success ~else_:else_.success
+        ; account_update_index =
+            Inputs.Index.if_ b ~then_:then_.account_update_index
+              ~else_:else_.account_update_index
+        ; failure_status_tbl = ()
+        ; will_succeed =
+            Boolean.if_ b ~then_:then_.will_succeed ~else_:else_.will_succeed
+        }
+
+      let select_global b ~(then_ : Global_state.t) ~(else_ : Global_state.t) :
+          Global_state.t =
+        { else_ with
+          first_pass_ledger =
+            select_ledger b ~then_:then_.first_pass_ledger
+              ~else_:else_.first_pass_ledger
+        ; second_pass_ledger =
+            select_ledger b ~then_:then_.second_pass_ledger
+              ~else_:else_.second_pass_ledger
+        ; fee_excess =
+            Inputs.Amount.Signed.if_ b ~then_:then_.fee_excess
+              ~else_:else_.fee_excess
+        ; supply_increase =
+            Inputs.Amount.Signed.if_ b ~then_:then_.supply_increase
+              ~else_:else_.supply_increase
+        }
+
+      let main ~signature_kind ?(optional_slots = false)
+          ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
+          (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -1963,114 +2088,132 @@ module Make_str (A : Wire_types.Concrete) = struct
         let zkapp_input = ref None in
         let must_verify = ref Boolean.true_ in
         let global, local =
-          List.fold_left spec ~init
-            ~f:(fun ((_, local) as acc) account_update_spec ->
-              let module S = Single (struct
-                let constraint_constants = constraint_constants
+          let apply_slot ((_, local) as acc) account_update_spec =
+            let module S = Single (struct
+              let constraint_constants = constraint_constants
 
-                let spec = account_update_spec
+              let spec = account_update_spec
 
-                let set_zkapp_input x = zkapp_input := Some x
+              let set_zkapp_input x = zkapp_input := Some x
 
-                let set_must_verify x = must_verify := x
-              end) in
-              let finish v =
-                let open Mina_transaction_logic.Zkapp_command_logic.Start_data in
-                let ps =
-                  V.map v ~f:(function
-                    | `Skip ->
-                        []
-                    | `Start p ->
-                        Zkapp_command.all_account_updates ~signature_kind
-                          p.account_updates )
-                in
-                let h =
-                  exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
-                      Zkapp_command.Call_forest.hash (V.get ps) )
-                in
-                let start_data =
-                  { Mina_transaction_logic.Zkapp_command_logic.Start_data
-                    .account_updates = { With_hash.hash = h; data = ps }
-                  ; memo_hash =
-                      exists Field.typ ~compute:(fun () ->
-                          match V.get v with
-                          | `Skip ->
-                              Field.Constant.zero
-                          | `Start p ->
-                              p.memo_hash )
-                  ; will_succeed =
-                      exists Boolean.typ ~compute:(fun () ->
-                          match V.get v with
-                          | `Skip ->
-                              false
-                          | `Start p ->
-                              p.will_succeed )
-                  }
-                in
-                let global_state, local_state =
-                  with_label "apply" (fun () ->
-                      S.apply ~signature_kind ~constraint_constants
-                        ~is_start:
-                          ( match account_update_spec.is_start with
-                          | `No ->
-                              `No
-                          | `Yes ->
-                              `Yes start_data
-                          | `Compute_in_circuit ->
-                              `Compute start_data )
-                        S.{ perform }
-                        acc )
-                in
-                (global_state, local_state)
+              let set_must_verify x = must_verify := x
+            end) in
+            let finish v =
+              let open Mina_transaction_logic.Zkapp_command_logic.Start_data in
+              let ps =
+                V.map v ~f:(function
+                  | `Skip ->
+                      []
+                  | `Start p ->
+                      Zkapp_command.all_account_updates ~signature_kind
+                        p.account_updates )
               in
-              let acc' =
-                match account_update_spec.is_start with
-                | `No ->
-                    let global_state, local_state =
-                      S.apply ~signature_kind ~constraint_constants
-                        ~is_start:`No
-                        S.{ perform }
-                        acc
-                    in
-                    (global_state, local_state)
-                | `Compute_in_circuit ->
-                    V.create (fun () ->
-                        let start_zkapp_command =
-                          As_prover.read (Typ.prover_value ())
-                            start_zkapp_command
-                        in
-                        match Stdlib.( ! ) start_zkapp_command with
-                        | [] ->
-                            `Skip
-                        | p :: ps ->
-                            let should_pop =
-                              Mina_base.Zkapp_command.Call_forest.is_empty
-                                (V.get local.stack_frame.data.calls.data)
-                            in
-                            if should_pop then (
-                              start_zkapp_command := ps ;
-                              `Start p )
-                            else `Skip )
-                    |> finish
-                | `Yes ->
-                    as_prover (fun () ->
-                        assert (
-                          Mina_base.Zkapp_command.Call_forest.is_empty
-                            (V.get local.stack_frame.data.calls.data) ) ) ;
-                    V.create (fun () ->
-                        let start_zkapp_command =
-                          As_prover.read (Typ.prover_value ())
-                            start_zkapp_command
-                        in
-                        match Stdlib.( ! ) start_zkapp_command with
-                        | [] ->
-                            assert false
-                        | p :: ps ->
+              let h =
+                exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
+                    Zkapp_command.Call_forest.hash (V.get ps) )
+              in
+              let start_data =
+                { Mina_transaction_logic.Zkapp_command_logic.Start_data
+                  .account_updates = { With_hash.hash = h; data = ps }
+                ; memo_hash =
+                    exists Field.typ ~compute:(fun () ->
+                        match V.get v with
+                        | `Skip ->
+                            Field.Constant.zero
+                        | `Start p ->
+                            p.memo_hash )
+                ; will_succeed =
+                    exists Boolean.typ ~compute:(fun () ->
+                        match V.get v with
+                        | `Skip ->
+                            false
+                        | `Start p ->
+                            p.will_succeed )
+                }
+              in
+              let global_state, local_state =
+                with_label "apply" (fun () ->
+                    S.apply ~signature_kind ~constraint_constants
+                      ~is_start:
+                        ( match account_update_spec.is_start with
+                        | `No ->
+                            `No
+                        | `Yes ->
+                            `Yes start_data
+                        | `Compute_in_circuit ->
+                            `Compute start_data )
+                      S.{ perform }
+                      acc )
+              in
+              (global_state, local_state)
+            in
+            let acc' =
+              match account_update_spec.is_start with
+              | `No ->
+                  let global_state, local_state =
+                    S.apply ~signature_kind ~constraint_constants ~is_start:`No
+                      S.{ perform }
+                      acc
+                  in
+                  (global_state, local_state)
+              | `Compute_in_circuit ->
+                  V.create (fun () ->
+                      let start_zkapp_command =
+                        As_prover.read (Typ.prover_value ()) start_zkapp_command
+                      in
+                      match Stdlib.( ! ) start_zkapp_command with
+                      | [] ->
+                          `Skip
+                      | p :: ps ->
+                          let should_pop =
+                            Mina_base.Zkapp_command.Call_forest.is_empty
+                              (V.get local.stack_frame.data.calls.data)
+                          in
+                          if should_pop then (
                             start_zkapp_command := ps ;
                             `Start p )
-                    |> finish
-              in
-              acc' )
+                          else `Skip )
+                  |> finish
+              | `Yes ->
+                  as_prover (fun () ->
+                      assert (
+                        Mina_base.Zkapp_command.Call_forest.is_empty
+                          (V.get local.stack_frame.data.calls.data) ) ) ;
+                  V.create (fun () ->
+                      let start_zkapp_command =
+                        As_prover.read (Typ.prover_value ()) start_zkapp_command
+                      in
+                      match Stdlib.( ! ) start_zkapp_command with
+                      | [] ->
+                          assert false
+                      | p :: ps ->
+                          start_zkapp_command := ps ;
+                          `Start p )
+                  |> finish
+            in
+            acc'
+          in
+          let placeholder =
+            lazy (placeholder_local ~signature_kind ~constraint_constants)
+          in
+          List.foldi spec ~init
+            ~f:(fun slot ((global, local) as acc) account_update_spec ->
+              if not optional_slots then apply_slot acc account_update_spec
+              else
+                let active =
+                  exists Boolean.typ
+                    ~request:(fun () -> Slot_active slot)
+                    ~compute:(fun () -> true)
+                in
+                let global', local' =
+                  apply_slot
+                    ( global
+                    , select_local active ~then_:local
+                        ~else_:(Lazy.force placeholder) )
+                    account_update_spec
+                in
+                ( select_global active ~then_:global' ~else_:global
+                , select_local active ~then_:local' ~else_:local ) )
         in
         let local_state_ledger =
           (* The actual output ledger may differ from the one generated by

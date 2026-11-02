@@ -319,8 +319,13 @@ module type Full = sig
          Tick.Checked.t
 
     module Zkapp_command_snark : sig
+      (** Whether the [i]th slot of a segment with optional slots is used. *)
+      type _ Snarky_backendless.Request.t +=
+        | Slot_active : int -> bool Snarky_backendless.Request.t
+
       val main :
            signature_kind:Mina_signature_kind.t
+        -> ?optional_slots:bool
         -> ?witness:Zkapp_command_segment.Witness.t
         -> Zkapp_command_segment.Spec.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
