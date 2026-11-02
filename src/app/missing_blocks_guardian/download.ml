@@ -33,17 +33,23 @@ let ssl_config url =
                 false ) )
         () )
 
-(* Saves [url] as [file]. An HTTP body is saved whatever its status. *)
+(* Saves [url] as [file]. An HTTP response that is not a success is an
+   error, so that an error page is never saved as a block. *)
 let fetch ~url ~file =
   let url = Uri.of_string url in
   Monitor.try_with_or_error (fun () ->
       match Uri.scheme url with
       | Some ("http" | "https") ->
-          let%bind _response, body =
+          let%bind response, body =
             Cohttp_async.Client.get ?ssl_config:(ssl_config url) url
           in
-          let%bind body = Cohttp_async.Body.to_string body in
-          Writer.save file ~contents:body
+          let status = Cohttp.Response.status response in
+          if Cohttp.Code.is_success (Cohttp.Code.code_of_status status) then
+            let%bind body = Cohttp_async.Body.to_string body in
+            Writer.save file ~contents:body
+          else
+            let%bind () = Cohttp_async.Body.drain body in
+            failwithf "HTTP %s" (Cohttp.Code.string_of_status status) ()
       | Some "file" ->
           let%bind contents = Reader.file_contents (Uri.path url) in
           Writer.save file ~contents

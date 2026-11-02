@@ -22,7 +22,7 @@ Flags and environment variables
 -------------------------------
 
 Each flag falls back to an environment variable. A flag wins over its
-variable.
+variable. A variable set to the empty string counts as unset.
 
 | Flag | Environment variable | Subcommands | Meaning |
 | --- | --- | --- | --- |
@@ -34,6 +34,32 @@ variable.
 | `--archive-blocks PATH` | `ARCHIVE_BLOCKS` | `single-run`, `daemon` | The program that writes blocks. Default `mina-archive-blocks`. |
 | `--interval SECONDS` | `TIMEOUT` | `daemon` | Time between two checks. Default 600. |
 | `--log-json`, `--log-level LEVEL` | none | all | Log format and level, as in the other Mina programs. |
+
+Every setting is checked before anything runs. Each problem is logged on
+its own line, `Cannot start: <setting>: <what is expected>`, and the
+program exits with 1 after listing all of them. The settings in use are
+logged at start, with the database password hidden.
+
+Exit codes
+----------
+
+- `audit`: 0 when the archive holds no block without a parent, 1 when it
+  does or when the auditor fails.
+- `single-run`: 0 when the archive holds no block without a parent after
+  the run, 1 when a block could not be restored.
+- `daemon`: runs until a block cannot be restored, then exits with 1. A
+  service manager such as docker-compose with `restart: always` starts it
+  again.
+
+A block cannot be restored when:
+
+- the bucket answers with an HTTP status that is not a success, for example
+  404 when the file does not exist. The error page is not saved;
+- the auditor or `mina-archive-blocks` cannot be run, is killed, or logs an
+  error. `mina-archive-blocks` exits with 0 when it cannot add a block, so
+  its log decides;
+- after a block was added, the auditor still reports the same missing
+  parent. That means the file in the bucket holds another block.
 
 Examples
 --------
@@ -60,8 +86,17 @@ Modules
 -------
 
 - `missing_blocks_guardian.ml`: the command line and the recovery loop.
+- `config.ml`: the settings, their sources and their validation.
 - `auditor.ml`: runs the auditor and reads the missing parent from its log.
-- `app_log.ml`: parses the JSON log of a Mina program and relays it.
+- `app_log.ml`: parses the JSON log of a Mina program, relays it and finds
+  the errors in it.
 - `subprocess.ml`: runs a program and collects its output.
 - `download.ml`: fetches a block file; HTTPS checks the host name.
 - `sql.ml`: the queries on the archive database.
+
+Tests
+-----
+
+`MINA_PROFILE=dev dune runtest src/app/missing_blocks_guardian` runs the
+unit tests of the settings, the log reading and the download, with a local
+HTTP server.

@@ -1,22 +1,44 @@
-(executable
- (package missing_blocks_guardian)
- (name missing_blocks_guardian)
- (public_name missing_blocks_guardian)
+(library
+ (name missing_blocks_guardian_lib)
+ (modules
+  (:standard \ missing_blocks_guardian))
  (libraries
   ;; opam libraries
   async
   async_ssl
   caqti
   caqti-driver-postgresql
+  cohttp
   cohttp-async
   conduit-async
   core
   uri
   yojson
   ;; local libraries
-  interpolator_lib
   logger
   mina_caqti)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx)))
+
+(executable
+ (package missing_blocks_guardian)
+ (name missing_blocks_guardian)
+ (public_name missing_blocks_guardian)
+ (modules missing_blocks_guardian)
+ (libraries
+  ;; opam libraries
+  async
+  caqti
+  core
+  uri
+  yojson
+  ;; local libraries
+  interpolator_lib
+  logger
+  mina_caqti
+  missing_blocks_guardian_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
