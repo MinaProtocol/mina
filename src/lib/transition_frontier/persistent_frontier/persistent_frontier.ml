@@ -153,6 +153,9 @@ module Instance = struct
 
   let check_database t = Database.check t.db
 
+  let get_root_hash t =
+    Database.get_root_hash t.db |> Result.map_error ~f:Database.Error.message
+
   let get_root_transition ~signature_kind ~proof_cache_db t =
     let open Result.Let_syntax in
     Database.get_root_hash t.db

@@ -57,7 +57,8 @@
   kimchi_pasta
   kimchi_pasta.basic
   mina_wire_types
-  internal_tracing)
+  internal_tracing
+  proof_cache_tag)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
