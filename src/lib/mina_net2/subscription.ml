@@ -21,22 +21,21 @@ let id { id; _ } = id
 
 let topic { topic; _ } = topic
 
-let subscribe ~helper ~topic ~encode ~decode ~on_decode_failure ~validator =
-  let open Deferred.Or_error.Let_syntax in
-  let subscription_id = Id.create () in
-  let%map _ =
-    Libp2p_helper.do_rpc helper
-      (module Libp2p_ipc.Rpcs.Subscribe)
-      (Libp2p_ipc.Rpcs.Subscribe.create_request ~topic ~subscription_id)
-  in
+let create ~topic ~encode ~decode ~on_decode_failure ~validator =
   { topic
-  ; id = subscription_id
+  ; id = Id.create ()
   ; closed = false
   ; encode
   ; on_decode_failure
   ; decode
   ; validator
   }
+
+let subscribe ~helper { topic; id = subscription_id; _ } =
+  Libp2p_helper.do_rpc helper
+    (module Libp2p_ipc.Rpcs.Subscribe)
+    (Libp2p_ipc.Rpcs.Subscribe.create_request ~topic ~subscription_id)
+  |> Deferred.Or_error.ignore_m
 
 let unsubscribe ~helper sub =
   let open Deferred.Or_error.Let_syntax in
