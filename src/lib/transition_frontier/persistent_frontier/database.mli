@@ -87,7 +87,7 @@ val add :
 
 val move_root :
      old_root_hash:State_hash.t
-  -> new_root:Root_data.Limited.Stable.Latest.t
+  -> new_root:Root_data.Limited.t
   -> garbage:State_hash.t list
   -> batch_t
   -> unit
