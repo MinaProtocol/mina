@@ -343,42 +343,39 @@ let remove_node t h =
   | Some node ->
       remove_node' t node
 
-let prune t ~root_hash =
-  let cache = State_hash.Table.create () in
-  let rec reachable_from_root (node : Node.t) =
-    Hashtbl.find_or_add cache node.state_hash ~default:(fun () ->
-        if State_hash.equal node.state_hash root_hash then true
-        else
-          match Hashtbl.find t.nodes node.parent with
-          | None ->
-              false
-          | Some parent ->
-              reachable_from_root parent )
+(** Of the nodes with the given hashes and parents, those to end because the
+    root has moved to [new_root] and the blocks [left] have left the frontier:
+    the nodes for those blocks, and every node descending from one other than
+    through the new root. *)
+let discarded ~(parents : (State_hash.t * State_hash.t) list) ~new_root
+    ~(left : State_hash.t list) =
+  let parent = State_hash.Table.of_alist_exn parents in
+  let left = State_hash.Hash_set.of_list left in
+  let memo = State_hash.Table.create () in
+  let rec discarded hash =
+    (not (State_hash.equal hash new_root))
+    && ( Hash_set.mem left hash
+       || Hashtbl.find_or_add memo hash ~default:(fun () ->
+              Option.value_map (Hashtbl.find parent hash) ~default:false
+                ~f:discarded ) )
   in
-  let to_remove =
-    Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key:_ ~data acc ->
-        if reachable_from_root data then acc else data :: acc )
-  in
-  List.iter to_remove ~f:(remove_node' t)
-
-let clear t = Hashtbl.data t.nodes |> List.iter ~f:(remove_node' t)
+  List.filter_map parents ~f:(fun (hash, _) ->
+      Option.some_if (discarded hash) hash )
 
 (** Update the tree for a breadcrumb the frontier has added, and for the root
-    transition the add applied, if any: the new root and the blocks the move
-    discarded. *)
-let frontier_added (t : t) breadcrumb ~root_transition =
+    move the add applied, if any: the new root, and the blocks that left the
+    frontier - the previous root and the blocks on the branches the move
+    discarded. Nodes for those blocks, and their descendants other than through
+    the new root, are removed; nothing else is. *)
+let frontier_added (t : t) breadcrumb ~root_moved =
   breadcrumb_added t breadcrumb ;
-  Option.iter root_transition ~f:(fun (new_root, garbage) ->
-      List.iter garbage ~f:(remove_node t) ;
-      if Hashtbl.mem t.nodes new_root then prune t ~root_hash:new_root
-      else (
-        [%log' debug t.logger]
-          ~metadata:
-            [ ("hash", State_hash.to_yojson new_root); ("tree", to_yojson t) ]
-          "catchup $tree invariant broken: new root $hash not present. Diffs \
-           may have been applied out of order. Clearing catchup state to avoid \
-           retaining stale jobs" ;
-        clear t ) )
+  Option.iter root_moved ~f:(fun (new_root, left) ->
+      discarded
+        ~parents:
+          (Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key ~data acc ->
+               (key, data.Node.parent) :: acc ) )
+        ~new_root ~left
+      |> List.iter ~f:(remove_node t) )
 
 let create ~logger ~root =
   let t =
