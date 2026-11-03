@@ -87,8 +87,8 @@ echo "--- Clean up any existing config files"
 rm -f config.json config.json.gz
 rm -rf "$OUTPUT_DIR"
 
-# Set the base network config for ./scripts/hardfork/create_runtime_config.sh
-export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
+# Check that the network is a known one.
+FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
 if [ ! -f "${FORKING_FROM_CONFIG_JSON}" ]; then
   echo "[ERROR] ${NETWORK_NAME} is not a known network name; check for existing network configs in 'genesis_ledgers/'"
   exit 1
@@ -104,9 +104,14 @@ jq 'del(.genesis)' "$TMP/config.json" > "$TMP/fork_config_no_genesis.json"
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
 
-jq 'del(.genesis)' "$FORKING_FROM_CONFIG_JSON" > "$TMP/config_no_genesis.json"
-
-"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --prefork-genesis-config "$TMP/config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+# The fork is Mesa -> Mesa: the slot duration does not change, so the accounts
+# are loaded verbatim (--identity-conversion), as the daemon's own hardfork
+# migration does. Without the flag the tool applies the Berkeley -> Mesa
+# slot_reduction_update, which doubles the vesting period of every account
+# still vesting at the fork slot and gives a genesis ledger root that differs
+# from the one automode nodes compute. --identity-conversion ignores
+# --prefork-genesis-config, so none is passed.
+"$RUNTIME_GENESIS_LEDGER" --identity-conversion --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
