@@ -15,7 +15,7 @@
   uri
   yojson
   ;; local libraries
-  interpolator_lib
+  cli_lib
   logger
   mina_caqti)
  (instrumentation

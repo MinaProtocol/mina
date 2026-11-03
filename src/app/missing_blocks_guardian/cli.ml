@@ -8,44 +8,12 @@ open Command.Let_syntax
    variable or its default and reports every problem at once. Each flag
    function takes the environment and returns the checked setting. *)
 
-let log_levels =
-  String.concat ~sep:", " (List.map Logger.Level.all ~f:Logger.Level.show)
-
-(* Sets up the log on stdout, as --log-json and --log-level do in the other
-   Mina programs. *)
+(* The log on stdout, with --log-json and --log-level as in the other Mina
+   programs. *)
 let log =
-  let%map_open json =
-    flag "--log-json" ~aliases:[ "log-json" ] no_arg
-      ~doc:"Print log output as JSON (default: plain text)"
-  and level =
-    flag "--log-level" ~aliases:[ "log-level" ]
-      ~doc:(sprintf "LEVEL Set log level, one of %s (default: Info)" log_levels)
-      (optional_with_default "info" string)
-  in
-  fun () ->
-    let level =
-      match Logger.Level.of_string (String.lowercase level) with
-      | Ok level ->
-          level
-      | Error _ ->
-          Stdlib.prerr_endline
-            (sprintf "Cannot start: --log-level %s: expected one of %s" level
-               log_levels ) ;
-          Core.exit 1
-    in
-    let processor =
-      if json then Logger.Processor.raw ~log_level:level ()
-      else
-        Logger.Processor.pretty ~log_level:level
-          ~config:
-            { Interpolator_lib.Interpolator.mode = Inline
-            ; max_interpolation_length = 200
-            ; pretty_print = true
-            }
-    in
-    Logger.Consumer_registry.register ~id:"default" ~processor
-      ~transport:(Logger.Transport.stdout ())
-      ()
+  let%map_open json = Cli_lib.Flag.Log.json
+  and level = Cli_lib.Flag.Log.level in
+  fun () -> Cli_lib.Stdout_log.setup json level
 
 let archive =
   let%map_open uri =
