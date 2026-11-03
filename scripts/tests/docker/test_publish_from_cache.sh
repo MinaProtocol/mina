@@ -255,6 +255,11 @@ t_publish_env_decides_the_registry () {
   run MINA_PUBLISH_TARGET_REGISTRY=docker.io/minaprotocol
   expect "exit $RC: $OUT" test $RC -eq 0
   expect "the same registry must not be logged as a redirection" not grep -q "publishing to" <<< "$OUT"
+  # docker load prints a docker.io tag without its host.
+  archive pkg mina-archive minaprotocol/mina-archive:1.0.0-noble-mainnet
+  run MINA_PUBLISH_TARGET_REGISTRY=other MINA_RELEASE_DOCKERS=mina-archive
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "a host-less tag must be logged as docker.io" grep -q "tagged for docker.io/minaprotocol, publishing to other" <<< "$OUT"
 }
 
 t_no_hash_tag_pushes_the_version_tag_only () {

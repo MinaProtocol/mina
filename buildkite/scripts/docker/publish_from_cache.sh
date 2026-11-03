@@ -130,6 +130,17 @@ retag_for_registry () {
   echo "${TARGET_REGISTRY}/${1##*/}"
 }
 
+# registry_of <tag>: the registry part of a tag, in full. docker load prints a
+# docker.io tag without its host ("minaprotocol/mina-daemon:1.0"), so a
+# registry with no host is docker.io.
+registry_of () {
+  local registry="${1%/*}"
+  if [[ "$registry" != */* && "$registry" != *.* && "$registry" != *:* ]]; then
+    registry="docker.io/${registry}"
+  fi
+  echo "$registry"
+}
+
 publish_tag () {
   # publish_tag <tag> <primary> <image id>: push, or alias registry-side.
   local tag="$1" primary="$2" id="$3" published
@@ -185,7 +196,7 @@ for archive in "${SELECTED[@]}"; do
       retagged+=("$target")
     done
     if [[ "${retagged[0]}" != "${tags[0]}" ]]; then
-      echo "    tagged for ${tags[0]%/*}, publishing to ${TARGET_REGISTRY}"
+      echo "    tagged for $(registry_of "${tags[0]}"), publishing to ${TARGET_REGISTRY}"
     fi
     tags=("${retagged[@]}")
   fi
