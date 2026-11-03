@@ -35,9 +35,10 @@ CACHE_ROOT="${CACHE_ROOT:-/var/storagebox/docker-cache}"
 
 # Reclaim disk if the agent is getting full, before we run docker. Covers
 # RunInToolchain jobs (which don't run a docker build, so the build-job prune
-# never fires for them). Threshold-gated and non-fatal. Disable with DISK_CLEANUP=0.
+# never fires for them). Threshold-gated and non-fatal; never removes the image
+# this step is about to use. Disable with DISK_CLEANUP=0.
 if [[ "${DISK_CLEANUP:-1}" != "0" && -x ./buildkite/scripts/docker/disk-cleanup.sh ]]; then
-  ./buildkite/scripts/docker/disk-cleanup.sh || true
+  DISK_CLEANUP_KEEP="$IMAGE" ./buildkite/scripts/docker/disk-cleanup.sh || true
 fi
 
 if [[ "$IMAGE" != *:* ]]; then
@@ -61,6 +62,9 @@ if [[ ! -f "$CACHE_FILE" ]]; then
 fi
 
 echo "Loading ${IMAGE} from CI cache at ${CACHE_FILE}"
+# Record the use for disk-cleanup.sh, which evicts images least recently used
+# first by LastTagTime: docker sets that on `docker tag`, not on load or run.
+trap 'docker tag "$IMAGE" "$IMAGE" >/dev/null 2>&1 || true' EXIT
 if docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image ${IMAGE} already exists locally, skipping load"
   exit 0
