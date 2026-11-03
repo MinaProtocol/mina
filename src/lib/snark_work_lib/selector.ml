@@ -21,8 +21,6 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
       [@@deriving sexp, yojson]
@@ -37,8 +35,6 @@ end
 module Result = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         (Spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t

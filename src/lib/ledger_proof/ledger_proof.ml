@@ -13,6 +13,8 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t [@@deriving compare, equal, sexp, yojson, hash]
+
 let statement (t : t) = Transaction_snark.statement t
 
 let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t

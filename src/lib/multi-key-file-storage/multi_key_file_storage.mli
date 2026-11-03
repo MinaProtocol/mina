@@ -27,6 +27,8 @@ module Tag : sig
     end
   end]
 
+  type ('filename_key, 'a) t = ('filename_key, 'a) Stable.Latest.t
+
   val compare :
        ('filename_key -> 'filename_key -> int)
     -> ('filename_key, 'a) t

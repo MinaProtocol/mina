@@ -21,8 +21,6 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
@@ -271,8 +269,6 @@ let hash_generic :
    the snarked ledger*)
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       { scan_state :

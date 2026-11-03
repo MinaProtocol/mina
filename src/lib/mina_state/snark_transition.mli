@@ -39,6 +39,8 @@ module Value : sig
       [@@deriving sexp, to_yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
 type value = Value.t

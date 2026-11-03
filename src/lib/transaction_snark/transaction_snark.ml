@@ -55,6 +55,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
   end
 
   module Pending_coinbase_stack_state =
@@ -72,6 +74,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving yojson, compare, equal, sexp, hash]
   end
 
   [%%versioned
@@ -86,6 +90,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, equal, sexp, yojson, hash]
 
   let proof t = t.Proof_carrying_data.proof
 
@@ -132,6 +138,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t = Opt_signed_opt_signed | Opt_signed | Proved
+      [@@deriving sexp, yojson]
 
       let of_controls = function
         | [ Control.Poly.Proof _ ] ->

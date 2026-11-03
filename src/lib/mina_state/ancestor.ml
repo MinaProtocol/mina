@@ -11,6 +11,9 @@ module Input = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { descendant : State_hash.t; generations : int }
+  [@@deriving sexp]
 end
 
 module Output = State_hash
@@ -24,6 +27,8 @@ module Proof = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t
 end
 
 let verify =

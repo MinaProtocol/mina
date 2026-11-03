@@ -34,6 +34,14 @@ module Commitments = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { w_comm : (Backend.Tick.Field.t * Backend.Tick.Field.t) Columns_vec.t
+    ; z_comm : Backend.Tick.Field.t * Backend.Tick.Field.t
+    ; t_comm :
+        (Backend.Tick.Field.t * Backend.Tick.Field.t) Quotient_polynomial_vec.t
+    }
+  [@@deriving compare, sexp, yojson, hash, equal]
+
   let to_kimchi ({ w_comm; z_comm; t_comm } : t) :
       Backend.Tock.Curve.Affine.t Plonk_types.Messages.t =
     { w_comm = Vector.map ~f:(fun x -> [| x |]) w_comm
@@ -89,6 +97,20 @@ module Evaluations = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { w : (Backend.Tock.Field.t * Backend.Tock.Field.t) Columns_vec.t
+    ; coefficients : (Backend.Tock.Field.t * Backend.Tock.Field.t) Columns_vec.t
+    ; z : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; s : (Backend.Tock.Field.t * Backend.Tock.Field.t) Permuts_minus_1_vec.t
+    ; generic_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; poseidon_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; complete_add_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; mul_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; emul_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; endomul_scalar_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    }
+  [@@deriving compare, sexp, yojson, hash, equal]
 
   let to_kimchi
       ({ w
@@ -198,6 +220,18 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t =
+  { commitments : Commitments.t
+  ; evaluations : Evaluations.t
+  ; ft_eval1 : Backend.Tock.Field.t
+  ; bulletproof :
+      ( Backend.Tick.Field.t * Backend.Tick.Field.t
+      , Backend.Tock.Field.t )
+      Plonk_types.Openings.Bulletproof.t
+        (* TODO-URGENT: Validate bulletproof length on the rust side *)
+  }
+[@@deriving compare, sexp, yojson, hash, equal]
 
 let to_kimchi_proof ({ commitments; bulletproof; evaluations; ft_eval1 } : t) :
     Backend.Tock.Proof.t =

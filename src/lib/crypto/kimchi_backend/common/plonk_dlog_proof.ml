@@ -133,6 +133,10 @@ module Challenge_polynomial = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ('g, 'fq) t = ('g, 'fq) Stable.Latest.t =
+    { challenges : 'fq Mina_stdlib.Bounded_types.ArrayN16.t; commitment : 'g }
+  [@@deriving sexp, compare, yojson]
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -154,6 +158,8 @@ module Make (Inputs : Inputs_intf) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
 
     type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
       { challenges : 'fq array; commitment : 'g }

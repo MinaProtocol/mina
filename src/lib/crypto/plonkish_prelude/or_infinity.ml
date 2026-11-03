@@ -10,6 +10,9 @@ module Stable = struct
   end
 end]
 
+type 'a t = 'a Stable.Latest.t = Infinity | Finite of 'a
+[@@deriving sexp, equal, compare, hash, yojson]
+
 [@@@warning "+4"]
 
 let finite_exn = function

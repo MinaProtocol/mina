@@ -32,6 +32,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
+
     let max_value = UInt64.max_int
 
     let zero = UInt64.zero
@@ -135,6 +137,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
       module Bits = B.UInt64
       include B.Snarkable.UInt64 (Tick)

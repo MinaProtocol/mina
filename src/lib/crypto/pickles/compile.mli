@@ -75,6 +75,8 @@ module Side_loaded : sig
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
     include Codable.Base58_check_intf with type t := t
 
     include Codable.Base64_intf with type t := t
@@ -113,6 +115,8 @@ module Side_loaded : sig
         val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, equal, yojson, hash, compare]
 
     val of_proof : _ Proof.t -> t
 

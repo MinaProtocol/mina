@@ -13,8 +13,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   [@@@with_versioned_json]
 
   module V4 : sig

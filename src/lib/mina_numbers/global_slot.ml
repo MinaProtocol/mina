@@ -10,6 +10,8 @@ module type S = sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, compare]
+
   module T : Intf.UInt32
 
   val to_uint32 : t -> uint32

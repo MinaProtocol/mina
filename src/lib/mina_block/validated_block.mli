@@ -2,8 +2,6 @@ open Mina_base
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V3 : sig
     type t [@@deriving equal]
 

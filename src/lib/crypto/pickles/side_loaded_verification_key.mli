@@ -16,6 +16,8 @@ module Width : sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
   module Checked : sig
     type t
 
@@ -38,6 +40,9 @@ module Width : sig
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 end
 
@@ -82,7 +87,7 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal]
+type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal, yojson]
 
 val dummy : t
 

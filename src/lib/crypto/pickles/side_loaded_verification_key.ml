@@ -45,6 +45,8 @@ module Width : sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
   open Impls.Step
 
   module Checked : sig
@@ -69,6 +71,9 @@ module Width : sig
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   module Length : Nat.Add.Intf_transparent
@@ -127,6 +132,8 @@ module R = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, yojson]
 end
 
 [%%versioned_binable
@@ -251,6 +258,8 @@ module Stable = struct
     include Codable.Make_base64 (T)
   end
 end]
+
+type t = Stable.Latest.t [@@deriving hash]
 
 [%%define_locally
 Stable.Latest.

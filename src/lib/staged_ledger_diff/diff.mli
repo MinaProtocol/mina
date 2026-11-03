@@ -45,6 +45,14 @@ module Pre_diff_two : sig
     end
   end]
 
+  type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
+    { completed_works : 'a list
+    ; commands : 'b list
+    ; coinbase : Coinbase.Fee_transfer.t At_most_two.t
+    ; internal_command_statuses : Transaction_status.t list
+    }
+  [@@deriving equal, compare, sexp, yojson]
+
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 end
 
@@ -61,6 +69,14 @@ module Pre_diff_one : sig
       [@@deriving equal, compare, sexp, yojson]
     end
   end]
+
+  type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
+    { completed_works : 'a list
+    ; commands : 'b list
+    ; coinbase : Coinbase.Fee_transfer.t At_most_one.t
+    ; internal_command_statuses : Transaction_status.t list
+    }
+  [@@deriving equal, compare, sexp, yojson]
 
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 end

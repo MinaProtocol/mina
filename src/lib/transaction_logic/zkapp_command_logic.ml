@@ -230,6 +230,38 @@ module Local_state = struct
     end
   end]
 
+  type ( 'stack_frame
+       , 'call_stack
+       , 'signed_amount
+       , 'ledger
+       , 'bool
+       , 'comm
+       , 'length
+       , 'failure_status_tbl )
+       t =
+        ( 'stack_frame
+        , 'call_stack
+        , 'signed_amount
+        , 'ledger
+        , 'bool
+        , 'comm
+        , 'length
+        , 'failure_status_tbl )
+        Stable.Latest.t =
+    { stack_frame : 'stack_frame
+    ; call_stack : 'call_stack
+    ; transaction_commitment : 'comm
+    ; full_transaction_commitment : 'comm
+    ; excess : 'signed_amount
+    ; supply_increase : 'signed_amount
+    ; ledger : 'ledger
+    ; success : 'bool
+    ; account_update_index : 'length
+    ; failure_status_tbl : 'failure_status_tbl
+    ; will_succeed : 'bool
+    }
+  [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
+
   let map_with_hashes (type with_hashes with_hashes_modified)
       ~(f : with_hashes -> with_hashes_modified)
       (t :
@@ -311,6 +343,8 @@ module Local_state = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving equal, compare, hash, yojson, sexp]
   end
 
   module Checked = struct
@@ -984,6 +1018,14 @@ module Start_data = struct
       [@@deriving sexp, yojson]
     end
   end]
+
+  type ('account_updates, 'field, 'bool) t =
+        ('account_updates, 'field, 'bool) Stable.Latest.t =
+    { account_updates : 'account_updates
+    ; memo_hash : 'field
+    ; will_succeed : 'bool
+    }
+  [@@deriving sexp, yojson]
 end
 
 module Make (Inputs : Inputs_intf) = struct

@@ -14,6 +14,11 @@ module Poly : sig
     end
   end]
 
+  type ('witness, 'ledger_proof) t = ('witness, 'ledger_proof) Stable.Latest.t =
+    | Transition of Transaction_snark.Statement.t * 'witness
+    | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
+  [@@deriving sexp, yojson]
+
   val map :
     f_witness:('a -> 'b) -> f_proof:('c -> 'd) -> ('a, 'c) t -> ('b, 'd) t
 
@@ -29,8 +34,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t =
       ( Transaction_witness.Stable.V3.t

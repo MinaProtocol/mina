@@ -24,6 +24,8 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, compare]
+
 include Hashable.Make (Stable.Latest)
 open Bigstring
 

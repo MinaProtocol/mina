@@ -14,6 +14,8 @@ module Id = struct
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving compare, hash, equal, sexp]
+
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x
 
@@ -45,13 +47,13 @@ module Inet_addr = struct
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+
   [%%define_locally Stable.V1.(to_yojson, of_yojson)]
 end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type t =
       { host : Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
@@ -140,8 +142,6 @@ end
 module Display = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         { host : Mina_stdlib.Bounded_types.String.Stable.V1.t

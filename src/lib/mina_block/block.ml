@@ -20,8 +20,6 @@ let transactions_impl ~get_transactions ~constraint_constants header
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       { header : Header.Stable.V3.t

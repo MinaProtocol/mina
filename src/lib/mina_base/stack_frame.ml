@@ -9,6 +9,10 @@ module Stable = struct
   end
 end]
 
+type ('caller, 'zkapp_command) t = ('caller, 'zkapp_command) Stable.Latest.t =
+  { caller : 'caller; caller_caller : 'caller; calls : 'zkapp_command }
+[@@deriving make, fields, sexp, yojson]
+
 type value =
   ( Token_id.t
   , ( Account_update.t
@@ -67,6 +71,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
   open Pickles.Impls.Step
 

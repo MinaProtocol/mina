@@ -240,8 +240,6 @@ module Make32 () : UInt32 = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 
@@ -276,8 +274,6 @@ module Make64 () : UInt64 = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       [@@@with_all_version_tags]
 

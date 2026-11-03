@@ -32,6 +32,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving equal, ord, hash, sexp, yojson, hlist]
       end
     end]
+
+    type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
+      { previous_state_hash : 'state_hash; body : 'body }
+    [@@deriving equal, ord, hash, sexp, yojson, hlist]
   end
 
   let hashes_abstract ~hash_body
@@ -65,6 +69,19 @@ module Make_str (A : Wire_types.Concrete) = struct
           [@@deriving sexp, equal, compare, yojson, hash, version, hlist]
         end
       end]
+
+      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
+            ( 'state_hash
+            , 'blockchain_state
+            , 'consensus_state
+            , 'constants )
+            Stable.Latest.t =
+        { genesis_state_hash : 'state_hash
+        ; blockchain_state : 'blockchain_state
+        ; consensus_state : 'consensus_state
+        ; constants : 'constants
+        }
+      [@@deriving sexp, equal, compare, yojson, hash, hlist]
     end
 
     module Value = struct
@@ -82,6 +99,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving equal, ord, hash, sexp, yojson]
     end
 
     type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
@@ -195,6 +214,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, hash, compare, equal, yojson]
 
     include Hashable.Make (Stable.Latest)
   end

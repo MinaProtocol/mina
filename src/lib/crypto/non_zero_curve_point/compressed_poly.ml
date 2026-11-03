@@ -14,4 +14,8 @@ module Poly = struct
       [@@deriving compare, equal, hash, hlist]
     end
   end]
+
+  type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
+    { x : 'field; is_odd : 'boolean }
+  [@@deriving compare, equal, hash, hlist]
 end

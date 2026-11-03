@@ -1,7 +1,5 @@
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t = { staged_ledger_diff : Diff.Stable.V3.t } [@@deriving equal, sexp]
 

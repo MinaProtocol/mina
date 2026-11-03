@@ -110,8 +110,6 @@ end
 module At_most_2 = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N2.n) at_most
 
@@ -141,8 +139,6 @@ module At_most_2 = struct
 module At_most_8 = struct
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N8.n) at_most
 

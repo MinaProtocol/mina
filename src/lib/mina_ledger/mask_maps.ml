@@ -54,8 +54,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { accounts : (Location.Stable.V1.t, Account.Stable.V3.t) Map.Stable.V1.t
@@ -76,8 +74,6 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t
     end

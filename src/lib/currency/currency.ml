@@ -899,8 +899,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         [@@@with_all_version_tags]
 
@@ -931,6 +929,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
           end
         end]
+
+        type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
         (* Give a definition to var, it will be hidden at the interface level *)
         include
@@ -1001,8 +1001,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       [%%versioned
       module Stable = struct
-        [@@@no_toplevel_latest_type]
-
         module V1 = struct
           [@@@with_all_version_tags]
 
@@ -1052,6 +1050,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 
     include (Amount : Basic with type t := t with type var = Amount.var)
 

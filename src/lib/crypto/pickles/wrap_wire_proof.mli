@@ -32,6 +32,14 @@ module Commitments : sig
     end
   end]
 
+  type t = Stable.Latest.t =
+    { w_comm : (Backend.Tick.Field.t * Backend.Tick.Field.t) Columns_vec.t
+    ; z_comm : Backend.Tick.Field.t * Backend.Tick.Field.t
+    ; t_comm :
+        (Backend.Tick.Field.t * Backend.Tick.Field.t) Quotient_polynomial_vec.t
+    }
+  [@@deriving compare, sexp, yojson, hash, equal]
+
   val to_kimchi : t -> Backend.Tock.Curve.Affine.t Plonk_types.Messages.t
 
   val of_kimchi : Backend.Tock.Curve.Affine.t Plonk_types.Messages.t -> t
@@ -70,6 +78,20 @@ module Evaluations : sig
     end
   end]
 
+  type t = Stable.Latest.t =
+    { w : (Backend.Tock.Field.t * Backend.Tock.Field.t) Columns_vec.t
+    ; coefficients : (Backend.Tock.Field.t * Backend.Tock.Field.t) Columns_vec.t
+    ; z : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; s : (Backend.Tock.Field.t * Backend.Tock.Field.t) Permuts_minus_1_vec.t
+    ; generic_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; poseidon_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; complete_add_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; mul_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; emul_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    ; endomul_scalar_selector : Backend.Tock.Field.t * Backend.Tock.Field.t
+    }
+  [@@deriving compare, sexp, yojson, hash, equal]
+
   val to_kimchi :
        t
     -> (Backend.Tock.Field.t array * Backend.Tock.Field.t array)
@@ -96,6 +118,17 @@ module Stable : sig
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 end]
+
+type t = Stable.Latest.t =
+  { commitments : Commitments.t
+  ; evaluations : Evaluations.t
+  ; ft_eval1 : Backend.Tock.Field.t
+  ; bulletproof :
+      ( Backend.Tick.Field.t * Backend.Tick.Field.t
+      , Backend.Tock.Field.t )
+      Plonk_types.Openings.Bulletproof.t
+  }
+[@@deriving compare, sexp, yojson, hash, equal]
 
 val to_kimchi_proof : t -> Backend.Tock.Proof.t
 

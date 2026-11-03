@@ -13,6 +13,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash]
+
 val gen : t Quickcheck.Generator.t
 
 include Codable.S with type t := t

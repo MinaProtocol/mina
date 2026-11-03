@@ -38,6 +38,8 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
 [%%define_locally
 Stable.Latest.
   ( to_yojson

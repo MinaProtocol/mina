@@ -28,8 +28,6 @@ module Base : sig
   module Wrap : sig
     [%%versioned:
     module Stable : sig
-      [@@@no_toplevel_latest_type]
-
       module V2 : sig
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :

@@ -46,3 +46,5 @@ module Stable = struct
         (M)
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, yojson, equal, compare, hash]

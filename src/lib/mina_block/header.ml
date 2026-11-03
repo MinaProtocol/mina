@@ -88,6 +88,17 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    { protocol_state : Protocol_state.Value.t
+    ; protocol_state_proof : (Proof.t[@sexp.opaque])
+    ; delta_block_chain_proof :
+        (* TODO: abstract *)
+        State_hash.t * State_body_hash.t list
+    ; current_protocol_version : Protocol_version.t
+    ; proposed_protocol_version_opt : Protocol_version.t option
+    }
+  [@@deriving fields, sexp, to_yojson]
+
   [%%define_locally
   Stable.Latest.
     ( protocol_state

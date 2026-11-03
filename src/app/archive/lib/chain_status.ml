@@ -11,6 +11,9 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t = Canonical | Orphaned | Pending
+[@@deriving yojson, equal]
+
 let to_string = function
   | Canonical ->
       "canonical"

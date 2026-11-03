@@ -543,8 +543,6 @@ include
 module Diff_versioned = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of

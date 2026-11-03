@@ -42,8 +42,6 @@ let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = int * Mina_stdlib.Bounded_types.String.Stable.V1.t
 
@@ -90,6 +88,8 @@ module Stable = struct
     let equal = equals
   end
 end]
+
+type t = Stable.Latest.t
 
 let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 

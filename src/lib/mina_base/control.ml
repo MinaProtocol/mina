@@ -14,13 +14,17 @@ module Poly = struct
       let to_latest = Fn.id
     end
   end]
+
+  type ('proof, 'signature) t = ('proof, 'signature) Stable.Latest.t =
+    | Proof of 'proof
+    | Signature of 'signature
+    | None_given
+  [@@deriving sexp, equal, yojson, hash, compare]
 end
 
 (* TODO: temporary hack *)
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       ( Pickles.Side_loaded.Proof.Stable.V2.t

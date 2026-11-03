@@ -15,6 +15,12 @@ module Poly : sig
     end
   end]
 
+  type ('single_spec, 'sub_zkapp_spec) t =
+        ('single_spec, 'sub_zkapp_spec) Stable.Latest.t =
+    | Single of ('single_spec, Id.Single.t) With_job_meta.t
+    | Sub_zkapp_command of ('sub_zkapp_spec, Id.Sub_zkapp.t) With_job_meta.t
+  [@@deriving sexp, yojson]
+
   val map :
        f_single_spec:('a -> 'b)
     -> f_subzkapp_spec:('c -> 'd)
@@ -28,8 +34,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t =
       (Single_spec.Stable.V2.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t

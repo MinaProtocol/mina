@@ -12,6 +12,9 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t = Pow_2_roots_of_unity of int
+[@@unboxed] [@@deriving sexp, equal, compare, hash, yojson]
+
 [@@@warning "+4"]
 
 include Hashable.Make (Stable.Latest)

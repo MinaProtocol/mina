@@ -16,6 +16,8 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t [@@deriving yojson, sexp]
+
 type sparse_ledger = t [@@deriving sexp, to_yojson]
 
 module Hash = struct

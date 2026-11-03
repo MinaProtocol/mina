@@ -6,8 +6,6 @@ open Transaction_snark
 module Zkapp_command_inputs = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         ( Zkapp_command_segment.Witness.Stable.V2.t

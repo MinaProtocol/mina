@@ -95,6 +95,8 @@ module Keypair : sig
     end
   end]
 
+  type t = Stable.Latest.t
+
   (** Formats this keypair to a comma-separated list of public key, secret key, and peer_id. *)
   val to_string : t -> string
 

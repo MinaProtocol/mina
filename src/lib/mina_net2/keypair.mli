@@ -9,6 +9,8 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t
+
 (** Securely generate a new keypair. *)
 val generate_random : Libp2p_helper.t -> t Deferred.t
 
