@@ -36,20 +36,19 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    ~valid_cb cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
+    cached_breadcrumb ~(precomputed_values : Precomputed_values.t) =
   let module Inclusion_time = Mina_metrics.Block_latency.Inclusion_time in
   let breadcrumb = Cached.peek cached_breadcrumb in
   let consensus_constants = precomputed_values.consensus_constants in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
-  [%log debug] "add_and_finalize $state_hash %s callback"
+  [%log debug] "add_and_finalize $state_hash"
     ~metadata:
       [ ( "state_hash"
         , Transition_frontier.Breadcrumb.state_hash breadcrumb
           |> State_hash.to_yojson )
-      ]
-    (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+      ] ;
   let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
@@ -74,9 +73,15 @@ let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
       let%map () = Transition_frontier.add_breadcrumb_exn frontier breadcrumb in
       true
   in
-  if not (Cached.is_pure cached_breadcrumb) then
-    Block_registry.finish block_registry cached_breadcrumb
-      (if added then `Added else `Ignored) ;
+  (* Produced blocks are not registered, and have no callback. *)
+  let valid_cb =
+    if Cached.is_pure cached_breadcrumb then None
+    else if added then
+      Block_registry.finish_added block_registry cached_breadcrumb
+    else (
+      Block_registry.finish block_registry cached_breadcrumb `Ignored ;
+      None )
+  in
   Block_outcome_log.record (fun () ->
       Frontier_add
         { state_hash; source = (source :> Block_outcome_log.source); added } ) ;
@@ -109,7 +114,7 @@ let add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~block_registry ~catchup_scheduler
-    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
+    ~processed_transition_writer ~time_controller ~block_or_header
     ?transaction_pool_proxy =
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
@@ -172,12 +177,13 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       with
       | Ok _ | Error `Parent_missing_from_frontier ->
           [%log internal] "Schedule_catchup" ;
-          Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
-            ~header_with_hash ;
+          Catchup_scheduler.watch_header catchup_scheduler ~header_with_hash ;
           return ()
       | Error `Not_selected_over_frontier_root ->
+          Block_registry.finish_header block_registry transition_hash `Ignored ;
           handle_not_selected ()
       | Error `Already_in_frontier ->
+          Block_registry.finish_header block_registry transition_hash `Ignored ;
           [%log internal] "Failure"
             ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
           [%log warn] ~metadata
@@ -235,8 +241,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                     ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
                 in
                 Catchup_scheduler.watch catchup_scheduler ~timeout_duration
-                  ~cached_transition:cached_initially_validated_transition
-                  ~valid_cb ;
+                  ~cached_transition:cached_initially_validated_transition ;
                 return (Error ()) )
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
@@ -281,6 +286,19 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               "Error while building breadcrumb in the transition handler \
                processor: $error" ;
             Deferred.return (Error ())
+        | Error `Invalid_body_reference ->
+            (* The body is not the one the block's header commits to, so the
+               block is invalid whatever our own state. *)
+            Block_registry.finish block_registry
+              cached_initially_validated_transition `Rejected ;
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Invalid body reference") ] ;
+            [%log error] ~metadata
+              "Error while building breadcrumb in the transition handler \
+               processor: invalid body reference" ;
+            Deferred.return (Error ())
         | Error (`Fatal_error exn) ->
             Block_registry.finish block_registry
               cached_initially_validated_transition `Ignored ;
@@ -301,7 +319,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       let%map.Deferred result =
         add_and_finalize ~logger ~frontier ~block_registry ~catchup_scheduler
           ~processed_transition_writer ~only_if_present:false ~time_controller
-          ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb
+          ~source:`Gossip breadcrumb ~precomputed_values
       in
       ( match result with
       | Ok () ->
@@ -338,13 +356,13 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       subtree
                       (* It could be the case that by the time we try and
                          * add the breadcrumb, it's no longer relevant when
-                         * we're catching up *) ~f:(fun (b, valid_cb) ->
+                         * we're catching up *) ~f:(fun b ->
                         let state_hash =
                           Frontier_base.Breadcrumb.state_hash (Cached.peek b)
                         in
                         let%map result =
                           add_and_finalize ~logger ~only_if_present:true
-                            ~source:`Catchup ~valid_cb b
+                            ~source:`Catchup b
                         in
                         Internal_tracing.with_state_hash state_hash
                         @@ fun () ->
@@ -362,8 +380,7 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 ()
             | Error err ->
                 List.iter breadcrumb_subtrees ~f:(fun tree ->
-                    Mina_stdlib.Rose_tree.iter tree
-                      ~f:(fun (cached_breadcrumb, _vc) ->
+                    Mina_stdlib.Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
                         Block_registry.finish block_registry cached_breadcrumb
                           `Ignored ) ) ;
                 [%log error]
@@ -401,7 +418,7 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
             let%map () =
               match%map
                 add_and_finalize ~logger ~only_if_present:false
-                  ~source:`Internal breadcrumb ~valid_cb:None
+                  ~source:`Internal breadcrumb
               with
               | Ok () ->
                   [%log internal] "Breadcrumb_integrated" ;
@@ -421,19 +438,17 @@ let create_handler ~context:(module Context : CONTEXT) ~verifier ~trust_system
             Mina_metrics.(
               Gauge.dec_one
                 Transition_frontier_controller.transitions_being_processed)
-        | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb) ->
-            process_transition ~block_or_header ~valid_cb
-              ?transaction_pool_proxy )
+        | `Partially_valid_transition block_or_header ->
+            process_transition ~block_or_header ?transaction_pool_proxy )
 
 (** The processor's inputs, each mapped to the message its handler takes. *)
 let inputs
     ~(primary_transition_reader :
-       ( [ `Block of
-           ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
+       [ `Block of
+         ( Mina_block.initial_valid_block Envelope.Incoming.t
+         , State_hash.t )
+         Cached.t
+       | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
        Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~catchup_breadcrumbs_reader =
@@ -599,7 +614,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let subtree =
                   List.map chain ~f:(fun breadcrumb ->
-                      (cached_breadcrumb breadcrumb, None) )
+                      cached_breadcrumb breadcrumb )
                   |> Mina_stdlib.Nonempty_list.of_list_opt |> Option.value_exn
                   |> Mina_stdlib.Rose_tree.of_non_empty_list
                 in
@@ -644,14 +659,143 @@ let%test_module "Transition_handler.Processor tests" =
                     ~valid_cb:(Some valid_cb)
                 in
                 let%map () =
-                  handle
-                    (`Partially_valid_transition
-                      (`Block cached, `Valid_cb (Some valid_cb)) )
+                  handle (`Partially_valid_transition (`Block cached))
                 in
                 List.rev !answers )
           in
           [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
             [ `Ignore ] )
+
+    let%test_unit "A header already in the frontier is answered Ignore" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let answers =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let handle =
+                  handler_for ~block_registry frontier
+                    ~capacity:(List.length chain)
+                in
+                let%bind () =
+                  Deferred.List.iter chain ~f:(fun breadcrumb ->
+                      handle (`Local_breadcrumb (Cached.pure breadcrumb)) )
+                in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let header =
+                  Envelope.Incoming.map
+                    (downcast_breadcrumb (List.hd_exn chain))
+                    ~f:Mina_block.Validation.to_header
+                in
+                Block_registry.register_header block_registry header
+                  ~valid_cb:(Some valid_cb) ;
+                let%map () =
+                  handle (`Partially_valid_transition (`Header header))
+                in
+                List.rev !answers )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Ignore ] )
+
+    let%test_unit "An added block is passed on with its registered callback" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let breadcrumb = List.hd_exn chain in
+          let valid_cb =
+            Mina_net2.Validation_callback.create
+              (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+          in
+          let passed_on =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let processed_reader, processed_transition_writer =
+                  Strict_pipe.create
+                    (Buffered (`Capacity 1, `Overflow (Drop_head ignore)))
+                in
+                let handle =
+                  handler_for ~block_registry ~processed_transition_writer
+                    frontier ~capacity:1
+                in
+                let cached =
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb breadcrumb)
+                    ~valid_cb:(Some valid_cb)
+                  |> Cached.transform ~f:(fun _ -> breadcrumb)
+                in
+                let subtree =
+                  Mina_stdlib.Rose_tree.of_non_empty_list
+                    (Mina_stdlib.Nonempty_list.singleton cached)
+                in
+                let%bind () =
+                  handle
+                    (`Catchup_breadcrumbs
+                      ([ subtree ], `Ledger_catchup (Ivar.create ())) )
+                in
+                Strict_pipe.Writer.close processed_transition_writer ;
+                let passed_on = ref [] in
+                let%map () =
+                  Strict_pipe.Reader.iter processed_reader
+                    ~f:(fun (_, _, `Valid_cb vc) ->
+                      passed_on := vc :: !passed_on ;
+                      Deferred.unit )
+                in
+                !passed_on )
+          in
+          match passed_on with
+          | [ Some vc ] ->
+              assert (phys_equal vc valid_cb)
+          | _ ->
+              failwith "expected the block passed on once, with its callback" )
+
+    let%test_unit "A block whose body does not match its header is rejected" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let[@warning "-8"] (first :: second :: _) = chain in
+          (* The first block's header, carrying the second block's body. *)
+          let forged =
+            let header_validated =
+              Envelope.Incoming.map
+                (downcast_breadcrumb first)
+                ~f:Mina_block.Validation.to_header
+            in
+            Envelope.Incoming.map header_validated ~f:(fun header ->
+                Mina_block.Validation.with_body header
+                  (Mina_block.body
+                     (Transition_frontier.Breadcrumb.block second) ) )
+          in
+          let answers =
+            Thread_safe.block_on_async_exn (fun () ->
+                let block_registry =
+                  Block_registry.create ~logger ~cache_exceptions:true
+                in
+                let handle = handler_for ~block_registry frontier ~capacity:1 in
+                let valid_cb =
+                  Mina_net2.Validation_callback.create
+                    (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
+                in
+                let answers = ref [] in
+                Mina_net2.Validation_callback.set_on_resolve valid_cb
+                  (fun answer -> answers := answer :: !answers) ;
+                let cached =
+                  Block_registry.register_exn block_registry forged
+                    ~valid_cb:(Some valid_cb)
+                in
+                let%map () =
+                  handle (`Partially_valid_transition (`Block cached))
+                in
+                List.rev !answers )
+          in
+          [%test_eq: [ `Accept | `Reject | `Ignore | `Expired ] list] answers
+            [ `Reject ] )
 
     let%test_unit "A catchup block whose parent is not in the frontier is \
                    ignored, not passed on" =
@@ -689,7 +833,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let subtree =
                   Mina_stdlib.Rose_tree.of_non_empty_list
-                    (Mina_stdlib.Nonempty_list.singleton (cached, Some valid_cb))
+                    (Mina_stdlib.Nonempty_list.singleton cached)
                 in
                 let%bind () =
                   handle
@@ -741,11 +885,10 @@ let%test_module "Transition_handler.Processor tests" =
                     frontier ~capacity:1
                 in
                 let cached breadcrumb =
-                  ( Block_registry.register_exn block_registry
-                      (downcast_breadcrumb breadcrumb)
-                      ~valid_cb:None
-                    |> Cached.transform ~f:(fun _ -> breadcrumb)
-                  , None )
+                  Block_registry.register_exn block_registry
+                    (downcast_breadcrumb breadcrumb)
+                    ~valid_cb:None
+                  |> Cached.transform ~f:(fun _ -> breadcrumb)
                 in
                 let subtree =
                   Mina_stdlib.Rose_tree.T
@@ -825,8 +968,7 @@ let%test_module "Transition_handler.Processor tests" =
                       downcast_breadcrumb breadcrumb
                       |> Unprocessed_transition_cache.register_exn cache
                     in
-                    Strict_pipe.Writer.write valid_transition_writer
-                      (`Block b, `Valid_cb None) ) ;
+                    Strict_pipe.Writer.write valid_transition_writer (`Block b) ) ;
                 match%map
                   Block_time.Timeout.await
                     ~timeout_duration:(Block_time.Span.of_ms 30000L)

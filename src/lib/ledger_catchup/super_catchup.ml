@@ -738,7 +738,7 @@ let create_node ~logger ~downloader t x =
         , l
         , parent
         , Ivar.create () )
-    | `Initial_validated (b, valid_cb) ->
+    | `Initial_validated b ->
         let t = (Cached.peek b).Envelope.Incoming.data in
         let state_hash =
           Mina_block.Validation.block_with_hash t
@@ -755,7 +755,7 @@ let create_node ~logger ~downloader t x =
               , Mina_numbers.Length.to_yojson blockchain_length )
             ] ;
         [%log internal] "To_verify" ;
-        ( Node.State.To_verify (b, valid_cb)
+        ( Node.State.To_verify b
         , state_hash
         , Mina_block.Validation.block t |> Mina_block.blockchain_length
         , Mina_block.Validation.block t
@@ -824,6 +824,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
        -> ( Breadcrumb.t
           , [> `Invalid_staged_ledger_diff of Error.t
             | `Invalid_staged_ledger_hash of Error.t
+            | `Invalid_body_reference
             | `Fatal_error of exn ] )
           Result.t
           Deferred.t ) =
@@ -908,10 +909,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           |> Deferred.map ~f:(fun x -> Ok x) )
           ~f:
             (on_initial_validated node ~start_time ~sender:external_block.sender)
-    | To_verify (tv, valid_cb) ->
-        [%log debug] "To_verify $state_hash %s callback"
-          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+    | To_verify tv ->
+        [%log debug] "To_verify $state_hash"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         let start_time = Time.now () in
         let iv = Cached.peek tv in
         (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
@@ -920,11 +920,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
              this node gets removed from the tree. *)
           ( Verify_work_batcher.verify verify_work_batcher iv
           |> Deferred.map ~f:Result.return )
-          ~f:(on_verified node ~start_time ~sender:iv.sender (tv, valid_cb))
-    | Wait_for_parent (av, valid_cb) ->
-        [%log debug] "Wait_for_parent $state_hash %s callback"
-          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+          ~f:(on_verified node ~start_time ~sender:iv.sender tv)
+    | Wait_for_parent av ->
+        [%log debug] "Wait_for_parent $state_hash"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         step node
           (let parent = Hashtbl.find_exn t.nodes node.parent in
            match%map.Async.Deferred Ivar.read parent.result with
@@ -937,11 +936,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                  `Ignored ;
                finish t node ~is_error:true ;
                Error `Finished )
-          ~f:(on_parent_added node (av, valid_cb))
-    | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) ->
-        [%log debug] "To_build_breadcrumb $state_hash %s callback"
-          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
-          (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
+          ~f:(on_parent_added node av)
+    | To_build_breadcrumb (`Parent parent_hash, c) ->
+        [%log debug] "To_build_breadcrumb $state_hash"
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         let start_time = Time.now () in
         let transition_receipt_time = Some start_time in
         let av = Cached.peek c in
@@ -962,9 +960,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         in
         step node
           (Deferred.map ~f:Result.return s)
-          ~f:
-            (on_built node ~start_time ~sender:av.sender ~parent_hash
-               (c, valid_cb) )
+          ~f:(on_built node ~start_time ~sender:av.sender ~parent_hash c)
   and on_downloaded node ~start_time (external_block, attempts) =
     let state_hash = node.state_hash in
     [%log' debug t.logger]
@@ -1024,9 +1020,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         | `Building_path tv ->
             (* To_initial_validate may only occur for a downloaded block,
                hence there is no validation callback *)
-            set_state t node (To_verify (tv, None)) ;
+            set_state t node (To_verify tv) ;
             run_node node )
-  and on_verified node ~start_time ~sender (tv, valid_cb) result =
+  and on_verified node ~start_time ~sender tv result =
     match result with
     | Error _e ->
         [%log' debug t.logger] "Couldn't reach verifier. Retrying"
@@ -1065,17 +1061,26 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               }
             in
             let av = Cached.transform tv ~f:(fun _ -> av) in
-            set_state t node (Wait_for_parent (av, valid_cb)) ;
+            set_state t node (Wait_for_parent av) ;
             run_node node )
-  and on_parent_added node (av, valid_cb) parent =
-    set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
+  and on_parent_added node av parent =
+    set_state t node (To_build_breadcrumb (`Parent parent, av)) ;
     run_node node
-  and on_built node ~start_time ~sender ~parent_hash (c, valid_cb) result =
+  and on_built node ~start_time ~sender ~parent_hash c result =
     match result with
     | Error e ->
         (* TODO consider rejecting the callback in some cases,
            see https://github.com/MinaProtocol/mina/issues/11087 *)
-        Transition_handler.Block_registry.finish block_registry c `Ignored ;
+        Transition_handler.Block_registry.finish block_registry c
+          ( match e with
+          | `Invalid_body_reference ->
+              `Rejected
+          | `Exn _
+          | `Fatal_error _
+          | `Invalid_staged_ledger_diff _
+          | `Invalid_staged_ledger_hash _
+          | `Parent_breadcrumb_not_found ->
+              `Ignored ) ;
         let e =
           match e with
           | `Exn e ->
@@ -1086,6 +1091,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               Error.tag e ~tag:"invalid staged ledger diff"
           | `Invalid_staged_ledger_hash e ->
               Error.tag e ~tag:"invalid staged ledger hash"
+          | `Invalid_body_reference ->
+              Error.of_string "invalid body reference"
           | `Parent_breadcrumb_not_found ->
               Error.tag
                 (Error.of_string
@@ -1100,13 +1107,13 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         upon (Scheduler.yield ()) (fun () ->
             resume ~finished:node.result (fun () ->
-                on_yielded node (c, valid_cb) breadcrumb ) )
-  and on_yielded node (c, valid_cb) breadcrumb =
+                on_yielded node c breadcrumb ) )
+  and on_yielded node c breadcrumb =
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
     Strict_pipe.Writer.write catchup_breadcrumbs_writer
       ( [ Mina_stdlib.Rose_tree.of_non_empty_list
-            (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
+            (Mina_stdlib.Nonempty_list.singleton c)
         ]
       , `Ledger_catchup finished ) ;
     (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
@@ -1126,8 +1133,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~network ~frontier ~build_func ~block_registry ~schedule
     ~(catchup_breadcrumbs_writer :
-       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-         * Mina_net2.Validation_callback.t option )
+       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
@@ -1138,15 +1144,20 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   let (Full t) = Transition_frontier.catchup_state frontier in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
+  set_release t
+    { release =
+        (fun c ->
+          Transition_handler.Block_registry.finish block_registry c `Ignored )
+    } ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
   let pre_context
       (trees :
-        ((Mina_block.initial_valid_block Envelope.Incoming.t, _) Cached.t * _)
+        (Mina_block.initial_valid_block Envelope.Incoming.t, _) Cached.t
         Mina_stdlib.Rose_tree.t
         list ) =
     let f tree =
       let best = ref None in
-      Mina_stdlib.Rose_tree.iter tree ~f:(fun (x, _vc) ->
+      Mina_stdlib.Rose_tree.iter tree ~f:(fun x ->
           let x, _ = Envelope.Incoming.data (Cached.peek x) in
           best :=
             combine !best
@@ -1256,17 +1267,16 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
         let state_hashes =
           let target_length =
             let len =
-              forest_pick forest |> Tuple2.get1 |> Cached.peek
-              |> Envelope.Incoming.data |> Mina_block.Validation.block
-              |> Mina_block.blockchain_length
+              forest_pick forest |> Cached.peek |> Envelope.Incoming.data
+              |> Mina_block.Validation.block |> Mina_block.blockchain_length
             in
             Option.value_exn (Length.sub len (Length.of_int 1))
           in
           let blockchain_length_of_target_hash =
             let blockchain_length_of_dangling_block =
-              List.hd_exn forest |> Mina_stdlib.Rose_tree.root |> Tuple2.get1
-              |> Cached.peek |> Envelope.Incoming.data
-              |> Mina_block.Validation.block |> Mina_block.blockchain_length
+              List.hd_exn forest |> Mina_stdlib.Rose_tree.root |> Cached.peek
+              |> Envelope.Incoming.data |> Mina_block.Validation.block
+              |> Mina_block.blockchain_length
             in
             Unsigned.UInt32.pred blockchain_length_of_dangling_block
           in
@@ -1274,7 +1284,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
           match
             List.find_map
               (List.concat_map ~f:Mina_stdlib.Rose_tree.flatten forest)
-              ~f:(fun (c, _vc) ->
+              ~f:(fun c ->
                 let h =
                   State_hash.With_state_hashes.state_hash
                     (Mina_block.Validation.block_with_hash (Cached.peek c).data)
@@ -1306,7 +1316,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               let preferred_peers =
                 List.fold
                   (List.concat_map ~f:Mina_stdlib.Rose_tree.flatten forest)
-                  ~init:Peer.Set.empty ~f:(fun acc (c, _vc) ->
+                  ~init:Peer.Set.empty ~f:(fun acc c ->
                     match (Cached.peek c).sender with
                     | Local ->
                         acc
@@ -1330,7 +1340,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               List.iter forest ~f:(fun subtree ->
                   let transition =
                     Mina_stdlib.Rose_tree.root subtree
-                    |> Tuple2.get1 |> Cached.peek |> Envelope.Incoming.data
+                    |> Cached.peek |> Envelope.Incoming.data
                   in
                   let children_transitions =
                     List.concat_map
@@ -1338,8 +1348,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                       ~f:Mina_stdlib.Rose_tree.flatten
                   in
                   let children_state_hashes =
-                    List.map children_transitions
-                      ~f:(fun (cached_transition, _vc) ->
+                    List.map children_transitions ~f:(fun cached_transition ->
                         Cached.peek cached_transition
                         |> Envelope.Incoming.data
                         |> Mina_block.Validation.block_with_hash
@@ -1371,7 +1380,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
             List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, _vc) ->
+                Mina_stdlib.Rose_tree.iter subtree ~f:(fun node ->
                     (* TODO consider rejecting the callback in some cases,
                        see https://github.com/MinaProtocol/mina/issues/11087 *)
                     Transition_handler.Block_registry.finish block_registry node
@@ -1406,10 +1415,9 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
             (* if state_hashes is Ok, then we iterate through the forest and fold over state_hashes and call run_state_machine on each node.  order doesn't really matter because nodes called "out of order" will enter the `Wait_for_parent` state and begin running again when ready *)
             List.iter forest
               ~f:
-                (Mina_stdlib.Rose_tree.iter ~f:(fun b_and_c ->
+                (Mina_stdlib.Rose_tree.iter ~f:(fun b ->
                      let node =
-                       create_node ~logger ~downloader t
-                         (`Initial_validated b_and_c)
+                       create_node ~logger ~downloader t (`Initial_validated b)
                      in
                      run_state_machine node ) ) ;
             ignore
@@ -1551,18 +1559,16 @@ let%test_module "Ledger_catchup tests" =
       { cache : Transition_handler.Unprocessed_transition_cache.t
       ; job_writer :
           ( State_hash.t
-            * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-                , State_hash.t )
-                Cached.t
-              * Mina_net2.Validation_callback.t option )
+            * ( Mina_block.initial_valid_block Envelope.Incoming.t
+              , State_hash.t )
+              Cached.t
               Mina_stdlib.Rose_tree.t
               list
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
       ; breadcrumbs_reader :
-          ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-            * Mina_net2.Validation_callback.t option )
+          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
             Mina_stdlib.Rose_tree.t
             list
           * [ `Catchup_scheduler | `Ledger_catchup of unit Ivar.t ] )
@@ -1631,8 +1637,7 @@ let%test_module "Ledger_catchup tests" =
           (downcast_breadcrumb target_breadcrumb)
       in
       Strict_pipe.Writer.write test.job_writer
-        ( parent_hash
-        , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
+        (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
       (`Test test, `Cached_transition target_transition)
 
     let rec call_read ~target_best_tip_path ~breadcrumbs_reader
@@ -1659,7 +1664,7 @@ let%test_module "Ledger_catchup tests" =
               | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
                   let breadcrumb : Breadcrumb.t =
                     Mina_stdlib.Rose_tree.root (List.hd_exn breadcrumbs)
-                    |> Tuple2.get1 |> Cache_lib.Cached.invalidate_with_success
+                    |> Cache_lib.Cached.invalidate_with_success
                   in
                   Ivar.fill ivar () ; breadcrumb )
         in
@@ -1787,8 +1792,7 @@ let%test_module "Ledger_catchup tests" =
           in
           [%log info] "download state hashes fails unit test" ;
           Strict_pipe.Writer.write test.job_writer
-            ( parent_hash
-            , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
+            (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
@@ -1885,8 +1889,7 @@ let%test_module "Ledger_catchup tests" =
               (downcast_breadcrumb target_breadcrumb)
           in
           Strict_pipe.Writer.write test.job_writer
-            ( parent_hash
-            , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
+            (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
           Thread_safe.block_on_async_exn (fun () ->
               let final = Cache_lib.Cached.final_state target_transition in
               match%map

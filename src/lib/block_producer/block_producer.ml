@@ -945,6 +945,11 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                            ( e
                            , Staged_ledger_diff.read_all_proofs_from_disk
                                staged_ledger_diff )
+                     | `Invalid_body_reference ->
+                         `Invalid_staged_ledger_diff
+                           ( Error.of_string "invalid body reference"
+                           , Staged_ledger_diff.read_all_proofs_from_disk
+                               staged_ledger_diff )
                      | ( `Fatal_error _
                        | `Invalid_genesis_protocol_state
                        | `Invalid_staged_ledger_hash _
@@ -1528,6 +1533,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                     | `Invalid_body_reference ->
+                         `Invalid_staged_ledger_diff
+                           ( Error.of_string "invalid body reference"
+                           , staged_ledger_diff )
                      | ( `Fatal_error _
                        | `Invalid_genesis_protocol_state
                        | `Invalid_staged_ledger_hash _

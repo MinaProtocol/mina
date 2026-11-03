@@ -51,21 +51,18 @@ module Node = struct
       | To_download of Downloader_job.t
       | To_initial_validate of Mina_block.t Envelope.Incoming.t
       | To_verify of
-          ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          ( Mina_block.initial_valid_block Envelope.Incoming.t
+          , State_hash.t )
+          Cached.t
       | Wait_for_parent of
-          ( ( Mina_block.almost_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          ( Mina_block.almost_valid_block Envelope.Incoming.t
+          , State_hash.t )
+          Cached.t
       | To_build_breadcrumb of
-          ( [ `Parent of State_hash.t ]
+          [ `Parent of State_hash.t ]
           * ( Mina_block.almost_valid_block Envelope.Incoming.t
             , State_hash.t )
             Cached.t
-          * Mina_net2.Validation_callback.t option )
       (* TODO: Name this to Initial_root *)
       | Root of Breadcrumb.t Ivar.t
 
@@ -157,13 +154,24 @@ let remove_state states (node : Node.t) =
     | Some hashes ->
         State_hash.Set.remove hashes node.state_hash )
 
+(** How the catchup tree gives up the block a removed node holds. *)
+type release = { release : 'a. ('a, State_hash.t) Cached.t -> unit }
+
+(** Fail the block's cache entry. *)
+let release_directly =
+  { release = (fun c -> ignore (Cached.invalidate_with_failure c : _)) }
+
 (* Invariant: The length of the path from each best tip to its oldest
    ancestor is at most k *)
 type t =
   { nodes : Node.t State_hash.Table.t
   ; states : State_hash.Set.t Node.State.Enum.Table.t
   ; logger : Logger.t
+  ; mutable release : release
   }
+
+(** Release the blocks of nodes removed from now on with [release]. *)
+let set_release t release = t.release <- release
 
 (* mutable root: Node.t ; *)
 (*     ; mutable target: State_hash.t Envelope.Incoming.t (* So that we know who to punish if the process fails *) *)
@@ -316,30 +324,17 @@ let remove_node' t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
-  | Wait_for_parent (c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      if not (Cached.was_consumed c) then
-        ignore
-          ( Cached.invalidate_with_failure c
-            : Mina_block.almost_valid_block Envelope.Incoming.t )
+  | Wait_for_parent c ->
+      if not (Cached.was_consumed c) then t.release.release c
   | To_download _job ->
       (* TODO: Cancel job somehow *)
       ()
   | To_initial_validate _ ->
       ()
-  | To_verify (c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      ignore
-        ( Cached.invalidate_with_failure c
-          : Mina_block.initial_valid_block Envelope.Incoming.t )
-  | To_build_breadcrumb (_parent, c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      ignore
-        ( Cached.invalidate_with_failure c
-          : Mina_block.almost_valid_block Envelope.Incoming.t )
+  | To_verify c ->
+      t.release.release c
+  | To_build_breadcrumb (_parent, c) ->
+      t.release.release c
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with
@@ -392,6 +387,7 @@ let create ~logger ~root =
     { states = Node.State.Enum.Table.create ()
     ; nodes = State_hash.Table.create ()
     ; logger
+    ; release = release_directly
     }
   in
   create_node_full t root ; t

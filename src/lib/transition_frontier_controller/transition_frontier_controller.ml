@@ -27,7 +27,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let block_registry =
     Transition_handler.Block_registry.create ~logger ~cache_exceptions
   in
-  let f_drop_head name head valid_cb =
+  let f_drop_head name head =
     let hashes =
       match head with
       | `Block b ->
@@ -37,15 +37,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           With_hash.hash @@ Validation.header_with_hash
           @@ Network_peer.Envelope.Incoming.data h
     in
+    (* Dropping a transition for want of room says nothing about the peer that
+       sent it, so it is ignored rather than rejected. *)
+    Mina_block.handle_dropped_transition hashes ~pipe_name:name ~logger ;
     match head with
     | `Block b ->
-        (* Dropping a block for want of room says nothing about the peer that
-           sent it, so it is ignored rather than rejected. *)
-        Mina_block.handle_dropped_transition hashes ~pipe_name:name ~logger ;
         Transition_handler.Block_registry.finish block_registry b `Ignored
     | `Header _ ->
-        Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
-          ~logger
+        Transition_handler.Block_registry.finish_header block_registry
+          (Mina_base.State_hash.State_hashes.state_hash hashes)
+          `Ignored
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
@@ -58,12 +59,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
          ( `Capacity primary_transition_pipe_capacity
          , `Overflow
              (Drop_head
-                (fun (head, `Valid_cb vc) ->
+                (fun head ->
                   Mina_metrics.(
                     Counter.inc_one
                       Pipe.Drop_on_overflow
                       .transition_frontier_primary_transitions) ;
-                  f_drop_head name head vc ) ) ) )
+                  f_drop_head name head ) ) ) )
   in
   let processed_transition_reader, processed_transition_writer =
     Strict_pipe.create ~name:"processed transitions"
@@ -89,9 +90,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  (Network_peer.Envelope.Incoming.map ~f:(const b) t)
                  ~valid_cb:vc )
         | `Header h ->
-            `Header (Network_peer.Envelope.Incoming.map ~f:(const h) t)
+            let header = Network_peer.Envelope.Incoming.map ~f:(const h) t in
+            Transition_handler.Block_registry.register_header block_registry
+              header ~valid_cb:vc ;
+            `Header header
       in
-      Strict_pipe.Writer.write primary_transition_writer (b_or_h, `Valid_cb vc) ) ;
+      Strict_pipe.Writer.write primary_transition_writer b_or_h ) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun (envelope, _) ->
         Network_peer.Envelope.Incoming.data envelope
