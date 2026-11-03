@@ -857,6 +857,83 @@ EOF
   assert_not_contains "$output" "Including dependency job FullDepBuild" "Selectable build is NOT pulled as a dependency"
 }
 
+# Test: Integration test - a retried triage step resumes its uploads.
+# The first attempt dies part-way through the uploads (as when its agent is
+# lost); the retry must upload the remaining jobs and skip the ones already
+# uploaded, whose step keys Buildkite would reject as duplicates.
+test_integration_retry_resumes_uploads() {
+  echo -e "\n${YELLOW}Testing: Integration - retried triage step resumes uploads${NC}"
+
+  local work="$TEST_DIR/retry"
+  mkdir -p "$work/jobs" "$work/meta" "$work/bin" "$work/buildkite/scripts/pipeline"
+
+  local name
+  for name in RetryA RetryB RetryC; do
+    cat > "$work/jobs/$name.yml" << EOF
+spec:
+  name: $name
+  path: Test
+  tags:
+    - RetryTest
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: _$name-run
+EOF
+    echo "^.*$" > "$work/jobs/$name.dirtywhen"
+  done
+
+  # Stands in for upload.sh: logs each upload, and dies with SIGTERM's status
+  # on the call numbered FAIL_AT_CALL.
+  cat > "$work/buildkite/scripts/pipeline/upload.sh" << 'EOF'
+#!/bin/bash
+calls=$(( $(cat "$WORK/calls" 2>/dev/null || echo 0) + 1 ))
+echo "$calls" > "$WORK/calls"
+if [[ "$calls" == "${FAIL_AT_CALL:-}" ]]; then exit 143; fi
+echo "$1" >> "$WORK/uploads"
+EOF
+
+  # Stands in for buildkite-agent's build meta-data, one file per key.
+  cat > "$work/bin/buildkite-agent" << 'EOF'
+#!/bin/bash
+[[ "$1" == meta-data ]] || exit 1
+file="$WORK/meta/$(printf '%s' "$3" | tr '/:' '__')"
+case "$2" in
+  exists) [[ -f "$file" ]] || exit 100 ;;
+  set) printf '%s' "$4" > "$file" ;;
+  *) exit 1 ;;
+esac
+EOF
+  chmod +x "$work/buildkite/scripts/pipeline/upload.sh" "$work/bin/buildkite-agent"
+
+  run_attempt() {
+    (cd "$work" && WORK="$work" PATH="$work/bin:$PATH" \
+      BUILDKITE_STEP_ID=step-1 BUILDKITE_RETRY_COUNT="$1" FAIL_AT_CALL="$2" \
+      FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+      --scopes pullrequest \
+      --tags retrytest \
+      --filter-mode any \
+      --selection-mode full \
+      --jobs "$work/jobs" \
+      --git-diff-file "$TEST_DIR/git_diff.txt" \
+      --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" 2>&1)
+  }
+
+  local first_status=0
+  run_attempt 0 2 > /dev/null || first_status=$?
+  assert_equals "143" "$first_status" "First attempt dies on its second upload"
+
+  local output
+  output=$(run_attempt 1 "" || true)
+  assert_contains "$output" "Already uploaded by an earlier attempt" "Retry skips the job the first attempt uploaded"
+
+  local uploads
+  uploads=$(sort "$work/uploads" | uniq -c | awk '{print $1}' | sort -u | tr '\n' ' ')
+  assert_equals "1 " "$uploads" "No job is uploaded twice"
+  assert_equals "3" "$(wc -l < "$work/uploads" | tr -d ' ')" "Every job is uploaded across the two attempts"
+}
+
 # Test: Integration test - both excludeIf and includeIf (includeIf matches, excludeIf doesn't)
 test_integration_both_include_exclude_include_wins() {
   echo -e "\n${YELLOW}Testing: Integration - includeIf matches, excludeIf doesn't${NC}"
@@ -983,6 +1060,7 @@ main() {
   test_integration_dependency_resolution
   test_integration_dependency_dedup
   test_integration_dependency_skip_when_selectable
+  test_integration_retry_resumes_uploads
 
   teardown
 
