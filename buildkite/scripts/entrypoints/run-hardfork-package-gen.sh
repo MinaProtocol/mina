@@ -21,6 +21,21 @@ set -euox pipefail
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
 #
+# READ BY THE RENDER, SHARED WITH THE RELEASE PIPELINES:
+#   MINA_RELEASE_CHANNEL               - (Optional) The channel the packages are built for (their Suite). Default: unstable
+#   MINA_RELEASE_DOCKER_REPO           - (Optional) The registry the images are tagged for, as a DockerRepo.dhall
+#                                        alternative spelled out in full, e.g. '< Internal | InternalEurope | Public >.Public'.
+#                                        Default: the internal euro registry.
+#
+# This pipeline publishes nothing. Every image is written to this build's cache
+# (/var/storagebox/<build id>/docker-images) and every package to
+# debians/<codename>/ of the same cache, which is the layout the publish
+# pipelines read. To publish, run mina-<network>-publish with
+# MINA_READ_CACHE_ROOT set to this build's id, and the MINA_RELEASE_* targets
+# of that pipeline (see buildkite/src/Jobs/Release/PublishDockers.dhall and
+# PublishDebians.dhall). That run is the switch: a build that is never
+# published is a dry run.
+#
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
 #   export NETWORK="Devnet"
@@ -45,6 +60,11 @@ DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
 ARCH_DHALL_DEF="(./buildkite/src/Constants/Arch.dhall)"
 NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
 GENERATE_HARDFORK_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/GenerateHardforkPackage.dhall)"
+
+# A release variable spelled so that Dhall would quietly ignore it is an error
+# here, as it is in Prepare.dhall. The YAML goes to stdout, so the gate's
+# report goes to stderr.
+./buildkite/scripts/pipeline/validate-release-env.sh >&2
 
 function usage() {
   if [[ -n "$1" ]]; then

@@ -991,4 +991,5 @@ in  { onlyDebianPipeline = onlyDebianPipeline
     , buildDebian = build_debian
     , buildDebianFromApps = buildDebianFromApps
     , debianTokens = debianTokens
+    , ownBuildCacheDir = ownBuildCacheDir
     }

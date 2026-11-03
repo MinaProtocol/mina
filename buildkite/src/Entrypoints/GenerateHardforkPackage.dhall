@@ -24,6 +24,12 @@ let PipelineTag = ../Pipeline/Tag.dhall
 
 let DockerImage = ../Command/DockerImage.dhall
 
+let DockerPublish = ../Constants/Docker/Publish.dhall
+
+let DockerRepo = ../Constants/DockerRepo.dhall
+
+let DebianChannel = ../Constants/DebianChannel.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
@@ -46,6 +52,43 @@ let DebianArchPair =
       { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
 
 let defaultMinaArtifactSpec = MinaArtifact.PackagingSpec::{=}
+
+let dockerRepo =
+    -- The registry the images are tagged for. Nothing here pushes: every
+    -- image goes to this build's cache (build.sh --build-cache-dir) and the
+    -- publish pipeline pushes it from there, after the verification, exactly
+    -- as it does for a release (Jobs/Release/PublishDockers.dhall). The
+    -- hardfork default is the internal euro registry. A fork-day run sets
+    -- MINA_RELEASE_DOCKER_REPO to Public, so the tags name docker.io, and
+    -- lets MINA_RELEASE_DOCKER_MIRROR in the publish pipeline add the euro
+    -- copy.
+      DockerRepo.effective DockerRepo.Type.InternalEurope
+
+let buildCacheDir = MinaArtifact.ownBuildCacheDir
+
+let debianChannel =
+    -- The channel the packages are built for, so their Suite matches the
+    -- channel the publish pipeline is pointed at (MINA_RELEASE_CHANNEL, the
+    -- same variable). Unstable unless the pipeline says otherwise.
+      DebianChannel.effective DebianChannel.Type.Unstable
+
+let cachedDockerSpec =
+    -- The image step as the hardfork pipeline wants it: tagged for the
+    -- registry above, kept on the agent (--load-only) and written to this
+    -- build's cache, never pushed. The layered bases (generic -> profiled ->
+    -- configured) come from the same cache, except when the generic images
+    -- are taken from a version in the registry: then there is no cached
+    -- base, and build.sh pulls it.
+          \(fromRegistry : Bool)
+      ->  \(docker : DockerImage.ReleaseSpec.Type)
+      ->      docker
+          //  { docker_repo = dockerRepo
+              , docker_publish = DockerPublish.Type.Disabled
+              , deb_release = debianChannel
+              , build_cache_dir = Some buildCacheDir
+              , base_cache_dir =
+                  if fromRegistry then None Text else Some buildCacheDir
+              }
 
 let Spec =
       { Type =
@@ -433,12 +476,18 @@ let generateDockerForCodename =
                   }
                   spec.use_generic_dockers_from_version
 
+          let fromRegistry =
+                merge
+                  { Some = \(_ : Text) -> True, None = False }
+                  spec.use_generic_dockers_from_version
+
           in    buildOrGetArtifacts
               # List/map
                   DockerImage.ReleaseSpec.Type
                   Command.Type
-                  (     \(spec : DockerImage.ReleaseSpec.Type)
-                    ->  DockerImage.generateStep spec
+                  (     \(docker : DockerImage.ReleaseSpec.Type)
+                    ->  DockerImage.generateStep
+                          (cachedDockerSpec fromRegistry docker)
                   )
                   dockerSpecs
 
@@ -447,21 +496,32 @@ let generateHfRelatedStepsForCodename =
       ->  \(codename : DebianArchPair)
       ->  \(codenames : List DebianArchPair)
       ->  \(pipelineName : Text)
-      ->  let image =
-                Docker.fullDockerTag
-                  Docker.Tag::{
-                  , remove_profile_from_name = True
-                  , network = spec.network
-                  , version =
-                      merge
-                        { Some =
-                                \(v : Text)
-                            ->  "${v}-${DebianVersions.lowerName
-                                          codename.DebVersion}"
-                        , None = "\\\${MINA_DOCKER_TAG}"
-                        }
-                        spec.use_generic_dockers_from_version
-                  }
+      ->  let imageTag =
+                Docker.Tag::{
+                , remove_profile_from_name = True
+                , network = spec.network
+                , version =
+                    merge
+                      { Some =
+                              \(v : Text)
+                          ->  "${v}-${DebianVersions.lowerName
+                                        codename.DebVersion}"
+                      , None = "\\\${MINA_DOCKER_TAG}"
+                      }
+                      spec.use_generic_dockers_from_version
+                }
+
+          let image =
+                "${DockerRepo.show
+                     dockerRepo}/${Docker.dockerName
+                                     imageTag.package}:${Docker.dockerTag
+                                                           imageTag}"
+
+          let loadImage =
+              -- The daemon image is never pushed; the verification takes it
+              -- from this build's cache, where its build step wrote it.
+                Cmd.run
+                  "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
 
           let profile = Profiles.fromNetwork spec.network
 
@@ -561,6 +621,7 @@ let generateHfRelatedStepsForCodename =
                           }
                           (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
                               , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              , "MINA_DEB_RELEASE=${debianChannel}"
                               ]
                             # DebianVersions.overrideEnvs
                           )
@@ -578,6 +639,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -598,6 +660,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -625,6 +688,7 @@ let generateHfRelatedStepsForCodename =
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                          , loadImage
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
                               "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && MINA_LOG_LEVEL=Spam FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -644,6 +708,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
