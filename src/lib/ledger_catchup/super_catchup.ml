@@ -1403,7 +1403,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               | `Breadcrumb root ->
                   (* If we hit this case we should probably remove the parent from the
                       table and prune, although in theory that should be handled by
-                     the frontier calling [Full_catchup_tree.apply_diffs]. *)
+                     the frontier calling [Full_catchup_tree.frontier_added]. *)
                   create_node ~logger ~downloader t (`Root root)
               | `Node node ->
                   (* TODO: Log what is going on with transition frontier. *)

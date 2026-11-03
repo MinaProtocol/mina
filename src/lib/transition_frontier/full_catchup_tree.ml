@@ -363,24 +363,22 @@ let prune t ~root_hash =
 
 let clear t = Hashtbl.data t.nodes |> List.iter ~f:(remove_node' t)
 
-let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
-  List.iter ds ~f:(function
-    | E (New_node (Full b)) ->
-        breadcrumb_added t b
-    | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
-        List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
-        if Hashtbl.mem t.nodes h then prune t ~root_hash:h
-        else (
-          [%log' debug t.logger]
-            ~metadata:
-              [ ("hash", State_hash.to_yojson h); ("tree", to_yojson t) ]
-            "catchup $tree invariant broken: new root $hash not present. Diffs \
-             may have been applied out of order. Clearing catchup state to \
-             avoid retaining stale jobs" ;
-          clear t )
-    | E (Best_tip_changed _) ->
-        () )
+(** Update the tree for a breadcrumb the frontier has added, and for the root
+    transition the add applied, if any: the new root and the blocks the move
+    discarded. *)
+let frontier_added (t : t) breadcrumb ~root_transition =
+  breadcrumb_added t breadcrumb ;
+  Option.iter root_transition ~f:(fun (new_root, garbage) ->
+      List.iter garbage ~f:(remove_node t) ;
+      if Hashtbl.mem t.nodes new_root then prune t ~root_hash:new_root
+      else (
+        [%log' debug t.logger]
+          ~metadata:
+            [ ("hash", State_hash.to_yojson new_root); ("tree", to_yojson t) ]
+          "catchup $tree invariant broken: new root $hash not present. Diffs \
+           may have been applied out of order. Clearing catchup state to avoid \
+           retaining stale jobs" ;
+        clear t ) )
 
 let create ~logger ~root =
   let t =

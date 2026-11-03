@@ -14,8 +14,10 @@ let max_catchup_chain_length : t -> int = function
   | Full t ->
       Full_catchup_tree.max_catchup_chain_length t
 
-let apply_diffs (t : t) (ds : Frontier_base.Diff.Full.E.t list) : unit =
-  match t with Full t -> Full_catchup_tree.apply_diffs t ds
+let frontier_added (t : t) breadcrumb ~root_transition : unit =
+  match t with
+  | Full t ->
+      Full_catchup_tree.frontier_added t breadcrumb ~root_transition
 
 let create t ~logger ~root =
   match t with `Super -> Full (Full_catchup_tree.create ~logger ~root)

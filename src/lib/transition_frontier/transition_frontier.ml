@@ -474,7 +474,10 @@ let add_breadcrumb_reporting_root_exn t breadcrumb =
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
   [%log internal] "Apply_catchup_state_diffs" ;
-  Catchup_state.apply_diffs t.catchup_state diffs ;
+  Catchup_state.frontier_added t.catchup_state breadcrumb
+    ~root_transition:
+      (Option.map root_transition ~f:(fun { new_root; garbage; _ } ->
+           (new_root, garbage) ) ) ;
   [%log internal] "Apply_full_frontier_diffs"
     ~metadata:[ ("count", `Int (List.length diffs)) ] ;
   let (`New_root_and_diffs_with_mutants
