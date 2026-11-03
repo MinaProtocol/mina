@@ -581,7 +581,28 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
   t.root <- new_root_hash
 
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
-let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
+
+(** The root transition that adding [breadcrumb] makes due, if any: when
+    [breadcrumb] would extend the frontier past its maximum length, the root
+    moves to the next block on the path to [breadcrumb]. *)
+let calculate_root_transition t breadcrumb =
+  let parent_node =
+    Hashtbl.find_exn t.table (Breadcrumb.parent_hash breadcrumb)
+  in
+  let root_node = Hashtbl.find_exn t.table t.root in
+  if parent_node.length + 1 - root_node.length > t.max_length then
+    let heir =
+      find_exn ~message:"heir" t (List.hd_exn (hash_path t breadcrumb))
+    in
+    Some
+      (Util.calculate_root_transition_diff ~parent:(root t)
+         ~protocol_states_for_root_scan_state:
+           t.protocol_states_for_root_scan_state ~successors:(successors t) heir )
+  else None
+
+(** The diffs that add [breadcrumb] to the frontier: the new node, and a new
+    best tip if consensus selects it over the current one. *)
+let calculate_add_diffs ({ context = (module Context); _ } as t) breadcrumb =
   let module Context = struct
     include Context
 
@@ -591,44 +612,28 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         ]
   end in
   let open Diff in
+  let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
+  let current_best_tip = best_tip t in
+  let new_node = Full.E.E (New_node (Full breadcrumb)) in
+  if
+    Consensus.Hooks.equal_select_status
+      (Consensus.Hooks.select
+         ~context:(module Context)
+         ~existing:(Breadcrumb.consensus_state_with_hashes current_best_tip)
+         ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb) )
+      `Take
+  then (new_node, Some (Full.E.E (Best_tip_changed breadcrumb_hash)))
+  else (new_node, None)
+
+let calculate_diffs t breadcrumb =
   O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
-      let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
-      let parent_node =
-        Hashtbl.find_exn t.table (Breadcrumb.parent_hash breadcrumb)
-      in
-      let root_node = Hashtbl.find_exn t.table t.root in
-      let current_best_tip = best_tip t in
-      let diffs = [ Full.E.E (New_node (Full breadcrumb)) ] in
-      (* check if new breadcrumb extends frontier to longer than k *)
-      let diffs =
-        if parent_node.length + 1 - root_node.length > t.max_length then
-          let heir =
-            find_exn ~message:"heir" t (List.hd_exn (hash_path t breadcrumb))
-          in
-          let root_transition =
-            Util.calculate_root_transition_diff ~parent:(root t)
-              ~protocol_states_for_root_scan_state:
-                t.protocol_states_for_root_scan_state ~successors:(successors t)
-              heir
-          in
-          Diff.Full.E.E (Root_transitioned root_transition) :: diffs
-        else diffs
-      in
-      (* check if new breadcrumb will be best tip *)
-      let diffs =
-        if
-          Consensus.Hooks.equal_select_status
-            (Consensus.Hooks.select
-               ~context:(module Context)
-               ~existing:
-                 (Breadcrumb.consensus_state_with_hashes current_best_tip)
-               ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb) )
-            `Take
-        then Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
-        else diffs
-      in
-      (* reverse diffs so that they are applied in the correct order *)
-      List.rev diffs )
+      let root_transition = calculate_root_transition t breadcrumb in
+      let new_node, best_tip_changed = calculate_add_diffs t breadcrumb in
+      new_node
+      :: Option.to_list
+           (Option.map root_transition ~f:(fun root_transition ->
+                Diff.Full.E.E (Root_transitioned root_transition) ) )
+      @ Option.to_list best_tip_changed )
 
 type 'mutant apply_diff_result =
   | Applied of { mutant : 'mutant; new_root : State_hash.t option }
