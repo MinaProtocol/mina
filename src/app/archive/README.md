@@ -72,16 +72,12 @@ To compile the Archive, use the following command:
 $ make build-archive
 ```
 
-This will build the archive executable in the _build directory. For mainnet signatures, use:
+This will build the archive executable in the _build directory. The signature
+kind follows the build profile, which is `dev` (testnet signatures) by default.
+For mainnet signatures, use:
 
 ```shell
-$ dune build src/app/archive/archive_mainnet_signatures.exe --profile=mainnet
-```
-
-For testnet signatures:
-
-```shell
-$ dune build src/app/archive/archive_testnet_signatures.exe --profile=dev
+$ make build-archive DUNE_PROFILE=mainnet
 ```
 
 Running the Archive

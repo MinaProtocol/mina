@@ -34,7 +34,6 @@ build_packages() {
 
   make build
   make build-daemon-utils
-  make build-devnet-sigs
   make build-archive
   make build-archive-utils
   make build-test-utils

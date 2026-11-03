@@ -13,8 +13,6 @@ Mina Protocol is a lightweight blockchain that maintains constant size by using 
 - `make build-rosetta` - Build Rosetta API components
 - `make libp2p_helper` - Build the Go libp2p helper (required for networking)
 - `make build-intgtest` - Build integration test tools
-- `make build-mainnet-sigs` - Build mainnet signature variants
-- `make build-devnet-sigs` - Build devnet signature variants
 - `make build-daemon-utils` - Build daemon utilities
 - `make build-archive-utils` - Build archive node and related utilities
 - `make build-test-utils` - Build test utilities
