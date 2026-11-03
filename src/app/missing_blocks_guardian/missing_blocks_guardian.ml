@@ -136,10 +136,11 @@ let populate ~logger (archive : Config.archive) (blocks : Config.blocks) file =
       | Some message, _ ->
           failed (App_log.describe message)
       | None, Error (`Exit_non_zero code) ->
-          failed (sprintf "it exited with %d" code)
+          failed (sprintf "it exited with %d%s" code (Subprocess.wrote output))
       | None, Error (`Signal signal) ->
           failed
-            (sprintf "it was killed by signal %s" (Signal.to_string signal))
+            (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
+               (Subprocess.wrote output) )
       | None, Ok () ->
           [%log info] "Populated the database with $file"
             ~metadata:[ ("file", `String file) ] ;

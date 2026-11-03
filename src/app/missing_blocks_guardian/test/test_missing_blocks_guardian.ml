@@ -6,6 +6,7 @@ open Async
 module Config = Missing_blocks_guardian_lib.Config
 module App_log = Missing_blocks_guardian_lib.App_log
 module Download = Missing_blocks_guardian_lib.Download
+module Subprocess = Missing_blocks_guardian_lib.Subprocess
 
 let env pairs name = List.Assoc.find pairs ~equal:String.equal name
 
@@ -195,6 +196,34 @@ let test_app_log () =
         "no error among info messages" true
         (Option.is_none (App_log.first_error [ List.hd_exn messages ]))
 
+(* A program that writes a secret to stderr and exits with 2: the secret is
+   hidden and the failure text has the stderr. *)
+let test_subprocess_failure () =
+  let logger = Logger.null () in
+  let output =
+    Thread_safe.block_on_async_exn (fun () ->
+        Subprocess.run ~logger ~secrets:[ "s3cret" ] ~prog:"sh"
+          ~args:[ "-c"; "echo 'cannot open s3cret' >&2; exit 2" ]
+          () )
+    |> Or_error.ok_exn
+  in
+  Alcotest.(check string) "stderr hidden" "cannot open <hidden>\n" output.stderr ;
+  Alcotest.(check string)
+    "wrote" " and wrote: cannot open <hidden>" (Subprocess.wrote output) ;
+  Alcotest.(check bool)
+    "exited with 2" true
+    ( match output.exit_status with
+    | Error (`Exit_non_zero 2) ->
+        true
+    | _ ->
+        false ) ;
+  let quiet =
+    Thread_safe.block_on_async_exn (fun () ->
+        Subprocess.run ~logger ~prog:"true" ~args:[] () )
+    |> Or_error.ok_exn
+  in
+  Alcotest.(check string) "nothing written" "" (Subprocess.wrote quiet)
+
 let block_path = "/mainnet-5-3NKabc.json"
 
 let block_body = {|{"block":"content"}|}
@@ -280,6 +309,10 @@ let () =
             test_both_collects_problems
         ] )
     ; ("app_log", [ Alcotest.test_case "parse and errors" `Quick test_app_log ])
+    ; ( "subprocess"
+      , [ Alcotest.test_case "failure text has stderr, secrets hidden" `Quick
+            test_subprocess_failure
+        ] )
     ; ( "download"
       , [ Alcotest.test_case "not found is an error" `Quick
             test_download_not_found

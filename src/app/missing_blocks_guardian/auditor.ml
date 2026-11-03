@@ -46,6 +46,7 @@ let check ~logger ~prog ~archive_uri =
           failed "it wrote no log message; is it mina-missing-blocks-auditor?"
       | None, Error (`Signal signal) ->
           failed
-            (sprintf "it was killed by signal %s" (Signal.to_string signal))
+            (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
+               (Subprocess.wrote output) )
       | None, (Ok () | Error (`Exit_non_zero _)) ->
           return (List.find_map messages ~f:missing_parent) )

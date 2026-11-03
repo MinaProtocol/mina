@@ -57,7 +57,8 @@ A block cannot be restored when:
   404 when the file does not exist. The error page is not saved;
 - the auditor or `mina-archive-blocks` cannot be run, is killed, or logs an
   error. `mina-archive-blocks` exits with 0 when it cannot add a block, so
-  its log decides;
+  its log decides. The fatal line of the guardian repeats the error of the
+  program, or its exit code and what it wrote to stderr;
 - after a block was added, the auditor still reports the same missing
   parent. That means the file in the bucket holds another block.
 
