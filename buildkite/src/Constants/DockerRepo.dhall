@@ -46,6 +46,25 @@ let envOverride
       -- about, which is why it errors rather than passing silently.
       Some (env:MINA_RELEASE_DOCKER_REPO : Repo) ? None Repo
 
+let mirror
+    : Optional Repo
+    =
+      -- A second registry that gets a copy of the release images, if the
+      -- pipeline names one. The packaging jobs bake ONE registry into the
+      -- image tags (envOverride above); the publish stage pushes those tags,
+      -- then retags for the mirror and pushes again, narrowed by
+      -- MINA_RELEASE_DOCKER_MIRROR_TAGS (see publish_from_cache.sh). A
+      -- release goes to docker.io for everyone and keeps one codename on the
+      -- internal registry for the deployments that read from there; the
+      -- mirror is the second of those. Same form as MINA_RELEASE_DOCKER_REPO:
+      --
+      --   MINA_RELEASE_DOCKER_MIRROR='< Internal | InternalEurope | Public >.InternalEurope'
+      --
+      -- Unset means no second push. The pair reads as
+      -- MINA_RELEASE_DEBIAN_REPO and MINA_RELEASE_DEBIAN_MIRROR do (see
+      -- DebianRepo.dhall).
+      Some (env:MINA_RELEASE_DOCKER_MIRROR : Repo) ? None Repo
+
 let effective
     : Repo -> Repo
     =
@@ -66,5 +85,6 @@ in  { Type = Repo
     , show = show
     , hashTag = hashTag
     , envOverride = envOverride
+    , mirror = mirror
     , effective = effective
     }

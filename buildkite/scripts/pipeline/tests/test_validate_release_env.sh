@@ -22,7 +22,7 @@ check() {
     fi
 }
 
-CLEAN=(env -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_DEBIAN_REPO -u MINA_RELEASE_DEBIAN_MIRROR)
+CLEAN=(env -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_DOCKER_MIRROR -u MINA_RELEASE_DEBIAN_REPO -u MINA_RELEASE_DEBIAN_MIRROR)
 
 # run <label> <expected exit code> [VAR=value ...]
 run() {
@@ -52,6 +52,15 @@ run "plain word" 1 "MINA_RELEASE_DOCKER_REPO=Public"
 run "an address" 1 "MINA_RELEASE_DOCKER_REPO=docker.io/minaprotocol"
 run "another union" 1 "MINA_RELEASE_DOCKER_REPO=< Foo | Bar >.Foo"
 
+echo "TEST: MINA_RELEASE_DOCKER_MIRROR"
+run "mirror alone" 0 "MINA_RELEASE_DOCKER_MIRROR=${D}.Public"
+run "repo and mirror" 0 "MINA_RELEASE_DOCKER_REPO=${D}.Public" "MINA_RELEASE_DOCKER_MIRROR=${D}.InternalEurope"
+run "typo in the mirror" 1 "MINA_RELEASE_DOCKER_MIRROR=${D}.InternalEurop"
+run "the debian union" 1 "MINA_RELEASE_DOCKER_MIRROR=${R}.Stable"
+run "mirror equal to the repo" 1 "MINA_RELEASE_DOCKER_REPO=${D}.Public" "MINA_RELEASE_DOCKER_MIRROR=${D}.Public"
+run "mirror equal to the packaging default" 1 "MINA_RELEASE_DOCKER_MIRROR=${D}.InternalEurope"
+run "mirror InternalEurope with another repo" 0 "MINA_RELEASE_DOCKER_REPO=${D}.Public" "MINA_RELEASE_DOCKER_MIRROR=${D}.InternalEurope"
+
 echo "TEST: MINA_RELEASE_DEBIAN_REPO"
 run "Stable" 0 "MINA_RELEASE_DEBIAN_REPO=${R}.Stable"
 run "O1Test" 0 "MINA_RELEASE_DEBIAN_REPO=${R}.O1Test"
@@ -71,15 +80,17 @@ run "mirror O1Test with another repo" 0 "MINA_RELEASE_DEBIAN_REPO=${R}.Stable" "
 echo "TEST: every variable is checked, and a good one does not excuse a bad one"
 run "good docker, bad debian" 1 "MINA_RELEASE_DOCKER_REPO=${D}.Public" "MINA_RELEASE_DEBIAN_REPO=O1Test"
 run "bad docker, good debian" 1 "MINA_RELEASE_DOCKER_REPO=Public" "MINA_RELEASE_DEBIAN_REPO=${R}.O1Test"
-run "all good" 0 "MINA_RELEASE_DOCKER_REPO=${D}.Public" "MINA_RELEASE_DEBIAN_REPO=${R}.O1Test" "MINA_RELEASE_DEBIAN_MIRROR=${R}.Stable"
+run "all good" 0 "MINA_RELEASE_DOCKER_REPO=${D}.Public" "MINA_RELEASE_DOCKER_MIRROR=${D}.InternalEurope" "MINA_RELEASE_DEBIAN_REPO=${R}.O1Test" "MINA_RELEASE_DEBIAN_MIRROR=${R}.Stable"
 
 echo "TEST: the message names the variable and the problem"
 msg="$(message "MINA_RELEASE_DEBIAN_MIRROR=${R}.Stabel")"
 check "names the variable" "1" "$(grep -c 'MINA_RELEASE_DEBIAN_MIRROR is set' <<< "$msg")"
 check "lists the accepted spellings" "1" "$(grep -c "${R}.Stable\$" <<< "$msg")"
 msg="$(message "MINA_RELEASE_DEBIAN_MIRROR=${R}.O1Test")"
-check "says the mirror is the primary" "1" "$(grep -c 'already go to' <<< "$msg")"
+check "says the mirror is the primary" "1" "$(grep -c 'already goes to' <<< "$msg")"
 check "says the primary is the job default" "1" "$(grep -c 'the job default' <<< "$msg")"
+msg="$(message "MINA_RELEASE_DOCKER_MIRROR=${D}.InternalEurope")"
+check "names the docker mirror" "1" "$(grep -c 'MINA_RELEASE_DOCKER_MIRROR names' <<< "$msg")"
 
 echo ""
 echo "${PASSED}/${RUN} passed"
