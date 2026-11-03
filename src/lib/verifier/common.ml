@@ -1,6 +1,20 @@
 open Core_kernel
 open Mina_base
 
+type ('proof, 'aux) verifiable_zkapp_command =
+  ( ( Account_update.Body.t
+    , ('proof, Signature_lib.Schnorr.Chunked.Signature.t) Control.Poly.t
+    , 'aux )
+    Account_update.Poly.t
+  , Verification_key_wire.t option )
+  Zkapp_command.Call_forest.With_hashes_and_data.t
+  Zkapp_command.Poly.t
+
+type ('proof, 'aux) verifiable_user_command =
+  ( Signed_command.t
+  , ('proof, 'aux) verifiable_zkapp_command )
+  User_command.Poly.t
+
 type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Invalid_signature of
