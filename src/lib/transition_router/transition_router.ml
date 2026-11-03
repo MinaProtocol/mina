@@ -61,53 +61,6 @@ let to_consensus_state h =
          (Fn.compose Mina_state.Protocol_state.consensus_state
             Mina_block.Header.protocol_state )
 
-let is_transition_for_bootstrap
-    ~context:(module Context : Consensus.Intf.CONTEXT) frontier new_header =
-  let root_consensus_state =
-    Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.consensus_state_with_hashes
-  in
-  let new_consensus_state = to_consensus_state new_header in
-  match
-    Consensus.Hooks.select
-      ~context:(module Context)
-      ~existing:root_consensus_state ~candidate:new_consensus_state
-  with
-  | `Keep ->
-      false
-  | `Take ->
-      let slack = 5 in
-      (* How far behind the frontier has to be for none of it to be worth
-         keeping: [k] blocks, because that is how much of the chain the
-         frontier holds. This used to be the literal 290 -- mainnet's k -- so
-         on any network configured with a different k the check was measuring
-         against the wrong chain. *)
-      let k = Unsigned.UInt32.to_int Context.consensus_constants.k in
-      if
-        Length.to_int
-          ( Transition_frontier.best_tip frontier
-          |> Transition_frontier.Breadcrumb.consensus_state
-          |> Consensus.Data.Consensus_state.blockchain_length )
-        + k + slack
-        < Length.to_int
-            (Consensus.Data.Consensus_state.blockchain_length
-               new_consensus_state.data )
-      then (* Then our entire frontier is useless. *)
-        true
-      else
-        let module Context = struct
-          include Context
-
-          let logger =
-            Logger.extend logger
-              [ ( "selection_context"
-                , `String "Transition_router.is_transition_for_bootstrap" )
-              ]
-        end in
-        Consensus.Hooks.should_bootstrap
-          ~context:(module Context)
-          ~existing:root_consensus_state ~candidate:new_consensus_state
-
 (** Which controller the transition router is running. No blocks are produced
     while bootstrapping, except in a rare race between bootstrap and block
     creation, so produced blocks only go anywhere while participating. *)
@@ -485,7 +438,7 @@ let initialize t ~transaction_pool_proxy ~sync_local_state ~is_seed
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
   | Some best_tip, Some frontier
-    when is_transition_for_bootstrap
+    when Transition_handler.Catchup_classifier.orphans_anchor
            ~context:(module Context)
            frontier
            ( best_tip |> Envelope.Incoming.data
@@ -635,7 +588,7 @@ let route_valid_transition t ~get_current_frontier ~clear_writer
        match get_current_frontier () with
        | Some frontier ->
            if
-             is_transition_for_bootstrap
+             Transition_handler.Catchup_classifier.orphans_anchor
                ~context:(module Context)
                frontier header_with_hash
            then (
