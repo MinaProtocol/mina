@@ -224,10 +224,10 @@ t_mirror_tags_narrow_the_mirror_only () {
   # A release pushes every codename to its registry and one to the mirror.
   archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-mainnet
   archive pkg mina-daemon reg/mina-daemon:1.0.0-bookworm-mainnet
-  run MINA_RELEASE_DOCKER_TAGS="*-mainnet" MINA_RELEASE_DOCKER_MIRROR_TAGS="*-noble-mainnet"
-  expect "exit $RC: $OUT" test $RC -eq 0
-  expect "without a target the mirror tags must not apply" called "push reg/mina-daemon:1.0.0-bookworm-mainnet"
   run MINA_RELEASE_DOCKER_TAGS="*-mainnet" MINA_RELEASE_DOCKER_MIRROR_TAGS="*-noble-mainnet" MINA_PUBLISH_TARGET_REGISTRY=other
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "a target alone is the primary: the mirror tags must not apply" called "push other/mina-daemon:1.0.0-bookworm-mainnet"
+  run MINA_RELEASE_DOCKER_TAGS="*-mainnet" MINA_RELEASE_DOCKER_MIRROR_TAGS="*-noble-mainnet" MINA_PUBLISH_TARGET_REGISTRY=other MINA_PUBLISH_MIRROR=1
   expect "exit $RC: $OUT" test $RC -eq 0
   expect "mirrored codename not pushed" called "push other/mina-daemon:1.0.0-noble-mainnet"
   expect "other codename must not reach the mirror" not called "push other/mina-daemon:1.0.0-bookworm-mainnet"
@@ -237,10 +237,51 @@ t_mirror_tags_narrow_the_mirror_only () {
 t_mirror_without_mirror_tags_takes_the_release_tags () {
   archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-mainnet
   archive pkg mina-daemon reg/mina-daemon:1.0.0-noble-devnet
-  run MINA_RELEASE_DOCKER_TAGS="*-mainnet" MINA_PUBLISH_TARGET_REGISTRY=other
+  run MINA_RELEASE_DOCKER_TAGS="*-mainnet" MINA_PUBLISH_TARGET_REGISTRY=other MINA_PUBLISH_MIRROR=1
   expect "exit $RC: $OUT" test $RC -eq 0
   expect "release tag not mirrored" called "push other/mina-daemon:1.0.0-noble-mainnet"
   expect "non-release tag must not be mirrored" not called "push other/mina-daemon:1.0.0-noble-devnet"
+}
+
+t_publish_env_decides_the_registry () {
+  # Packaged for docker.io (the archive's tags), published with the internal
+  # registry as target: the target wins, and the log says so.
+  archive pkg mina-daemon docker.io/minaprotocol/mina-daemon:1.0.0-noble-mainnet
+  run MINA_PUBLISH_TARGET_REGISTRY=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "not pushed to the target" called "push europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-daemon:1.0.0-noble-mainnet"
+  expect "pushed to the registry it was tagged for" not called "push docker.io/minaprotocol/mina-daemon:1.0.0-noble-mainnet"
+  expect "the redirection must be logged" grep -q "tagged for docker.io/minaprotocol, publishing to europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo" <<< "$OUT"
+  run MINA_PUBLISH_TARGET_REGISTRY=docker.io/minaprotocol
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "the same registry must not be logged as a redirection" not grep -q "publishing to" <<< "$OUT"
+}
+
+t_no_hash_tag_pushes_the_version_tag_only () {
+  # build.sh saves the version tag first, then the hash tag. The public
+  # registry takes only the first.
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet
+  run MINA_PUBLISH_HASH_TAG=0 MINA_PUBLISH_TARGET_REGISTRY=docker.io/minaprotocol
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "version tag not pushed" called "push docker.io/minaprotocol/mina-daemon:1.0.0-devnet"
+  expect "hash tag must not reach the registry" not grep -q "abc-devnet" <(grep -E "^(push|buildx)" "$CALLS")
+  expect "hash tag must not be retagged either" not called "tag reg/mina-daemon:abc-devnet docker.io/minaprotocol/mina-daemon:abc-devnet"
+  expect "dropped tag must be listed" grep -q "not for this registry: reg/mina-daemon:abc-devnet" <<< "$OUT"
+  expect "loaded image still dropped from the store" \
+    called "image rm --no-prune reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet docker.io/minaprotocol/mina-daemon:1.0.0-devnet"
+  expect "summary counts one tag" grep -q "1 tag(s) published from 1 image(s)" <<< "$OUT"
+}
+
+t_hash_tag_kept_by_default () {
+  archive pkg mina-daemon reg/mina-daemon:1.0.0-devnet reg/mina-daemon:abc-devnet
+  run MINA_PUBLISH_TARGET_REGISTRY=other
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "hash tag not added in the target registry" \
+    called "buildx imagetools create --tag other/mina-daemon:abc-devnet other/mina-daemon:1.0.0-devnet"
+  run MINA_PUBLISH_HASH_TAG=1 MINA_PUBLISH_TARGET_REGISTRY=other
+  expect "exit $RC: $OUT" test $RC -eq 0
+  expect "explicit 1 keeps the hash tag" \
+    called "buildx imagetools create --tag other/mina-daemon:abc-devnet other/mina-daemon:1.0.0-devnet"
 }
 
 for t in t_pushes_primary_and_tags_the_rest t_refuses_a_tag_holding_another_image \
@@ -253,7 +294,9 @@ for t in t_pushes_primary_and_tags_the_rest t_refuses_a_tag_holding_another_imag
          t_target_registry_retags_and_pushes_there \
          t_target_registry_equal_to_the_tagged_one_pushes_as_tagged \
          t_mirror_tags_narrow_the_mirror_only \
-         t_mirror_without_mirror_tags_takes_the_release_tags; do
+         t_mirror_without_mirror_tags_takes_the_release_tags \
+         t_publish_env_decides_the_registry t_no_hash_tag_pushes_the_version_tag_only \
+         t_hash_tag_kept_by_default; do
   echo "TEST: $t"
   setup
   "$t"

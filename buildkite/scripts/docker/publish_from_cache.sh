@@ -33,15 +33,26 @@
 # Holding one image for the minutes it takes to push it keeps that window small,
 # and the store small for the other jobs on the agent.
 #
-# A mirror: with MINA_PUBLISH_TARGET_REGISTRY set, each image is given the
-# same name and tags in that registry and those are pushed instead of the tags
-# it was built with (same name, same tag, other registry). The release
-# selection then comes from MINA_RELEASE_DOCKER_MIRROR_TAGS when it is set,
-# else from MINA_RELEASE_DOCKER_TAGS as above, so a release can push every
-# image to docker.io and only "*-noble-mainnet" to the internal registry. A
-# target equal to the registry the images already carry pushes them as tagged.
-# This is what Jobs/Release/PublishDockers.dhall runs for
-# MINA_RELEASE_DOCKER_MIRROR.
+# Where they go is decided here, not at packaging time. With
+# MINA_PUBLISH_TARGET_REGISTRY set, each image is given the same name and tags
+# in that registry and those are pushed (same name, same tag, other registry).
+# The registry in the archive's tags is where packaging was told the images
+# would go; when it is the target, they are pushed as tagged, and when it is
+# not, the publish env wins and says so in the log. A release packaged for
+# docker.io and published with the variable unset therefore goes to the
+# internal registry, the publish job's default, not to docker.io. Unset, the
+# images are pushed as tagged.
+#
+# MINA_PUBLISH_HASH_TAG=0 pushes the version tag only: the public registry
+# gets no hash tag (DockerRepo.hashTag), whatever the archive holds.
+#
+# MINA_PUBLISH_MIRROR=1 marks the second target of a release. Its selection
+# comes from MINA_RELEASE_DOCKER_MIRROR_TAGS when that is set, else from
+# MINA_RELEASE_DOCKER_TAGS as above, so a release can push every image to
+# docker.io and only "*-noble-mainnet" to the internal registry.
+#
+# Jobs/Release/PublishDockers.dhall renders one run per target, from
+# MINA_RELEASE_DOCKER_REPO and MINA_RELEASE_DOCKER_MIRROR.
 #
 # DRY_RUN=1 lists what would be pushed.
 
@@ -70,7 +81,8 @@ if [[ ${#ARCHIVES[@]} -eq 0 ]]; then
 fi
 
 TARGET_REGISTRY="${MINA_PUBLISH_TARGET_REGISTRY:-}"
-if [[ -n "$TARGET_REGISTRY" ]]; then
+KEEP_HASH_TAG="${MINA_PUBLISH_HASH_TAG:-1}"
+if [[ "${MINA_PUBLISH_MIRROR:-0}" == "1" ]]; then
   TAG_SELECTION="${MINA_RELEASE_DOCKER_MIRROR_TAGS:-${MINA_RELEASE_DOCKER_TAGS:-*}}"
 else
   TAG_SELECTION="${MINA_RELEASE_DOCKER_TAGS:-*}"
@@ -156,17 +168,26 @@ for archive in "${SELECTED[@]}"; do
     exit 1
   fi
   loaded=("${tags[@]}")
+  if [[ "$KEEP_HASH_TAG" != "1" && ${#tags[@]} -gt 1 ]]; then
+    # build.sh saves the version tag first, then the hash tag.
+    echo "    not for this registry: ${tags[*]:1}"
+    tags=("${tags[0]}")
+  fi
   if [[ -n "$TARGET_REGISTRY" ]]; then
-    # The archive holds the tags of the registry it was built for. Give the
-    # image the same tags in the target registry and publish those instead.
-    tags=()
-    for tag in "${loaded[@]}"; do
+    # The archive holds the tags of the registry packaging was told about.
+    # Give the image the same tags in the target registry and publish those.
+    retagged=()
+    for tag in "${tags[@]}"; do
       target="$(retag_for_registry "$tag")"
       if [[ "$target" != "$tag" ]]; then
         docker tag "$tag" "$target"
       fi
-      tags+=("$target")
+      retagged+=("$target")
     done
+    if [[ "${retagged[0]}" != "${tags[0]}" ]]; then
+      echo "    tagged for ${tags[0]%/*}, publishing to ${TARGET_REGISTRY}"
+    fi
+    tags=("${retagged[@]}")
   fi
   primary="${tags[0]}"
   id="$(docker image inspect --format '{{.Id}}' "$primary")"
