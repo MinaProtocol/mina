@@ -1,0 +1,26 @@
+(library
+ (name vinegar_base)
+ (public_name vinegar_base)
+ ; Deactivated warnings
+ ;
+ ; 44: open-shadow-identifier (the use of Core_kernel makes it ubiquitous)
+ (flags
+  (:standard -w +a-44 -warn-error +a))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps h_list.ppx ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+ (libraries
+   ;; opam libraries
+   base.base_internalhash_types
+   sexplib0
+   bin_prot.shape
+   base.caml
+   ppxlib
+   core_kernel
+   ;; local libraries
+   mina_wire_types
+   snarky.backendless
+   random_oracle_input
+   vinegar_types
+   vinegar_base.one_hot_vector
+   ppx_version.runtime
+))
