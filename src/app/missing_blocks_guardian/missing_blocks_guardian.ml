@@ -1,43 +1,13 @@
 (* missing_blocks_guardian.ml -- populate an archive database with missing
    blocks, fetched one by one from a bucket of precomputed or extensional
-   blocks *)
+   blocks. The commands are here; the flags and the settings are in Cli and
+   Config. *)
 
 open Core
 open Async
 open Missing_blocks_guardian_lib
 
-(* After a recovery, the daemon waits this many intervals. *)
-let recovery_sleep_factor = 6
-
 let top_blocks_count = 10
-
-(* The settings, or every problem with them in the log and exit 1. *)
-let or_exit ~logger = function
-  | Ok value ->
-      value
-  | Error problems ->
-      List.iter problems ~f:(fun problem ->
-          [%log fatal] "Cannot start: $problem"
-            ~metadata:[ ("problem", `String problem) ] ) ;
-      Core.exit 1
-
-let log_archive ~logger (archive : Config.archive) =
-  [%log info] "Archive database $archive, audited with $auditor"
-    ~metadata:
-      [ ("archive", `String (Config.redact archive.uri))
-      ; ("auditor", `String archive.auditor)
-      ]
-
-let log_blocks ~logger (blocks : Config.blocks) =
-  [%log info]
-    "Block files $network-<height>-<state hash>.json from $url, in the $format \
-     format, written with $archive_blocks"
-    ~metadata:
-      [ ("network", `String blocks.network)
-      ; ("url", `String blocks.url)
-      ; ("format", `String (Config.Block_format.to_string blocks.format))
-      ; ("archive_blocks", `String blocks.archive_blocks)
-      ]
 
 let connect ~logger (archive : Config.archive) =
   match Mina_caqti.connect_pool archive.uri with
@@ -213,7 +183,8 @@ let daemon ~logger ~interval archive blocks =
   let rec loop () =
     let%bind recovered = recover ~logger ~pool archive blocks in
     let sleep =
-      if recovered then recovery_sleep_factor * interval else interval
+      if recovered then Config.Default.recovery_sleep_factor * interval
+      else interval
     in
     [%log info] "Checking again in %d seconds" sleep ;
     let%bind () = after (Time.Span.of_int_sec sleep) in
@@ -221,161 +192,51 @@ let daemon ~logger ~interval archive blocks =
   in
   loop ()
 
-(* Each flag is optional here. Config fills it from its environment
-   variable or its default and reports every problem at once. *)
-module Flags = struct
-  open Command.Let_syntax
-
-  let log_levels =
-    String.concat ~sep:", " (List.map Logger.Level.all ~f:Logger.Level.show)
-
-  (* Sets up the log on stdout, as --log-json and --log-level do in the other
-     Mina programs. *)
-  let log =
-    let%map_open json =
-      flag "--log-json" ~aliases:[ "log-json" ] no_arg
-        ~doc:"Print log output as JSON (default: plain text)"
-    and level =
-      flag "--log-level" ~aliases:[ "log-level" ]
-        ~doc:
-          (sprintf "LEVEL Set log level, one of %s (default: Info)" log_levels)
-        (optional_with_default "info" string)
-    in
-    fun () ->
-      let level =
-        match Logger.Level.of_string (String.lowercase level) with
-        | Ok level ->
-            level
-        | Error _ ->
-            Stdlib.prerr_endline
-              (sprintf "Cannot start: --log-level %s: expected one of %s" level
-                 log_levels ) ;
-            Core.exit 1
-      in
-      let processor =
-        if json then Logger.Processor.raw ~log_level:level ()
-        else
-          Logger.Processor.pretty ~log_level:level
-            ~config:
-              { Interpolator_lib.Interpolator.mode = Inline
-              ; max_interpolation_length = 200
-              ; pretty_print = true
-              }
-      in
-      Logger.Consumer_registry.register ~id:"default" ~processor
-        ~transport:(Logger.Transport.stdout ())
-        ()
-
-  let archive =
-    let%map_open uri =
-      flag "--archive-uri" ~aliases:[ "archive-uri" ]
-        ~doc:
-          "URI Archive database to check and repair, for example \
-           postgres://user:password@localhost:5432/archive (or DB_USERNAME, \
-           PGPASSWORD, DB_HOST, DB_PORT and DB_NAME)"
-        (optional string)
-    and auditor =
-      flag "--missing-blocks-auditor"
-        ~aliases:[ "missing-blocks-auditor" ]
-        ~doc:
-          (sprintf
-             "PATH mina-missing-blocks-auditor program (or \
-              MISSING_BLOCKS_AUDITOR; default: %s)"
-             Config.Default.auditor )
-        (optional string)
-    in
-    fun ~env -> Config.archive ~env ~uri ~auditor
-
-  let blocks =
-    let%map_open url =
-      flag "--precomputed-blocks-url"
-        ~aliases:[ "precomputed-blocks-url" ]
-        ~doc:
-          "URL Bucket with the block files, as an http, https or file URL (or \
-           PRECOMPUTED_BLOCKS_URL)"
-        (optional string)
-    and network =
-      flag "--network" ~aliases:[ "network" ]
-        ~doc:
-          "NAME Network name, the prefix of the block file names (or \
-           MINA_NETWORK)"
-        (optional string)
-    and format =
-      flag "--block-format" ~aliases:[ "block-format" ]
-        ~doc:
-          (sprintf
-             "precomputed|extensional Format of the block files (or \
-              BLOCKS_FORMAT; default: %s)"
-             (Config.Block_format.to_string Config.Default.format) )
-        (optional string)
-    and archive_blocks =
-      flag "--archive-blocks" ~aliases:[ "archive-blocks" ]
-        ~doc:
-          (sprintf
-             "PATH mina-archive-blocks program (or ARCHIVE_BLOCKS; default: %s)"
-             Config.Default.archive_blocks )
-        (optional string)
-    in
-    fun ~env -> Config.blocks ~env ~url ~network ~format ~archive_blocks
-
-  let interval =
-    let%map_open interval =
-      flag "--interval" ~aliases:[ "interval" ]
-        ~doc:
-          (sprintf
-             "SECONDS Time between two checks; after a recovery, %d times \
-              longer (or TIMEOUT; default: %d)"
-             recovery_sleep_factor Config.Default.interval )
-        (optional string)
-    in
-    fun ~env -> Config.interval ~env interval
-end
-
 let audit_command =
   Command.async ~summary:"Check whether the archive has missing blocks"
-    (let%map_open.Command setup_log = Flags.log and archive = Flags.archive in
+    (let%map_open.Command setup_log = Cli.log and archive = Cli.archive in
      fun () ->
        setup_log () ;
        let logger = Logger.create () in
-       let archive = or_exit ~logger (archive ~env:Config.process_env) in
-       log_archive ~logger archive ;
+       let archive = Cli.or_exit ~logger (archive ~env:Config.process_env) in
+       Cli.log_archive ~logger archive ;
        audit ~logger archive )
 
 let single_run_command =
   Command.async ~summary:"Check the archive and restore its missing blocks"
-    (let%map_open.Command setup_log = Flags.log
-     and archive = Flags.archive
-     and blocks = Flags.blocks in
+    (let%map_open.Command setup_log = Cli.log
+     and archive = Cli.archive
+     and blocks = Cli.blocks in
      fun () ->
        setup_log () ;
        let logger = Logger.create () in
        let env = Config.process_env in
        let archive, blocks =
-         or_exit ~logger (Config.both (archive ~env) (blocks ~env))
+         Cli.or_exit ~logger (Config.both (archive ~env) (blocks ~env))
        in
-       log_archive ~logger archive ;
-       log_blocks ~logger blocks ;
+       Cli.log_archive ~logger archive ;
+       Cli.log_blocks ~logger blocks ;
        single_run ~logger archive blocks )
 
 let daemon_command =
   Command.async
     ~summary:"Check the archive and restore its missing blocks, repeatedly"
-    (let%map_open.Command setup_log = Flags.log
-     and archive = Flags.archive
-     and blocks = Flags.blocks
-     and interval = Flags.interval in
+    (let%map_open.Command setup_log = Cli.log
+     and archive = Cli.archive
+     and blocks = Cli.blocks
+     and interval = Cli.interval in
      fun () ->
        setup_log () ;
        let logger = Logger.create () in
        let env = Config.process_env in
        let (archive, blocks), interval =
-         or_exit ~logger
+         Cli.or_exit ~logger
            (Config.both
               (Config.both (archive ~env) (blocks ~env))
               (interval ~env) )
        in
-       log_archive ~logger archive ;
-       log_blocks ~logger blocks ;
+       Cli.log_archive ~logger archive ;
+       Cli.log_blocks ~logger blocks ;
        [%log info] "Checking every %d seconds" interval ;
        daemon ~logger ~interval archive blocks )
 

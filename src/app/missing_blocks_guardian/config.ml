@@ -30,6 +30,9 @@ module Default = struct
   let format = Block_format.Precomputed
 
   let interval = 600
+
+  (* After a recovery, the daemon waits this many intervals. *)
+  let recovery_sleep_factor = 6
 end
 
 (* The archive database and the program that audits it. *)

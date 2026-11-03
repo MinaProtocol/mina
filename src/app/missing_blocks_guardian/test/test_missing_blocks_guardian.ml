@@ -7,6 +7,7 @@ module Config = Missing_blocks_guardian_lib.Config
 module App_log = Missing_blocks_guardian_lib.App_log
 module Download = Missing_blocks_guardian_lib.Download
 module Subprocess = Missing_blocks_guardian_lib.Subprocess
+module Cli = Missing_blocks_guardian_lib.Cli
 
 let env pairs name = List.Assoc.find pairs ~equal:String.equal name
 
@@ -196,6 +197,53 @@ let test_app_log () =
         "no error among info messages" true
         (Option.is_none (App_log.first_error [ List.hd_exn messages ]))
 
+(* Runs the flags of [param] on [argv] and returns what they map to. *)
+let parse_flags param argv =
+  let result = ref None in
+  Command.run ~argv:("guardian" :: argv)
+    (Command.basic ~summary:"test"
+       (let%map_open.Command value = param in
+        fun () -> result := Some value ) ) ;
+  Option.value_exn !result
+
+(* The flags reach Config: a flag wins over the environment, and a flag that
+   is not given falls back to it. *)
+let test_cli_flags () =
+  let env = env [ ("DB_HOST", "ignored"); ("MINA_NETWORK", "devnet") ] in
+  let archive =
+    parse_flags Cli.archive
+      [ "--archive-uri"; "postgres://mina:pw@db:5432/archive" ]
+  in
+  let archive = expect_ok (archive ~env) in
+  Alcotest.(check string)
+    "archive uri from the flag" "postgres://mina:pw@db:5432/archive"
+    (Uri.to_string archive.uri) ;
+  Alcotest.(check string)
+    "auditor default" Config.Default.auditor archive.auditor ;
+  let blocks =
+    parse_flags Cli.blocks
+      [ "--precomputed-blocks-url"
+      ; "https://bucket.example/blocks/"
+      ; "--block-format"
+      ; "extensional"
+      ]
+  in
+  let blocks = expect_ok (blocks ~env) in
+  Alcotest.(check string)
+    "url without the trailing slash" "https://bucket.example/blocks" blocks.url ;
+  Alcotest.(check string) "network from the environment" "devnet" blocks.network ;
+  Alcotest.(check string)
+    "format from the flag" "extensional"
+    (Config.Block_format.to_string blocks.format) ;
+  let interval = parse_flags Cli.interval [ "--interval"; "30" ] in
+  Alcotest.(check int) "interval" 30 (expect_ok (interval ~env)) ;
+  let interval = parse_flags Cli.interval [] in
+  Alcotest.(check int)
+    "interval default" Config.Default.interval
+    (expect_ok (interval ~env)) ;
+  expect_problems ~mentioning:[ "--interval" ]
+    (parse_flags Cli.interval [ "--interval"; "soon" ] ~env)
+
 (* A program that writes a secret to stderr and exits with 2: the secret is
    hidden and the failure text has the stderr. *)
 let test_subprocess_failure () =
@@ -309,6 +357,7 @@ let () =
             test_both_collects_problems
         ] )
     ; ("app_log", [ Alcotest.test_case "parse and errors" `Quick test_app_log ])
+    ; ("cli", [ Alcotest.test_case "flags reach config" `Quick test_cli_flags ])
     ; ( "subprocess"
       , [ Alcotest.test_case "failure text has stderr, secrets hidden" `Quick
             test_subprocess_failure

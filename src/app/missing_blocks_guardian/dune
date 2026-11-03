@@ -15,6 +15,7 @@
   uri
   yojson
   ;; local libraries
+  interpolator_lib
   logger
   mina_caqti)
  (instrumentation
@@ -35,7 +36,6 @@
   uri
   yojson
   ;; local libraries
-  interpolator_lib
   logger
   mina_caqti
   missing_blocks_guardian_lib)

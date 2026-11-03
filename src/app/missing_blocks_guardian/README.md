@@ -86,7 +86,9 @@ mina-missing-blocks-guardian daemon
 Modules
 -------
 
-- `missing_blocks_guardian.ml`: the command line and the recovery loop.
+- `missing_blocks_guardian.ml`: the commands and the recovery loop.
+- `cli.ml`: the flags, the log setup, the check of the settings and the
+  report of the settings in use.
 - `config.ml`: the settings, their sources and their validation.
 - `auditor.ml`: runs the auditor and reads the missing parent from its log.
 - `app_log.ml`: parses the JSON log of a Mina program, relays it and finds
