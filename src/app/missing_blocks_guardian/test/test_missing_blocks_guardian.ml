@@ -129,6 +129,12 @@ let test_archive_uri_flag_problem_hides_password () =
         "shows <hidden>" true
         (String.is_substring text ~substring:"<hidden>")
 
+let test_gs_url_hint () =
+  expect_problems
+    ~mentioning:[ "https://storage.googleapis.com/<bucket>" ]
+    (Config.blocks ~env:no_env ~url:(Some "gs://mina_network_block_data")
+       ~network:(Some "mainnet") ~format:None ~archive_blocks:None )
+
 let test_blocks_url () =
   let blocks ~url =
     Config.blocks ~env:no_env ~url:(Some url) ~network:(Some "mainnet")
@@ -279,14 +285,18 @@ let block_body = {|{"block":"content"}|}
 let not_found_body =
   {|<?xml version='1.0' encoding='UTF-8'?><Error><Code>NoSuchKey</Code></Error>|}
 
-(* Serves [block_path] and answers 404 to every other path. *)
+(* Serves [block_path], answers 403 at the root like a private bucket, and
+   404 to every other path. *)
 let with_server f =
   Thread_safe.block_on_async_exn (fun () ->
       let%bind server =
         Cohttp_async.Server.create ~on_handler_error:`Raise
           Tcp.Where_to_listen.of_port_chosen_by_os (fun ~body:_ _ request ->
-            if String.equal (Uri.path (Cohttp.Request.uri request)) block_path
-            then Cohttp_async.Server.respond_string block_body
+            let path = Uri.path (Cohttp.Request.uri request) in
+            if String.equal path block_path then
+              Cohttp_async.Server.respond_string block_body
+            else if String.equal path "/" then
+              Cohttp_async.Server.respond_string ~status:`Forbidden "denied"
             else
               Cohttp_async.Server.respond_string ~status:`Not_found
                 not_found_body )
@@ -314,6 +324,30 @@ let test_download_not_found () =
                ~substring:"HTTP 404 Not Found" ) ;
           let%map exists = Sys.file_exists_exn file in
           Alcotest.(check bool) "no file saved" false exists )
+
+(* A private bucket answers 403 at its root and exists; a bucket that
+   answers 404 does not; a file bucket is a directory. *)
+let test_probe () =
+  with_server (fun ~url ~dir ->
+      let%bind private_bucket = Download.probe ~url in
+      Alcotest.(check bool)
+        "403 at the root is a bucket" true
+        (Or_error.is_ok private_bucket) ;
+      let%bind missing = Download.probe ~url:(url ^ "/no-such-bucket") in
+      ( match missing with
+      | Ok () ->
+          Alcotest.fail "expected an error"
+      | Error err ->
+          Alcotest.(check bool)
+            "says the bucket does not exist" true
+            (String.is_substring (Error.to_string_hum err)
+               ~substring:"the bucket does not exist" ) ) ;
+      let%bind directory = Download.probe ~url:("file://" ^ dir) in
+      Alcotest.(check bool) "directory" true (Or_error.is_ok directory) ;
+      let%bind no_directory = Download.probe ~url:("file://" ^ dir ^ "/none") in
+      Alcotest.(check bool) "no directory" true (Or_error.is_error no_directory) ;
+      let%map unreachable = Download.probe ~url:"http://127.0.0.1:1" in
+      Alcotest.(check bool) "unreachable" true (Or_error.is_error unreachable) )
 
 let test_download_ok () =
   with_server (fun ~url ~dir ->
@@ -351,6 +385,7 @@ let () =
         ; Alcotest.test_case "archive uri flag problem hides password" `Quick
             test_archive_uri_flag_problem_hides_password
         ; Alcotest.test_case "blocks url" `Quick test_blocks_url
+        ; Alcotest.test_case "gs url hint" `Quick test_gs_url_hint
         ; Alcotest.test_case "blocks problems reported together" `Quick
             test_blocks_problems_reported_together
         ; Alcotest.test_case "both collects problems" `Quick
@@ -368,5 +403,6 @@ let () =
         ; Alcotest.test_case "success saves the body" `Quick test_download_ok
         ; Alcotest.test_case "missing file url is an error" `Quick
             test_download_missing_file_url
+        ; Alcotest.test_case "probe of the bucket" `Quick test_probe
         ] )
     ]

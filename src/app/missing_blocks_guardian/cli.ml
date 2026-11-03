@@ -85,8 +85,7 @@ let or_exit ~logger = function
       value
   | Error problems ->
       List.iter problems ~f:(fun problem ->
-          [%log fatal] "Cannot start: $problem"
-            ~metadata:[ ("problem", `String problem) ] ) ;
+          [%log fatal] "Cannot start: %s" problem ) ;
       Core.exit 1
 
 let log_archive ~logger (archive : Config.archive) =

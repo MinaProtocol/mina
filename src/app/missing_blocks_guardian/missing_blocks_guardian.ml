@@ -40,21 +40,44 @@ let log_top_blocks ~logger ~pool ~when_ =
 let check ~logger (archive : Config.archive) =
   Auditor.check ~logger ~prog:archive.auditor ~archive_uri:archive.uri
 
-let download ~logger (blocks : Config.blocks) file =
+(* The bucket must answer at start, so that a wrong URL is reported as such
+   and not later as a block that cannot be downloaded. *)
+let check_bucket ~logger (blocks : Config.blocks) =
+  match%bind Download.probe ~url:blocks.url with
+  | Ok () ->
+      return ()
+  | Error err ->
+      [%log fatal]
+        "Cannot start: the bucket %s does not answer: %s. Check \
+         --precomputed-blocks-url or PRECOMPUTED_BLOCKS_URL."
+        blocks.url (Error.to_string_hum err) ;
+      exit 1
+
+let block_file (blocks : Config.blocks) (parent : Auditor.missing_parent) =
+  sprintf "%s-%d-%s.json" blocks.network parent.height parent.hash
+
+(* Downloads the file of [parent] from the bucket and returns its name. The
+   bucket answered at start, so a failure here is about the file: the error
+   shows how its URL was built. *)
+let download ~logger (blocks : Config.blocks) (parent : Auditor.missing_parent)
+    =
+  let file = block_file blocks parent in
   let url = blocks.url ^ "/" ^ file in
   [%log info] "Downloading block $file from $url"
     ~metadata:[ ("file", `String file); ("url", `String url) ] ;
   match%bind Download.fetch ~url ~file with
   | Ok () ->
-      return ()
+      return file
   | Error err ->
       [%log fatal]
-        "Could not download $file: $error. Check --precomputed-blocks-url and \
-         --network."
-        ~metadata:
-          [ ("file", `String file)
-          ; ("error", `String (Error.to_string_hum err))
-          ] ;
+        "Could not download the block at height %d with state hash %s: %s. Its \
+         URL %s is <bucket URL>/<network>-<height>-<state hash>.json, with the \
+         bucket URL %s from --precomputed-blocks-url or PRECOMPUTED_BLOCKS_URL \
+         and the network %s from --network or MINA_NETWORK. The bucket \
+         answered at start, so check the network name and whether the block is \
+         in the bucket."
+        parent.height parent.hash (Error.to_string_hum err) url blocks.url
+        blocks.network ;
       exit 1
 
 let remove ~logger file =
@@ -126,10 +149,7 @@ let bootstrap ~logger ~pool (archive : Config.archive) (blocks : Config.blocks)
   [%log info] "Restoring blocks one by one from $url"
     ~metadata:[ ("url", `String blocks.url) ] ;
   let rec loop (parent : Auditor.missing_parent) =
-    let file =
-      sprintf "%s-%d-%s.json" blocks.network parent.height parent.hash
-    in
-    let%bind () = download ~logger blocks file in
+    let%bind file = download ~logger blocks parent in
     let%bind () = populate ~logger archive blocks file in
     match%bind check ~logger archive with
     | None ->
@@ -174,12 +194,14 @@ let recover ~logger ~pool archive blocks =
 
 let single_run ~logger archive blocks =
   let pool = connect ~logger archive in
+  let%bind () = check_bucket ~logger blocks in
   Deferred.ignore_m (recover ~logger ~pool archive blocks)
 
 (* Checks every [interval] seconds forever; after a recovery, waits
    [recovery_sleep_factor] times longer. *)
 let daemon ~logger ~interval archive blocks =
   let pool = connect ~logger archive in
+  let%bind () = check_bucket ~logger blocks in
   let rec loop () =
     let%bind recovered = recover ~logger ~pool archive blocks in
     let sleep =

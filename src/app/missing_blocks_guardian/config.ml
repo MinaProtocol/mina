@@ -151,6 +151,14 @@ let blocks_url text =
       Ok without_slash
   | Some "file" ->
       Error "expected a path in the URL"
+  | Some "gs" ->
+      Error
+        "expected an http, https or file URL; for a Google Cloud Storage \
+         bucket use https://storage.googleapis.com/<bucket>"
+  | Some "s3" ->
+      Error
+        "expected an http, https or file URL; for an S3 bucket use \
+         https://<bucket>.s3.<region>.amazonaws.com"
   | _ ->
       Error "expected an http, https or file URL"
 

@@ -1,4 +1,5 @@
-(* download.ml -- fetch one block file by http, https or file URL *)
+(* download.ml -- check a bucket and fetch one block file by http, https or
+   file URL *)
 
 open Core
 open Async
@@ -33,11 +34,23 @@ let ssl_config url =
                 false ) )
         () )
 
+(* Runs [f] and returns its failure as a short text: the message of a
+   Failure, or the exception, without the backtrace that the Async monitor
+   adds. *)
+let try_with f =
+  match%map Monitor.try_with ~extract_exn:true f with
+  | Ok value ->
+      Ok value
+  | Error (Failure text) ->
+      Error (Error.of_string text)
+  | Error exn ->
+      Error (Error.of_exn exn)
+
 (* Saves [url] as [file]. An HTTP response that is not a success is an
    error, so that an error page is never saved as a block. *)
 let fetch ~url ~file =
   let url = Uri.of_string url in
-  Monitor.try_with_or_error (fun () ->
+  try_with (fun () ->
       match Uri.scheme url with
       | Some ("http" | "https") ->
           let%bind response, body =
@@ -53,6 +66,36 @@ let fetch ~url ~file =
       | Some "file" ->
           let%bind contents = Reader.file_contents (Uri.path url) in
           Writer.save file ~contents
+      | scheme ->
+          failwithf "URL scheme not supported: %s"
+            (Option.value scheme ~default:"none")
+            () )
+
+(* Checks that the bucket at [url] answers. An HTTP bucket exists when its
+   root answers with any status but 404: a public listing is 200, a private
+   bucket is 403, and Google Cloud Storage and S3 answer 404 for a bucket
+   that does not exist. A file bucket is a directory. *)
+let probe ~url =
+  let root = Uri.of_string (url ^ "/") in
+  try_with (fun () ->
+      match Uri.scheme root with
+      | Some ("http" | "https") -> (
+          let%bind response, body =
+            Cohttp_async.Client.get ?ssl_config:(ssl_config root) root
+          in
+          let%map () = Cohttp_async.Body.drain body in
+          match Cohttp.Response.status response with
+          | `Not_found ->
+              failwithf "HTTP 404 Not Found for %s, the bucket does not exist"
+                (Uri.to_string root) ()
+          | _ ->
+              () )
+      | Some "file" -> (
+          match%map Sys.is_directory (Uri.path root) with
+          | `Yes ->
+              ()
+          | `No | `Unknown ->
+              failwithf "%s is not a directory" (Uri.path root) () )
       | scheme ->
           failwithf "URL scheme not supported: %s"
             (Option.value scheme ~default:"none")

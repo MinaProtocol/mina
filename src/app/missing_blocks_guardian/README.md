@@ -51,10 +51,17 @@ Exit codes
   service manager such as docker-compose with `restart: always` starts it
   again.
 
+`single-run` and `daemon` also check at start that the database and the
+bucket answer. A bucket URL that answers 404 at its root, as Google Cloud
+Storage and S3 do for a bucket that does not exist, stops the program. A
+`gs://` or `s3://` URL is rejected with the https URL to use instead.
+
 A block cannot be restored when:
 
 - the bucket answers with an HTTP status that is not a success, for example
-  404 when the file does not exist. The error page is not saved;
+  404 when the file does not exist. The error page is not saved. The fatal
+  line shows how the URL of the file was built from the bucket URL and the
+  network name;
 - the auditor or `mina-archive-blocks` cannot be run, is killed, or logs an
   error. `mina-archive-blocks` exits with 0 when it cannot add a block, so
   its log decides. The fatal line of the guardian repeats the error of the
