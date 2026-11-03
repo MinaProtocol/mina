@@ -12,7 +12,10 @@
 #   - MINA_RELEASE_DOCKER_REPO and MINA_RELEASE_CHANNEL, the variables the
 #     release pipelines read, reach the image tags and the package Suite;
 #   - a run that takes the generic images from a version in the registry does
-#     not look for their bases in the cache.
+#     not look for their bases in the cache;
+#   - the publish gate: a block step after every command step, and a trigger
+#     of the network's publish pipeline carrying this build's id, registry
+#     and channel.
 #
 # Needs dhall-to-yaml, as the render does.
 
@@ -109,6 +112,34 @@ if "${CLEAN[@]}" MINA_RELEASE_DOCKER_REPO='< Internal | InternalEurope | Public 
 else
   ok "a typo in MINA_RELEASE_DOCKER_REPO fails the render"
 fi
+
+echo "TEST: the publish gate: block after everything, then trigger the publish pipeline"
+yaml="$(render)"
+# The block step's depends_on lists every command step key, and nothing else.
+# Strings holding a "$" or a "?" are double-quoted by the YAML writer, the
+# rest single-quoted; the patterns below take either.
+command_keys="$(commands <<< "$yaml" | grep -o "'key': '_GenerateHardforkPackage-[^']*'" | sed "s/'key': '//; s/'$//" | grep -v -- '-publish' | sort -u)"
+block_deps="$(awk "/'block': .Publish\\?/{f=1} f&&/'depends_on':/{d=1;next} d&&/^ *- '/{sub(/^ *- '/,\"\"); sub(/'$/,\"\"); print; next} d&&!/^ *- /{exit}" <<< "$yaml" | sort -u)"
+expect "a block step is rendered" grep -q "'block': .Publish?" <<< "$yaml"
+expect "a build nobody unblocks shows as passed" grep -q "'blocked_state': 'passed'" <<< "$yaml"
+expect "the block waits for every command step (missing: $(comm -23 <(echo "$command_keys") <(echo "$block_deps") | tr '\n' ' '))" \
+  test -z "$(comm -23 <(echo "$command_keys") <(echo "$block_deps"))"
+expect "the block waits for nothing else (extra: $(comm -13 <(echo "$command_keys") <(echo "$block_deps") | tr '\n' ' '))" \
+  test -z "$(comm -13 <(echo "$command_keys") <(echo "$block_deps"))"
+expect "the trigger names the mainnet publish pipeline" grep -q "'trigger': 'mina-mainnet-publish'" <<< "$yaml"
+expect "the trigger waits for the block" \
+  grep -q "_GenerateHardforkPackage-publish-gate" <<< "$(awk "/'build':/{b=1} b&&/'depends_on':/{d=1;next} d{print; exit}" <<< "$yaml")"
+expect "the trigger is synchronous" grep -q "'async': false" <<< "$yaml"
+expect "the publish reads this build's cache" grep -qF "'MINA_READ_CACHE_ROOT': \"\${BUILDKITE_BUILD_ID}\"" <<< "$yaml"
+expect "the publish gets this build's registry" grep -qF "'MINA_RELEASE_DOCKER_REPO': \"< Internal | InternalEurope | Public >.InternalEurope\"" <<< "$yaml"
+expect "the publish gets this build's channel" grep -q "'MINA_RELEASE_CHANNEL': 'unstable'" <<< "$yaml"
+expect "the publish runs on this build's branch" grep -qF "'branch': \"\${BUILDKITE_BRANCH}\"" <<< "$yaml"
+expect "the publish runs on this build's commit" grep -qF "'commit': \"\${BUILDKITE_COMMIT}\"" <<< "$yaml"
+yaml="$(render MINA_RELEASE_DOCKER_REPO='< Internal | InternalEurope | Public >.Public' MINA_RELEASE_CHANNEL=stable)"
+expect "the registry passed on follows the env" grep -qF "'MINA_RELEASE_DOCKER_REPO': \"< Internal | InternalEurope | Public >.Public\"" <<< "$yaml"
+expect "the channel passed on follows the env" grep -q "'MINA_RELEASE_CHANNEL': 'stable'" <<< "$yaml"
+yaml="$("${CLEAN[@]}" CODENAMES_CONFIG=Noble_Amd64 NETWORK=Devnet GENESIS_TIMESTAMP=2026-10-29T18:00:00Z CONFIG_JSON_GZ_URL=https://example.invalid/config.json.gz ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null)"
+expect "devnet triggers the devnet publish pipeline, slug as it is in Buildkite" grep -q "'trigger': 'mina-devet-publish'" <<< "$yaml"
 
 echo "TEST: generic images from a version in the registry: no cached base"
 yaml="$(render USE_GENERIC_DOCKERS_FROM_VERSION=4.0.4-c9e2eac)"

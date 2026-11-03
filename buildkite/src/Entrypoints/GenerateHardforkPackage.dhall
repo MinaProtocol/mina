@@ -90,6 +90,41 @@ let cachedDockerSpec =
                   if fromRegistry then None Text else Some buildCacheDir
               }
 
+let BlockStep =
+    -- A Buildkite block step: the build pauses here until someone unblocks
+    -- it. blocked_state "passed" shows a build nobody unblocks as passed,
+    -- which is what a dry run is.
+      { block : Text
+      , prompt : Text
+      , key : Text
+      , depends_on : List Text
+      , blocked_state : Text
+      }
+
+let TriggerStep =
+    -- A Buildkite trigger step: starts a build of another pipeline. async
+    -- False keeps this build running until that one ends, and takes its
+    -- result, so the hardfork build is red when the publish failed.
+      { trigger : Text
+      , label : Text
+      , key : Text
+      , depends_on : List Text
+      , async : Bool
+      , build :
+          { message : Text
+          , branch : Text
+          , commit : Text
+          , env : List { mapKey : Text, mapValue : Text }
+          }
+      }
+
+let Step =
+    -- The command steps are Buildkite command steps as everywhere else in
+    -- this repository; the publish gate adds a block and a trigger step,
+    -- which the shared pipeline type has no room for. dhall-to-yaml renders
+    -- a union as its contents, so each alternative is one plain step.
+      < Command : Command.Type | Block : BlockStep | Trigger : TriggerStep >
+
 let Spec =
       { Type =
           { codenames : List DebianArchPair
@@ -724,52 +759,130 @@ let generateHfRelatedStepsForCodename =
                     }
                 ]
 
+let publishPipeline =
+    -- The publish pipeline of the network. The devnet one is spelled
+    -- "devet" in Buildkite, and a trigger must name the slug as it is.
+          \(network : Network.Type)
+      ->  merge
+            { Devnet = "mina-devet-publish", Mainnet = "mina-mainnet-publish" }
+            network
+
+let publishGate =
+    -- "Publish?" after everything is built and verified, then the publish
+    -- pipeline of the network, started with this build's id as the cache
+    -- root and the registry and channel this build was rendered with, so
+    -- the two cannot disagree. Where the images and packages go is that
+    -- pipeline's own setting (MINA_RELEASE_DOCKER_MIRROR, the debian
+    -- repositories, the tag globs). The $\{BUILDKITE_*\} below are filled
+    -- in by `buildkite-agent pipeline upload`, with the values of this
+    -- build: they are not escaped on purpose, unlike the ones the command
+    -- steps defer to the agent's shell.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  \(commandKeys : List Text)
+      ->  let gateKey = "_${pipelineName}-publish-gate"
+
+          in  [ Step.Block
+                  { block = "Publish?"
+                  , prompt =
+                      "Start ${publishPipeline
+                                 spec.network} with this build's images and packages. A build that is not published is a dry run."
+                  , key = gateKey
+                  , depends_on = commandKeys
+                  , blocked_state = "passed"
+                  }
+              , Step.Trigger
+                  { trigger = publishPipeline spec.network
+                  , label =
+                      ":rocket: Publish via ${publishPipeline spec.network}"
+                  , key = "_${pipelineName}-publish"
+                  , depends_on = [ gateKey ]
+                  , async = False
+                  , build =
+                      { message =
+                          "Publish hardfork build \${BUILDKITE_BUILD_NUMBER} of \${BUILDKITE_BRANCH}"
+                      , branch = "\${BUILDKITE_BRANCH}"
+                      , commit = "\${BUILDKITE_COMMIT}"
+                      , env = toMap
+                          { MINA_READ_CACHE_ROOT = "\${BUILDKITE_BUILD_ID}"
+                          , MINA_RELEASE_DOCKER_REPO =
+                              DockerRepo.envValue dockerRepo
+                          , MINA_RELEASE_CHANNEL = debianChannel
+                          }
+                      }
+                  }
+              ]
+
 let pipeline =
           \(spec : Spec.Type)
       ->  let pipelineName = "GenerateHardforkPackage"
 
-          in  Pipeline.build
-                Pipeline.Config::{
-                , spec = JobSpec::{
-                  , dirtyWhen = [ SelectFiles.everything ]
-                  , path = "Entrypoints"
-                  , name = pipelineName
-                  , tags =
-                    [ PipelineTag.Type.Release
-                    , PipelineTag.Type.Hardfork
-                    , PipelineTag.Type.Long
-                    ]
+          let commandSteps =
+                      if Prelude.List.null DebianArchPair spec.codenames
+
+                then  [] : List Command.Type
+
+                else  let first =
+                            Prelude.List.head DebianArchPair spec.codenames
+
+                      in    merge
+                              { Some =
+                                      \(codename : DebianArchPair)
+                                  ->  generateHfRelatedStepsForCodename
+                                        spec
+                                        codename
+                                        spec.codenames
+                                        pipelineName
+                              , None = [] : List Command.Type
+                              }
+                              first
+                          # List/concatMap
+                              DebianArchPair
+                              Command.Type
+                              (     \(codename : DebianArchPair)
+                                ->  generateDockerForCodename
+                                      spec
+                                      codename
+                                      pipelineName
+                              )
+                              spec.codenames
+
+          let built =
+                Pipeline.build
+                  Pipeline.Config::{
+                  , spec = JobSpec::{
+                    , dirtyWhen = [ SelectFiles.everything ]
+                    , path = "Entrypoints"
+                    , name = pipelineName
+                    , tags =
+                      [ PipelineTag.Type.Release
+                      , PipelineTag.Type.Hardfork
+                      , PipelineTag.Type.Long
+                      ]
+                    }
+                  , steps = commandSteps
                   }
-                , steps =
-                          if Prelude.List.null DebianArchPair spec.codenames
 
-                    then  [] : List Command.Type
+          let commands = built.pipeline.steps
 
-                    else  let first =
-                                Prelude.List.head DebianArchPair spec.codenames
+          let commandKeys =
+                List/map
+                  Command.Type
+                  Text
+                  (     \(c : Command.Type)
+                    ->  Prelude.Optional.default Text "" c.key
+                  )
+                  commands
 
-                          in    merge
-                                  { Some =
-                                          \(codename : DebianArchPair)
-                                      ->  generateHfRelatedStepsForCodename
-                                            spec
-                                            codename
-                                            spec.codenames
-                                            pipelineName
-                                  , None = [] : List Command.Type
-                                  }
-                                  first
-                              # List/concatMap
-                                  DebianArchPair
-                                  Command.Type
-                                  (     \(codename : DebianArchPair)
-                                    ->  generateDockerForCodename
-                                          spec
-                                          codename
-                                          pipelineName
-                                  )
-                                  spec.codenames
-                }
+          let gate =
+                      if Prelude.List.null Command.Type commands
+
+                then  [] : List Step
+
+                else  publishGate spec pipelineName commandKeys
+
+          in  { steps = List/map Command.Type Step Step.Command commands # gate
+              }
 
 let generate_hardfork_package =
           \(codenames : List DebianArchPair)
@@ -781,23 +894,22 @@ let generate_hardfork_package =
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
       ->  \(use_generic_dockers_from_version : Optional Text)
-      ->  ( pipeline
-              Spec::{
-              , codenames = codenames
-              , network = network
-              , version =
-                  merge
-                    { Some = \(v : Text) -> v, None = "\\\$MINA_DEB_VERSION" }
-                    version
-              , genesis_timestamp = genesis_timestamp
-              , config_json_gz_url = config_json_gz_url
-              , suffix = suffix
-              , precomputed_block_prefix = precomputed_block_prefix
-              , use_artifacts_from_buildkite_build =
-                  use_artifacts_from_buildkite_build
-              , use_generic_dockers_from_version =
-                  use_generic_dockers_from_version
-              }
-          ).pipeline
+      ->  pipeline
+            Spec::{
+            , codenames = codenames
+            , network = network
+            , version =
+                merge
+                  { Some = \(v : Text) -> v, None = "\\\$MINA_DEB_VERSION" }
+                  version
+            , genesis_timestamp = genesis_timestamp
+            , config_json_gz_url = config_json_gz_url
+            , suffix = suffix
+            , precomputed_block_prefix = precomputed_block_prefix
+            , use_artifacts_from_buildkite_build =
+                use_artifacts_from_buildkite_build
+            , use_generic_dockers_from_version =
+                use_generic_dockers_from_version
+            }
 
 in  { generate_hardfork_package = generate_hardfork_package }

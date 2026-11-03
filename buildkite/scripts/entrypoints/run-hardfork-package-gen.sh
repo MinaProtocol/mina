@@ -27,14 +27,16 @@ set -euox pipefail
 #                                        alternative spelled out in full, e.g. '< Internal | InternalEurope | Public >.Public'.
 #                                        Default: the internal euro registry.
 #
-# This pipeline publishes nothing. Every image is written to this build's cache
-# (/var/storagebox/<build id>/docker-images) and every package to
+# This pipeline publishes nothing itself. Every image is written to this
+# build's cache (/var/storagebox/<build id>/docker-images) and every package to
 # debians/<codename>/ of the same cache, which is the layout the publish
-# pipelines read. To publish, run mina-<network>-publish with
-# MINA_READ_CACHE_ROOT set to this build's id, and the MINA_RELEASE_* targets
-# of that pipeline (see buildkite/src/Jobs/Release/PublishDockers.dhall and
-# PublishDebians.dhall). That run is the switch: a build that is never
-# published is a dry run.
+# pipelines read. Once everything is built and verified the build pauses on a
+# "Publish?" block step. Unblocking it triggers mina-<network>-publish with
+# MINA_READ_CACHE_ROOT set to this build's id and the registry and channel
+# above passed along; where the images and packages go is that pipeline's own
+# setting (see buildkite/src/Jobs/Release/PublishDockers.dhall and
+# PublishDebians.dhall). A build nobody unblocks is a dry run, and shows as
+# passed.
 #
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"

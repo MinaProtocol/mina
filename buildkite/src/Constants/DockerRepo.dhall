@@ -14,6 +14,32 @@ let show =
             }
             repo
 
+let envValue
+    : Repo -> Text
+    =
+      -- The value of MINA_RELEASE_DOCKER_REPO that names this registry: what
+      -- a pipeline passes on to another one it triggers, so that both read
+      -- the same registry. The spelling envOverride below accepts.
+          \(repo : Repo)
+      ->  "< Internal | InternalEurope | Public >.${merge
+                                                      { Internal = "Internal"
+                                                      , InternalEurope =
+                                                          "InternalEurope"
+                                                      , Public = "Public"
+                                                      }
+                                                      repo}"
+
+let test_envValue_public =
+        assert
+      : envValue Repo.Public === "< Internal | InternalEurope | Public >.Public"
+
+let test_envValue_round_trips =
+    -- The spelled value is what the gate accepts
+    -- (buildkite/scripts/pipeline/validate-release-env.sh, DOCKER_ACCEPTED).
+        assert
+      :     envValue Repo.InternalEurope
+        ===  "< Internal | InternalEurope | Public >.InternalEurope"
+
 let envOverride
     : Optional Repo
     =
@@ -84,6 +110,7 @@ let hashTag
 in  { Type = Repo
     , show = show
     , hashTag = hashTag
+    , envValue = envValue
     , envOverride = envOverride
     , mirror = mirror
     , effective = effective
