@@ -155,8 +155,7 @@ module Config : sig
   [@@deriving make]
 
   type t =
-    { genesis_ledger_hash : Ledger_hash.t
-    ; creatable_gossip_net : Gossip_net.Any.creatable
+    { creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard
     }
