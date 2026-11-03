@@ -88,6 +88,20 @@ val closed : t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
+(** A root transition applied while adding a breadcrumb. The previous root
+    leaves the frontier for its root history, and [garbage] holds the blocks on
+    the branches the move discarded. *)
+type root_transition =
+  { previous_root : State_hash.t
+  ; new_root : State_hash.t
+  ; garbage : State_hash.t list
+  }
+
+(** [add_breadcrumb_exn], also returning the root transition the add made due
+    and applied with it, if any. *)
+val add_breadcrumb_reporting_root_exn :
+  t -> Breadcrumb.t -> root_transition option Deferred.t
+
 val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t

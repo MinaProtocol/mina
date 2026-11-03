@@ -434,7 +434,13 @@ let genesis_state_hash { genesis_state_hash; _ } = genesis_state_hash
 let root_snarked_ledger { persistent_root_instance; _ } =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
-let add_breadcrumb_exn t breadcrumb =
+type root_transition =
+  { previous_root : State_hash.t
+  ; new_root : State_hash.t
+  ; garbage : State_hash.t list
+  }
+
+let add_breadcrumb_reporting_root_exn t breadcrumb =
   let open Deferred.Let_syntax in
   let state_hash = Breadcrumb.state_hash breadcrumb in
   Internal_tracing.with_state_hash state_hash
@@ -444,6 +450,19 @@ let add_breadcrumb_exn t breadcrumb =
   [%log internal] "Calculate_diffs" ;
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
   [%log internal] "Calculate_diffs_done" ;
+  let previous_root = Full_frontier.root t.full_frontier in
+  let root_transition =
+    List.find_map diffs ~f:(function
+      | Diff.Full.E.E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
+          Some
+            { previous_root = Breadcrumb.state_hash previous_root
+            ; new_root =
+                (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+            ; garbage = Diff.Node_list.to_lite hs
+            }
+      | _ ->
+          None )
+  in
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
@@ -521,7 +540,11 @@ let add_breadcrumb_exn t breadcrumb =
       ~diffs_with_mutants
   in
   [%log internal] "Notify_frontier_extensions_done" ;
-  [%log internal] "Add_breadcrumb_to_frontier_done"
+  [%log internal] "Add_breadcrumb_to_frontier_done" ;
+  root_transition
+
+let add_breadcrumb_exn t breadcrumb =
+  Deferred.ignore_m (add_breadcrumb_reporting_root_exn t breadcrumb)
 
 (* proxy full frontier functions *)
 include struct
