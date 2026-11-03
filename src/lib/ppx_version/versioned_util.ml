@@ -74,3 +74,37 @@ let jane_street_library_modules = [ "Uuid" ]
 
 let jane_street_modules =
   [ "Core"; "Core_kernel" ] @ jane_street_library_modules
+
+module StringSet = Set.Make (String)
+
+let collect_types : StringSet.t Ast_traverse.fold =
+  let rec lident l acc =
+    match l with
+    | Lident s ->
+        StringSet.add acc s
+    | Ldot (m, _) ->
+        lident m acc
+    | Lapply (l1, l2) ->
+        lident l1 (lident l2 acc)
+  in
+
+  object (self)
+    inherit [StringSet.t] Ast_traverse.fold as super
+
+    method! core_type_desc ct acc =
+      match ct with
+      | Ptyp_constr (l, types) ->
+          let acc' = lident l.txt acc in
+          List.fold_right ~f:self#core_type ~init:acc' types
+      | _ ->
+          super#core_type_desc ct acc
+
+    method! module_expr_desc desc acc =
+      match desc with
+      | Pmod_ident l ->
+          lident l.txt acc
+      | _ ->
+          super#module_expr_desc desc acc
+
+    method! module_substitution ms acc = lident ms.pms_manifest.txt acc
+  end
