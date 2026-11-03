@@ -39,6 +39,8 @@
   mina_metrics
   sgn
   ledger_proof
+  proof_cache_tag
+  proof_carrying_data
   genesis_constants
   o1trace
   with_hash

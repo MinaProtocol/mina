@@ -19,6 +19,10 @@ module type S = sig
 
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
+
+  (** Read the bin_prot serialization of a value from the cache, without
+      deserializing it, crashing if the value cannot be found. *)
+  val get_bin_prot : t -> id -> Bigstring.t
 end
 
 module type S_with_count = sig

@@ -46,6 +46,8 @@ end
 module Ledger_proof_with_hash : sig
   type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
 
+  val hash : Ledger_proof.Stable.Latest.t -> Aux_hash.t
+
   val create : Ledger_proof.Cached.t -> t
 end
 

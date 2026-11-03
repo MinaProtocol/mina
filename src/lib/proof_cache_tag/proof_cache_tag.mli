@@ -12,6 +12,9 @@ val create_db :
 
 val read_proof_from_disk : t -> Pickles.Proof.Proofs_verified_2.Stable.Latest.t
 
+(** The bin_prot serialization of the proof, read without decoding it *)
+val read_proof_bin_prot_from_disk : t -> Bigstring.t
+
 val write_proof_to_disk :
   cache_db -> Pickles.Proof.Proofs_verified_2.Stable.Latest.t -> t
 
