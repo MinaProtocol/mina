@@ -281,6 +281,9 @@ module Account =
       actionState
       zkappState
       zkappUri
+      zkappUriBytes { hex
+                      utf8
+                    }
       timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                cliffAmount
                vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
@@ -289,6 +292,9 @@ module Account =
              }
       tokenId
       tokenSymbol
+      tokenSymbolBytes { hex
+                         utf8
+                       }
       verificationKey { verificationKey
                         hash
                       }

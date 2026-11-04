@@ -1189,6 +1189,164 @@ module HealthcheckUnreachable = struct
         Mina_automation_fixture.Intf.Passed
 end
 
+(** Token symbols and zkApp URIs are stored on chain as bytes that need not be
+    valid UTF-8, and a GraphQL response must be UTF-8. The genesis ledger gets
+    an account whose token symbol is the single byte 0xff and whose zkApp URI
+    ends in a 0xff byte, and an account whose token symbol is the valid UTF-8
+    text "ÿ" (bytes c3 bf). The account query must give the exact bytes in
+    [tokenSymbolBytes.hex] and [zkappUriBytes.hex], the text in [utf8] only
+    when the bytes are valid UTF-8, and always valid UTF-8 in [tokenSymbol] and
+    [zkappUri]. Both token symbols read "ÿ" in [tokenSymbol]; only the byte
+    fields tell them apart. *)
+module GraphqlTokenSymbolBytes = struct
+  module GC = Mina_graphql_client.Client
+  module HC = Mina_healthcheck_lib
+
+  let logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let raw_symbol = "\xff"
+
+  let raw_uri = "https://example.com/\xff"
+
+  let raw_uri_hex = "68747470733a2f2f6578616d706c652e636f6d2fff"
+
+  (* "ÿ" as UTF-8: also what [tokenSymbol] shows for the byte 0xff *)
+  let text_symbol = "\xc3\xbf"
+
+  let raw_uri_text = "https://example.com/\xc3\xbf"
+
+  (* Two of the generated accounts get the values under test. The config is
+     written as bytes, so the daemon reads them as they are. Returns the public
+     keys of the raw-byte account and of the text account. *)
+  let write_config daemon ledger_file =
+    let client = Daemon.client daemon in
+    let%map ledger_content = Daemon.Client.test_ledger client ~n:10 in
+    let accounts =
+      Yojson.Safe.from_string ledger_content
+      |> Runtime_config.Accounts.of_yojson |> Result.ok_or_failwith
+    in
+    let raw_account, text_account, rest =
+      match accounts with
+      | a :: b :: rest ->
+          (a, b, rest)
+      | _ ->
+          failwith "expected at least two generated accounts"
+    in
+    let zkapp : Runtime_config.Accounts.Single.Zkapp_account.t =
+      { (Runtime_config.Accounts.Single.Zkapp_account.of_zkapp
+           Mina_base.Zkapp_account.default )
+        with
+        zkapp_uri = raw_uri
+      }
+    in
+    let raw_account : Runtime_config.Accounts.Single.t =
+      { raw_account with token_symbol = Some raw_symbol; zkapp = Some zkapp }
+    in
+    let text_account : Runtime_config.Accounts.Single.t =
+      { text_account with token_symbol = Some text_symbol }
+    in
+    let ledger : Runtime_config.Ledger.t =
+      { base = Accounts (raw_account :: text_account :: rest)
+      ; num_accounts = None
+      ; balances = []
+      ; hash = None
+      ; s3_data_hash = None
+      ; name = None
+      ; add_genesis_winner = Some true
+      }
+    in
+    Runtime_config.to_yojson (Runtime_config.make ~ledger ())
+    |> Yojson.Safe.to_file ledger_file ;
+    (raw_account.pk, text_account.pk)
+
+  let show = Option.value_map ~default:"null" ~f:(sprintf "%S")
+
+  let expect ~what ~expected actual =
+    if Option.equal String.equal expected actual then Ok ()
+    else
+      Or_error.errorf "%s: expected %s, got %s" what (show expected)
+        (show actual)
+
+  let check_account node_uri ~pk ~symbol_hex ~symbol_utf8 ~uri =
+    let open Deferred.Or_error.Let_syntax in
+    let account_id =
+      Mina_base.Account_id.create
+        (Public_key.Compressed.of_base58_check_exn pk)
+        Mina_base.Token_id.default
+    in
+    let%bind obj = GC.get_account ~logger node_uri ~account_id in
+    Deferred.return
+    @@
+    match obj.account with
+    | None ->
+        Or_error.errorf "account %s not found" pk
+    | Some account ->
+        let open Or_error.Let_syntax in
+        let%bind () =
+          expect ~what:"tokenSymbol" ~expected:(Some text_symbol)
+            account.tokenSymbol
+        in
+        let%bind () =
+          expect ~what:"tokenSymbolBytes.hex" ~expected:(Some symbol_hex)
+            (Option.map account.tokenSymbolBytes ~f:(fun b -> b.hex))
+        in
+        let%bind () =
+          expect ~what:"tokenSymbolBytes.utf8" ~expected:symbol_utf8
+            (Option.bind account.tokenSymbolBytes ~f:(fun b -> b.utf8))
+        in
+        let uri_text, uri_hex, uri_utf8 =
+          match uri with
+          | None ->
+              (None, None, None)
+          | Some (text, hex, utf8) ->
+              (Some text, Some hex, utf8)
+        in
+        let%bind () =
+          expect ~what:"zkappUri" ~expected:uri_text account.zkappUri
+        in
+        let%bind () =
+          expect ~what:"zkappUriBytes.hex" ~expected:uri_hex
+            (Option.map account.zkappUriBytes ~f:(fun b -> b.hex))
+        in
+        expect ~what:"zkappUriBytes.utf8" ~expected:uri_utf8
+          (Option.bind account.zkappUriBytes ~f:(fun b -> b.utf8))
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind raw_pk, text_pk = write_config daemon ledger_file in
+    let%bind process = Daemon.start daemon in
+    let node_uri =
+      Uri.make ~scheme:"http" ~host:"localhost" ~port:test.config.rest_port
+        ~path:"/graphql" ()
+    in
+    let run () =
+      let open Deferred.Or_error.Let_syntax in
+      let%bind _ =
+        HC.wait_for_graphql ~logger node_uri ~timeout:120 ~interval:5
+      in
+      let%bind _ =
+        HC.wait_for_ready ~logger node_uri ~min_peers:0 ~timeout:300 ~interval:5
+      in
+      let%bind () =
+        check_account node_uri ~pk:raw_pk ~symbol_hex:"ff" ~symbol_utf8:None
+          ~uri:(Some (raw_uri_text, raw_uri_hex, None))
+      in
+      check_account node_uri ~pk:text_pk ~symbol_hex:"c3bf"
+        ~symbol_utf8:(Some text_symbol) ~uri:None
+    in
+    let%bind result = run () in
+    let%map () = Daemon.Client.stop_daemon process.client in
+    match result with
+    | Ok () ->
+        Mina_automation_fixture.Intf.Passed
+    | Error e ->
+        Mina_automation_fixture.Intf.Failed e
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1337,6 +1495,16 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (NodeStatusReport) ) )
+        ] )
+    ; ( "graphql-token-symbol-bytes"
+      , [ test_case
+            "GraphQL returns token symbols and zkApp URIs as exact bytes and \
+             as UTF-8"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (GraphqlTokenSymbolBytes) ) )
         ] )
     ; ( "healthcheck"
       , [ test_case "Healthcheck lifecycle: readiness check then wait for ready"
