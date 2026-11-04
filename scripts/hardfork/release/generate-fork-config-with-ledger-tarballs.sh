@@ -97,9 +97,6 @@ fi
 echo "--- Download and extract previous network config"
 curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > "$TMP/config.json"
 
-# make sure files does not have genesis key
-jq 'del(.genesis)' "$TMP/config.json" > "$TMP/fork_config_no_genesis.json"
-
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
@@ -110,11 +107,13 @@ mkdir "$OUTPUT_DIR"
 # slot_reduction_update, which doubles the vesting period of every account
 # still vesting at the fork slot and gives a genesis ledger root that differs
 # from the one automode nodes compute. --identity-conversion ignores
-# --prefork-genesis-config, so none is passed.
-"$RUNTIME_GENESIS_LEDGER" --identity-conversion --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+# --prefork-genesis-config, so none is passed. The config is passed as
+# downloaded: token symbols and zkApp URIs are arbitrary bytes, so the file must
+# stay byte for byte.
+"$RUNTIME_GENESIS_LEDGER" --identity-conversion --pad-app-state --config-file "$TMP/config.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
-FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
+FORK_CONFIG_JSON="$TMP/config.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 echo "--- New genesis config"
 cat new_config.json

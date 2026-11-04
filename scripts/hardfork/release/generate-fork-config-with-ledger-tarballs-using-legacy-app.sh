@@ -67,7 +67,9 @@ HASH_PATH="$WORKDIR/$HASH_NAME"
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-# make sure files does not have genesis key
-jq 'del(.genesis)' "$FORK_CONFIG" > "$TMP/fork_config_no_genesis.json"
+# The legacy app rejects .genesis. The config is copied byte for byte: token
+# symbols and zkApp URIs are arbitrary bytes, not always valid UTF-8, so no
+# text-only JSON tool is used on it.
+"$(dirname "$0")/remove-genesis-field.py" "$FORK_CONFIG" "$TMP/fork_config_no_genesis.json"
 
 "$MINA_LEGACY_GENESIS_EXE" --identity-conversion --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH"
