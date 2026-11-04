@@ -41,6 +41,11 @@ module Db : sig
     -> [ `CreateSchema | `DropTables | `Upgrade | `Rollback ]
     -> unit Deferred.Or_error.t
 
+  (** [copy db ~name] makes database [name] as a copy of [db] (CREATE DATABASE
+      ... TEMPLATE), dropping a database of that name first. [name] must start
+      with [test_], and nothing may be connected to [db]. *)
+  val copy : t -> name:string -> t Deferred.Or_error.t
+
   (** The server [MINA_TEST_POSTGRES] names, as CI sets it. A test that needs
       a database calls this first: without the variable it exits with status
       2 and a message, so a missing server is never a silent pass. *)

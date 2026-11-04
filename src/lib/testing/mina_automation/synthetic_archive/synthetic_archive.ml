@@ -47,6 +47,20 @@ module Db = struct
 
   let run_script = load_script
 
+  let copy db ~name =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind () = Deferred.return (check_name name) in
+    let copy = { name; uri = Uri.with_path db.uri ("/" ^ name) } in
+    let%bind () = drop copy in
+    let%map (_ : string) =
+      Mina_automation.Psql.run_command
+        ~connection:(on_server db.uri "postgres")
+        (sprintf "CREATE DATABASE %s TEMPLATE %s;"
+           (Mina_automation.Psql.quote_ident name)
+           (Mina_automation.Psql.quote_ident db.name) )
+    in
+    copy
+
   let test_server_env = "MINA_TEST_POSTGRES"
 
   let test_server_uri () =
