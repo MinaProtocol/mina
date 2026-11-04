@@ -99,6 +99,7 @@ let Spec =
           , precomputed_block_prefix : Optional Text
           , use_artifacts_from_buildkite_build : Optional Text
           , use_generic_dockers_from_version : Optional Text
+          , hardfork_config_url : Optional Text
           , size : Size
           , deb_legacy_version : Text
           , deb_legacy_githash_config : Text
@@ -118,6 +119,7 @@ let Spec =
           , precomputed_block_prefix = None Text
           , use_artifacts_from_buildkite_build = None Text
           , use_generic_dockers_from_version = None Text
+          , hardfork_config_url = None Text
           , size = Size.XLarge
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
           , deb_legacy_githash_config =
@@ -130,6 +132,7 @@ let generateReferenceTarballsCommand =
       ->  \ ( codename
             : { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
             )
+      ->  \(cachePrefix : Text)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
       ->  let cacheArg =
@@ -152,7 +155,7 @@ let generateReferenceTarballsCommand =
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
                                                                                                                                        spec.network} --version ${spec.deb_legacy_version}  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
+                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} --cache-prefix ${cachePrefix} ${cacheArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename.DebVersion}"
@@ -165,6 +168,8 @@ let generateTarballsCommand =
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
       ->  \(codenames : List DebianArchPair)
+      ->  \(cachePrefix : Text)
+      ->  \(upload : Bool)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
       ->  let cacheArg =
@@ -202,6 +207,8 @@ let generateTarballsCommand =
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName
                                             codename.DebVersion} "
+                        ++  "--cache-prefix ${cachePrefix} "
+                        ++  (if upload then "" else "--no-upload ")
                         ++  "${cacheArg}"
                       )
                 , label =
@@ -211,6 +218,77 @@ let generateTarballsCommand =
                 , depends_on = depends_on
                 , target = Size.Large
                 }
+
+let fetchHardforkConfigCommand =
+    -- The ready config (scripts/hardfork/release/publish-hardfork-config.sh)
+    -- written to the cache in the layout the packaging reads, in seconds.
+    -- It takes the key of the generation step, so that the packaging step
+    -- waits for it exactly as it waits for a generated config. It depends on
+    -- nothing: it needs no package of this build.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  \(url : Text)
+      ->  \(key : Text)
+      ->  let genesis_timestamp_env =
+                merge
+                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
+                  , None = [] : List Text
+                  }
+                  spec.genesis_timestamp
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                    Toolchain.select
+                      Toolchain.Spec::{
+                      , debVersion = codename.DebVersion
+                      , arch = codename.Arch
+                      , submodules = True
+                      }
+                      (   [ "AWS_ACCESS_KEY_ID"
+                          , "AWS_SECRET_ACCESS_KEY"
+                          , "GENESIS_TIMESTAMP"
+                          ]
+                        # genesis_timestamp_env
+                      )
+                      (     "./buildkite/scripts/hardfork/release/fetch-hardfork-config.sh "
+                        ++  "--network ${Network.lowerName spec.network} "
+                        ++  "--url ${url} "
+                        ++  "--config-json-gz-url ${spec.config_json_gz_url}"
+                      )
+                , label =
+                    "Fetch the hardfork config for ${DebianVersions.lowerName
+                                                       codename.DebVersion}"
+                , key = key
+                , target = Size.Small
+                }
+
+let compareHardforkDataCommand =
+    -- The ready config against the one rebuilt from the state dump: same
+    -- ledger roots, same fork block, or the build is red.
+          \(codename : DebianArchPair)
+      ->  \(readyPrefix : Text)
+      ->  \(recomputedPrefix : Text)
+      ->  \(key : Text)
+      ->  \(depends_on : List Command.TaggedKey.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                Toolchain.select
+                  Toolchain.Spec::{
+                  , debVersion = codename.DebVersion
+                  , arch = codename.Arch
+                  , submodules = True
+                  }
+                  ([] : List Text)
+                  "./buildkite/scripts/hardfork/release/compare-hardfork-data.sh --ready ${readyPrefix} --recomputed ${recomputedPrefix}"
+            , label =
+                "Check the hardfork config against the state dump for ${DebianVersions.lowerName
+                                                                          codename.DebVersion}"
+            , key = key
+            , depends_on = depends_on
+            , target = Size.Small
+            }
 
 let generateDockerForCodename =
           \(spec : Spec.Type)
@@ -558,7 +636,19 @@ let generateHfRelatedStepsForCodename =
                 "generate-reference-tarballs-" ++ lowerNameCodename
 
           let dependsOnTest =
-                [ { name = pipelineName, key = dockerDaemonStep } ]
+              -- The verification reads the reference ledgers from the cache.
+              -- With a generated config they come from the reference step,
+              -- which the image build does not wait for; with a ready config
+              -- they come from the fetch step, which the packaging, and so
+              -- the image, already waits for.
+                  [ { name = pipelineName, key = dockerDaemonStep } ]
+                # merge
+                    { None =
+                      [ { name = pipelineName, key = referencesTarballStepKey }
+                      ]
+                    , Some = \(_ : Text) -> [] : List Command.TaggedKey.Type
+                    }
+                    spec.hardfork_config_url
 
           let precomputed_block_prefix_arg =
                 merge
@@ -576,19 +666,73 @@ let generateHfRelatedStepsForCodename =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let recomputedPrefix = "hardfork-recomputed"
+
+          let recomputeTarballsKey =
+                "recompute-hardfork-tarballs-${lowerNameCodename}"
+
+          let recomputeReferenceKey =
+                "recompute-reference-tarballs-${lowerNameCodename}"
+
           let generateTarballs =
-                [ generateTarballsCommand
-                    spec
-                    codename
-                    codenames
-                    tarballGenKey
-                    dependsOnArtifactsOrEmpty
-                , generateReferenceTarballsCommand
-                    spec
-                    codename
-                    referencesTarballStepKey
-                    dependsOnArtifactsOrEmpty
-                ]
+              -- Without a ready config the ledgers are built from the state
+              -- dump, and the packaging waits for them. With one, the
+              -- packaging starts from the ready config at once, and the same
+              -- rebuild runs beside it as a check, into its own cache prefix,
+              -- without uploading its tarballs.
+                merge
+                  { None =
+                    [ generateTarballsCommand
+                        spec
+                        codename
+                        codenames
+                        "hardfork"
+                        True
+                        tarballGenKey
+                        dependsOnArtifactsOrEmpty
+                    , generateReferenceTarballsCommand
+                        spec
+                        codename
+                        "hardfork"
+                        referencesTarballStepKey
+                        dependsOnArtifactsOrEmpty
+                    ]
+                  , Some =
+                          \(url : Text)
+                      ->  [ fetchHardforkConfigCommand
+                              spec
+                              codename
+                              url
+                              tarballGenKey
+                          , generateTarballsCommand
+                              spec
+                              codename
+                              codenames
+                              recomputedPrefix
+                              False
+                              recomputeTarballsKey
+                              dependsOnArtifactsOrEmpty
+                          , generateReferenceTarballsCommand
+                              spec
+                              codename
+                              recomputedPrefix
+                              recomputeReferenceKey
+                              dependsOnArtifactsOrEmpty
+                          , compareHardforkDataCommand
+                              codename
+                              "hardfork"
+                              recomputedPrefix
+                              "check-hardfork-config-${lowerNameCodename}"
+                              [ { name = pipelineName
+                                , key = recomputeTarballsKey
+                                }
+                              , { name = pipelineName
+                                , key = recomputeReferenceKey
+                                }
+                              ]
+                          ]
+                  }
+                  spec.hardfork_config_url
 
           let cached_tarball_ledgers =
                 "--cached-hardfork-data /var/storagebox/\\\${BUILDKITE_BUILD_ID}/hardfork/ "
@@ -779,6 +923,7 @@ let generate_hardfork_package =
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
       ->  \(use_generic_dockers_from_version : Optional Text)
+      ->  \(hardfork_config_url : Optional Text)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
@@ -795,6 +940,7 @@ let generate_hardfork_package =
                   use_artifacts_from_buildkite_build
               , use_generic_dockers_from_version =
                   use_generic_dockers_from_version
+              , hardfork_config_url = hardfork_config_url
               }
           ).pipeline
 

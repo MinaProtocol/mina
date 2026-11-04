@@ -20,6 +20,12 @@ set -euox pipefail
 #   PRECOMPUTED_FORK_BLOCK_PREFIX      - (Optional) Prefix for precomputed fork block URLs (e.g., "gs://mina_network_block_data/mainnet")
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
+#   HARDFORK_CONFIG_URL                - (Optional) URL of a ready hardfork config archive, as
+#                                        scripts/hardfork/release/publish-hardfork-config.sh uploads it from a node's
+#                                        `mina advanced generate-hardfork-config` directory. The packages are then built
+#                                        from it at once, and the ledgers are still rebuilt from CONFIG_JSON_GZ_URL
+#                                        beside it, as a check that must agree. Without it the ledgers are built from
+#                                        CONFIG_JSON_GZ_URL and the packaging waits for them.
 #
 # READ BY THE RENDER, SHARED WITH THE RELEASE PIPELINES:
 #   MINA_RELEASE_CHANNEL               - (Optional) The channel the packages are built for (their Suite), which is
@@ -82,6 +88,7 @@ function usage() {
   PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
   USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
+  HARDFORK_CONFIG_URL                (Optional) URL of a ready hardfork config archive; the state dump is then only a check
 EOF
   exit 1
 }
@@ -158,6 +165,14 @@ else
 fi
 
 
+# Format HARDFORK_CONFIG_URL as Optional Text for Dhall
+if [[ -z "${HARDFORK_CONFIG_URL:-}" ]]; then
+  HARDFORK_CONFIG_URL="(None Text)"
+else
+  # shellcheck disable=SC2089
+  HARDFORK_CONFIG_URL="(Some \"${HARDFORK_CONFIG_URL}\")"
+fi
+
 # Format PRECOMPUTED_FORK_BLOCK_PREFIX as Optional Text for Dhall
 if [[ -z "${PRECOMPUTED_FORK_BLOCK_PREFIX:-}" ]]; then
   PRECOMPUTED_FORK_BLOCK_PREFIX="(None Text)"
@@ -185,7 +200,7 @@ else
 fi
 
 # shellcheck disable=SC2089
-printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s\n' \
   "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
   "$DHALL_CODENAMES" \
   "$NETWORK_DHALL_DEF" \
@@ -197,4 +212,5 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
   "$PRECOMPUTED_FORK_BLOCK_PREFIX" \
   "$USE_ARTIFACTS_FROM_BUILDKITE_BUILD" \
   "$USE_GENERIC_DOCKERS_FROM_VERSION" \
+  "$HARDFORK_CONFIG_URL" \
    | dhall-to-yaml --quoted

@@ -3,7 +3,10 @@
 set -ex
 
 usage() {
-  echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --codename CODENAME"
+  echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --codename CODENAME [--cache-prefix PREFIX] [--no-upload]"
+  echo "  --cache-prefix  where in this build's cache to write (default: hardfork)"
+  echo "  --no-upload     do not upload the ledger tarballs to MINA_LEDGER_S3_BUCKET:"
+  echo "                  for a rebuild that only checks a ready config"
   exit 1
 }
 
@@ -11,6 +14,8 @@ NETWORK_NAME=""
 CONFIG_JSON_GZ_URL=""
 CODENAME=""
 CACHED_BUILDKITE_BUILD_ID=""
+CACHE_PREFIX="hardfork"
+UPLOAD=1
 while [[ $# -gt 0 ]]; do
   case $1 in
     --network)
@@ -28,6 +33,14 @@ while [[ $# -gt 0 ]]; do
     --cached-buildkite-build-id)
       CACHED_BUILDKITE_BUILD_ID="$2"
       shift 2
+      ;;
+    --cache-prefix)
+      CACHE_PREFIX="$2"
+      shift 2
+      ;;
+    --no-upload)
+      UPLOAD=0
+      shift
       ;;
     -h|--help)
       usage
@@ -67,11 +80,15 @@ echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 
 ./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc
 
-./scripts/hardfork/release/upload-ledger-tarballs.sh hardfork_ledgers new_config.json
+if [[ "$UPLOAD" == 1 ]]; then
+  ./scripts/hardfork/release/upload-ledger-tarballs.sh hardfork_ledgers new_config.json
+else
+  echo "--- Not uploading the ledger tarballs (--no-upload)"
+fi
 
 # Write to cache
-buildkite-cache-manager write hardfork_ledgers/*.tar.gz hardfork/ledgers/
-buildkite-cache-manager write hashes.json new_config.json hardfork/
+buildkite-cache-manager write hardfork_ledgers/*.tar.gz "$CACHE_PREFIX/ledgers/"
+buildkite-cache-manager write hashes.json new_config.json "$CACHE_PREFIX/"
 
 # Clean up generated ledgers and config
 rm -rf hardfork_ledgers hashes.json new_config.json

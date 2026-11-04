@@ -8,6 +8,7 @@ WORKDIR=$(pwd)
 FORCE_VERSION="*"
 CACHED_BUILDKITE_BUILD_ID="${CACHED_BUILDKITE_BUILD_ID:-}"
 CONFIG_JSON_GZ_URL=""
+CACHE_PREFIX="hardfork"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --network)
@@ -30,9 +31,13 @@ while [[ $# -gt 0 ]]; do
       CONFIG_JSON_GZ_URL="$2"
       shift 2
       ;;
+    --cache-prefix)
+      CACHE_PREFIX="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
+      echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>] [--cache-prefix <prefix>]"
       exit 1
       ;;
   esac
@@ -76,7 +81,7 @@ ls -lh $WORKDIR/legacy_ledgers/
 
 head -n 10 "$WORKDIR/legacy_hashes.json"
 
-buildkite-cache-manager write "$WORKDIR/legacy_hashes.json" "$WORKDIR/legacy_ledgers/*.tar.gz" "hardfork/legacy/"
+buildkite-cache-manager write "$WORKDIR/legacy_hashes.json" "$WORKDIR/legacy_ledgers/*.tar.gz" "$CACHE_PREFIX/legacy/"
 
 #clean up generated ledgers and config
 rm -rf "$WORKDIR/legacy_ledgers" "$WORKDIR/legacy_hashes.json" config.json
