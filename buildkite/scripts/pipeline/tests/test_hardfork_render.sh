@@ -145,6 +145,8 @@ for check in config ledgers tarballs; do
   expect "the $check check waits for the reference step" \
     grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-artifacts-$check-noble")"
 done
+expect "the corrupted-artifacts check waits for it too" \
+  grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-assert-unverify-corrupted-packaged-artifacts-noble")"
 expect "the packaging waits for the generation step" \
   grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-build-hf-debian")"
 expect "the generation step uploads its tarballs" \
