@@ -54,15 +54,13 @@ let DebianArchPair =
 let defaultMinaArtifactSpec = MinaArtifact.PackagingSpec::{=}
 
 let dockerRepo =
-    -- The registry the images are tagged for. Nothing here pushes: every
-    -- image goes to this build's cache (build.sh --build-cache-dir) and the
-    -- publish pipeline pushes it from there, after the verification, exactly
-    -- as it does for a release (Jobs/Release/PublishDockers.dhall). The
-    -- hardfork default is the internal euro registry. A fork-day run sets
-    -- MINA_RELEASE_DOCKER_REPO to Public, so the tags name docker.io, and
-    -- lets MINA_RELEASE_DOCKER_MIRROR in the publish pipeline add the euro
-    -- copy.
-      DockerRepo.effective DockerRepo.Type.InternalEurope
+    -- Always the internal euro registry. Every image is pushed there by this
+    -- build and also written to the build's cache, so a hardfork candidate
+    -- can be run from the registry, which needs credentials, without reaching
+    -- a user. The fork-day publish (Jobs/Release/PublishDockers.dhall) takes
+    -- the images from the cache and retags them for docker.io itself, so the
+    -- registry named here is never the public one.
+      DockerRepo.Type.InternalEurope
 
 let buildCacheDir = MinaArtifact.ownBuildCacheDir
 
@@ -72,18 +70,18 @@ let debianChannel =
     -- same variable). Unstable unless the pipeline says otherwise.
       DebianChannel.effective DebianChannel.Type.Unstable
 
-let cachedDockerSpec =
-    -- The image step as the hardfork pipeline wants it: tagged for the
-    -- registry above, kept on the agent (--load-only) and written to this
-    -- build's cache, never pushed. The layered bases (generic -> profiled ->
-    -- configured) come from the same cache, except when the generic images
-    -- are taken from a version in the registry: then there is no cached
-    -- base, and build.sh pulls it.
+let hardforkDockerSpec =
+    -- The image step as the hardfork pipeline wants it: tagged for and pushed
+    -- to the euro registry, and written to this build's cache for the
+    -- fork-day publish. The layered bases (generic -> profiled -> configured)
+    -- come from the same cache, except when the generic images are taken
+    -- from a version in the registry: then there is no cached base, and
+    -- build.sh pulls it.
           \(fromRegistry : Bool)
       ->  \(docker : DockerImage.ReleaseSpec.Type)
       ->      docker
           //  { docker_repo = dockerRepo
-              , docker_publish = DockerPublish.Type.Disabled
+              , docker_publish = DockerPublish.Type.Enabled
               , deb_release = debianChannel
               , build_cache_dir = Some buildCacheDir
               , base_cache_dir =
@@ -487,7 +485,7 @@ let generateDockerForCodename =
                   Command.Type
                   (     \(docker : DockerImage.ReleaseSpec.Type)
                     ->  DockerImage.generateStep
-                          (cachedDockerSpec fromRegistry docker)
+                          (hardforkDockerSpec fromRegistry docker)
                   )
                   dockerSpecs
 

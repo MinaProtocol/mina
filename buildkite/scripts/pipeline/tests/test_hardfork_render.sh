@@ -6,11 +6,12 @@
 #
 #   - every depends_on names a step of the pipeline (build 1314 stalled on a
 #     key no step had);
-#   - no image step pushes: each one builds --load-only and writes the image
-#     to this build's cache, where the publish pipeline reads it;
+#   - every image step pushes to the internal euro registry, never to the
+#     public one, and writes the image to this build's cache, where the
+#     fork-day publish reads it;
 #   - the verification steps load the daemon image from that cache;
-#   - MINA_RELEASE_DOCKER_REPO and MINA_RELEASE_CHANNEL, the variables the
-#     release pipelines read, reach the image tags and the package Suite;
+#   - MINA_RELEASE_CHANNEL, the variable the release pipelines read, reaches
+#     the package Suite, and MINA_RELEASE_DOCKER_REPO does not reach the tags;
 #   - a run that takes the generic images from a version in the registry does
 #     not look for their bases in the cache.
 #
@@ -67,41 +68,39 @@ undefined="$(comm -23 \
 expect "no undefined depends_on target (got: ${undefined:-none})" test -z "$undefined"
 expect "the profiled daemon step is there" grep -q "daemon_profile-mainnet-noble-docker-image" <<< "$yaml"
 
-echo "TEST: no image step pushes; every image goes to this build's cache"
+echo "TEST: every image is pushed to the euro registry and written to this build's cache"
 builds="$(build_lines <<< "$yaml")"
 n="$(grep -c . <<< "$builds")"
 expect "image steps rendered (got $n)" test "$n" -ge 5
-expect "every build is --load-only" test "$(grep -c -- '--load-only' <<< "$builds")" -eq "$n"
+expect_not "no build is --load-only: every image is pushed" grep -q -- '--load-only' <<< "$builds"
 expect "every build writes to the build cache" \
   test "$(grep -c -- '--build-cache-dir /var/storagebox/[^ ]*BUILDKITE_BUILD_ID[^ ]*/docker-images' <<< "$builds")" -eq "$n"
 expect "layered bases come from the build cache" \
   test "$(grep -c -- '--base-cache-dir /var/storagebox/[^ ]*BUILDKITE_BUILD_ID[^ ]*/docker-images' <<< "$builds")" -eq "$n"
-expect_not "no step pushes the image after the build" grep -q "docker push" <<< "$yaml"
 
 echo "TEST: the verification steps load the daemon image from the build cache"
 loads="$(commands <<< "$yaml" | grep -c "CACHE_ROOT=/var/storagebox/[^ ]*BUILDKITE_BUILD_ID[^ ]*/docker-images ./buildkite/scripts/docker/load_from_cache.sh europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-daemon:" || true)"
 expect "four verification steps load the image (got $loads)" test "$loads" -eq 4
 
-echo "TEST: the hardfork default is the euro registry, unstable channel"
+echo "TEST: the registry is the euro one; the default channel is unstable"
 expect "images tagged for the euro registry" \
   test "$(grep -c -- '--docker-registry europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo' <<< "$builds")" -eq "$n"
 expect_not "internal registry keeps the hash tag" grep -q -- '--no-hash-tag' <<< "$builds"
 expect "config packages built for unstable" grep -q "MINA_DEB_RELEASE=unstable" <<< "$yaml"
 expect "images built from the unstable packages" test "$(grep -c -- '--deb-release unstable' <<< "$builds")" -eq "$n"
 
-echo "TEST: MINA_RELEASE_DOCKER_REPO and MINA_RELEASE_CHANNEL reach the render"
+echo "TEST: MINA_RELEASE_CHANNEL reaches the render; MINA_RELEASE_DOCKER_REPO does not"
 yaml="$(render MINA_RELEASE_DOCKER_REPO='< Internal | InternalEurope | Public >.Public' MINA_RELEASE_CHANNEL=stable)"
 builds="$(build_lines <<< "$yaml")"
-expect "images tagged for docker.io" \
-  test "$(grep -c -- '--docker-registry docker.io/minaprotocol' <<< "$builds")" -eq "$n"
-expect "docker.io gets no hash tag" test "$(grep -c -- '--no-hash-tag' <<< "$builds")" -eq "$n"
-expect "verification loads the docker.io-tagged image" \
-  grep -q "load_from_cache.sh docker.io/minaprotocol/mina-daemon:" <<< "$yaml"
+expect "images still tagged for the euro registry, never docker.io" \
+  test "$(grep -c -- '--docker-registry europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo' <<< "$builds")" -eq "$n"
+expect_not "no image is tagged for docker.io" grep -q -- '--docker-registry docker.io' <<< "$builds"
+expect_not "verification does not look for a docker.io-tagged image" \
+  grep -q "load_from_cache.sh docker.io/" <<< "$yaml"
 expect "config packages built for stable" grep -q "MINA_DEB_RELEASE=stable" <<< "$yaml"
 expect "images built from the stable packages" test "$(grep -c -- '--deb-release stable' <<< "$builds")" -eq "$n"
-expect "still nothing pushed" test "$(grep -c -- '--load-only' <<< "$builds")" -eq "$n"
 
-echo "TEST: a misspelled release variable stops the render"
+echo "TEST: a misspelled release variable in the environment stops the render"
 if "${CLEAN[@]}" MINA_RELEASE_DOCKER_REPO='< Internal | InternalEurope | Public >.Pubic' \
     CODENAMES_CONFIG=Noble_Amd64 NETWORK=Mainnet CONFIG_JSON_GZ_URL=https://example.invalid/c.json.gz \
     ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh > /dev/null 2>&1; then
