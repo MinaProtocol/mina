@@ -68,7 +68,7 @@ case "$NETWORK" in
 esac
 export MINA_PROFILE
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" --prefork-genesis-config "genesis_ledgers/${NETWORK}.json"
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR"
 
 echo "--- Caching legacy ledger tarballs and hashes"
 
