@@ -56,7 +56,13 @@ type Structured_log_events.t += Persisted_frontier_dropped
 
 val max_catchup_chunk_length : int
 
-val catchup_tree : t -> Full_catchup_tree.t
+(** The catchup tree attached to the frontier, if any. *)
+val catchup_tree : t -> Full_catchup_tree.t option
+
+(** Attach catchup's tree, replacing any attached before. Each breadcrumb the
+    frontier adds from then on, and the root transition it applies with the
+    add, update the tree in the same step. *)
+val attach_catchup_tree : t -> Full_catchup_tree.t -> unit
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
