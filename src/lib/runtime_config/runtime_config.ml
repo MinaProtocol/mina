@@ -145,19 +145,21 @@ module Json_layout = struct
                 Impossible
         end
 
-        module Txn_version = struct
-          type t = Mina_numbers.Txn_version.Stable.Latest.t
-          [@@deriving bin_io_unversioned]
-
-          include (
-            Mina_numbers.Txn_version :
-              module type of Mina_numbers.Txn_version with type t := t )
-        end
-
-        module Verification_key_perm = struct
-          type t = { auth : Auth_required.t; txn_version : Txn_version.t }
-          [@@deriving sexp, yojson, bin_io_unversioned]
-        end
+        (* Configs written by earlier releases, such as the one a node of the
+           previous release generates for a hard fork, give
+           [set_verification_key] as an object that also carries a
+           transaction version, which is ignored. *)
+        let verification_key_auth_of_yojson = function
+          | `Assoc fields -> (
+              match List.Assoc.find fields ~equal:String.equal "auth" with
+              | Some auth ->
+                  Auth_required.of_yojson auth
+              | None ->
+                  Error
+                    "Runtime_config.Json_Account.Single.Permissions: \
+                     set_verification_key has no auth" )
+          | json ->
+              Auth_required.of_yojson json
 
         type t =
           { edit_state : Auth_required.t
@@ -184,17 +186,11 @@ module Json_layout = struct
                 [@default
                   Auth_required.of_account_perm
                     Mina_base.Permissions.user_default.set_permissions]
-          ; set_verification_key : Verification_key_perm.t
+          ; set_verification_key : Auth_required.t
                 [@default
-                  { auth =
-                      Auth_required.of_account_perm
-                        (fst
-                           Mina_base.Permissions.user_default
-                             .set_verification_key )
-                  ; txn_version =
-                      snd
-                        Mina_base.Permissions.user_default.set_verification_key
-                  }]
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_verification_key]
+                [@of_yojson verification_key_auth_of_yojson]
           ; set_zkapp_uri : Auth_required.t
                 [@default
                   Auth_required.of_account_perm
@@ -235,7 +231,7 @@ module Json_layout = struct
             ; ("set_delegate", Auth_required.to_yojson t.set_delegate)
             ; ("set_permissions", Auth_required.to_yojson t.set_permissions)
             ; ( "set_verification_key"
-              , Verification_key_perm.to_yojson t.set_verification_key )
+              , Auth_required.to_yojson t.set_verification_key )
             ; ("set_zkapp_uri", Auth_required.to_yojson t.set_zkapp_uri)
             ; ("edit_action_state", Auth_required.to_yojson t.edit_action_state)
             ; ("set_token_symbol", Auth_required.to_yojson t.set_token_symbol)
@@ -251,8 +247,7 @@ module Json_layout = struct
           ; set_delegate = Auth_required.of_account_perm perm.set_delegate
           ; set_permissions = Auth_required.of_account_perm perm.set_permissions
           ; set_verification_key =
-              (let auth, txn_version = perm.set_verification_key in
-               { auth = Auth_required.of_account_perm auth; txn_version } )
+              Auth_required.of_account_perm perm.set_verification_key
           ; set_token_symbol =
               Auth_required.of_account_perm perm.set_token_symbol
           ; access = Auth_required.of_account_perm perm.access
@@ -696,9 +691,8 @@ module Accounts = struct
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.set_permissions
           ; set_verification_key =
-              ( Json_layout.Accounts.Single.Permissions.Auth_required
-                .to_account_perm perms.set_verification_key.auth
-              , perms.set_verification_key.txn_version )
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.set_verification_key
           ; set_zkapp_uri =
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.set_zkapp_uri

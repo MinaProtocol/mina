@@ -33,13 +33,13 @@ module V4 = struct
           Snark_pool.Diff_versioned.Stable.V3.t
           Network_pool.With_nonce.Stable.V1.t
       | Transaction_pool_diff of
-          Transaction_pool.Diff_versioned.Stable.V3.t
+          Transaction_pool.Diff_versioned.Stable.V4.t
           Network_pool.With_nonce.Stable.V1.t
     [@@deriving bin_io, version { rpc }]
 
     type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V3.t
 
-    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V3.t
+    type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V4.t
 
     let callee_model_of_msg msg =
       match msg with

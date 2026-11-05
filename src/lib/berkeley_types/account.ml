@@ -84,7 +84,7 @@ module Stable = struct
       ; delegate : Public_key.Compressed.Stable.V1.t option
       ; voting_for : Mina_base.State_hash.Stable.V1.t
       ; timing : Mina_base.Account.Timing.Stable.V2.t
-      ; permissions : Mina_base.Permissions.Stable.V2.t
+      ; permissions : Permissions.Stable.V2.t
       ; zkapp : Zkapp_account.Stable.V2.t option
       }
     [@@deriving equal, sexp, yojson]
@@ -119,6 +119,6 @@ let to_mesa
   ; delegate
   ; voting_for
   ; timing
-  ; permissions
+  ; permissions = Permissions.to_mesa permissions
   ; zkapp = Option.map zkapp ~f:Zkapp_account.to_mesa
   }

@@ -153,20 +153,41 @@ let of_precomputed_v5 ~constraint_constants ~proof_cache_db
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
-(* The protocol state and staged ledger diff are read at the versions a V4
-   block carries, so that a later change to either stops this compiling,
-   rather than letting a V4 block be read by the rules of a newer version. *)
+(* A V4 block's diff is read as Mesa's, and its transactions derived from that
+   converted to the current version. Each command takes the Mesa hash of the
+   command it was converted from, found by the current hash of the converted
+   command. *)
 let of_precomputed_v4 ~constraint_constants ~proof_cache_db
-    (t : Mina_block.Precomputed.Stable.V4.t) =
+    (t : Mina_block.Precomputed.V4.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
+  let mesa_hashes =
+    lazy
+      (let two, one =
+         Mesa_types.Diff.commands_with_hashes t.staged_ledger_diff
+       in
+       let { Staged_ledger_diff.Pre_diff_two.commands; _ } = two in
+       let one_commands =
+         Option.value_map one ~default:[]
+           ~f:(fun { Staged_ledger_diff.Pre_diff_one.commands; _ } -> commands)
+       in
+       List.map (commands @ one_commands)
+         ~f:(fun { With_status.data = command, hash; _ } ->
+           ( Transaction_hash.hash_command
+               (Mesa_types.User_command.to_current command)
+           , hash ) )
+       |> Transaction_hash.Map.of_alist_exn )
+  in
+  of_protocol_state
+    ~command_hash:(fun command ->
+      Map.find_exn (Lazy.force mesa_hashes)
+        (Transaction_hash.hash_command_with_hashes command) )
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
     ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
     ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
       Staged_ledger.Pre_diff_info.get_transactions_stable_v3
         ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
-        (t.staged_ledger_diff : Staged_ledger_diff.Stable.V3.t)
+        (Mesa_types.Diff.to_current t.staged_ledger_diff)
       |> Result.map
            ~f:
              (List.map

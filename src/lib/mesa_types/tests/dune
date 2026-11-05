@@ -1,0 +1,16 @@
+(test
+ (name main)
+ (libraries
+  alcotest
+  base64
+  bin_prot
+  core_kernel
+  mesa_types
+  mina_base
+  mina_numbers
+  mina_transaction)
+ (deps zkapp_transaction_id.txt)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))

@@ -584,9 +584,9 @@ module With_hashes = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Account_update.Stable.V2.t
+        ( Account_update.Stable.V3.t
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t

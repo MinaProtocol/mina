@@ -144,4 +144,4 @@ end
 (* Verify zkApp command version is as expected. *)
 let latest_zkapp_version () =
   Alcotest.(check int)
-    "Stable.Latest.version is 2" 2 Zkapp_command.Stable.Latest.version
+    "Stable.Latest.version is 3" 3 Zkapp_command.Stable.Latest.version

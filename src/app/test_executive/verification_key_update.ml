@@ -162,8 +162,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ; receive = Proof
                   ; set_delegate = Proof
                   ; set_permissions = Signature
-                  ; set_verification_key =
-                      (Signature, Mina_numbers.Txn_version.current)
+                  ; set_verification_key = Signature
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof
@@ -306,9 +305,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { Account_update.Update.dummy with
           permissions =
             Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                set_verification_key = (Proof, Mina_numbers.Txn_version.current)
-              }
+              { Permissions.user_default with set_verification_key = Proof }
         }
       in
       let snapp_update_impossible =
@@ -316,8 +313,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           permissions =
             Zkapp_basic.Set_or_keep.Set
               { Permissions.user_default with
-                set_verification_key =
-                  (Impossible, Mina_numbers.Txn_version.current)
+                set_verification_key = Impossible
               }
         }
       in

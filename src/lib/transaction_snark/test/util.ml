@@ -412,9 +412,7 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body
             ledger [ zkapp_command ] ) )
 
-let permissions_from_update ~auth
-    ?(txn_version = Mina_numbers.Txn_version.current)
-    (update : Account_update.Update.t) =
+let permissions_from_update ~auth (update : Account_update.Update.t) =
   let default = Permissions.user_default in
   { default with
     edit_state =
@@ -430,7 +428,7 @@ let permissions_from_update ~auth
   ; set_verification_key =
       ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
         default.set_verification_key
-      else (auth, txn_version) )
+      else auth )
   ; set_permissions =
       ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions

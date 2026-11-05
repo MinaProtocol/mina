@@ -86,11 +86,11 @@ end
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         { sequence_no : int
         ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Body.Simple.Stable.V2.t list
+        ; account_updates : Account_update.Body.Simple.Stable.V3.t list
         ; memo : Signed_command_memo.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
@@ -141,7 +141,7 @@ module Block = struct
         ; timestamp : Block_time.Stable.V1.t
         ; user_cmds : User_command.Stable.V2.t list
         ; internal_cmds : Internal_command.Stable.V2.t list
-        ; zkapp_cmds : Zkapp_command.Stable.V2.t list
+        ; zkapp_cmds : Zkapp_command.Stable.V3.t list
         ; protocol_version : Protocol_version.Stable.V2.t
         ; proposed_protocol_version : Protocol_version.Stable.V2.t option
         ; chain_status : Chain_status.Stable.V1.t

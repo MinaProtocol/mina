@@ -1120,7 +1120,7 @@ module Make (L : Ledger_intf.S) :
          fun a -> a.permissions.set_permissions
 
         let set_verification_key_auth : t -> Controller.t =
-         fun a -> fst a.permissions.set_verification_key
+         fun a -> a.permissions.set_verification_key
 
         let set_zkapp_uri : t -> Controller.t =
          fun a -> a.permissions.set_zkapp_uri
@@ -2304,7 +2304,7 @@ module For_tests = struct
             ; receive = None
             ; set_delegate = Either
             ; set_permissions = Either
-            ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+            ; set_verification_key = Either
             ; set_zkapp_uri = Either
             ; edit_action_state = Either
             ; set_token_symbol = Either

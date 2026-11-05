@@ -87,8 +87,10 @@ module V2 : sig
       ; memo : Mina_base_signed_command_memo.V1.t
       }
   end
+end
 
-  type t = (Mina_base_account_update.V2.t, unit, unit) Call_forest.V1.t T.t
+module V3 : sig
+  type t = (Mina_base_account_update.V3.t, unit, unit) Call_forest.V1.t V2.T.t
 end
 
 module Valid : sig
@@ -98,8 +100,8 @@ module Valid : sig
     end
   end
 
-  module V2 : sig
-    type t = { zkapp_command : V2.t }
+  module V3 : sig
+    type t = { zkapp_command : V3.t }
   end
 end
 

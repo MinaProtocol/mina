@@ -24,7 +24,7 @@ module Update = struct
     end
   end
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { app_state :
           Snark_params.Tick.Field.t Mina_base_zkapp_basic.Set_or_keep.V1.t
@@ -35,7 +35,7 @@ module Update = struct
           Mina_base_verification_key_wire.V1.t
           Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; permissions :
-          Mina_base_permissions.V2.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+          Mina_base_permissions.V3.t Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; zkapp_uri : string Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; token_symbol :
           Mina_base_account.Token_symbol.V1.t
@@ -81,11 +81,11 @@ module Body = struct
     end
   end
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { public_key : Public_key.Compressed.V1.t
       ; token_id : Mina_base_token_id.V2.t
-      ; update : Update.V2.t
+      ; update : Update.V3.t
       ; balance_change :
           (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       ; increment_nonce : bool
@@ -115,6 +115,6 @@ module Poly = struct
   end
 end
 
-module V2 = struct
-  type t = (Body.V2.t, Mina_base_control.V2.t) Poly.V1.t
+module V3 = struct
+  type t = (Body.V3.t, Mina_base_control.V2.t) Poly.V1.t
 end

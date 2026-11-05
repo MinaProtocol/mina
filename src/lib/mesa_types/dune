@@ -10,8 +10,14 @@
   currency
   mina_base
   mina_numbers
+  mina_stdlib
+  mina_transaction
+  pickles
   pickles_types
-  signature_lib)
+  sgn
+  signature_lib
+  staged_ledger_diff
+  transaction_snark_work)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

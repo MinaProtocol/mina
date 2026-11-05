@@ -741,7 +741,6 @@ module Zkapp_permissions = struct
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key_auth : Permissions.Auth_required.t
-    ; set_verification_key_txn_version : int
     ; set_zkapp_uri : Permissions.Auth_required.t
     ; edit_action_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
@@ -760,7 +759,6 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
-      ; Caqti_type.int
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -771,10 +769,19 @@ module Zkapp_permissions = struct
 
   let table_name = "zkapp_permissions"
 
+  (* An archive migrated from a release whose permissions stored a
+     transaction version may hold several rows that now differ in nothing, so
+     the lookup takes the first of them. *)
   let add_if_doesn't_exist =
-    let select_insert =
-      Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-        ~table_name ~cols:(Fields.names, typ) ()
+    let select_req =
+      find_opt_req typ Caqti_type.int
+        ( Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()
+        ^ " ORDER BY id LIMIT 1" )
+    in
+    let insert_req =
+      find_req typ Caqti_type.int
+        (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+           ~cols:Fields.names () )
     in
     fun (module Conn : CONNECTION) (perms : Permissions.t) ->
       let value =
@@ -784,9 +791,7 @@ module Zkapp_permissions = struct
         ; access = perms.access
         ; set_delegate = perms.set_delegate
         ; set_permissions = perms.set_permissions
-        ; set_verification_key_auth = fst perms.set_verification_key
-        ; set_verification_key_txn_version =
-            Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
+        ; set_verification_key_auth = perms.set_verification_key
         ; set_zkapp_uri = perms.set_zkapp_uri
         ; edit_action_state = perms.edit_action_state
         ; set_token_symbol = perms.set_token_symbol
@@ -795,7 +800,9 @@ module Zkapp_permissions = struct
         ; set_timing = perms.set_timing
         }
       in
-      select_insert.run (module Conn) value
+      let open Deferred.Result.Let_syntax in
+      Conn.find_opt select_req value
+      >>= function Some id -> return id | None -> Conn.find insert_req value
 
   let load =
     let query =

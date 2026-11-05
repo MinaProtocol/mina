@@ -263,7 +263,6 @@ CREATE TABLE zkapp_permissions
 , set_delegate                     zkapp_auth_required_type    NOT NULL
 , set_permissions                  zkapp_auth_required_type    NOT NULL
 , set_verification_key_auth        zkapp_auth_required_type    NOT NULL
-, set_verification_key_txn_version int                         NOT NULL
 , set_zkapp_uri                    zkapp_auth_required_type    NOT NULL
 , edit_action_state                zkapp_auth_required_type    NOT NULL
 , set_token_symbol                 zkapp_auth_required_type    NOT NULL

@@ -165,6 +165,13 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
               with _ ->
                 Or_error.error_string
                   "Could not decode serialized signed command (version 2)" )
+          | 3 -> (
+              try
+                let cmd = Zkapp_command.Stable.V3.bin_read_t ~pos_ref buf in
+                Ok (hash_zkapp_command cmd)
+              with _ ->
+                Or_error.error_string
+                  "Could not decode serialized zkApp command (version 3)" )
           | _ ->
               Or_error.error_string
                 (sprintf
@@ -222,9 +229,9 @@ module User_command = struct
 
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type t =
-        ( (User_command.Stable.V3.t[@hash.ignore])
+        ( (User_command.Stable.V4.t[@hash.ignore])
         , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
@@ -347,6 +354,14 @@ let%test_module "Transaction hashes" =
           (* there's no point checking the hash is the same if it's freshly generated *)
       | Error err ->
           failwithf "Error hashing new transaction: %s\n"
+            (Error.to_string_hum err) ()
+
+    let%test "zkApp transaction id of the latest version" =
+      match hash_of_transaction_id (Zkapp_command.to_base64 new_zkapp_txn) with
+      | Ok hash ->
+          equal hash (hash_command (Zkapp_command new_zkapp_txn))
+      | Error err ->
+          failwithf "Error hashing zkApp transaction id: %s\n"
             (Error.to_string_hum err) ()
 
     let%test "hash with proof cache tags matches hash with proofs" =

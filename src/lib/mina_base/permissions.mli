@@ -56,18 +56,16 @@ end
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type ('controller, 'txn_version) t =
-            ( 'controller
-            , 'txn_version )
-            Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
+    module V3 : sig
+      type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V3.t =
         { edit_state : 'controller
         ; access : 'controller
         ; send : 'controller
         ; receive : 'controller (* TODO: Consider having fee *)
         ; set_delegate : 'controller
         ; set_permissions : 'controller
-        ; set_verification_key : 'controller * 'txn_version
+        ; set_verification_key : 'controller
         ; set_zkapp_uri : 'controller
         ; edit_action_state : 'controller
         ; set_token_symbol : 'controller
@@ -82,11 +80,8 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V2 : sig
-    type t =
-      ( Auth_required.Stable.V2.t
-      , Mina_numbers.Txn_version.Stable.V1.t )
-      Poly.Stable.V2.t
+  module V3 : sig
+    type t = Auth_required.Stable.V2.t Poly.Stable.V3.t
     [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
@@ -99,10 +94,7 @@ val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
 module Checked : sig
-  type t =
-    ( Auth_required.Checked.t
-    , Mina_numbers.Txn_version.Checked.t )
-    Poly.Stable.Latest.t
+  type t = Auth_required.Checked.t Poly.Stable.Latest.t
 
   val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 

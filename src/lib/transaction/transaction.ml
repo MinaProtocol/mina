@@ -33,8 +33,8 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
-    type t = User_command.Stable.V3.t Poly.Stable.V2.t
+  module V4 = struct
+    type t = User_command.Stable.V4.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id

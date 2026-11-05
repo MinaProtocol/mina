@@ -923,7 +923,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              fun a -> a.data.permissions.set_permissions
 
             let set_verification_key_auth : t -> controller =
-             fun a -> fst a.data.permissions.set_verification_key
+             fun a -> a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri

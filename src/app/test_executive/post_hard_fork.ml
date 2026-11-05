@@ -194,14 +194,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ()
           ; create ~account_name:"vk-proof" ~balance:"10000"
               ~permissions:
-                { Permissions.user_default with
-                  set_verification_key = (Proof, older_version)
-                }
+                { Permissions.user_default with set_verification_key = Proof }
               ~zkapp:stale_vk_zkapp ()
           ; create ~account_name:"vk-impossible" ~balance:"1000"
               ~permissions:
                 { Permissions.user_default with
-                  set_verification_key = (Impossible, older_version)
+                  set_verification_key = Impossible
                 }
               ~zkapp:stale_vk_zkapp ()
           ])

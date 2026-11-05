@@ -13,9 +13,7 @@ struct
     { Account_update.Update.dummy with
       permissions =
         Zkapp_basic.Set_or_keep.Set
-          { Permissions.user_default with
-            set_verification_key = (Proof, Mina_numbers.Txn_version.current)
-          }
+          { Permissions.user_default with set_verification_key = Proof }
     }
 
   let is_non_zkapp_update = true
@@ -44,17 +42,8 @@ let suite () =
       { Account_update.Update.dummy with
         permissions =
           Zkapp_basic.Set_or_keep.Set
-            { Permissions.user_default with
-              set_verification_key =
-                (perm_after, Mina_numbers.Txn_version.current)
-            }
+            { Permissions.user_default with set_verification_key = perm_after }
       }
-
-    let older_version =
-      let oldest = Mina_numbers.Txn_version.of_int 1 in
-      if Mina_numbers.Txn_version.equal_to_current oldest then
-        failwith "already oldest version"
-      else oldest
 
     let mk_update_perm_check ~perm_after () =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -82,24 +71,24 @@ let suite () =
           U.test_snapp_update
             ~snapp_permissions:
               (U.permissions_from_update (snapp_update ~perm_after)
-                 ~auth:Signature ~txn_version:older_version )
+                 ~auth:Signature )
             test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let () =
-      test "change verification key perm to Signature and bump txn version"
+      test "change verification key perm to Signature"
       @@ fun () -> mk_update_perm_check ~perm_after:Signature ()
 
     let () =
-      test "change verification key perm to Proof and bump txn version"
+      test "change verification key perm to Proof"
       @@ fun () -> mk_update_perm_check ~perm_after:Proof ()
 
     let () =
-      test "change verification key perm to Impossible and bump txn version"
+      test "change verification key perm to Impossible"
       @@ fun () -> mk_update_perm_check ~perm_after:Impossible ()
 
     let () =
-      test "change verification key perm to Either and bump txn version"
+      test "change verification key perm to Either"
       @@ fun () -> mk_update_perm_check ~perm_after:Either ()
   end in
   ()

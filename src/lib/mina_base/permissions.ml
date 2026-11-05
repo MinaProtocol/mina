@@ -353,18 +353,16 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type ('controller, 'txn_version) t =
-            ( 'controller
-            , 'txn_version )
-            Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
+    module V3 = struct
+      type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V3.t =
         { edit_state : 'controller
         ; access : 'controller
         ; send : 'controller
         ; receive : 'controller
         ; set_delegate : 'controller
         ; set_permissions : 'controller
-        ; set_verification_key : 'controller * 'txn_version
+        ; set_verification_key : 'controller
         ; set_zkapp_uri : 'controller
         ; edit_action_state : 'controller
         ; set_token_symbol : 'controller
@@ -376,15 +374,11 @@ module Poly = struct
     end
   end]
 
-  let to_input controller txn_version t =
+  let to_input controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
       ~send:(f controller) ~set_delegate:(f controller)
-      ~set_permissions:(f controller)
-      ~set_verification_key:
-        (f (fun (c, v) ->
-             Random_oracle.Input.Chunked.append (controller c) (txn_version v) )
-        )
+      ~set_permissions:(f controller) ~set_verification_key:(f controller)
       ~receive:(f controller) ~set_zkapp_uri:(f controller)
       ~edit_action_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
@@ -395,11 +389,8 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t =
-      ( Auth_required.Stable.V2.t
-      , Mina_numbers.Txn_version.Stable.V1.t )
-      Poly.Stable.V2.t
+  module V3 = struct
+    type t = Auth_required.Stable.V2.t Poly.Stable.V3.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
@@ -423,10 +414,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind receive = auth_required_gen in
   let%bind set_delegate = auth_required_gen in
   let%bind set_permissions = auth_required_gen in
-  let%bind set_verification_key_auth = auth_required_gen in
-  let txn_version =
-    Mina_numbers.Txn_version.of_int @@ Protocol_version.(transaction current)
-  in
+  let%bind set_verification_key = auth_required_gen in
   let%bind set_zkapp_uri = auth_required_gen in
   let%bind edit_action_state = auth_required_gen in
   let%bind set_token_symbol = auth_required_gen in
@@ -445,7 +433,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; receive
     ; set_delegate
     ; set_permissions
-    ; set_verification_key = (set_verification_key_auth, txn_version)
+    ; set_verification_key
     ; set_zkapp_uri
     ; edit_action_state
     ; set_token_symbol
@@ -456,14 +444,9 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     }
 
 module Checked = struct
-  type t =
-    ( Auth_required.Checked.t
-    , Mina_numbers.Txn_version.Checked.t )
-    Poly.Stable.Latest.t
+  type t = Auth_required.Checked.t Poly.Stable.Latest.t
 
-  let to_input (x : t) =
-    Poly.to_input Auth_required.Checked.to_input
-      Mina_numbers.Txn_version.Checked.to_input x
+  let to_input (x : t) = Poly.to_input Auth_required.Checked.to_input x
 
   let if_ b ~(then_ : t) ~(else_ : t) : t Snark_params.Tick.Checked.t =
     let open Snark_params.Tick in
@@ -485,15 +468,9 @@ module Checked = struct
       Auth_required.Checked.if_ b ~then_:then_.set_permissions
         ~else_:else_.set_permissions
     in
-    let set_verification_key_auth =
-      Auth_required.Checked.if_ b
-        ~then_:(fst then_.set_verification_key)
-        ~else_:(fst else_.set_verification_key)
-    in
-    let%map txn_version =
-      Mina_numbers.Txn_version.Checked.if_ b
-        ~then_:(snd then_.set_verification_key)
-        ~else_:(snd else_.set_verification_key)
+    let set_verification_key =
+      Auth_required.Checked.if_ b ~then_:then_.set_verification_key
+        ~else_:else_.set_verification_key
     in
     let set_zkapp_uri =
       Auth_required.Checked.if_ b ~then_:then_.set_zkapp_uri
@@ -522,32 +499,29 @@ module Checked = struct
     let access =
       Auth_required.Checked.if_ b ~then_:then_.access ~else_:else_.access
     in
-    { Poly.edit_state
-    ; send
-    ; receive
-    ; set_delegate
-    ; set_permissions
-    ; set_verification_key = (set_verification_key_auth, txn_version)
-    ; set_zkapp_uri
-    ; edit_action_state
-    ; set_token_symbol
-    ; increment_nonce
-    ; set_voting_for
-    ; set_timing
-    ; access
-    }
+    Checked.return
+      { Poly.edit_state
+      ; send
+      ; receive
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      ; access
+      }
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
     let a f = Auth_required.Checked.constant (get f t) in
     Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
-      ~set_permissions:a
-      ~set_verification_key:(fun f ->
-        let auth, txn_version = get f t in
-        ( Auth_required.Checked.constant auth
-        , Mina_numbers.Txn_version.Checked.constant txn_version ) )
-      ~set_zkapp_uri:a ~edit_action_state:a ~set_token_symbol:a
-      ~increment_nonce:a ~set_voting_for:a ~set_timing:a ~access:a
+      ~set_permissions:a ~set_verification_key:a ~set_zkapp_uri:a
+      ~edit_action_state:a ~set_token_symbol:a ~increment_nonce:a
+      ~set_voting_for:a ~set_timing:a ~access:a
 end
 
 let typ =
@@ -559,7 +533,7 @@ let typ =
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
-    ; Typ.tuple2 Auth_required.typ Mina_numbers.Txn_version.typ
+    ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -570,8 +544,7 @@ let typ =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
-let to_input (x : t) =
-  Poly.to_input Auth_required.to_input Mina_numbers.Txn_version.to_input x
+let to_input (x : t) = Poly.to_input Auth_required.to_input x
 
 let user_default : t =
   { edit_state = Signature
@@ -579,16 +552,7 @@ let user_default : t =
   ; receive = None
   ; set_delegate = Signature
   ; set_permissions = Signature
-  ; set_verification_key =
-      (* NB: This hard coding is *very* deliberate. We don't want every version
-         bump to arbitrarily change the empty account contents for no reason,
-         so we explicitly fix it at 4, the value it attained after being
-         dragged forwards unnecessarily once already by the Mesa hard-fork.
-
-         The logic around the version is only active in 'proof' mode, so the
-         choice of *any* number is a no-op here.
-      *)
-      (Signature, Mina_numbers.Txn_version.of_uint32 (Unsigned.UInt32.of_int 4))
+  ; set_verification_key = Signature
   ; set_zkapp_uri = Signature
   ; edit_action_state = Signature
   ; set_token_symbol = Signature
@@ -605,7 +569,7 @@ let dummy_value_for_set_or_keep_placeholder_only : t =
   ; access = None
   ; set_delegate = None
   ; set_permissions = None
-  ; set_verification_key = (None, Mina_numbers.Txn_version.current)
+  ; set_verification_key = None
   ; set_zkapp_uri = None
   ; edit_action_state = None
   ; set_token_symbol = None
@@ -621,32 +585,12 @@ let auth_required =
     ~js_type:(Custom "AuthRequired") ~doc:"Kind of authorization required"
     ~to_string:Auth_required.to_string ~of_string:Auth_required.of_string
 
-module As_record = struct
-  type t = { auth : Auth_required.t; txn_version : Mina_numbers.Txn_version.t }
-  [@@deriving fields, annot]
-
-  let deriver obj =
-    let open Fields_derivers_zkapps.Derivers in
-    let ( !. ) = ( !. ) ~t_fields_annots in
-    let transaction_version =
-      needs_custom_js ~js_type:uint32 ~name:"TransactionVersion" uint32
-    in
-    Fields.make_creator obj ~auth:!.auth_required
-      ~txn_version:!.transaction_version
-    |> finish "VerificationKeyPermission" ~t_toplevel_annots
-end
-
-let to_record (auth, txn_version) = { As_record.auth; txn_version }
-
-let of_record { As_record.auth; txn_version } = (auth, txn_version)
-
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
-    ~set_permissions:!.auth_required
-    ~set_verification_key:!.(iso_record ~to_record ~of_record As_record.deriver)
+    ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
     ~set_zkapp_uri:!.auth_required ~edit_action_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
     ~set_voting_for:!.auth_required ~set_timing:!.auth_required
@@ -672,10 +616,7 @@ let%test_unit "json value" =
         receive: "None",
         setDelegate: "Signature",
         setPermissions: "Signature",
-        setVerificationKey: {
-          auth: "Signature",
-          txnVersion: "4"
-          },
+        setVerificationKey: "Signature",
         setZkappUri: "Signature",
         editActionState: "Signature",
         setTokenSymbol: "Signature",
