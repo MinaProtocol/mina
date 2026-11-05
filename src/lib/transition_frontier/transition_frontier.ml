@@ -14,7 +14,6 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Full_catchup_tree = Full_catchup_tree
-module Catchup_hash_tree = Catchup_hash_tree
 
 module type CONTEXT = sig
   val logger : Logger.t
