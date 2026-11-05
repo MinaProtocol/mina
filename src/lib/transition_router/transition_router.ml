@@ -80,9 +80,9 @@ type participating =
 type phase =
   | Starting  (** Neither controller has started yet. *)
   | Bootstrapping
-  | Draining
+  | Draining of participating
       (** The frontier controller is being stopped, and its frontier closed,
-          before bootstrapping. *)
+          before bootstrapping or shutting down. *)
   | Participating of participating
 
 (** Start leaving the frontier controller, if it is running: move to
@@ -91,10 +91,30 @@ type phase =
 let start_draining phase =
   match !phase with
   | Participating participating ->
-      phase := Draining ;
+      phase := Draining participating ;
       Some participating
-  | Starting | Bootstrapping | Draining ->
+  | Starting | Bootstrapping | Draining _ ->
       None
+
+(** Stop the frontier controller, and wait for it to drain. The blocks we
+    produce no longer reach it. *)
+let drain { producer_transition_writer; stop; drained } =
+  Strict_pipe.Writer.kill producer_transition_writer ;
+  Ivar.fill_if_empty stop () ;
+  Ivar.read drained
+
+(** Drain the frontier controller if it is running, or wait for the drain
+    already under way, so that its frontier can be closed. *)
+let stop_participating phase =
+  match start_draining phase with
+  | Some participating ->
+      drain participating
+  | None -> (
+      match !phase with
+      | Draining { drained; _ } ->
+          Ivar.read drained
+      | Starting | Bootstrapping | Participating _ ->
+          Deferred.unit )
 
 let%test_unit "Only the first trigger starts draining" =
   let _reader, producer_transition_writer =
@@ -111,10 +131,28 @@ let%test_unit "Only the first trigger starts draining" =
   assert (Option.is_some (start_draining phase)) ;
   assert (Option.is_none (start_draining phase)) ;
   match !phase with
-  | Draining ->
+  | Draining _ ->
       ()
   | Starting | Bootstrapping | Participating _ ->
       failwith "expected to be draining"
+
+let%test_unit "Stopping drains the controller once, and waits for the drain" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      let _reader, producer_transition_writer =
+        Strict_pipe.create ~name:"test producer transitions" Synchronous
+      in
+      let stop = Ivar.create () and drained = Ivar.create () in
+      let phase =
+        ref (Participating { producer_transition_writer; stop; drained })
+      in
+      let first = stop_participating phase in
+      assert (Ivar.is_full stop) ;
+      assert (Strict_pipe.Writer.is_closed producer_transition_writer) ;
+      let second = stop_participating phase in
+      let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
+      assert (not (Deferred.is_determined first || Deferred.is_determined second) ) ;
+      Ivar.fill drained () ;
+      Deferred.both first second |> Deferred.ignore_m )
 
 (** What the transition router shares between the controllers it starts. *)
 type t =
@@ -634,14 +672,12 @@ let route_valid_transition t ~get_current_frontier (b_or_h, `Valid_cb vc) =
                frontier header_with_hash
            then
              match start_draining phase with
-             | Some { producer_transition_writer; stop; drained } ->
-                 Strict_pipe.Writer.kill producer_transition_writer ;
+             | Some participating ->
                  let initial_root_transition =
                    Transition_frontier.(
                      Breadcrumb.validated_transition (root frontier))
                  in
-                 Ivar.fill stop () ;
-                 let%bind () = Ivar.read drained in
+                 let%bind () = drain participating in
                  let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
                  ignore
                  @@ start_bootstrap_controller t ~initial_root_transition
@@ -693,7 +729,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
              match !phase with
              | Participating { producer_transition_writer; _ } ->
                  Strict_pipe.Writer.write producer_transition_writer x
-             | Starting | Bootstrapping | Draining ->
+             | Starting | Bootstrapping | Draining _ ->
                  Deferred.unit ) ;
       Bootstrap_status.set_phase bootstrap_status Waiting_for_genesis ;
       let%bind () =
@@ -791,4 +827,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(route_valid_transition t ~get_current_frontier) ) ;
-  (verified_transition_reader, initialization_finish_signal)
+  ( verified_transition_reader
+  , initialization_finish_signal
+  , fun () -> stop_participating phase )

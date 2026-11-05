@@ -1950,14 +1950,6 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_current_frontier () =
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
           in
-          Exit_handlers.register_async_shutdown_handler ~logger:config.logger
-            ~description:"Close transition frontier, if exists"
-            ~tier:FlushPersistentFrontier (fun () ->
-              match get_current_frontier () with
-              | None ->
-                  Deferred.unit
-              | Some frontier ->
-                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let sync_status_ref = ref None in
           let get_node_status (net : Mina_networking.t) =
@@ -2230,7 +2222,9 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
 
           let bootstrap_status = Bootstrap_status.create () in
-          let valid_transitions, initialization_finish_signal =
+          let ( valid_transitions
+              , initialization_finish_signal
+              , stop_participating ) =
             Transition_router.run
               ~context:(module Context)
               ~trust_system:config.trust_system ~verifier ~network:net
@@ -2249,6 +2243,15 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~notify_online ~transaction_pool_proxy
               ~ledger_backing:config.ledger_backing ~bootstrap_status ()
           in
+          Exit_handlers.register_async_shutdown_handler ~logger:config.logger
+            ~description:"Close transition frontier, if exists"
+            ~tier:FlushPersistentFrontier (fun () ->
+              let%bind () = stop_participating () in
+              match get_current_frontier () with
+              | None ->
+                  Deferred.unit
+              | Some frontier ->
+                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
           let ( valid_transitions_for_network
               , valid_transitions_for_api
               , new_blocks ) =

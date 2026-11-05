@@ -309,7 +309,11 @@ module type Transition_router_intf = sig
 
   type network
 
-  (** [sync_local_state] is `true` by default, may be set to `false` for tests *)
+  (** [sync_local_state] is `true` by default, may be set to `false` for tests.
+      Returns the valid transitions, a signal filled once the router has
+      initialized, and a function that stops the frontier controller, if it
+      is running, and is determined once it has drained, so that its frontier
+      can be closed. *)
   val run :
        ?sync_local_state:bool
     -> ?cache_exceptions:bool
@@ -351,4 +355,5 @@ module type Transition_router_intf = sig
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Strict_pipe.Reader.t
        * unit Ivar.t
+       * (unit -> unit Deferred.t)
 end
