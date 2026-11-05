@@ -23,7 +23,7 @@ let create ~logger ~cache_exceptions =
   ; header_callbacks = State_hash.Table.create ()
   }
 
-let cache t = t.cache
+let final_state t block = Unprocessed_transition_cache.final_state t.cache block
 
 let register_exn t block ~valid_cb =
   let cached = Unprocessed_transition_cache.register_exn t.cache block in

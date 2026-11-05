@@ -1551,7 +1551,7 @@ let%test_module "Ledger_catchup tests" =
         |> Mina_block.Validated.remember )
 
     type catchup_test =
-      { cache : Transition_handler.Unprocessed_transition_cache.t
+      { block_registry : Transition_handler.Block_registry.t
       ; job_writer :
           ( State_hash.t
             * ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1598,7 +1598,7 @@ let%test_module "Ledger_catchup tests" =
          in
          Strict_pipe.Reader.iter_without_pushback catchup_job_reader
            ~f:process_catchup_job ) ;
-      { cache = Transition_handler.Block_registry.cache block_registry
+      { block_registry
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
       }
@@ -1629,8 +1629,9 @@ let%test_module "Ledger_catchup tests" =
         Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
       in
       let target_transition =
-        Transition_handler.Unprocessed_transition_cache.register_exn test.cache
+        Transition_handler.Block_registry.register_exn test.block_registry
           (downcast_breadcrumb target_breadcrumb)
+          ~valid_cb:None
       in
       Strict_pipe.Writer.write test.job_writer
         (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;
@@ -1782,9 +1783,9 @@ let%test_module "Ledger_catchup tests" =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
           in
           let target_transition =
-            Transition_handler.Unprocessed_transition_cache.register_exn
-              test.cache
+            Transition_handler.Block_registry.register_exn test.block_registry
               (downcast_breadcrumb target_breadcrumb)
+              ~valid_cb:None
           in
           [%log info] "download state hashes fails unit test" ;
           Strict_pipe.Writer.write test.job_writer
@@ -1880,9 +1881,9 @@ let%test_module "Ledger_catchup tests" =
             Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
           in
           let target_transition =
-            Transition_handler.Unprocessed_transition_cache.register_exn
-              test.cache
+            Transition_handler.Block_registry.register_exn test.block_registry
               (downcast_breadcrumb target_breadcrumb)
+              ~valid_cb:None
           in
           Strict_pipe.Writer.write test.job_writer
             (parent_hash, [ Mina_stdlib.Rose_tree.T (target_transition, []) ]) ;

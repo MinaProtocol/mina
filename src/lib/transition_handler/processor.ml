@@ -938,7 +938,6 @@ let%test_module "Transition_handler.Processor tests" =
                 let block_registry =
                   Block_registry.create ~logger ~cache_exceptions:true
                 in
-                let cache = Block_registry.cache block_registry in
                 let catchup_scheduler =
                   Catchup_scheduler.create ~logger ~precomputed_values
                     ~in_flight:(Otp_lib.In_flight.create ())
@@ -963,8 +962,9 @@ let%test_module "Transition_handler.Processor tests" =
                      ~f:handle ) ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
-                      downcast_breadcrumb breadcrumb
-                      |> Unprocessed_transition_cache.register_exn cache
+                      Block_registry.register_exn block_registry
+                        (downcast_breadcrumb breadcrumb)
+                        ~valid_cb:None
                     in
                     Strict_pipe.Writer.write valid_transition_writer (`Block b) ) ;
                 match%map
