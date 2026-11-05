@@ -102,6 +102,7 @@ hashes_of "$CONFIG_DIR/fork_validation/legacy/daemon.json" > "$WORKDIR/legacy_ha
 # daemon.json carries the fork block, the seeds and the hashes; the script
 # takes those and sets the genesis timestamp, as it does for a generated config.
 FORK_CONFIG_JSON="$CONFIG_DIR/daemon.json" LEDGER_HASHES_JSON="$WORKDIR/hashes.json" \
+  FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK}.json" \
   ./scripts/hardfork/create_runtime_config.sh > "$WORKDIR/new_config.json"
 cat "$WORKDIR/new_config.json"
 
