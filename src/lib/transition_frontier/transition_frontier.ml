@@ -451,6 +451,10 @@ let add_breadcrumb_reporting_root_exn t breadcrumb =
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
   let logger = t.logger in
+  if t.closing then
+    failwithf
+      !"Adding breadcrumb %{sexp: State_hash.t} to a frontier that is closing"
+      state_hash () ;
   [%log internal] "Add_breadcrumb_to_frontier" ;
   [%log internal] "Calculate_diffs" ;
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
