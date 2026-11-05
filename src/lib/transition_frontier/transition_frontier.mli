@@ -14,7 +14,6 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
-module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
 module Root_ledger = Mina_ledger.Root
@@ -57,7 +56,7 @@ type Structured_log_events.t += Persisted_frontier_dropped
 
 val max_catchup_chunk_length : int
 
-val catchup_state : t -> Catchup_state.t
+val catchup_tree : t -> Full_catchup_tree.t
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
