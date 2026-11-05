@@ -87,6 +87,8 @@ val load :
        | `Snarked_ledger_mismatch ] )
      Deferred.Result.t
 
+(** Close the frontier. Closing a frontier that is already closing, or closed,
+    does nothing more, and is determined when the first close is. *)
 val close : loc:string -> t -> unit Deferred.t
 
 val closed : t -> unit Deferred.t
