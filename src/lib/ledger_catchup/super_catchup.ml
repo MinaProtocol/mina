@@ -925,17 +925,27 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         [%log debug] "Wait_for_parent $state_hash"
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ] ;
         step node
-          (let parent = Hashtbl.find_exn t.nodes node.parent in
-           match%map.Async.Deferred Ivar.read parent.result with
-           | Ok `Added_to_frontier ->
-               Ok parent.state_hash
-           | Error _ ->
-               (* TODO consider rejecting the callback in some cases,
-                  see https://github.com/MinaProtocol/mina/issues/11087 *)
-               Transition_handler.Block_registry.finish block_registry av
-                 `Ignored ;
-               finish t node ~is_error:true ;
-               Error `Finished )
+          (let parent_failed () =
+             (* TODO consider rejecting the callback in some cases,
+                see https://github.com/MinaProtocol/mina/issues/11087 *)
+             Transition_handler.Block_registry.finish block_registry av `Ignored ;
+             finish t node ~is_error:true ;
+             Error `Finished
+           in
+           match Hashtbl.find t.nodes node.parent with
+           | Some parent -> (
+               match%map.Async.Deferred Ivar.read parent.result with
+               | Ok `Added_to_frontier ->
+                   Ok parent.state_hash
+               | Error _ ->
+                   parent_failed () )
+           | None ->
+               Deferred.return
+                 ( if
+                   Option.is_some
+                     (Transition_frontier.find frontier node.parent)
+                 then Ok node.parent
+                 else parent_failed () ) )
           ~f:(on_parent_added node av)
     | To_build_breadcrumb (`Parent parent_hash, c) ->
         [%log debug] "To_build_breadcrumb $state_hash"
