@@ -71,10 +71,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     Strict_pipe.create ~name:"processed transitions"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  let catchup_job_reader, catchup_job_writer =
-    Strict_pipe.create ~name:"catchup jobs"
-      (Buffered (`Capacity 30, `Overflow Crash))
-  in
   let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
     Strict_pipe.create ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
@@ -155,7 +151,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let catchup_scheduler =
     Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
       ~block_registry ~in_flight ~verifier ~trust_system ~frontier
-      ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
+      ~time_controller
+      ~on_catchup_job:(fun job ->
+        Transition_handler.Block_dispatcher.submit dispatcher (Catchup_job job)
+        )
+      ~catchup_breadcrumbs_writer
   in
   let process_message =
     Transition_handler.Processor.create_handler
@@ -172,9 +172,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ~f:(fun message ->
             Otp_lib.In_flight.run in_flight (fun () -> process_message message) ) )
   in
-  Strict_pipe.Reader.iter_without_pushback catchup_job_reader ~f:(fun job ->
-      Transition_handler.Block_dispatcher.submit dispatcher (Catchup_job job) )
-  |> don't_wait_for ;
   O1trace.background_thread "perform_super_catchup" (fun () ->
       Deferred.map
         (Ledger_catchup.create_job_handler
@@ -204,7 +201,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
          (* The processor's last messages may have left blocks with the
             scheduler. *)
          Transition_handler.Catchup_scheduler.clean_up catchup_scheduler ;
-         kill catchup_job_writer ;
          Otp_lib.In_flight.idle in_flight )
         (fun () ->
           Transition_handler.Block_registry.finish_outstanding block_registry ;

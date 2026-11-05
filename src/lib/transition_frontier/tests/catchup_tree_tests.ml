@@ -30,6 +30,9 @@ let%test_module "Tracking the blocks the frontier adds" =
   ( module struct
     module Tree = Transition_frontier.Full_catchup_tree
 
+    (* Nothing these tests remove holds a block. *)
+    let release = { Tree.release = (fun _ -> ()) }
+
     let hash name =
       Quickcheck.random_value ~seed:(`Deterministic name) State_hash.gen
 
@@ -54,12 +57,12 @@ let%test_module "Tracking the blocks the frontier adds" =
       node
 
     let%test_unit "A block without a node is not tracked" =
-      let t = Tree.create ~logger:(Logger.null ()) in
+      let t = Tree.create ~logger:(Logger.null ()) ~release in
       Tree.block_added t (hash "added") ;
       [%test_eq: int] (Hashtbl.length t.nodes) 0
 
     let%test_unit "The node for an added block leaves the tree, added" =
-      let t = Tree.create ~logger:(Logger.null ()) in
+      let t = Tree.create ~logger:(Logger.null ()) ~release in
       let node = downloading t (hash "added") ~parent:(hash "parent") in
       let (_ : Tree.Node.t) =
         downloading t (hash "child") ~parent:(hash "added")

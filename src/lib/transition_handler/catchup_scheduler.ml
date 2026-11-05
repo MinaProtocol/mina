@@ -22,16 +22,14 @@ open Network_peer
 type t =
   { logger : Logger.t
   ; time_controller : Block_time.Controller.t
-  ; catchup_job_writer :
-      ( State_hash.t
-        * ( Mina_block.initial_valid_block Envelope.Incoming.t
-          , State_hash.t )
-          Cached.t
-          Mina_stdlib.Rose_tree.t
-          list
-      , crash buffered
-      , unit )
-      Writer.t
+  ; on_catchup_job :
+         State_hash.t
+         * ( Mina_block.initial_valid_block Envelope.Incoming.t
+           , State_hash.t )
+           Cached.t
+           Mina_stdlib.Rose_tree.t
+           list
+      -> unit
         (** `collected_transitins` stores all seen transitions as its keys,
             and values are a list of direct children of those transitions.
             The invariant is that every collected transition would appear as
@@ -74,7 +72,7 @@ let release_unbuilt block_registry cached_transition =
   Block_registry.finish block_registry cached_transition `Ignored
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller ~block_registry ~in_flight ~catchup_job_writer
+    ~time_controller ~block_registry ~in_flight ~on_catchup_job
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          Mina_stdlib.Rose_tree.t
@@ -122,7 +120,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   { logger
   ; collected_transitions
   ; time_controller
-  ; catchup_job_writer
+  ; on_catchup_job
   ; parent_root_timeouts
   ; breadcrumb_builder_supervisor
   ; watched_headers
@@ -250,11 +248,7 @@ let make_timeout t transition_with_hash duration =
           ]
         "Timed out waiting for the parent of $cached_transition after \
          $duration ms, signalling a catchup job" ;
-      (* it's ok to create a new thread here because the thread essentially does no work *)
-      if Writer.is_closed t.catchup_job_writer then
-        [%log' trace t.logger]
-          "catchup job pipe was closed; attempt to write to closed pipe"
-      else Writer.write t.catchup_job_writer forest )
+      t.on_catchup_job forest )
 
 let watch t ~timeout_duration ~cached_transition =
   let transition_with_hash, _ =
@@ -320,10 +314,7 @@ let watch_header t ~header_with_hash =
   match Hashtbl.find t.collected_transitions hash with
   | None ->
       Hash_set.add t.watched_headers hash ;
-      if Writer.is_closed t.catchup_job_writer then
-        [%log' trace t.logger]
-          "catchup job pipe was closed; attempt to write to closed pipe"
-      else Writer.write t.catchup_job_writer (hash, [])
+      t.on_catchup_job (hash, [])
   | _ ->
       ()
 
@@ -424,7 +415,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create
               ~in_flight:(Otp_lib.In_flight.create ())
-              ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~frontier ~precomputed_values ~verifier
+              ~on_catchup_job:(Strict_pipe.Writer.write catchup_job_writer)
               ~catchup_breadcrumbs_writer
           in
           watch scheduler ~timeout_duration
@@ -498,7 +490,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create
               ~in_flight:(Otp_lib.In_flight.create ())
-              ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~frontier ~precomputed_values ~verifier
+              ~on_catchup_job:(Strict_pipe.Writer.write catchup_job_writer)
               ~catchup_breadcrumbs_writer
           in
           let cache =
@@ -555,7 +548,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create
               ~in_flight:(Otp_lib.In_flight.create ())
-              ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~frontier ~precomputed_values ~verifier
+              ~on_catchup_job:(Strict_pipe.Writer.write catchup_job_writer)
               ~catchup_breadcrumbs_writer
           in
           let cache =
@@ -633,7 +627,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create
               ~in_flight:(Otp_lib.In_flight.create ())
-              ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+              ~precomputed_values ~frontier ~verifier
+              ~on_catchup_job:(Strict_pipe.Writer.write catchup_job_writer)
               ~catchup_breadcrumbs_writer
           in
           watch scheduler ~timeout_duration
@@ -711,7 +706,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create
               ~in_flight:(Otp_lib.In_flight.create ())
-              ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+              ~precomputed_values ~frontier ~verifier
+              ~on_catchup_job:(Strict_pipe.Writer.write catchup_job_writer)
               ~catchup_breadcrumbs_writer
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =

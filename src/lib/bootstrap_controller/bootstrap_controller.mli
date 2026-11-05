@@ -53,6 +53,5 @@ val run :
   -> persistent_root:Transition_frontier.Persistent_root.t
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
-  -> catchup_mode:[ `Super ]
   -> bootstrap_status:Bootstrap_status.t
   -> (Transition_frontier.t * Transition_cache.element list) Deferred.t
