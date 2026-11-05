@@ -170,8 +170,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
                  (Persistent_frontier.Database.Error.not_found_message err) ) )
   in
   { logger
-  ; catchup_tree =
-      Full_catchup_tree.create ~logger ~root:(Full_frontier.root full_frontier)
+  ; catchup_tree = Full_catchup_tree.create ~logger
   ; verifier
   ; consensus_local_state
   ; full_frontier
