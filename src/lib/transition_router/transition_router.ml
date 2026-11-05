@@ -67,6 +67,9 @@ let to_consensus_state h =
 type phase =
   | Starting  (** Neither controller has started yet. *)
   | Bootstrapping
+  | Draining
+      (** The frontier controller is being stopped, and its frontier closed,
+          before bootstrapping. *)
   | Participating of
       { producer_transition_writer :
           ( Transition_frontier.Breadcrumb.t
@@ -74,6 +77,31 @@ type phase =
           , unit Deferred.t )
           Strict_pipe.Writer.t
       }
+
+(** Start leaving the frontier controller, if it is running: move to
+    [Draining], and return the writer for the blocks we produce, which the
+    controller reads. [None] if the controller isn't running, including when
+    the router is already leaving it. *)
+let start_draining phase =
+  match !phase with
+  | Participating { producer_transition_writer } ->
+      phase := Draining ;
+      Some producer_transition_writer
+  | Starting | Bootstrapping | Draining ->
+      None
+
+let%test_unit "Only the first trigger starts draining" =
+  let _reader, producer_transition_writer =
+    Strict_pipe.create ~name:"test producer transitions" Synchronous
+  in
+  let phase = ref (Participating { producer_transition_writer }) in
+  assert (Option.is_some (start_draining phase)) ;
+  assert (Option.is_none (start_draining phase)) ;
+  match !phase with
+  | Draining ->
+      ()
+  | Starting | Bootstrapping | Participating _ ->
+      failwith "expected to be draining"
 
 (** What the transition router shares between the controllers it starts. *)
 type t =
@@ -591,21 +619,23 @@ let route_valid_transition t ~get_current_frontier ~clear_writer
              Transition_handler.Catchup_classifier.orphans_anchor
                ~context:(module Context)
                frontier header_with_hash
-           then (
-             ( match !phase with
-             | Participating { producer_transition_writer } ->
-                 Strict_pipe.Writer.kill producer_transition_writer
-             | Starting | Bootstrapping ->
-                 () ) ;
-             let initial_root_transition =
-               Transition_frontier.(
-                 Breadcrumb.validated_transition (root frontier))
-             in
-             let%bind () = Strict_pipe.Writer.write clear_writer `Clear in
-             let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
-             ignore
-             @@ start_bootstrap_controller t ~initial_root_transition
-                  ~best_seen_transition:(Some b_or_h) )
+           then
+             match start_draining phase with
+             | Some producer_transition_writer ->
+                 Strict_pipe.Writer.kill producer_transition_writer ;
+                 let initial_root_transition =
+                   Transition_frontier.(
+                     Breadcrumb.validated_transition (root frontier))
+                 in
+                 let%bind () = Strict_pipe.Writer.write clear_writer `Clear in
+                 let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+                 ignore
+                 @@ start_bootstrap_controller t ~initial_root_transition
+                      ~best_seen_transition:(Some b_or_h)
+             | None ->
+                 (* Already leaving the frontier controller: one switch to
+                    bootstrap is enough. *)
+                 Deferred.unit
            else Deferred.unit
        | None ->
            Deferred.unit
@@ -652,7 +682,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
              match !phase with
              | Participating { producer_transition_writer } ->
                  Strict_pipe.Writer.write producer_transition_writer x
-             | Starting | Bootstrapping ->
+             | Starting | Bootstrapping | Draining ->
                  Deferred.unit ) ;
       Bootstrap_status.set_phase bootstrap_status Waiting_for_genesis ;
       let%bind () =
