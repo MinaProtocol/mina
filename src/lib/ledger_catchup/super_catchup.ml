@@ -708,24 +708,6 @@ let create_node ~logger ~downloader t x =
   let attempts = Attempt_history.empty in
   let state, h, blockchain_length, parent, result =
     match x with
-    | `Root root ->
-        let blockchain_length =
-          Breadcrumb.block root |> Mina_block.blockchain_length
-        in
-        Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
-        @@ fun () ->
-        [%log internal] "@block_metadata"
-          ~metadata:
-            [ ( "blockchain_length"
-              , Mina_numbers.Length.to_yojson blockchain_length )
-            ] ;
-        [%log internal] "Catchup_job_finished" ;
-        ( Node.State.Finished
-        , Breadcrumb.state_hash root
-        , Breadcrumb.consensus_state root
-          |> Consensus.Data.Consensus_state.blockchain_length
-        , Breadcrumb.parent_hash root
-        , Ivar.create_full (Ok `Added_to_frontier) )
     | `Hash (h, l, parent) ->
         Internal_tracing.with_state_hash h
         @@ fun () ->
@@ -1408,16 +1390,15 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                            `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
                 ]
               "before entering state machine.  node_states: $node_states" ;
-            let root =
+            let anchor =
               match root with
               | `Breadcrumb root ->
-                  (* If we hit this case we should probably remove the parent from the
-                      table and prune, although in theory that should be handled by
-                     the frontier calling [Full_catchup_tree.frontier_added]. *)
-                  create_node ~logger ~downloader t (`Root root)
-              | `Node node ->
+                  ( Breadcrumb.state_hash root
+                  , Breadcrumb.consensus_state root
+                    |> Consensus.Data.Consensus_state.blockchain_length )
+              | `Node (node : Node.t) ->
                   (* TODO: Log what is going on with transition frontier. *)
-                  node
+                  (node.state_hash, node.blockchain_length)
             in
             [%log debug]
               ~metadata:[ ("n", `Int (List.length state_hashes)) ]
@@ -1431,9 +1412,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                      in
                      run_state_machine node ) ) ;
             ignore
-              ( List.fold state_hashes
-                  ~init:(root.state_hash, root.blockchain_length)
-                  ~f:(fun (parent, l) h ->
+              ( List.fold state_hashes ~init:anchor ~f:(fun (parent, l) h ->
                     let l = Length.succ l in
                     ( if not (Hashtbl.mem t.nodes h) then
                       let node =
