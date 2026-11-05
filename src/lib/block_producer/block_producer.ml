@@ -985,7 +985,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                     @@ Block_time.to_time_exn scheduled_time)) ;
               [%log internal] "Send_breadcrumb_to_transition_frontier" ;
               let%bind.Async.Deferred () =
-                Strict_pipe.Writer.write transition_writer breadcrumb
+                Strict_pipe.Writer.write transition_writer
+                  ( breadcrumb
+                  , `Built_on (Transition_frontier.generation frontier) )
               in
               let metadata =
                 [ ( "state_hash"
@@ -1560,7 +1562,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                 @@ diff (now ())
                 @@ Block_time.to_time_exn scheduled_time)) ;
           let%bind.Async.Deferred () =
-            Strict_pipe.Writer.write transition_writer breadcrumb
+            Strict_pipe.Writer.write transition_writer
+              (breadcrumb, `Built_on (Transition_frontier.generation frontier))
           in
           [%log debug] ~metadata
             "Waiting for block $state_hash to be inserted into frontier" ;
