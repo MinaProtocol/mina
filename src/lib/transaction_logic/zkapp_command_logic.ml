@@ -293,7 +293,7 @@ module Local_state = struct
   module Value = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
           , Mina_base.Call_stack_digest.Stable.V1.t
@@ -304,7 +304,7 @@ module Local_state = struct
           , bool
           , Zkapp_command.Transaction_commitment.Stable.V1.t
           , Mina_numbers.Index.Stable.V1.t
-          , Transaction_status.Failure.Collection.Stable.V1.t )
+          , Transaction_status.Failure.Collection.Stable.V2.t )
           Stable.V1.t
         [@@deriving equal, compare, hash, yojson, sexp]
 
@@ -1575,6 +1575,15 @@ module Make (Inputs : Inputs_intf) = struct
     let auth_with_fallback ~fallback_logic auth =
       Controller.if_ verification_key_is_stale ~then_:(fallback_logic auth)
         ~else_:auth
+    in
+    (* A proof made against a stale key is never accepted, whatever the
+       permissions would otherwise allow. *)
+    let local_state =
+      Local_state.add_check local_state Proof_with_outdated_verification_key
+        Bool.(
+          not
+            ( Account_update.is_proved account_update
+            &&& verification_key_is_stale ))
     in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =

@@ -196,7 +196,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
         , unit
-        , Local_state.Stable.V1.t )
+        , Local_state.Stable.V2.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -210,7 +210,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
         , unit
-        , Local_state.Stable.V1.t )
+        , Local_state.Stable.V2.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -384,7 +384,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V2.t
           , Sok_message.Digest.Stable.V1.t
-          , Local_state.Stable.V1.t )
+          , Local_state.Stable.V2.t )
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -398,7 +398,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
-          , Local_state.Stable.V1.t )
+          , Local_state.Stable.V2.t )
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
 

@@ -270,15 +270,15 @@ module Mina_base = struct
       (W.Pending_coinbase.Hash_versioned)
   include Assert_equal0V2 (O.Fee_excess.Stable) (W.Fee_excess)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Transaction_status.Failure.Stable)
       (W.Transaction_status.Failure)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Transaction_status.Failure.Collection.Stable)
       (W.Transaction_status.Failure.Collection)
-  include Assert_equal0V2 (O.Transaction_status.Stable) (W.Transaction_status)
-  include Assert_equal1V2 (O.With_status.Stable) (W.With_status)
+  include Assert_equal0V3 (O.Transaction_status.Stable) (W.Transaction_status)
+  include Assert_equal1V3 (O.With_status.Stable) (W.With_status)
   include
     Assert_equal0V1
       (O.Zkapp_command.Transaction_commitment.Stable)
@@ -324,7 +324,7 @@ module Mina_state = struct
   module O = Mina_state
   module W = WT.Mina_state
   include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
-  include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
+  include Assert_equal0V2 (O.Local_state.Stable) (W.Local_state)
   include
     Assert_equal0V3 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
   include Assert_equal0 (O.Blockchain_state.Value) (W.Blockchain_state.Value.V3)
@@ -354,7 +354,7 @@ module Mina_transaction_logic = struct
       (O.Zkapp_command_logic.Local_state.Stable)
       (W.Zkapp_command_logic.Local_state)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Zkapp_command_logic.Local_state.Value.Stable)
       (W.Zkapp_command_logic.Local_state.Value)
 end

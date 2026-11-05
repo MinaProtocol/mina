@@ -20,13 +20,13 @@ module Transactions = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
         { commands :
             ( User_command.Stable.V3.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
-            With_status.Stable.V2.t
+            With_status.Stable.V3.t
             list
         ; fee_transfers :
             (Fee_transfer.Single.Stable.V2.t * Fee_transfer_type.Stable.V1.t)
@@ -82,7 +82,7 @@ module Stable = struct
       { creator : Public_key.Compressed.Stable.V1.t
       ; winner : Public_key.Compressed.Stable.V1.t
       ; protocol_state : Protocol_state.Stable.V4.t
-      ; transactions : Transactions.Stable.V3.t
+      ; transactions : Transactions.Stable.V4.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V3.t list
       ; proof : Proof.Stable.V2.t
       }
@@ -95,7 +95,7 @@ module Stable = struct
       { creator : Public_key.Compressed.Stable.V1.t
       ; winner : Public_key.Compressed.Stable.V1.t
       ; protocol_state : Protocol_state.Stable.V3.t
-      ; transactions : Transactions.Stable.V3.t
+      ; transactions : Transactions.Stable.V4.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
       ; proof : Proof.Stable.V2.t
       }

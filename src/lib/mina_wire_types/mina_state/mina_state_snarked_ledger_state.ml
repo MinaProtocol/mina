@@ -37,7 +37,7 @@ module Types = struct
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V2.t
         , unit
-        , Mina_state_local_state.V1.t )
+        , Mina_state_local_state.V2.t )
         Poly.V2.t
     end
 
@@ -49,7 +49,7 @@ module Types = struct
           , Mina_base.Pending_coinbase.Stack_versioned.V1.t
           , Mina_base.Fee_excess.V2.t
           , Mina_base.Sok_message.Digest.V1.t
-          , Mina_state_local_state.V1.t )
+          , Mina_state_local_state.V2.t )
           Poly.V2.t
       end
     end
@@ -92,7 +92,7 @@ module type Concrete = sig
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V2.t
       , unit
-      , Mina_state_local_state.V1.t )
+      , Mina_state_local_state.V2.t )
       Poly.V2.t
   end
 
@@ -104,7 +104,7 @@ module type Concrete = sig
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V2.t
         , Mina_base.Sok_message.Digest.V1.t
-        , Mina_state_local_state.V1.t )
+        , Mina_state_local_state.V2.t )
         Poly.V2.t
     end
   end
@@ -146,7 +146,7 @@ module M = struct
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V2.t
       , unit
-      , Mina_state_local_state.V1.t )
+      , Mina_state_local_state.V2.t )
       Poly.V2.t
   end
 
@@ -158,7 +158,7 @@ module M = struct
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V2.t
         , Mina_base.Sok_message.Digest.V1.t
-        , Mina_state_local_state.V1.t )
+        , Mina_state_local_state.V2.t )
         Poly.V2.t
     end
   end

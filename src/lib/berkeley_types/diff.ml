@@ -6,10 +6,10 @@ module Diff = Staged_ledger_diff
 
 type 'command pre_diffs =
   ( Transaction_snark_work.Stable.V2.t
-  , 'command Mina_base.With_status.Stable.V2.t )
+  , 'command Mina_base.With_status.Stable.V3.t )
   Diff.Pre_diff_two.Stable.V2.t
   * ( Transaction_snark_work.Stable.V2.t
-    , 'command Mina_base.With_status.Stable.V2.t )
+    , 'command Mina_base.With_status.Stable.V3.t )
     Diff.Pre_diff_one.Stable.V2.t
     option
 [@@deriving yojson]
