@@ -169,7 +169,6 @@ module type Transition_router_intf = sig
     -> get_completed_work:
          (   Transaction_snark_work.Statement.t
           -> Transaction_snark_work.Checked.t option )
-    -> catchup_mode:[ `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> ledger_backing:Mina_ledger.Root.Config.backing_type
     -> bootstrap_status:Bootstrap_status.t

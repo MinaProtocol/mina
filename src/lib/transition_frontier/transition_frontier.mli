@@ -77,7 +77,6 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:[ `Super ]
   -> unit
   -> ( t
      , [ `Failure of string
