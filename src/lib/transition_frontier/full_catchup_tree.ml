@@ -283,28 +283,11 @@ let max_catchup_chain_length (t : t) =
   Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key:_ ~data acc ->
       Int.max acc (longest_starting_at data) )
 
-let create_node_full t b : unit =
-  let h = Breadcrumb.state_hash b in
-  let node : Node.t =
-    { state = Finished
-    ; state_hash = h
-    ; blockchain_length =
-        Consensus.Data.Consensus_state.blockchain_length
-        @@ Breadcrumb.consensus_state b
-    ; attempts = Attempt_history.empty
-    ; parent = Breadcrumb.parent_hash b
-    ; result = Ivar.create_full (Ok `Added_to_frontier)
-    }
-  in
-  add_state t.states node ;
-  Hashtbl.add_exn t.nodes ~key:h ~data:node
-
-let breadcrumb_added (t : t) b =
-  let h = Breadcrumb.state_hash b in
-  match Hashtbl.find t.nodes h with
-  | None ->
-      create_node_full t b
-  | Some node -> (
+(** Mark the node for a block the frontier has added as finished, if there is
+    one. Blocks without a node are not being caught up, and the tree does not
+    track them. *)
+let block_added (t : t) h =
+  Option.iter (Hashtbl.find t.nodes h) ~f:(fun node ->
       Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
       match node.state with
       | Root _ | Failed | Finished ->
@@ -368,7 +351,7 @@ let discarded ~(parents : (State_hash.t * State_hash.t) list) ~new_root
     discarded. Nodes for those blocks, and their descendants other than through
     the new root, are removed; nothing else is. *)
 let frontier_added (t : t) breadcrumb ~root_moved =
-  breadcrumb_added t breadcrumb ;
+  block_added t (Breadcrumb.state_hash breadcrumb) ;
   Option.iter root_moved ~f:(fun (new_root, left) ->
       discarded
         ~parents:
@@ -377,12 +360,9 @@ let frontier_added (t : t) breadcrumb ~root_moved =
         ~new_root ~left
       |> List.iter ~f:(remove_node t) )
 
-let create ~logger ~root =
-  let t =
-    { states = Node.State.Enum.Table.create ()
-    ; nodes = State_hash.Table.create ()
-    ; logger
-    ; release = release_directly
-    }
-  in
-  create_node_full t root ; t
+let create ~logger =
+  { states = Node.State.Enum.Table.create ()
+  ; nodes = State_hash.Table.create ()
+  ; logger
+  ; release = release_directly
+  }

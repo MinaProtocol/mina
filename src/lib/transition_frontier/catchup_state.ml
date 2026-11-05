@@ -19,5 +19,5 @@ let frontier_added (t : t) breadcrumb ~root_moved : unit =
   | Full t ->
       Full_catchup_tree.frontier_added t breadcrumb ~root_moved
 
-let create t ~logger ~root =
-  match t with `Super -> Full (Full_catchup_tree.create ~logger ~root)
+let create t ~logger =
+  match t with `Super -> Full (Full_catchup_tree.create ~logger)
