@@ -184,15 +184,32 @@ let generateDockerForCodename =
           let dependsOnBuildHfDebian =
                 [ { name = pipelineName, key = buildHfDebian } ]
 
-          let dependsOnDaemonOnly =
+          let daemonGeneric =
+                DockerImage.ReleaseSpec::{
+                , deps = dependsOnBuildHfDebian
+                , service = Docker.Type.DaemonGeneric
+                , network = spec.network
+                , deb_codename = codename.DebVersion
+                , deb_profile = profile
+                , deb_legacy_version = spec.deb_legacy_version
+                , docker_target = Some "mina-daemon-prefork-genesis"
+                , size = spec.size
+                , deb_version = spec.version
+                , generic = True
+                , step_key_suffix =
+                    "-${DebianVersions.lowerName
+                          codename.DebVersion}-docker-image"
+                }
+
+          let dependsOnDaemonGeneric =
                 [ { name = pipelineName
-                  , key = "daemon_apps_only-${lowerNameCodename}-docker-image"
+                  , key = DockerImage.stepKey daemonGeneric
                   }
                 ]
 
           let daemonProfiled =
                 DockerImage.ReleaseSpec::{
-                , deps = dependsOnBuildHfDebian # dependsOnDaemonOnly
+                , deps = dependsOnBuildHfDebian # dependsOnDaemonGeneric
                 , service = Docker.Type.DaemonProfiled { profile = profile }
                 , network = spec.network
                 , deb_codename = codename.DebVersion
@@ -212,11 +229,35 @@ let generateDockerForCodename =
                   }
                 ]
 
-          let dependsOnRosettaAppsOnly =
+          let rosettaGeneric =
+                DockerImage.ReleaseSpec::{
+                , deps = dependsOnBuildHfDebian
+                , service = Docker.Type.RosettaGeneric
+                , network = spec.network
+                , deb_codename = codename.DebVersion
+                , deb_profile = profile
+                , deb_legacy_version = spec.deb_legacy_version
+                , size = spec.size
+                , deb_version = spec.version
+                , generic = True
+                , step_key_suffix =
+                    "-${DebianVersions.lowerName
+                          codename.DebVersion}-docker-image"
+                }
+
+          let dependsOnRosettaGeneric =
                 [ { name = pipelineName
-                  , key = "rosetta_apps_only-${lowerNameCodename}-docker-image"
+                  , key = DockerImage.stepKey rosettaGeneric
                   }
                 ]
+
+          let persistArtifacts =
+                "mina-logproc mina-generic mina-archive-generic mina-rosetta-generic mina-${Profiles.lowerName
+                                                                                              profile}-profile mina-${Profiles.lowerName
+                                                                                                                        profile}-generic mina-${Network.lowerName
+                                                                                                                                                  spec.network} mina-archive-${Network.lowerName
+                                                                                                                                                                                 spec.network} mina-rosetta-${Network.lowerName
+                                                                                                                                                                                                                spec.network} mina-tx-tools mina-daemon-storage-toolbox"
 
           let buildOrGetArtifacts =
                 merge
@@ -232,16 +273,9 @@ let generateDockerForCodename =
                                     , submodules = True
                                     }
                                     [ "FORCE_DOCKER_OVERWRITE" ]
-                                    (     "./buildkite/scripts/release/manager.sh persist "
-                                      ++  " --backend local --artifacts mina-logproc,mina-${Profiles.lowerName
-                                                                                              profile}-profile,mina-${Profiles.lowerName
-                                                                                                                        profile}-generic,mina-${Network.lowerName
-                                                                                                                                                  spec.network},mina-archive-${Network.lowerName
-                                                                                                                                                                                 spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                                                                                spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
-                                      ++  " --buildkite-build-id ${cached_build_id}"
-                                      ++  " --codename ${lowerNameCodename} "
-                                      ++  " --target \\\${BUILDKITE_BUILD_ID} "
+                                    (     "tmp=\$(mktemp -d) && "
+                                      ++  "for a in ${persistArtifacts}; do buildkite-cache-manager read --root ${cached_build_id} \"debians/${lowerNameCodename}/\${a}_*_amd64.deb\" \"\$tmp\"; done && "
+                                      ++  "buildkite-cache-manager write \"\$tmp\"/* debians/${lowerNameCodename}/"
                                     )
                               , label =
                                   "Download cached packages for ${lowerNameCodename}"
@@ -255,6 +289,9 @@ let generateDockerForCodename =
                         MinaArtifact.PackagingSpec::{
                         , artifacts =
                           [ Artifact.Type.LogProc
+                          , Artifact.Type.DaemonGeneric
+                          , Artifact.Type.ArchiveGeneric
+                          , Artifact.Type.RosettaGeneric
                           , Artifact.Type.Daemon { network = spec.network }
                           , Artifact.Type.DaemonProfiled { profile = profile }
                           , Artifact.Type.Archive { network = spec.network }
@@ -340,21 +377,7 @@ let generateDockerForCodename =
                             }
                           ]
                   , None =
-                    [ DockerImage.ReleaseSpec::{
-                      , deps = dependsOnBuildHfDebian
-                      , service = Docker.Type.DaemonGeneric
-                      , network = spec.network
-                      , deb_codename = codename.DebVersion
-                      , deb_profile = profile
-                      , deb_legacy_version = spec.deb_legacy_version
-                      , docker_target = Some "mina-daemon-prefork-genesis"
-                      , size = spec.size
-                      , deb_version = spec.version
-                      , generic = True
-                      , step_key_suffix =
-                          "-${DebianVersions.lowerName
-                                codename.DebVersion}-docker-image"
-                      }
+                    [ daemonGeneric
                     , daemonProfiled
                     , DockerImage.ReleaseSpec::{
                       , deps = dependsOnBuildHfDebian # dependsOnDaemonProfiled
@@ -385,22 +408,9 @@ let generateDockerForCodename =
                           "-${DebianVersions.lowerName
                                 codename.DebVersion}-docker-image"
                       }
+                    , rosettaGeneric
                     , DockerImage.ReleaseSpec::{
-                      , deps = dependsOnBuildHfDebian
-                      , service = Docker.Type.RosettaGeneric
-                      , network = spec.network
-                      , deb_codename = codename.DebVersion
-                      , deb_profile = profile
-                      , deb_legacy_version = spec.deb_legacy_version
-                      , size = spec.size
-                      , deb_version = spec.version
-                      , generic = True
-                      , step_key_suffix =
-                          "-${DebianVersions.lowerName
-                                codename.DebVersion}-docker-image"
-                      }
-                    , DockerImage.ReleaseSpec::{
-                      , deps = dependsOnBuildHfDebian # dependsOnRosettaAppsOnly
+                      , deps = dependsOnBuildHfDebian # dependsOnRosettaGeneric
                       , service = Docker.Type.Rosetta { network = spec.network }
                       , network = spec.network
                       , deb_codename = codename.DebVersion
