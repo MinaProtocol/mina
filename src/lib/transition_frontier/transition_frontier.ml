@@ -51,6 +51,7 @@ type t =
   ; persistent_frontier_instance : Persistent_frontier.Instance.t
   ; extensions : Extensions.t
   ; genesis_state_hash : State_hash.t
+  ; mutable closing : bool
   ; closed : unit Ivar.t
   }
 
@@ -182,6 +183,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   ; persistent_frontier
   ; persistent_frontier_instance
   ; extensions
+  ; closing = false
   ; closed = Ivar.create ()
   ; genesis_state_hash =
       (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
@@ -398,27 +400,31 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
 let close ~loc
-    { logger
-    ; verifier = _
-    ; consensus_local_state = _
-    ; catchup_tree = _
-    ; full_frontier
-    ; persistent_root = _safe_to_ignore_1
-    ; persistent_root_instance
-    ; persistent_frontier = _safe_to_ignore_2
-    ; persistent_frontier_instance
-    ; extensions
-    ; closed
-    ; genesis_state_hash = _
-    } =
-  [%log debug] "Closing transition frontier" ;
-  Full_frontier.close ~loc full_frontier ;
-  Extensions.close extensions ;
-  let%map () =
-    Persistent_frontier.Instance.destroy persistent_frontier_instance
-  in
-  Persistent_root.Instance.close persistent_root_instance ;
-  Ivar.fill_if_empty closed ()
+    ( { logger
+      ; verifier = _
+      ; consensus_local_state = _
+      ; catchup_tree = _
+      ; full_frontier
+      ; persistent_root = _safe_to_ignore_1
+      ; persistent_root_instance
+      ; persistent_frontier = _safe_to_ignore_2
+      ; persistent_frontier_instance
+      ; extensions
+      ; closing
+      ; closed
+      ; genesis_state_hash = _
+      } as t ) =
+  if closing then Ivar.read closed
+  else (
+    t.closing <- true ;
+    [%log debug] "Closing transition frontier" ;
+    Full_frontier.close ~loc full_frontier ;
+    Extensions.close extensions ;
+    let%map () =
+      Persistent_frontier.Instance.destroy persistent_frontier_instance
+    in
+    Persistent_root.Instance.close persistent_root_instance ;
+    Ivar.fill_if_empty closed () )
 
 let closed t = Ivar.read t.closed
 
@@ -445,6 +451,10 @@ let add_breadcrumb_reporting_root_exn t breadcrumb =
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
   let logger = t.logger in
+  if t.closing then
+    failwithf
+      !"Adding breadcrumb %{sexp: State_hash.t} to a frontier that is closing"
+      state_hash () ;
   [%log internal] "Add_breadcrumb_to_frontier" ;
   [%log internal] "Calculate_diffs" ;
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in

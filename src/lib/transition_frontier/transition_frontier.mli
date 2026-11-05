@@ -87,10 +87,16 @@ val load :
        | `Snarked_ledger_mismatch ] )
      Deferred.Result.t
 
+(** Close the frontier. Closing a frontier that is already closing, or closed,
+    does nothing more, and is determined when the first close is. *)
 val close : loc:string -> t -> unit Deferred.t
 
 val closed : t -> unit Deferred.t
 
+(** Add a breadcrumb, and make any root transition that is then due. Raises
+    if the frontier has started closing, before changing anything: closing
+    detaches the breadcrumbs' masks, and a root transition on a closing
+    frontier could rotate the epoch ledgers that the next frontier uses. *)
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
 (** A root transition applied while adding a breadcrumb. The previous root
