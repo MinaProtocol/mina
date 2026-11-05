@@ -1,5 +1,5 @@
-(* Tests of the guardian's settings, of the reading of a child's log and of
-   the block download. *)
+(* Tests of the guardian's settings, of the reading of a child's log, of the
+   block download with [Mock_bucket] and of the recovery with [Fake_app]. *)
 
 open Core
 open Async
@@ -7,6 +7,10 @@ module Config = Missing_blocks_guardian_lib.Config
 module App_log = Missing_blocks_guardian_lib.App_log
 module Download = Missing_blocks_guardian_lib.Download
 module Subprocess = Missing_blocks_guardian_lib.Subprocess
+module Archive_blocks = Missing_blocks_guardian_lib.Archive_blocks
+module Auditor = Missing_blocks_guardian_lib.Auditor
+module Bucket = Missing_blocks_guardian_lib.Bucket
+module Recovery = Missing_blocks_guardian_lib.Recovery
 module Cli = Missing_blocks_guardian_lib.Cli
 
 let env pairs name = List.Assoc.find pairs ~equal:String.equal name
@@ -174,17 +178,13 @@ let test_both_collects_problems () =
        (Config.blocks ~env:no_env ~url:None ~network:(Some "mainnet")
           ~format:None ~archive_blocks:None ) )
 
-let message ~level ~text ~metadata =
-  sprintf
-    {|{"timestamp":"2026-11-02 10:00:00.000000Z","level":"%s","source":{"module":"x","location":"y"},"message":"%s","metadata":%s}|}
-    level text metadata
-
 let test_app_log () =
   let output =
     String.concat ~sep:"\n"
-      [ message ~level:"Info" ~text:"Querying missing blocks" ~metadata:"{}"
+      [ Fake_app.message ~level:"Info" ~text:"Querying missing blocks"
+          ~metadata:"{}"
       ; "not a log line"
-      ; message ~level:"Error" ~text:"Error getting missing blocks"
+      ; Fake_app.message ~level:"Error" ~text:"Error getting missing blocks"
           ~metadata:{|{"error":"Failed to connect"}|}
       ; ""
       ]
@@ -278,39 +278,34 @@ let test_subprocess_failure () =
   in
   Alcotest.(check string) "nothing written" "" (Subprocess.wrote quiet)
 
-let block_path = "/mainnet-5-3NKabc.json"
+let test_bucket_block_url () =
+  let file =
+    Bucket.block_file ~network:"mainnet" ~height:5 ~state_hash:"3NKabc"
+  in
+  Alcotest.(check string) "file" "mainnet-5-3NKabc.json" file ;
+  Alcotest.(check string)
+    "url" "https://b.example/mainnet-5-3NKabc.json"
+    (Bucket.block_url ~url:"https://b.example" ~file)
 
-let block_body = {|{"block":"content"}|}
-
-let not_found_body =
-  {|<?xml version='1.0' encoding='UTF-8'?><Error><Code>NoSuchKey</Code></Error>|}
-
-(* Serves [block_path], answers 403 at the root like a private bucket, and
-   404 to every other path. *)
-let with_server f =
-  Thread_safe.block_on_async_exn (fun () ->
-      let%bind server =
-        Cohttp_async.Server.create ~on_handler_error:`Raise
-          Tcp.Where_to_listen.of_port_chosen_by_os (fun ~body:_ _ request ->
-            let path = Uri.path (Cohttp.Request.uri request) in
-            if String.equal path block_path then
-              Cohttp_async.Server.respond_string block_body
-            else if String.equal path "/" then
-              Cohttp_async.Server.respond_string ~status:`Forbidden "denied"
-            else
-              Cohttp_async.Server.respond_string ~status:`Not_found
-                not_found_body )
-      in
-      let url =
-        sprintf "http://127.0.0.1:%d" (Cohttp_async.Server.listening_on server)
-      in
-      let%bind dir = Unix.mkdtemp "/tmp/missing_blocks_guardian_test" in
-      let%bind result = f ~url ~dir in
-      let%map () = Cohttp_async.Server.close server in
-      result )
+let test_bucket_listing () =
+  let check name ~url ~uri ~key_prefix ~url_is_bucket =
+    let listing = Bucket.listing ~url ~network:"mainnet" in
+    Alcotest.(check string) (name ^ " uri") uri (Uri.to_string listing.uri) ;
+    Alcotest.(check string) (name ^ " prefix") key_prefix listing.key_prefix ;
+    Alcotest.(check bool) (name ^ " bucket") url_is_bucket listing.url_is_bucket
+  in
+  check "host" ~url:"https://b.example"
+    ~uri:"https://b.example/?prefix=mainnet-&max-keys=1" ~key_prefix:"mainnet-"
+    ~url_is_bucket:true ;
+  check "bucket" ~url:"https://h.example/b"
+    ~uri:"https://h.example/b/?prefix=mainnet-&max-keys=1"
+    ~key_prefix:"mainnet-" ~url_is_bucket:true ;
+  check "path" ~url:"https://h.example/b/x/y"
+    ~uri:"https://h.example/b/?prefix=x/y/mainnet-&max-keys=1"
+    ~key_prefix:"x/y/mainnet-" ~url_is_bucket:false
 
 let test_download_not_found () =
-  with_server (fun ~url ~dir ->
+  Mock_bucket.with_server (fun ~url ~dir ->
       let file = dir ^/ "mainnet-4-3NKmissing.json" in
       match%bind
         Download.fetch ~url:(url ^ "/mainnet-4-3NKmissing.json") ~file
@@ -325,42 +320,69 @@ let test_download_not_found () =
           let%map exists = Sys.file_exists_exn file in
           Alcotest.(check bool) "no file saved" false exists )
 
-(* A private bucket answers 403 at its root and exists; a bucket that
-   answers 404 does not; a file bucket is a directory. *)
-let test_probe () =
-  with_server (fun ~url ~dir ->
-      let%bind private_bucket = Download.probe ~url in
+let expect_error_with ~substring = function
+  | Ok _ ->
+      Alcotest.failf "expected an error with %S" substring
+  | Error text ->
       Alcotest.(check bool)
-        "403 at the root is a bucket" true
-        (Or_error.is_ok private_bucket) ;
-      let%bind missing = Download.probe ~url:(url ^ "/no-such-bucket") in
-      ( match missing with
-      | Ok () ->
-          Alcotest.fail "expected an error"
-      | Error err ->
-          Alcotest.(check bool)
-            "says the bucket does not exist" true
-            (String.is_substring (Error.to_string_hum err)
-               ~substring:"the bucket does not exist" ) ) ;
-      let%bind directory = Download.probe ~url:("file://" ^ dir) in
-      Alcotest.(check bool) "directory" true (Or_error.is_ok directory) ;
-      let%bind no_directory = Download.probe ~url:("file://" ^ dir ^ "/none") in
-      Alcotest.(check bool) "no directory" true (Or_error.is_error no_directory) ;
-      let%map unreachable = Download.probe ~url:"http://127.0.0.1:1" in
-      Alcotest.(check bool) "unreachable" true (Or_error.is_error unreachable) )
+        (sprintf "%S mentions %S" text substring)
+        true
+        (String.is_substring text ~substring)
+
+let probe ~url ~network =
+  Deferred.map
+    (Download.probe ~url ~network)
+    ~f:(Result.map_error ~f:Error.to_string_hum)
+
+let check_ok name result = Alcotest.(check bool) name true (Result.is_ok result)
+
+(* A listing decides when there is one. Other answers cannot say that the
+   files are absent, and only a 404 of the bucket itself is an error. *)
+let test_probe () =
+  Mock_bucket.with_server (fun ~url ~dir ->
+      let bucket = url ^ "/listed" in
+      let%bind listed = probe ~url:bucket ~network:"mainnet" in
+      check_ok "the list has the network" listed ;
+      let%bind listed = probe ~url:(bucket ^ "/sub") ~network:"mainnet" in
+      check_ok "the list has the network under a path" listed ;
+      let%bind no_files = probe ~url:bucket ~network:"devnet" in
+      expect_error_with ~substring:"no file that starts with devnet-" no_files ;
+      let%bind no_files = probe ~url:(bucket ^ "/other") ~network:"mainnet" in
+      expect_error_with ~substring:"no file that starts with other/mainnet-"
+        no_files ;
+      let%bind private_bucket = probe ~url ~network:"mainnet" in
+      check_ok "403 is a private bucket" private_bucket ;
+      let%bind plain = probe ~url:(url ^ "/plain") ~network:"mainnet" in
+      check_ok "a page is not a list" plain ;
+      let%bind missing =
+        probe ~url:(url ^ "/no-such-bucket") ~network:"mainnet"
+      in
+      expect_error_with ~substring:"HTTP 404 Not Found, nothing at" missing ;
+      let%bind path = probe ~url:(url ^ "/a/b") ~network:"mainnet" in
+      check_ok "404 below a path says nothing" path ;
+      let%bind directory = probe ~url:("file://" ^ dir) ~network:"mainnet" in
+      check_ok "directory" directory ;
+      let%bind no_directory =
+        probe ~url:("file://" ^ dir ^ "/none") ~network:"mainnet"
+      in
+      expect_error_with ~substring:"is not a directory" no_directory ;
+      let%map unreachable =
+        probe ~url:"http://127.0.0.1:1" ~network:"mainnet"
+      in
+      Alcotest.(check bool) "unreachable" true (Result.is_error unreachable) )
 
 let test_download_ok () =
-  with_server (fun ~url ~dir ->
+  Mock_bucket.with_server (fun ~url ~dir ->
       let file = dir ^/ "mainnet-5-3NKabc.json" in
-      match%bind Download.fetch ~url:(url ^ block_path) ~file with
+      match%bind Download.fetch ~url:(url ^ Mock_bucket.block_path) ~file with
       | Error err ->
           Alcotest.fail (Error.to_string_hum err)
       | Ok () ->
           let%map contents = Reader.file_contents file in
-          Alcotest.(check string) "saved body" block_body contents )
+          Alcotest.(check string) "saved body" Mock_bucket.block_body contents )
 
 let test_download_missing_file_url () =
-  with_server (fun ~url:_ ~dir ->
+  Mock_bucket.with_server (fun ~url:_ ~dir ->
       let file = dir ^/ "out.json" in
       match%map
         Download.fetch ~url:("file://" ^ dir ^ "/absent.json") ~file
@@ -369,6 +391,242 @@ let test_download_missing_file_url () =
           Alcotest.fail "expected an error"
       | Error _ ->
           () )
+
+let archive_uri = Uri.of_string "postgres://mina:secret@db:5432/archive"
+
+let check_auditor ~prog =
+  Auditor.check ~logger:(Logger.null ()) ~prog ~archive_uri
+
+let archive ~auditor : Config.archive = { uri = archive_uri; auditor }
+
+let blocks ~dir ~archive_blocks : Config.blocks =
+  { url = "file://" ^ dir
+  ; network = "mainnet"
+  ; format = Config.Default.format
+  ; archive_blocks
+  }
+
+let test_auditor_missing_blocks () =
+  Fake_app.with_dir (fun ~dir ->
+      (* The auditor exits with 1 whenever blocks are missing: that is a
+         result, not a failure. *)
+      let%bind prog =
+        Fake_app.printing ~dir ~name:"auditor"
+          ~lines:
+            [ Fake_app.info_line
+            ; Fake_app.parent_lacking ~height:4 ~hash:"3NKfour"
+            ]
+          ~ending:"exit 1"
+      in
+      let%map result = check_auditor ~prog in
+      match result with
+      | Ok (Some parent) ->
+          Alcotest.(check string) "hash" "3NKfour" parent.hash ;
+          Alcotest.(check int) "height" 4 parent.height
+      | Ok None ->
+          Alcotest.fail "expected a missing parent"
+      | Error text ->
+          Alcotest.fail text )
+
+let test_auditor_healthy () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind prog =
+        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
+          ~ending:"exit 0"
+      in
+      let%map result = check_auditor ~prog in
+      Alcotest.(check bool)
+        "no missing parent" true
+        (match result with Ok None -> true | _ -> false) )
+
+let test_auditor_error_line () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind prog =
+        Fake_app.printing ~dir ~name:"auditor"
+          ~lines:
+            [ Fake_app.error_line
+            ; Fake_app.parent_lacking ~height:4 ~hash:"3NKfour"
+            ]
+          ~ending:"exit 1"
+      in
+      let%map result = check_auditor ~prog in
+      expect_error_with
+        ~substring:"Error getting missing blocks: Failed to connect" result )
+
+let test_auditor_no_log () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind prog = Fake_app.write_program ~dir ~name:"auditor" "exit 0" in
+      let%map result = check_auditor ~prog in
+      expect_error_with ~substring:"it wrote no log message" result )
+
+let test_auditor_signal () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind prog =
+        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
+          ~ending:"echo gone >&2\nkill -KILL $$"
+      in
+      let%map result = check_auditor ~prog in
+      expect_error_with ~substring:"it was killed by signal" result ;
+      expect_error_with ~substring:"and wrote: gone" result )
+
+let test_auditor_not_found () =
+  Fake_app.with_dir (fun ~dir ->
+      let%map result = check_auditor ~prog:(dir ^/ "absent") in
+      expect_error_with ~substring:"failed: " result )
+
+let block_name = "mainnet-5-3NKfive.json"
+
+let block_at_five : Auditor.missing_parent = { hash = "3NKfive"; height = 5 }
+
+(* Runs [populate] on a block file in the working directory. The file must
+   be removed in every case. *)
+let populate ~dir ~archive_blocks =
+  let%bind () = Writer.save block_name ~contents:Mock_bucket.block_body in
+  let%bind result =
+    Recovery.populate ~logger:(Logger.null ())
+      (archive ~auditor:"unused")
+      (blocks ~dir ~archive_blocks)
+      block_name
+  in
+  let%map exists = Sys.file_exists_exn block_name in
+  Alcotest.(check bool) "file removed" false exists ;
+  result
+
+(* The flags of the format and of the database, then the file. *)
+let test_archive_blocks_arguments () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind prog =
+        Fake_app.printing ~dir ~name:"archive-blocks"
+          ~lines:[ Fake_app.info_line ]
+          ~ending:(sprintf "echo \"$*\" > %s/arguments" dir)
+      in
+      let%bind result =
+        Archive_blocks.add ~logger:(Logger.null ()) ~prog
+          ~format:Config.Block_format.Extensional ~archive_uri "block.json"
+      in
+      check_ok "added" result ;
+      let%map arguments = Reader.file_lines (dir ^/ "arguments") in
+      Alcotest.(check (list string))
+        "arguments"
+        [ "--extensional --archive-uri " ^ Uri.to_string archive_uri
+          ^ " block.json"
+        ]
+        arguments )
+
+let test_populate_ok () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind archive_blocks =
+        Fake_app.printing ~dir ~name:"archive-blocks"
+          ~lines:[ Fake_app.info_line ] ~ending:"exit 0"
+      in
+      let%map result = populate ~dir ~archive_blocks in
+      check_ok "added" result )
+
+let test_populate_error_line () =
+  Fake_app.with_dir (fun ~dir ->
+      (* mina-archive-blocks exits with 0 when it cannot add a block. *)
+      let%bind archive_blocks =
+        Fake_app.printing ~dir ~name:"archive-blocks"
+          ~lines:[ Fake_app.error_line ] ~ending:"exit 0"
+      in
+      let%map result = populate ~dir ~archive_blocks in
+      expect_error_with ~substring:"Failed to connect" result ;
+      expect_error_with ~substring:"The database remains unhealthy" result )
+
+let test_populate_exit_code () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind archive_blocks =
+        Fake_app.printing ~dir ~name:"archive-blocks"
+          ~lines:[ Fake_app.info_line ] ~ending:"echo bad flag >&2\nexit 2"
+      in
+      let%map result = populate ~dir ~archive_blocks in
+      expect_error_with ~substring:"it exited with 2 and wrote: bad flag" result )
+
+let test_populate_signal () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind archive_blocks =
+        Fake_app.printing ~dir ~name:"archive-blocks" ~lines:[]
+          ~ending:"kill -KILL $$"
+      in
+      let%map result = populate ~dir ~archive_blocks in
+      expect_error_with ~substring:"it was killed by signal" result )
+
+let save_block ~dir ~height ~hash =
+  Writer.save
+    (dir ^/ sprintf "mainnet-%d-%s.json" height hash)
+    ~contents:Mock_bucket.block_body
+
+(* A fake mina-archive-blocks that records the names of its files in
+   [dir]/imported, so that a test can see the order of the imports. *)
+let recording_archive_blocks ~dir =
+  let%bind () =
+    Writer.save (dir ^/ "line") ~contents:(Fake_app.info_line ^ "\n")
+  in
+  Fake_app.write_program ~dir ~name:"archive-blocks"
+    (sprintf "for last; do :; done\necho \"$last\" >> %s/imported\ncat %s/line"
+       dir dir )
+
+let restore ~dir ~auditor ~archive_blocks =
+  Recovery.restore ~logger:(Logger.null ()) (archive ~auditor)
+    (blocks ~dir ~archive_blocks)
+    block_at_five
+
+let test_restore_follows_parents () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind () = save_block ~dir ~height:5 ~hash:"3NKfive" in
+      let%bind () = save_block ~dir ~height:4 ~hash:"3NKfour" in
+      let%bind auditor =
+        Fake_app.printing_in_turn ~dir ~name:"auditor"
+          ~runs:
+            [ [ Fake_app.parent_lacking ~height:4 ~hash:"3NKfour" ]
+            ; [ Fake_app.info_line ]
+            ]
+      in
+      let%bind archive_blocks = recording_archive_blocks ~dir in
+      let%bind result = restore ~dir ~auditor ~archive_blocks in
+      check_ok "restored" result ;
+      let%map imported = Reader.file_lines (dir ^/ "imported") in
+      Alcotest.(check (list string))
+        "imports in order"
+        [ block_name; "mainnet-4-3NKfour.json" ]
+        imported )
+
+let test_restore_no_progress () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind () = save_block ~dir ~height:5 ~hash:"3NKfive" in
+      let%bind auditor =
+        Fake_app.printing ~dir ~name:"auditor"
+          ~lines:[ Fake_app.parent_lacking ~height:5 ~hash:"3NKfive" ]
+          ~ending:"exit 1"
+      in
+      let%bind archive_blocks = recording_archive_blocks ~dir in
+      let%bind result = restore ~dir ~auditor ~archive_blocks in
+      expect_error_with ~substring:"still lacks block 3NKfive at height 5"
+        result ;
+      let%map imported = Reader.file_lines (dir ^/ "imported") in
+      Alcotest.(check (list string)) "one import" [ block_name ] imported )
+
+let test_restore_block_not_in_bucket () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind auditor =
+        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
+          ~ending:"exit 0"
+      in
+      let%bind archive_blocks = recording_archive_blocks ~dir in
+      let%map result = restore ~dir ~auditor ~archive_blocks in
+      expect_error_with ~substring:"Could not download the block at height 5"
+        result )
+
+let test_restore_auditor_fails () =
+  Fake_app.with_dir (fun ~dir ->
+      let%bind () = save_block ~dir ~height:5 ~hash:"3NKfive" in
+      let%bind auditor =
+        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.error_line ]
+          ~ending:"exit 1"
+      in
+      let%bind archive_blocks = recording_archive_blocks ~dir in
+      let%map result = restore ~dir ~auditor ~archive_blocks in
+      expect_error_with ~substring:"Failed to connect" result )
 
 let () =
   Alcotest.run "missing_blocks_guardian"
@@ -397,6 +655,10 @@ let () =
       , [ Alcotest.test_case "failure text has stderr, secrets hidden" `Quick
             test_subprocess_failure
         ] )
+    ; ( "bucket"
+      , [ Alcotest.test_case "block url" `Quick test_bucket_block_url
+        ; Alcotest.test_case "listing" `Quick test_bucket_listing
+        ] )
     ; ( "download"
       , [ Alcotest.test_case "not found is an error" `Quick
             test_download_not_found
@@ -404,5 +666,37 @@ let () =
         ; Alcotest.test_case "missing file url is an error" `Quick
             test_download_missing_file_url
         ; Alcotest.test_case "probe of the bucket" `Quick test_probe
+        ] )
+    ; ( "auditor"
+      , [ Alcotest.test_case "exit 1 with missing blocks is a result" `Quick
+            test_auditor_missing_blocks
+        ; Alcotest.test_case "healthy archive" `Quick test_auditor_healthy
+        ; Alcotest.test_case "error line is a failure" `Quick
+            test_auditor_error_line
+        ; Alcotest.test_case "no log is a failure" `Quick test_auditor_no_log
+        ; Alcotest.test_case "signal is a failure" `Quick test_auditor_signal
+        ; Alcotest.test_case "program not found is a failure" `Quick
+            test_auditor_not_found
+        ] )
+    ; ( "archive_blocks"
+      , [ Alcotest.test_case "arguments" `Quick test_archive_blocks_arguments ]
+      )
+    ; ( "populate"
+      , [ Alcotest.test_case "success" `Quick test_populate_ok
+        ; Alcotest.test_case "error line with exit 0 is a failure" `Quick
+            test_populate_error_line
+        ; Alcotest.test_case "non-zero exit is a failure" `Quick
+            test_populate_exit_code
+        ; Alcotest.test_case "signal is a failure" `Quick test_populate_signal
+        ] )
+    ; ( "restore"
+      , [ Alcotest.test_case "follows the missing parents" `Quick
+            test_restore_follows_parents
+        ; Alcotest.test_case "stops when nothing changes" `Quick
+            test_restore_no_progress
+        ; Alcotest.test_case "stops when the block is not in the bucket" `Quick
+            test_restore_block_not_in_bucket
+        ; Alcotest.test_case "stops when the auditor fails" `Quick
+            test_restore_auditor_fails
         ] )
     ]

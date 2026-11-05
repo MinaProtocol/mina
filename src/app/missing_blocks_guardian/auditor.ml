@@ -20,16 +20,11 @@ let missing_parent (message : Logger.Message.t) =
 (* Runs the auditor, relays its log and returns the first missing parent it
    reports. Its exit code is a bit set of the problems it found, and a
    database error also exits with 1, so its log tells whether it failed: an
-   error in the log, or no log at all, is a failure. Exits with 1 on a
-   failure. *)
+   error in the log, or no log at all, is an [Error] with the reason. *)
 let check ~logger ~prog ~archive_uri =
   let uri = Uri.to_string archive_uri in
-  let failed error =
-    [%log fatal] "$prog failed: $error"
-      ~metadata:[ ("prog", `String prog); ("error", `String error) ] ;
-    exit 1
-  in
-  match%bind
+  let failed error = Error (sprintf "%s failed: %s" prog error) in
+  match%map
     Subprocess.run ~logger ~secrets:[ uri ] ~prog ~args:[ "--archive-uri"; uri ]
       ()
   with
@@ -49,4 +44,4 @@ let check ~logger ~prog ~archive_uri =
             (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
                (Subprocess.wrote output) )
       | None, (Ok () | Error (`Exit_non_zero _)) ->
-          return (List.find_map messages ~f:missing_parent) )
+          Ok (List.find_map messages ~f:missing_parent) )

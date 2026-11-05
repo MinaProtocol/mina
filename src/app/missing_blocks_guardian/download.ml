@@ -71,31 +71,38 @@ let fetch ~url ~file =
             (Option.value scheme ~default:"none")
             () )
 
-(* Checks that the bucket at [url] answers. An HTTP bucket exists when its
-   root answers with any status but 404: a public listing is 200, a private
-   bucket is 403, and Google Cloud Storage and S3 answer 404 for a bucket
-   that does not exist. A file bucket is a directory. *)
-let probe ~url =
-  let root = Uri.of_string (url ^ "/") in
+(* Checks that the bucket at [url] can give the block files of [network]. A
+   public Google Cloud Storage or S3 bucket lists them, so an empty list
+   means that the URL or the network is wrong. Other answers cannot say
+   that: a private bucket answers 403 and a plain HTTP server answers with
+   a page. A 404 is an error only for the bucket itself, because a plain
+   HTTP server can answer 404 for a part of a longer path. A file bucket is
+   a directory. *)
+let probe ~url ~network =
+  let uri = Uri.of_string url in
   try_with (fun () ->
-      match Uri.scheme root with
+      match Uri.scheme uri with
       | Some ("http" | "https") -> (
+          let listing = Bucket.listing ~url ~network in
           let%bind response, body =
-            Cohttp_async.Client.get ?ssl_config:(ssl_config root) root
+            Cohttp_async.Client.get ?ssl_config:(ssl_config uri) listing.uri
           in
-          let%map () = Cohttp_async.Body.drain body in
+          let%map body = Cohttp_async.Body.to_string body in
+          let contains substring = String.is_substring body ~substring in
           match Cohttp.Response.status response with
-          | `Not_found ->
-              failwithf "HTTP 404 Not Found for %s, the bucket does not exist"
-                (Uri.to_string root) ()
+          | `OK when contains "<ListBucketResult" && not (contains "<Key>") ->
+              failwithf "the bucket has no file that starts with %s"
+                listing.key_prefix ()
+          | `Not_found when listing.url_is_bucket ->
+              failwithf "HTTP 404 Not Found, nothing at %s" url ()
           | _ ->
               () )
       | Some "file" -> (
-          match%map Sys.is_directory (Uri.path root) with
+          match%map Sys.is_directory (Uri.path uri) with
           | `Yes ->
               ()
           | `No | `Unknown ->
-              failwithf "%s is not a directory" (Uri.path root) () )
+              failwithf "%s is not a directory" (Uri.path uri) () )
       | scheme ->
           failwithf "URL scheme not supported: %s"
             (Option.value scheme ~default:"none")

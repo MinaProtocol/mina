@@ -37,137 +37,41 @@ let log_top_blocks ~logger ~pool ~when_ =
       [%log error] "Could not query the top blocks: $error"
         ~metadata:[ ("error", `String (Caqti_error.show err)) ]
 
+(* Logs the reason of a failure and exits with 1. *)
+let or_exit ~logger = function
+  | Ok value ->
+      return value
+  | Error reason ->
+      [%log fatal] "%s" reason ;
+      exit 1
+
 let check ~logger (archive : Config.archive) =
   Auditor.check ~logger ~prog:archive.auditor ~archive_uri:archive.uri
+  >>= or_exit ~logger
 
 (* The bucket must answer at start, so that a wrong URL is reported as such
    and not later as a block that cannot be downloaded. *)
 let check_bucket ~logger (blocks : Config.blocks) =
-  match%bind Download.probe ~url:blocks.url with
+  match%bind Download.probe ~url:blocks.url ~network:blocks.network with
   | Ok () ->
       return ()
   | Error err ->
       [%log fatal]
-        "Cannot start: the bucket %s does not answer: %s. Check \
-         --precomputed-blocks-url or PRECOMPUTED_BLOCKS_URL."
+        "Cannot start: the bucket %s failed the check: %s. Check \
+         --precomputed-blocks-url or PRECOMPUTED_BLOCKS_URL, and --network or \
+         MINA_NETWORK."
         blocks.url (Error.to_string_hum err) ;
       exit 1
 
-let block_file (blocks : Config.blocks) (parent : Auditor.missing_parent) =
-  sprintf "%s-%d-%s.json" blocks.network parent.height parent.hash
-
-(* Downloads the file of [parent] from the bucket and returns its name. The
-   bucket answered at start, so a failure here is about the file: the error
-   shows how its URL was built. *)
-let download ~logger (blocks : Config.blocks) (parent : Auditor.missing_parent)
-    =
-  let file = block_file blocks parent in
-  let url = blocks.url ^ "/" ^ file in
-  [%log info] "Downloading block $file from $url"
-    ~metadata:[ ("file", `String file); ("url", `String url) ] ;
-  match%bind Download.fetch ~url ~file with
-  | Ok () ->
-      return file
-  | Error err ->
-      [%log fatal]
-        "Could not download the block at height %d with state hash %s: %s. Its \
-         URL %s is <bucket URL>/<network>-<height>-<state hash>.json, with the \
-         bucket URL %s from --precomputed-blocks-url or PRECOMPUTED_BLOCKS_URL \
-         and the network %s from --network or MINA_NETWORK. The bucket \
-         answered at start, so check the network name and whether the block is \
-         in the bucket."
-        parent.height parent.hash (Error.to_string_hum err) url blocks.url
-        blocks.network ;
-      exit 1
-
-let remove ~logger file =
-  match%bind Monitor.try_with_or_error (fun () -> Unix.unlink file) with
-  | Ok () ->
-      return ()
-  | Error err ->
-      [%log fatal] "Could not remove $file: $error"
-        ~metadata:
-          [ ("file", `String file)
-          ; ("error", `String (Error.to_string_hum err))
-          ] ;
-      exit 1
-
-(* Writes [file] to the archive with mina-archive-blocks and removes it. The
-   log of mina-archive-blocks is relayed. Its exit code is 0 even when the
-   block was not added, so an error in its log is the failure. *)
-let populate ~logger (archive : Config.archive) (blocks : Config.blocks) file =
-  let uri = Uri.to_string archive.uri in
-  let prog = blocks.archive_blocks in
-  let failed error =
-    let%bind () = remove ~logger file in
-    [%log fatal]
-      "$prog could not add $file: $error. The database remains unhealthy."
-      ~metadata:
-        [ ("prog", `String prog)
-        ; ("file", `String file)
-        ; ("error", `String error)
-        ] ;
-    exit 1
-  in
-  match%bind
-    Subprocess.run ~logger ~secrets:[ uri ] ~prog
-      ~args:
-        [ "--" ^ Config.Block_format.to_string blocks.format
-        ; "--archive-uri"
-        ; uri
-        ; file
-        ]
-      ()
-  with
-  | Error err ->
-      failed (sprintf "it could not be run: %s" (Error.to_string_hum err))
-  | Ok output -> (
-      let messages, other_lines = App_log.parse output.stdout in
-      App_log.relay ~logger messages ;
-      App_log.warn_other_lines ~logger ~prog other_lines ;
-      match (App_log.first_error messages, output.exit_status) with
-      | Some message, _ ->
-          failed (App_log.describe message)
-      | None, Error (`Exit_non_zero code) ->
-          failed (sprintf "it exited with %d%s" code (Subprocess.wrote output))
-      | None, Error (`Signal signal) ->
-          failed
-            (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
-               (Subprocess.wrote output) )
-      | None, Ok () ->
-          [%log info] "Populated the database with $file"
-            ~metadata:[ ("file", `String file) ] ;
-          remove ~logger file )
-
-(* Imports [parent] from the bucket, then each next missing parent that the
-   auditor reports, until it reports none. Stops when an import changes
-   nothing, so that one bad block file cannot keep it busy forever. *)
 let bootstrap ~logger ~pool (archive : Config.archive) (blocks : Config.blocks)
     (parent : Auditor.missing_parent) =
   [%log info] "Some blocks are missing, moving to recovery" ;
   let%bind () = log_top_blocks ~logger ~pool ~when_:"before the recovery" in
   [%log info] "Restoring blocks one by one from $url"
     ~metadata:[ ("url", `String blocks.url) ] ;
-  let rec loop (parent : Auditor.missing_parent) =
-    let%bind file = download ~logger blocks parent in
-    let%bind () = populate ~logger archive blocks file in
-    match%bind check ~logger archive with
-    | None ->
-        return ()
-    | Some next when Auditor.equal_missing_parent next parent ->
-        [%log fatal]
-          "Added $file, but the archive still lacks block $hash at height \
-           $height. The database remains unhealthy."
-          ~metadata:
-            [ ("file", `String file)
-            ; ("hash", `String parent.hash)
-            ; ("height", `Int parent.height)
-            ] ;
-        exit 1
-    | Some next ->
-        loop next
+  let%bind () =
+    Recovery.restore ~logger archive blocks parent >>= or_exit ~logger
   in
-  let%bind () = loop parent in
   log_top_blocks ~logger ~pool ~when_:"after the recovery"
 
 (* Exits 0 when no block is missing and 1 when some are. *)
