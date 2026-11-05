@@ -720,10 +720,11 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
   let phase = ref Starting in
   O1trace.background_thread "transition_router" (fun () ->
       don't_wait_for
-      @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
+      @@ Strict_pipe.Reader.iter producer_transition_reader
+           ~f:(fun (breadcrumb, `Built_on _) ->
              match !phase with
              | Participating { producer_transition_writer; _ } ->
-                 Strict_pipe.Writer.write producer_transition_writer x
+                 Strict_pipe.Writer.write producer_transition_writer breadcrumb
              | Starting | Bootstrapping | Draining _ ->
                  Deferred.unit ) ;
       Bootstrap_status.set_phase bootstrap_status Waiting_for_genesis ;
