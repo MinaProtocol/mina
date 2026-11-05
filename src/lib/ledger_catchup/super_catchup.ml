@@ -1149,7 +1149,8 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let t = Transition_frontier.catchup_tree frontier in
+  let t = Transition_frontier.Full_catchup_tree.create ~logger in
+  Transition_frontier.attach_catchup_tree frontier t ;
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
@@ -1917,7 +1918,9 @@ let%test_module "Ledger_catchup tests" =
                       failwith "final state should be at `Failed"
                   | `Failed ->
                       let catchup_state =
-                        Transition_frontier.catchup_tree my_net.state.frontier
+                        Option.value_exn
+                          (Transition_frontier.catchup_tree
+                             my_net.state.frontier )
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes
