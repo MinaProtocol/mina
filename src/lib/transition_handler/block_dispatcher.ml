@@ -42,6 +42,8 @@ let create ~on_validated ~on_dropped =
               on_dropped (`Validated transition)
           | Validated transition ->
               on_validated transition
+          | Resume_catchup _ when !cleared ->
+              ()
           | Resume_catchup resume ->
               resume ()
           | Catchup_job job when !cleared ->
@@ -140,8 +142,8 @@ let%test_module "Block_dispatcher" =
              clear t ; submit t ready ) )
         [ dropped_job 1 ]
 
-    let%test_unit "Clearing drops what is queued and submitted later, but not \
-                   resumptions, passing on what it drops" =
+    let%test_unit "Clearing drops what is queued and submitted later, passing \
+                   on what it drops" =
       [%test_eq: handled list]
         (handled (fun t ~ready ~resume ->
              submit t ready ;
@@ -152,12 +154,7 @@ let%test_module "Block_dispatcher" =
              submit t (Validated validated) ;
              submit t (Catchup_job (job 2)) ;
              Deferred.unit ) )
-        [ Dropped_validated
-        ; dropped_job 1
-        ; Resumed
-        ; Dropped_validated
-        ; dropped_job 2
-        ]
+        [ Dropped_validated; dropped_job 1; Dropped_validated; dropped_job 2 ]
 
     let%test_unit "Validated transitions are passed on" =
       [%test_eq: handled list]

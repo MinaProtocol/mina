@@ -43,9 +43,9 @@ val create :
 
 val submit : t -> event -> unit
 
-(** Pre-empt the dispatcher: validated transitions and catchup jobs it has
-    yet to handle, including held jobs, are dropped, as are any submitted
-    later. Catchup resumptions still run. This takes effect immediately rather
-    than queueing behind events already submitted, because the frontier is
-    closed as soon as the controller has been cleared. *)
+(** Pre-empt the dispatcher: validated transitions, catchup jobs and catchup
+    resumptions it has yet to handle, including held jobs, are dropped, as are
+    any submitted later. Catchup work resumed after this could start a build
+    on a frontier about to close. This takes effect immediately rather than
+    queueing behind events already submitted. *)
 val clear : t -> unit
