@@ -61,10 +61,12 @@ let to_consensus_state h =
          (Fn.compose Mina_state.Protocol_state.consensus_state
             Mina_block.Header.protocol_state )
 
-(** The running frontier controller: where the blocks we produce go, and how
-    to stop it. *)
+(** The running frontier controller: the frontier it runs on, where the
+    blocks we produce go, and how to stop it. *)
 type participating =
-  { producer_transition_writer :
+  { generation : Transition_frontier.Generation.t
+        (** The generation of the controller's frontier. *)
+  ; producer_transition_writer :
       ( Transition_frontier.Breadcrumb.t
       , Strict_pipe.synchronous
       , unit Deferred.t )
@@ -98,7 +100,7 @@ let start_draining phase =
 
 (** Stop the frontier controller, and wait for it to drain. The blocks we
     produce no longer reach it. *)
-let drain { producer_transition_writer; stop; drained } =
+let drain { producer_transition_writer; stop; drained; _ } =
   Strict_pipe.Writer.kill producer_transition_writer ;
   Ivar.fill_if_empty stop () ;
   Ivar.read drained
@@ -116,6 +118,19 @@ let stop_participating phase =
       | Starting | Bootstrapping | Participating _ ->
           Deferred.unit )
 
+(** Where a block we produced goes: to the frontier controller, if it is
+    running on the frontier the block was built on. A block built on an
+    earlier frontier is stale, because its staged ledger extends that
+    frontier's, which has been closed. *)
+let produced_block_destination phase ~built_on =
+  match !phase with
+  | Participating participating ->
+      if Transition_frontier.Generation.equal participating.generation built_on
+      then `Controller participating
+      else `Stale
+  | Starting | Bootstrapping | Draining _ ->
+      `No_controller
+
 let%test_unit "Only the first trigger starts draining" =
   let _reader, producer_transition_writer =
     Strict_pipe.create ~name:"test producer transitions" Synchronous
@@ -123,7 +138,8 @@ let%test_unit "Only the first trigger starts draining" =
   let phase =
     ref
       (Participating
-         { producer_transition_writer
+         { generation = Transition_frontier.Generation.create ()
+         ; producer_transition_writer
          ; stop = Ivar.create ()
          ; drained = Ivar.create ()
          } )
@@ -143,7 +159,13 @@ let%test_unit "Stopping drains the controller once, and waits for the drain" =
       in
       let stop = Ivar.create () and drained = Ivar.create () in
       let phase =
-        ref (Participating { producer_transition_writer; stop; drained })
+        ref
+          (Participating
+             { generation = Transition_frontier.Generation.create ()
+             ; producer_transition_writer
+             ; stop
+             ; drained
+             } )
       in
       let first = stop_participating phase in
       assert (Ivar.is_full stop) ;
@@ -153,6 +175,38 @@ let%test_unit "Stopping drains the controller once, and waits for the drain" =
       assert (not (Deferred.is_determined first || Deferred.is_determined second) ) ;
       Ivar.fill drained () ;
       Deferred.both first second |> Deferred.ignore_m )
+
+let%test_unit "Produced blocks reach only the controller of their frontier" =
+  let _reader, producer_transition_writer =
+    Strict_pipe.create ~name:"test producer transitions" Synchronous
+  in
+  let generation = Transition_frontier.Generation.create () in
+  let earlier = Transition_frontier.Generation.create () in
+  let phase =
+    ref
+      (Participating
+         { generation
+         ; producer_transition_writer
+         ; stop = Ivar.create ()
+         ; drained = Ivar.create ()
+         } )
+  in
+  ( match produced_block_destination phase ~built_on:generation with
+  | `Controller _ ->
+      ()
+  | `Stale | `No_controller ->
+      failwith "expected the controller" ) ;
+  ( match produced_block_destination phase ~built_on:earlier with
+  | `Stale ->
+      ()
+  | `Controller _ | `No_controller ->
+      failwith "expected a stale block" ) ;
+  ignore (start_draining phase : participating option) ;
+  match produced_block_destination phase ~built_on:generation with
+  | `No_controller ->
+      ()
+  | `Controller _ | `Stale ->
+      failwith "expected no controller while draining"
 
 (** What the transition router shares between the controllers it starts. *)
 type t =
@@ -213,7 +267,13 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
   in
   let stop = Ivar.create () in
   let drained = Ivar.create () in
-  phase := Participating { producer_transition_writer; stop; drained } ;
+  phase :=
+    Participating
+      { generation = Transition_frontier.generation frontier
+      ; producer_transition_writer
+      ; stop
+      ; drained
+      } ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let start_and_iterate =
     let%bind transition_frontier_controller_reader =
@@ -721,11 +781,21 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
   O1trace.background_thread "transition_router" (fun () ->
       don't_wait_for
       @@ Strict_pipe.Reader.iter producer_transition_reader
-           ~f:(fun (breadcrumb, `Built_on _) ->
-             match !phase with
-             | Participating { producer_transition_writer; _ } ->
+           ~f:(fun (breadcrumb, `Built_on built_on) ->
+             match produced_block_destination phase ~built_on with
+             | `Controller { producer_transition_writer; _ } ->
                  Strict_pipe.Writer.write producer_transition_writer breadcrumb
-             | Starting | Bootstrapping | Draining _ ->
+             | `Stale ->
+                 [%log info]
+                   "Dropping block $state_hash that we produced on a frontier \
+                    that has since been replaced"
+                   ~metadata:
+                     [ ( "state_hash"
+                       , Transition_frontier.Breadcrumb.state_hash breadcrumb
+                         |> Mina_base.State_hash.to_yojson )
+                     ] ;
+                 Deferred.unit
+             | `No_controller ->
                  Deferred.unit ) ;
       Bootstrap_status.set_phase bootstrap_status Waiting_for_genesis ;
       let%bind () =
