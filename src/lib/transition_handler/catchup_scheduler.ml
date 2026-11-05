@@ -74,7 +74,7 @@ let release_unbuilt block_registry cached_transition =
   Block_registry.finish block_registry cached_transition `Ignored
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller ~block_registry ~catchup_job_writer
+    ~time_controller ~block_registry ~in_flight ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          Mina_stdlib.Rose_tree.t
@@ -90,6 +90,8 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   let breadcrumb_builder_supervisor =
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
+        Otp_lib.In_flight.run in_flight
+        @@ fun () ->
         match%map
           Breadcrumb_builder.build_subtrees_of_breadcrumbs
             ~logger:
@@ -420,7 +422,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
-            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+            create
+              ~in_flight:(Otp_lib.In_flight.create ())
+              ~frontier ~precomputed_values ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer
           in
           watch scheduler ~timeout_duration
@@ -492,7 +496,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
-            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+            create
+              ~in_flight:(Otp_lib.In_flight.create ())
+              ~frontier ~precomputed_values ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer
           in
           let cache =
@@ -547,7 +553,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let breadcrumb = List.hd_exn branch in
           let scheduler =
-            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+            create
+              ~in_flight:(Otp_lib.In_flight.create ())
+              ~frontier ~precomputed_values ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer
           in
           let cache =
@@ -623,7 +631,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map ~f:register_breadcrumb branch
           in
           let scheduler =
-            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+            create
+              ~in_flight:(Otp_lib.In_flight.create ())
+              ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer
           in
           watch scheduler ~timeout_duration
@@ -699,7 +709,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let scheduler =
-            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+            create
+              ~in_flight:(Otp_lib.In_flight.create ())
+              ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =

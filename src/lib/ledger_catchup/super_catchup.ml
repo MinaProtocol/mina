@@ -789,7 +789,7 @@ let create_resumption_queue ~schedule ~finished resumption =
   schedule (fun () -> if Ivar.is_empty finished then resumption ())
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
-    ~schedule ~downloader ~trust_system ~frontier ~block_registry
+    ~schedule ~downloader ~trust_system ~frontier ~block_registry ~in_flight
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -945,10 +945,11 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               | Some breadcrumb ->
                   Ok breadcrumb )
           in
-          build_func ~logger ~skip_staged_ledger_verification:`Proofs
-            ~precomputed_values ~verifier ~trust_system ~parent
-            ~transition:av.data ~sender:(Some av.sender)
-            ~transition_receipt_time ()
+          Otp_lib.In_flight.run in_flight (fun () ->
+              build_func ~logger ~skip_staged_ledger_verification:`Proofs
+                ~precomputed_values ~verifier ~trust_system ~parent
+                ~transition:av.data ~sender:(Some av.sender)
+                ~transition_receipt_time () )
         in
         step node
           (Deferred.map ~f:Result.return s)
@@ -1123,7 +1124,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
 (** Set up super catchup for [frontier], and return the function that handles
     one catchup job. *)
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~frontier ~build_func ~block_registry ~schedule
+    ~verifier ~network ~frontier ~build_func ~block_registry ~in_flight
+    ~schedule
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          Mina_stdlib.Rose_tree.t
@@ -1233,8 +1235,8 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   let run_state_machine =
     setup_state_machine_runner ~t ~verifier ~schedule ~downloader
       ~context:(module Context)
-      ~trust_system ~frontier ~block_registry ~catchup_breadcrumbs_writer
-      ~build_func
+      ~trust_system ~frontier ~block_registry ~in_flight
+      ~catchup_breadcrumbs_writer ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
@@ -1583,6 +1585,7 @@ let%test_module "Ledger_catchup tests" =
              ~context:(module Context)
              ~verifier ~trust_system ~network ~frontier
              ~catchup_breadcrumbs_writer ~block_registry
+             ~in_flight:(Otp_lib.In_flight.create ())
              ~build_func:
                (Transition_frontier.Breadcrumb.build
                   ~get_completed_work:(Fn.const None) )

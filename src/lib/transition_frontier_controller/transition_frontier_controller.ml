@@ -27,6 +27,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let block_registry =
     Transition_handler.Block_registry.create ~logger ~cache_exceptions
   in
+  let in_flight = Otp_lib.In_flight.create () in
   let f_drop_head name head =
     let hashes =
       match head with
@@ -138,8 +139,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~f:validate_transition ) ;
   let catchup_scheduler =
     Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
-      ~block_registry ~verifier ~trust_system ~frontier ~time_controller
-      ~catchup_job_writer ~catchup_breadcrumbs_writer
+      ~block_registry ~in_flight ~verifier ~trust_system ~frontier
+      ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
   in
   let process_message =
     Transition_handler.Processor.create_handler
@@ -152,7 +153,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       Strict_pipe.Reader.Merge.iter
         (Transition_handler.Processor.inputs ~primary_transition_reader
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
-        ~f:process_message ) ;
+        ~f:(fun message ->
+          Otp_lib.In_flight.run in_flight (fun () -> process_message message) ) ) ;
   Strict_pipe.Reader.iter_without_pushback catchup_job_reader ~f:(fun job ->
       Transition_handler.Block_dispatcher.submit dispatcher (Catchup_job job) )
   |> don't_wait_for ;
@@ -161,7 +163,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         (Ledger_catchup.create_job_handler
            ~context:(module Context)
            ~trust_system ~verifier ~network ~frontier
-           ~catchup_breadcrumbs_writer ~block_registry
+           ~catchup_breadcrumbs_writer ~block_registry ~in_flight
            ~schedule:(fun resume ->
              Transition_handler.Block_dispatcher.submit dispatcher
                (Resume_catchup resume) ) )
