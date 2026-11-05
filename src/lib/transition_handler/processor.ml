@@ -546,7 +546,8 @@ let%test_module "Transition_handler.Processor tests" =
         Catchup_scheduler.create ~logger ~precomputed_values
           ~in_flight:(Otp_lib.In_flight.create ())
           ~verifier ~block_registry ~trust_system ~frontier ~time_controller
-          ~catchup_job_writer ~catchup_breadcrumbs_writer
+          ~on_catchup_job:(Strict_pipe.Writer.write catchup_job_writer)
+          ~catchup_breadcrumbs_writer
       in
       create_handler
         ~context:(module Context)
@@ -942,7 +943,9 @@ let%test_module "Transition_handler.Processor tests" =
                   Catchup_scheduler.create ~logger ~precomputed_values
                     ~in_flight:(Otp_lib.In_flight.create ())
                     ~verifier ~block_registry ~trust_system ~frontier
-                    ~time_controller ~catchup_job_writer
+                    ~time_controller
+                    ~on_catchup_job:
+                      (Strict_pipe.Writer.write catchup_job_writer)
                     ~catchup_breadcrumbs_writer
                 in
                 let handle =
