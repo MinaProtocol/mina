@@ -22,27 +22,30 @@ type event =
   | Catchup_job of catchup_job
   | Catchup_ready of (catchup_job -> unit)
 
+type dropped = [ `Validated of validated | `Catchup_job of catchup_job ]
+
 type t =
   { loop : event Otp_lib.Event_loop.t
   ; catchup_jobs_before_ready : catchup_job Core_kernel.Queue.t
   ; cleared : bool ref
+  ; on_dropped : dropped -> unit
   }
 
-let create ~on_validated =
+let create ~on_validated ~on_dropped =
   let process_catchup_job = ref None in
   let catchup_jobs_before_ready = Core_kernel.Queue.create () in
   let cleared = ref false in
   let loop =
     O1trace.sync_thread "dispatch_blocks" (fun () ->
         Otp_lib.Event_loop.create ~handle:(function
-          | Validated _ when !cleared ->
-              ()
+          | Validated transition when !cleared ->
+              on_dropped (`Validated transition)
           | Validated transition ->
               on_validated transition
           | Resume_catchup resume ->
               resume ()
-          | Catchup_job _ when !cleared ->
-              ()
+          | Catchup_job job when !cleared ->
+              on_dropped (`Catchup_job job)
           | Catchup_job job -> (
               match !process_catchup_job with
               | Some process ->
@@ -54,12 +57,14 @@ let create ~on_validated =
               Core_kernel.Queue.iter catchup_jobs_before_ready ~f:process ;
               Core_kernel.Queue.clear catchup_jobs_before_ready ) )
   in
-  { loop; catchup_jobs_before_ready; cleared }
+  { loop; catchup_jobs_before_ready; cleared; on_dropped }
 
 let submit t event = Otp_lib.Event_loop.submit t.loop event
 
 let clear t =
   t.cleared := true ;
+  Core_kernel.Queue.iter t.catchup_jobs_before_ready ~f:(fun job ->
+      t.on_dropped (`Catchup_job job) ) ;
   Core_kernel.Queue.clear t.catchup_jobs_before_ready
 
 let%test_module "Block_dispatcher" =
@@ -84,7 +89,12 @@ let%test_module "Block_dispatcher" =
           State_hash.gen
       , [] )
 
-    type handled = Validated | Job of State_hash.t | Resumed
+    type handled =
+      | Validated
+      | Job of State_hash.t
+      | Resumed
+      | Dropped_validated
+      | Dropped_job of State_hash.t
     [@@deriving compare, sexp]
 
     (* What the dispatcher handles while [f] submits to it, with [ready] the
@@ -93,13 +103,23 @@ let%test_module "Block_dispatcher" =
       Thread_safe.block_on_async_exn (fun () ->
           let handled = ref [] in
           let record x = handled := x :: !handled in
-          let t = create ~on_validated:(fun _ -> record Validated) in
+          let t =
+            create
+              ~on_validated:(fun _ -> record Validated)
+              ~on_dropped:(function
+                | `Validated _ ->
+                    record Dropped_validated
+                | `Catchup_job (hash, _) ->
+                    record (Dropped_job hash) )
+          in
           let ready = Catchup_ready (fun (hash, _) -> record (Job hash)) in
           let%bind () = f t ~ready ~resume:(fun () -> record Resumed) in
           let%map () = Scheduler.yield_until_no_jobs_remain () in
           List.rev !handled )
 
     let job_hash i = Job (fst (job i))
+
+    let dropped_job i = Dropped_job (fst (job i))
 
     let%test_unit "Catchup jobs held until catchup is ready are handled in \
                    order" =
@@ -118,10 +138,10 @@ let%test_module "Block_dispatcher" =
              submit t (Catchup_job (job 1)) ;
              let%map () = Scheduler.yield_until_no_jobs_remain () in
              clear t ; submit t ready ) )
-        []
+        [ dropped_job 1 ]
 
     let%test_unit "Clearing drops what is queued and submitted later, but not \
-                   resumptions" =
+                   resumptions, passing on what it drops" =
       [%test_eq: handled list]
         (handled (fun t ~ready ~resume ->
              submit t ready ;
@@ -132,7 +152,12 @@ let%test_module "Block_dispatcher" =
              submit t (Validated validated) ;
              submit t (Catchup_job (job 2)) ;
              Deferred.unit ) )
-        [ Resumed ]
+        [ Dropped_validated
+        ; dropped_job 1
+        ; Resumed
+        ; Dropped_validated
+        ; dropped_job 2
+        ]
 
     let%test_unit "Validated transitions are passed on" =
       [%test_eq: handled list]

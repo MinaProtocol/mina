@@ -31,10 +31,15 @@ type event =
 
 type t
 
+(** What the dispatcher drops once it has been cleared. *)
+type dropped = [ `Validated of validated | `Catchup_job of catchup_job ]
+
 (** Start a dispatcher that passes validated transitions to [on_validated].
     Catchup jobs that arrive before [Catchup_ready] are held, in order, and
-    handled when it arrives. *)
-val create : on_validated:(validated -> unit) -> t
+    handled when it arrives. Whatever is dropped once the dispatcher has been
+    cleared is passed to [on_dropped], to be released. *)
+val create :
+  on_validated:(validated -> unit) -> on_dropped:(dropped -> unit) -> t
 
 val submit : t -> event -> unit
 

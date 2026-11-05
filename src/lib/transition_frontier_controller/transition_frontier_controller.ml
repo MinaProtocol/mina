@@ -124,6 +124,21 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let dispatcher =
     Transition_handler.Block_dispatcher.create
       ~on_validated:(Strict_pipe.Writer.write primary_transition_writer)
+      ~on_dropped:(function
+      | `Validated (`Block b) ->
+          Transition_handler.Block_registry.finish block_registry b `Ignored
+      | `Validated (`Header h) ->
+          Transition_handler.Block_registry.finish_header block_registry
+            ( Network_peer.Envelope.Incoming.data h
+            |> Validation.header_with_hash
+            |> Mina_base.State_hash.With_state_hashes.state_hash )
+            `Ignored
+      | `Catchup_job (_, forest) ->
+          List.iter forest
+            ~f:
+              (Mina_stdlib.Rose_tree.iter ~f:(fun b ->
+                   Transition_handler.Block_registry.finish block_registry b
+                     `Ignored ) ) )
   in
   let validate_transition =
     Transition_handler.Validator.create_handler
