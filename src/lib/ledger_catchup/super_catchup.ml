@@ -1135,15 +1135,18 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let t = Transition_frontier.Full_catchup_tree.create ~logger in
+  let t =
+    Transition_frontier.Full_catchup_tree.create ~logger
+      ~release:
+        { release =
+            (fun c ->
+              Transition_handler.Block_registry.finish block_registry c `Ignored
+              )
+        }
+  in
   Transition_frontier.attach_catchup_tree frontier t ;
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
-  set_release t
-    { release =
-        (fun c ->
-          Transition_handler.Block_registry.finish block_registry c `Ignored )
-    } ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
   let pre_context
       (trees :

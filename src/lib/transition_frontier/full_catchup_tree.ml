@@ -157,21 +157,14 @@ let remove_state states (node : Node.t) =
 (** How the catchup tree gives up the block a removed node holds. *)
 type release = { release : 'a. ('a, State_hash.t) Cached.t -> unit }
 
-(** Fail the block's cache entry. *)
-let release_directly =
-  { release = (fun c -> ignore (Cached.invalidate_with_failure c : _)) }
-
 (* Invariant: The length of the path from each best tip to its oldest
    ancestor is at most k *)
 type t =
   { nodes : Node.t State_hash.Table.t
   ; states : State_hash.Set.t Node.State.Enum.Table.t
   ; logger : Logger.t
-  ; mutable release : release
+  ; release : release
   }
-
-(** Release the blocks of nodes removed from now on with [release]. *)
-let set_release t release = t.release <- release
 
 (* mutable root: Node.t ; *)
 (*     ; mutable target: State_hash.t Envelope.Incoming.t (* So that we know who to punish if the process fails *) *)
@@ -354,9 +347,11 @@ let frontier_added (t : t) breadcrumb ~root_moved =
         ~new_root ~left
       |> List.iter ~f:(remove_node t) )
 
-let create ~logger =
+(** A tree that gives up the blocks of the nodes it removes with
+    [release]. *)
+let create ~logger ~release =
   { states = Node.State.Enum.Table.create ()
   ; nodes = State_hash.Table.create ()
   ; logger
-  ; release = release_directly
+  ; release
   }
