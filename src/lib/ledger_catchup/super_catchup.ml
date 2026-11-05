@@ -371,7 +371,7 @@ let try_to_connect_hash_chain t hashes ~frontier
       | Some node, None ->
           f (`Node node)
       | Some node, Some _ ->
-          finish t node ~is_error:false ;
+          block_added t node.state_hash ;
           f (`Node node)
       | None, Some b ->
           f (`Breadcrumb b)

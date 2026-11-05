@@ -58,13 +58,18 @@ let%test_module "Tracking the blocks the frontier adds" =
       Tree.block_added t (hash "added") ;
       [%test_eq: int] (Hashtbl.length t.nodes) 0
 
-    let%test_unit "The node for an added block finishes" =
+    let%test_unit "The node for an added block leaves the tree, added" =
       let t = Tree.create ~logger:(Logger.null ()) in
       let node = downloading t (hash "added") ~parent:(hash "parent") in
+      let (_ : Tree.Node.t) =
+        downloading t (hash "child") ~parent:(hash "added")
+      in
       Tree.block_added t (hash "added") ;
-      [%test_eq: Tree.Node.State.Enum.t]
-        (Tree.Node.State.enum node.state)
-        Finished ;
+      [%test_eq: State_hash.t list] (Hashtbl.keys t.nodes) [ hash "child" ] ;
+      [%test_eq: int]
+        (Hashtbl.fold t.states ~init:0 ~f:(fun ~key:_ ~data n ->
+             n + Set.length data ) )
+        1 ;
       assert (
         match Async_kernel.Ivar.peek node.result with
         | Some (Ok `Added_to_frontier) ->
