@@ -61,6 +61,19 @@ let to_consensus_state h =
          (Fn.compose Mina_state.Protocol_state.consensus_state
             Mina_block.Header.protocol_state )
 
+(** The running frontier controller: where the blocks we produce go, and how
+    to stop it. *)
+type participating =
+  { producer_transition_writer :
+      ( Transition_frontier.Breadcrumb.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
+  ; stop : unit Ivar.t  (** Filled to start draining the controller. *)
+  ; drained : unit Ivar.t
+        (** Filled once it has drained, and its frontier can be closed. *)
+  }
+
 (** Which controller the transition router is running. No blocks are produced
     while bootstrapping, except in a rare race between bootstrap and block
     creation, so produced blocks only go anywhere while participating. *)
@@ -70,23 +83,16 @@ type phase =
   | Draining
       (** The frontier controller is being stopped, and its frontier closed,
           before bootstrapping. *)
-  | Participating of
-      { producer_transition_writer :
-          ( Transition_frontier.Breadcrumb.t
-          , Strict_pipe.synchronous
-          , unit Deferred.t )
-          Strict_pipe.Writer.t
-      }
+  | Participating of participating
 
 (** Start leaving the frontier controller, if it is running: move to
-    [Draining], and return the writer for the blocks we produce, which the
-    controller reads. [None] if the controller isn't running, including when
-    the router is already leaving it. *)
+    [Draining], and return the controller. [None] if the controller isn't
+    running, including when the router is already leaving it. *)
 let start_draining phase =
   match !phase with
-  | Participating { producer_transition_writer } ->
+  | Participating participating ->
       phase := Draining ;
-      Some producer_transition_writer
+      Some participating
   | Starting | Bootstrapping | Draining ->
       None
 
@@ -94,7 +100,14 @@ let%test_unit "Only the first trigger starts draining" =
   let _reader, producer_transition_writer =
     Strict_pipe.create ~name:"test producer transitions" Synchronous
   in
-  let phase = ref (Participating { producer_transition_writer }) in
+  let phase =
+    ref
+      (Participating
+         { producer_transition_writer
+         ; stop = Ivar.create ()
+         ; drained = Ivar.create ()
+         } )
+  in
   assert (Option.is_some (start_draining phase)) ;
   assert (Option.is_none (start_draining phase)) ;
   match !phase with
@@ -121,7 +134,6 @@ type t =
       , Strict_pipe.drop_head Strict_pipe.buffered
       , unit )
       Strict_pipe.Writer.t
-  ; clear_reader : [ `Clear ] Strict_pipe.Reader.t
   ; network_transition_pipe :
       ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t
         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
@@ -147,7 +159,6 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
       ; get_completed_work
       ; phase
       ; verified_transition_writer
-      ; clear_reader
       ; cache_exceptions
       ; network_transition_pipe
       ; frontier_w
@@ -163,7 +174,9 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
   in
-  phase := Participating { producer_transition_writer } ;
+  let stop = Ivar.create () in
+  let drained = Ivar.create () in
+  phase := Participating { producer_transition_writer; stop; drained } ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let start_and_iterate =
     let%bind transition_frontier_controller_reader =
@@ -175,7 +188,8 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
         ~trust_system ~verifier ~network ~time_controller ~collected_transitions
         ~frontier ~get_completed_work
         ~network_transition_reader:transition_frontier_controller_reader
-        ~producer_transition_reader ~clear_reader ~cache_exceptions
+        ~producer_transition_reader ~stop:(Ivar.read stop) ~drained
+        ~cache_exceptions
     in
     Strict_pipe.Reader.iter new_verified_transition_reader
       ~f:
@@ -604,8 +618,7 @@ let update_most_recent_valid_block ~context:(module Context : CONTEXT)
 (** If a valid block or header shows the frontier is too far behind to catch
     up, stop the frontier controller and start bootstrapping; either way, pass
     the transition on to whichever controller is reading. *)
-let route_valid_transition t ~get_current_frontier ~clear_writer
-    (b_or_h, `Valid_cb vc) =
+let route_valid_transition t ~get_current_frontier (b_or_h, `Valid_cb vc) =
   let (module Context : CONTEXT) = t.context in
   let { phase; network_transition_pipe; _ } = t in
   don't_wait_for
@@ -621,13 +634,14 @@ let route_valid_transition t ~get_current_frontier ~clear_writer
                frontier header_with_hash
            then
              match start_draining phase with
-             | Some producer_transition_writer ->
+             | Some { producer_transition_writer; stop; drained } ->
                  Strict_pipe.Writer.kill producer_transition_writer ;
                  let initial_root_transition =
                    Transition_frontier.(
                      Breadcrumb.validated_transition (root frontier))
                  in
-                 let%bind () = Strict_pipe.Writer.write clear_writer `Clear in
+                 Ivar.fill stop () ;
+                 let%bind () = Ivar.read drained in
                  let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
                  ignore
                  @@ start_bootstrap_controller t ~initial_root_transition
@@ -659,9 +673,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
-  let clear_reader, clear_writer =
-    Strict_pipe.create ~name:"clear" Synchronous
-  in
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
     create_buffered_pipe ~name
@@ -680,7 +691,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       don't_wait_for
       @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
              match !phase with
-             | Participating { producer_transition_writer } ->
+             | Participating { producer_transition_writer; _ } ->
                  Strict_pipe.Writer.write producer_transition_writer x
              | Starting | Bootstrapping | Draining ->
                  Deferred.unit ) ;
@@ -751,7 +762,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         ; get_completed_work
         ; phase
         ; verified_transition_writer
-        ; clear_reader
         ; network_transition_pipe
         ; frontier_w
         ; consensus_local_state
@@ -780,5 +790,5 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                 ~get_most_recent_valid_block ~most_recent_valid_block_writer ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
-           ~f:(route_valid_transition t ~get_current_frontier ~clear_writer) ) ;
+           ~f:(route_valid_transition t ~get_current_frontier) ) ;
   (verified_transition_reader, initialization_finish_signal)

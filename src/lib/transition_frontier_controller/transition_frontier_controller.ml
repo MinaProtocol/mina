@@ -19,7 +19,7 @@ end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
-    ~network_transition_reader ~producer_transition_reader ~clear_reader
+    ~network_transition_reader ~producer_transition_reader ~stop ~drained
     ~cache_exceptions ?transaction_pool_proxy =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
@@ -164,12 +164,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~block_registry ~catchup_scheduler ~processed_transition_writer
       ?transaction_pool_proxy ()
   in
-  O1trace.background_thread "process_blocks" (fun () ->
-      Strict_pipe.Reader.Merge.iter
-        (Transition_handler.Processor.inputs ~primary_transition_reader
-           ~producer_transition_reader ~catchup_breadcrumbs_reader )
-        ~f:(fun message ->
-          Otp_lib.In_flight.run in_flight (fun () -> process_message message) ) ) ;
+  let processing =
+    O1trace.thread "process_blocks" (fun () ->
+        Strict_pipe.Reader.Merge.iter
+          (Transition_handler.Processor.inputs ~primary_transition_reader
+             ~producer_transition_reader ~catchup_breadcrumbs_reader )
+          ~f:(fun message ->
+            Otp_lib.In_flight.run in_flight (fun () -> process_message message) ) )
+  in
   Strict_pipe.Reader.iter_without_pushback catchup_job_reader ~f:(fun job ->
       Transition_handler.Block_dispatcher.submit dispatcher (Catchup_job job) )
   |> don't_wait_for ;
@@ -185,12 +187,27 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~f:(fun process ->
           Transition_handler.Block_dispatcher.submit dispatcher
             (Catchup_ready process) ) ) ;
-  upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
-      Transition_handler.Block_dispatcher.clear dispatcher ;
+  (* Stopping drains the controller: it takes no new work, waits for the work
+     already under way, and gives every block it still holds an outcome.
+     Whoever stops it must already have killed the producer pipe, and closes
+     the frontier only once it has drained. *)
+  upon stop (fun () ->
       let open Strict_pipe.Writer in
+      Transition_handler.Block_dispatcher.clear dispatcher ;
+      (* Stop the scheduler's builder before closing the pipe it hands
+         breadcrumbs on through. *)
+      Transition_handler.Catchup_scheduler.clean_up catchup_scheduler ;
       kill primary_transition_writer ;
-      kill processed_transition_writer ;
-      kill catchup_job_writer ;
       kill catchup_breadcrumbs_writer ;
-      Transition_handler.Catchup_scheduler.clean_up catchup_scheduler ) ;
+      upon
+        (let%bind () = processing in
+         (* The processor's last messages may have left blocks with the
+            scheduler. *)
+         Transition_handler.Catchup_scheduler.clean_up catchup_scheduler ;
+         kill catchup_job_writer ;
+         Otp_lib.In_flight.idle in_flight )
+        (fun () ->
+          Transition_handler.Block_registry.finish_outstanding block_registry ;
+          kill processed_transition_writer ;
+          Ivar.fill drained () ) ) ;
   processed_transition_reader
