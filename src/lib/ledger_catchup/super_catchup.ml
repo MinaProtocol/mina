@@ -932,22 +932,33 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         step node
-          (let parent = Hashtbl.find_exn t.nodes node.parent in
-           match%map.Async.Deferred Ivar.read parent.result with
-           | Ok `Added_to_frontier ->
-               Ok parent.state_hash
-           | Error _ ->
-               (* TODO consider rejecting the callback in some cases,
-                  see https://github.com/MinaProtocol/mina/issues/11087 *)
-               Option.value_map valid_cb ~default:ignore
-                 ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                 `Ignore ;
-               if not (Cached.was_consumed av) then
-                 ignore
-                   ( Cached.invalidate_with_failure av
-                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-               finish t node ~is_error:true ;
-               Error `Finished )
+          (let parent_failed () =
+             (* TODO consider rejecting the callback in some cases,
+                see https://github.com/MinaProtocol/mina/issues/11087 *)
+             Option.value_map valid_cb ~default:ignore
+               ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+               `Ignore ;
+             if not (Cached.was_consumed av) then
+               ignore
+                 ( Cached.invalidate_with_failure av
+                   : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+             finish t node ~is_error:true ;
+             Error `Finished
+           in
+           match Hashtbl.find t.nodes node.parent with
+           | Some parent -> (
+               match%map.Async.Deferred Ivar.read parent.result with
+               | Ok `Added_to_frontier ->
+                   Ok parent.state_hash
+               | Error _ ->
+                   parent_failed () )
+           | None ->
+               Deferred.return
+                 ( if
+                   Option.is_some
+                     (Transition_frontier.find frontier node.parent)
+                 then Ok node.parent
+                 else parent_failed () ) )
           ~f:(on_parent_added node (av, valid_cb))
     | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) ->
         [%log debug] "To_build_breadcrumb $state_hash %s callback"
