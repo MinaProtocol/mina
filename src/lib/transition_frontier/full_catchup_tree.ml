@@ -283,39 +283,16 @@ let max_catchup_chain_length (t : t) =
   Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key:_ ~data acc ->
       Int.max acc (longest_starting_at data) )
 
-let create_node_full t b : unit =
-  let h = Breadcrumb.state_hash b in
-  let node : Node.t =
-    { state = Finished
-    ; state_hash = h
-    ; blockchain_length =
-        Consensus.Data.Consensus_state.blockchain_length
-        @@ Breadcrumb.consensus_state b
-    ; attempts = Attempt_history.empty
-    ; parent = Breadcrumb.parent_hash b
-    ; result = Ivar.create_full (Ok `Added_to_frontier)
-    }
-  in
-  add_state t.states node ;
-  Hashtbl.add_exn t.nodes ~key:h ~data:node
-
-let breadcrumb_added (t : t) b =
-  let h = Breadcrumb.state_hash b in
-  match Hashtbl.find t.nodes h with
-  | None ->
-      create_node_full t b
-  | Some node -> (
+(** Remove the node for a block the frontier has added, if there is one: the
+    block is no longer being caught up. The nodes waiting for it see it added.
+    The block itself is not released, because whoever added it owns it. Blocks
+    without a node are not being caught up, and the tree does not track them. *)
+let block_added (t : t) h =
+  Option.iter (Hashtbl.find t.nodes h) ~f:(fun node ->
+      (* TODO: Cancel the node's download job, if it has one. *)
       Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
-      match node.state with
-      | Root _ | Failed | Finished ->
-          ()
-      | To_download _
-      (* TODO: Cancel download job somehow.. maybe wait on the ivar? *)
-      | Wait_for_parent _
-      | To_initial_validate _
-      | To_verify _
-      | To_build_breadcrumb _ ->
-          set_state t node Finished )
+      Hashtbl.remove t.nodes h ;
+      remove_state t.states node )
 
 let remove_node' t (node : Node.t) =
   Hashtbl.remove t.nodes node.state_hash ;
@@ -343,51 +320,43 @@ let remove_node t h =
   | Some node ->
       remove_node' t node
 
-let prune t ~root_hash =
-  let cache = State_hash.Table.create () in
-  let rec reachable_from_root (node : Node.t) =
-    Hashtbl.find_or_add cache node.state_hash ~default:(fun () ->
-        if State_hash.equal node.state_hash root_hash then true
-        else
-          match Hashtbl.find t.nodes node.parent with
-          | None ->
-              false
-          | Some parent ->
-              reachable_from_root parent )
+(** Of the nodes with the given hashes and parents, those to end because the
+    root has moved to [new_root] and the blocks [left] have left the frontier:
+    the nodes for those blocks, and every node descending from one other than
+    through the new root. *)
+let discarded ~(parents : (State_hash.t * State_hash.t) list) ~new_root
+    ~(left : State_hash.t list) =
+  let parent = State_hash.Table.of_alist_exn parents in
+  let left = State_hash.Hash_set.of_list left in
+  let memo = State_hash.Table.create () in
+  let rec discarded hash =
+    (not (State_hash.equal hash new_root))
+    && ( Hash_set.mem left hash
+       || Hashtbl.find_or_add memo hash ~default:(fun () ->
+              Option.value_map (Hashtbl.find parent hash) ~default:false
+                ~f:discarded ) )
   in
-  let to_remove =
-    Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key:_ ~data acc ->
-        if reachable_from_root data then acc else data :: acc )
-  in
-  List.iter to_remove ~f:(remove_node' t)
+  List.filter_map parents ~f:(fun (hash, _) ->
+      Option.some_if (discarded hash) hash )
 
-let clear t = Hashtbl.data t.nodes |> List.iter ~f:(remove_node' t)
+(** Update the tree for a breadcrumb the frontier has added, and for the root
+    move the add applied, if any: the new root, and the blocks that left the
+    frontier - the previous root and the blocks on the branches the move
+    discarded. Nodes for those blocks, and their descendants other than through
+    the new root, are removed; nothing else is. *)
+let frontier_added (t : t) breadcrumb ~root_moved =
+  block_added t (Breadcrumb.state_hash breadcrumb) ;
+  Option.iter root_moved ~f:(fun (new_root, left) ->
+      discarded
+        ~parents:
+          (Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key ~data acc ->
+               (key, data.Node.parent) :: acc ) )
+        ~new_root ~left
+      |> List.iter ~f:(remove_node t) )
 
-let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
-  List.iter ds ~f:(function
-    | E (New_node (Full b)) ->
-        breadcrumb_added t b
-    | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
-        List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
-        if Hashtbl.mem t.nodes h then prune t ~root_hash:h
-        else (
-          [%log' debug t.logger]
-            ~metadata:
-              [ ("hash", State_hash.to_yojson h); ("tree", to_yojson t) ]
-            "catchup $tree invariant broken: new root $hash not present. Diffs \
-             may have been applied out of order. Clearing catchup state to \
-             avoid retaining stale jobs" ;
-          clear t )
-    | E (Best_tip_changed _) ->
-        () )
-
-let create ~logger ~root =
-  let t =
-    { states = Node.State.Enum.Table.create ()
-    ; nodes = State_hash.Table.create ()
-    ; logger
-    ; release = release_directly
-    }
-  in
-  create_node_full t root ; t
+let create ~logger =
+  { states = Node.State.Enum.Table.create ()
+  ; nodes = State_hash.Table.create ()
+  ; logger
+  ; release = release_directly
+  }
