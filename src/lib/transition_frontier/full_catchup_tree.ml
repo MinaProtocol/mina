@@ -283,22 +283,16 @@ let max_catchup_chain_length (t : t) =
   Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key:_ ~data acc ->
       Int.max acc (longest_starting_at data) )
 
-(** Mark the node for a block the frontier has added as finished, if there is
-    one. Blocks without a node are not being caught up, and the tree does not
-    track them. *)
+(** Remove the node for a block the frontier has added, if there is one: the
+    block is no longer being caught up. The nodes waiting for it see it added.
+    The block itself is not released, because whoever added it owns it. Blocks
+    without a node are not being caught up, and the tree does not track them. *)
 let block_added (t : t) h =
   Option.iter (Hashtbl.find t.nodes h) ~f:(fun node ->
+      (* TODO: Cancel the node's download job, if it has one. *)
       Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
-      match node.state with
-      | Root _ | Failed | Finished ->
-          ()
-      | To_download _
-      (* TODO: Cancel download job somehow.. maybe wait on the ivar? *)
-      | Wait_for_parent _
-      | To_initial_validate _
-      | To_verify _
-      | To_build_breadcrumb _ ->
-          set_state t node Finished )
+      Hashtbl.remove t.nodes h ;
+      remove_state t.states node )
 
 let remove_node' t (node : Node.t) =
   Hashtbl.remove t.nodes node.state_hash ;
