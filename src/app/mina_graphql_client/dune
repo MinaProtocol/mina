@@ -11,6 +11,7 @@
   uri
   yojson
   ;; local libraries
+  bootstrap_status
   currency
   graphql_lib
   logger
@@ -19,6 +20,7 @@
   mina_numbers
   mina_transaction
   signature_lib
-  sync_status)
+  sync_status
+  syncable_ledger)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps mina_ppx -allow-unannotated-ignores -allow-toplevel-expression -dont-check-underscored-literal)))
