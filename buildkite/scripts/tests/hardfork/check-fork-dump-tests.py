@@ -75,6 +75,8 @@ class CheckForkDump(unittest.TestCase):
             [
                 sys.executable,
                 str(SCRIPT),
+                "--network",
+                "net",
                 "--config-url",
                 dump.as_uri(),
                 "--block-prefix",
@@ -119,6 +121,10 @@ class CheckForkDump(unittest.TestCase):
         config = fork_config()
         config["ledger"]["hash"] = "other"
         self.assert_fails(self.run_check(config), "ledger hash")
+
+    def test_dump_without_a_fork_point_fails(self):
+        result = self.run_check({})
+        self.assertNotEqual(result.returncode, 0, result.stdout)
 
     def test_wrong_fork_slot_fails(self):
         config = fork_config()
