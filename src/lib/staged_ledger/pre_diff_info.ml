@@ -567,7 +567,7 @@ let get_transactions_stable_v3 ~constraint_constants ~coinbase_receiver
         (Staged_ledger_diff.Diff.Stable.V3.coinbase ~constraint_constants
            ~supercharge_coinbase diff )
   in
-  transactions
+  List.map transactions ~f:(With_status.map ~f:Transaction.Stable.V3.to_latest)
 
 let get_transactions ~constraint_constants ~coinbase_receiver
     ~supercharge_coinbase ({ diff } : Staged_ledger_diff.t) =

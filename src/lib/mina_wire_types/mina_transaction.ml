@@ -10,3 +10,7 @@ end
 module V3 = struct
   type t = Mina_base.User_command.V3.t Poly.V2.t
 end
+
+module V4 = struct
+  type t = Mina_base.User_command.V4.t Poly.V2.t
+end

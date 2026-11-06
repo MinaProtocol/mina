@@ -89,6 +89,10 @@ module V2 = struct
   type t = (Mina_base_account_update.V2.t, unit, unit) Call_forest.V1.t T.t
 end
 
+module V3 = struct
+  type t = (Mina_base_account_update.V3.t, unit, unit) Call_forest.V1.t V2.T.t
+end
+
 module Valid = struct
   module Verification_key_hash = struct
     module V1 = struct
@@ -98,6 +102,10 @@ module Valid = struct
 
   module V2 = struct
     type t = { zkapp_command : V2.t }
+  end
+
+  module V3 = struct
+    type t = { zkapp_command : V3.t }
   end
 end
 

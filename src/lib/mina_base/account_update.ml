@@ -671,6 +671,26 @@ module Update = struct
 
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
+      type t = Mina_wire_types.Mina_base.Account_update.Update.V3.t =
+        { app_state :
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V2.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; verification_key :
+            Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Stable.V3.t Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; token_symbol :
+            Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
+        }
+      [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
@@ -688,7 +708,26 @@ module Update = struct
         }
       [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ app_state
+           ; delegate
+           ; verification_key
+           ; permissions
+           ; zkapp_uri
+           ; token_symbol
+           ; timing
+           ; voting_for
+           } :
+            t ) : Latest.t =
+        { app_state
+        ; delegate
+        ; verification_key
+        ; permissions
+        ; zkapp_uri
+        ; token_symbol
+        ; timing
+        ; voting_for
+        }
     end
   end]
 
@@ -1129,11 +1168,11 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V2.t
+          ; update : Update.Stable.V3.t
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
@@ -1187,6 +1226,29 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
+      module V3 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V3.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Actions'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V2.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1207,13 +1269,66 @@ module Body = struct
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
-        let to_latest = Fn.id
+        let to_latest
+            ({ public_key
+             ; token_id
+             ; update
+             ; balance_change
+             ; increment_nonce
+             ; events
+             ; actions
+             ; call_data
+             ; call_depth
+             ; preconditions
+             ; use_full_commitment
+             ; implicit_account_creation_fee
+             ; may_use_token
+             ; authorization_kind
+             } :
+              t ) : Latest.t =
+          { public_key
+          ; token_id
+          ; update = Update.Stable.V2.to_latest update
+          ; balance_change
+          ; increment_nonce
+          ; events
+          ; actions
+          ; call_data
+          ; call_depth
+          ; preconditions
+          ; use_full_commitment
+          ; implicit_account_creation_fee
+          ; may_use_token
+          ; authorization_kind
+          }
       end
     end]
   end
 
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V3.t =
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
+        ; update : Update.Stable.V3.t
+        ; balance_change :
+            (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        ; increment_nonce : bool
+        ; events : Events'.Stable.V1.t
+        ; actions : Actions'.Stable.V1.t
+        ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+        ; preconditions : Preconditions.Stable.V2.t
+        ; use_full_commitment : bool
+        ; implicit_account_creation_fee : bool
+        ; may_use_token : May_use_token.Stable.V1.t
+        ; authorization_kind : Authorization_kind.Stable.V1.t
+        }
+      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -1233,7 +1348,36 @@ module Body = struct
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ public_key
+           ; token_id
+           ; update
+           ; balance_change
+           ; increment_nonce
+           ; events
+           ; actions
+           ; call_data
+           ; preconditions
+           ; use_full_commitment
+           ; implicit_account_creation_fee
+           ; may_use_token
+           ; authorization_kind
+           } :
+            t ) : Latest.t =
+        { public_key
+        ; token_id
+        ; update = Update.Stable.V2.to_latest update
+        ; balance_change
+        ; increment_nonce
+        ; events
+        ; actions
+        ; call_data
+        ; preconditions
+        ; use_full_commitment
+        ; implicit_account_creation_fee
+        ; may_use_token
+        ; authorization_kind
+        }
     end
   end]
 
@@ -1741,9 +1885,9 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          ( Body.Graphql_repr.Stable.V2.t
+          ( Body.Graphql_repr.Stable.V3.t
           , Control.Stable.V2.t )
           Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
@@ -1766,9 +1910,9 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+          (Body.Simple.Stable.V3.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1780,12 +1924,20 @@ module T = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       (** A account_update to a zkApp transaction *)
-      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+      type t = (Body.Stable.V3.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest ({ body; authorization; aux = () } : t) : Latest.t =
+        { body = Body.Stable.V2.to_latest body; authorization; aux = () }
     end
   end]
 

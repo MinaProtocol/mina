@@ -15,10 +15,10 @@ module Zkapp_command_segment_witness : sig
         ; global_second_pass_ledger : Sparse_ledger.Stable.V4.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
-              , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
+              , Zkapp_command.Call_forest.With_hashes.Stable.V3.t )
               Stack_frame.Stable.V1.t
             , ( ( ( Token_id.Stable.V2.t
-                  , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
+                  , Zkapp_command.Call_forest.With_hashes.Stable.V3.t )
                   Stack_frame.Stable.V1.t
                 , Stack_frame.Digest.Stable.V1.t )
                 With_hash.t
@@ -33,7 +33,7 @@ module Zkapp_command_segment_witness : sig
             , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
-            ( Zkapp_command.Stable.V2.t
+            ( Zkapp_command.Stable.V3.t
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t

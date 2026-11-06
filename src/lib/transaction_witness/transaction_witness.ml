@@ -16,10 +16,10 @@ module Zkapp_command_segment_witness = struct
         ; global_second_pass_ledger : Sparse_ledger.Stable.V4.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
-              , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
+              , Zkapp_command.Call_forest.With_hashes.Stable.V3.t )
               Stack_frame.Stable.V1.t
             , ( ( ( Token_id.Stable.V2.t
-                  , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
+                  , Zkapp_command.Call_forest.With_hashes.Stable.V3.t )
                   Stack_frame.Stable.V1.t
                 , Stack_frame.Digest.Stable.V1.t )
                 With_hash.Stable.V1.t
@@ -34,7 +34,7 @@ module Zkapp_command_segment_witness = struct
             , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
-            ( Zkapp_command.Stable.V2.t
+            ( Zkapp_command.Stable.V3.t
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
@@ -97,10 +97,18 @@ module Zkapp_command_segment_witness = struct
         { global_first_pass_ledger = to_latest_ledger global_first_pass_ledger
         ; global_second_pass_ledger = to_latest_ledger global_second_pass_ledger
         ; local_state_init =
-            { local_state_init with
-              ledger = to_latest_ledger local_state_init.ledger
-            }
-        ; start_zkapp_command
+            Mina_transaction_logic.Zkapp_command_logic.Local_state
+            .map_with_hashes
+              ~f:Zkapp_command.Call_forest.With_hashes.Stable.V2.to_latest
+              { local_state_init with
+                ledger = to_latest_ledger local_state_init.ledger
+              }
+        ; start_zkapp_command =
+            List.map start_zkapp_command ~f:(fun start_data ->
+                { start_data with
+                  account_updates =
+                    Zkapp_command.Stable.V2.to_latest start_data.account_updates
+                } )
         ; state_body =
             Mina_state.Protocol_state.Body.Value.Stable.V3.to_latest state_body
         ; init_stack

@@ -9,11 +9,23 @@ module V3 = struct
     (Mina_base_signed_command.V2.t, Mina_base_zkapp_command.V2.t) Poly.V2.t
 end
 
+module V4 = struct
+  type t =
+    (Mina_base_signed_command.V2.t, Mina_base_zkapp_command.V3.t) Poly.V2.t
+end
+
 module Valid = struct
   module V3 = struct
     type t =
       ( Mina_base_signed_command.With_valid_signature.V2.t
       , Mina_base_zkapp_command.Valid.V2.t )
+      Poly.V2.t
+  end
+
+  module V4 = struct
+    type t =
+      ( Mina_base_signed_command.With_valid_signature.V2.t
+      , Mina_base_zkapp_command.Valid.V3.t )
       Poly.V2.t
   end
 end

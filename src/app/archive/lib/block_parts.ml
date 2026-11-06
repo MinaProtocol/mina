@@ -203,7 +203,8 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
        List.map (commands @ one_commands)
          ~f:(fun { With_status.data = command, hash; _ } ->
            ( Transaction_hash.hash_command
-               (Berkeley_types.User_command.to_mesa command)
+               (Mina_base.User_command.Stable.V3.to_latest
+                  (Berkeley_types.User_command.to_mesa command) )
            , hash ) )
        |> Transaction_hash.Map.of_alist_exn )
   in
