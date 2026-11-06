@@ -19,6 +19,11 @@ let envOverride
     =
       -- The registry a release pipeline pushes to, if it says.
       --
+      -- Two pipelines read it: packaging, for the registry in the tags it
+      -- writes into the build cache, and the publish pipeline, for where it
+      -- pushes them (Jobs/Release/PublishDockers.dhall retags when the two
+      -- disagree, and the publish pipeline wins).
+      --
       -- It has to be an environment variable rather than a field on the job,
       -- because the packaging jobs are shared: nightly and a release pipeline
       -- run the very same MinaArtifact* jobs and must push to different

@@ -24,6 +24,12 @@ let PipelineTag = ../Pipeline/Tag.dhall
 
 let DockerImage = ../Command/DockerImage.dhall
 
+let DockerPublish = ../Constants/Docker/Publish.dhall
+
+let DockerRepo = ../Constants/DockerRepo.dhall
+
+let DebianChannel = ../Constants/DebianChannel.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
@@ -46,6 +52,41 @@ let DebianArchPair =
       { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
 
 let defaultMinaArtifactSpec = MinaArtifact.PackagingSpec::{=}
+
+let dockerRepo =
+    -- Always the internal euro registry. Every image is pushed there by this
+    -- build and also written to the build's cache, so a hardfork candidate
+    -- can be run from the registry, which needs credentials, without reaching
+    -- a user. The fork-day publish (Jobs/Release/PublishDockers.dhall) takes
+    -- the images from the cache and retags them for docker.io itself, so the
+    -- registry named here is never the public one.
+      DockerRepo.Type.InternalEurope
+
+let buildCacheDir = MinaArtifact.ownBuildCacheDir
+
+let debianChannel =
+    -- The channel the packages are built for, so their Suite matches the
+    -- channel the publish pipeline is pointed at (MINA_RELEASE_CHANNEL, the
+    -- same variable). Unstable unless the pipeline says otherwise.
+      DebianChannel.effective DebianChannel.Type.Unstable
+
+let hardforkDockerSpec =
+    -- The image step as the hardfork pipeline wants it: tagged for and pushed
+    -- to the euro registry, and written to this build's cache for the
+    -- fork-day publish. The layered bases (generic -> profiled -> configured)
+    -- come from the same cache, except when the generic images are taken
+    -- from a version in the registry: then there is no cached base, and
+    -- build.sh pulls it.
+          \(fromRegistry : Bool)
+      ->  \(docker : DockerImage.ReleaseSpec.Type)
+      ->      docker
+          //  { docker_repo = dockerRepo
+              , docker_publish = DockerPublish.Type.Enabled
+              , deb_release = debianChannel
+              , build_cache_dir = Some buildCacheDir
+              , base_cache_dir =
+                  if fromRegistry then None Text else Some buildCacheDir
+              }
 
 let Spec =
       { Type =
@@ -433,35 +474,157 @@ let generateDockerForCodename =
                   }
                   spec.use_generic_dockers_from_version
 
+          let fromRegistry =
+                merge
+                  { Some = \(_ : Text) -> True, None = False }
+                  spec.use_generic_dockers_from_version
+
           in    buildOrGetArtifacts
               # List/map
                   DockerImage.ReleaseSpec.Type
                   Command.Type
-                  (     \(spec : DockerImage.ReleaseSpec.Type)
-                    ->  DockerImage.generateStep spec
+                  (     \(docker : DockerImage.ReleaseSpec.Type)
+                    ->  DockerImage.generateStep
+                          (hardforkDockerSpec fromRegistry docker)
                   )
                   dockerSpecs
+
+let daemonImage =
+    -- The configured daemon image of one codename, and how to load it. The
+    -- verification takes it from this build's cache, where its build step
+    -- wrote it, so it runs the image that was built here.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  let imageTag =
+                Docker.Tag::{
+                , remove_profile_from_name = True
+                , network = spec.network
+                , version =
+                    merge
+                      { Some =
+                              \(v : Text)
+                          ->  "${v}-${DebianVersions.lowerName
+                                        codename.DebVersion}"
+                      , None = "\\\${MINA_DOCKER_TAG}"
+                      }
+                      spec.use_generic_dockers_from_version
+                }
+
+          let image =
+                "${DockerRepo.show
+                     dockerRepo}/${Docker.dockerName
+                                     imageTag.package}:${Docker.dockerTag
+                                                           imageTag}"
+
+          in  { image = image
+              , load =
+                  Cmd.run
+                    "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
+              }
+
+let precomputedBlockArg =
+          \(flag : Text)
+      ->  \(spec : Spec.Type)
+      ->  merge
+            { Some = \(prefix : Text) -> "${flag} ${prefix}", None = "" }
+            spec.precomputed_block_prefix
+
+let preflightKey = "preflight-state-dump"
+
+let preflightCommand =
+    -- The dump is checked before anything is built from it, beside the build
+    -- and not ahead of it: no deb or image waits for this step. The reference
+    -- tarballs do, and the verification with them, so a bad dump stops those
+    -- within seconds and the builds carry on.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                Toolchain.select
+                  Toolchain.Spec::{
+                  , debVersion = codename.DebVersion
+                  , arch = codename.Arch
+                  }
+                  ([] : List Text)
+                  "./scripts/hardfork/release/check-fork-dump.py --network ${Network.lowerName
+                                                                               spec.network} --config-url ${spec.config_json_gz_url} ${precomputedBlockArg
+                                                                                                                                         "--block-prefix"
+                                                                                                                                         spec}"
+            , label = "Preflight: check the state dump"
+            , key = preflightKey
+            , target = Size.Small
+            }
+
+let verifyImageCommand =
+    -- The full verification runs for the first codename. Every other codename
+    -- has its own image, with its own binary and packages, so it gets the
+    -- checks that read the image. amd64 only: the verification runs on amd64
+    -- agents.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  \(firstCodename : DebianArchPair)
+      ->  \(codename : DebianArchPair)
+      ->  let daemon = daemonImage spec codename
+
+          let lowerNameCodename = DebianVersions.lowerName codename.DebVersion
+
+          let dockerDaemonSpec =
+                DockerImage.ReleaseSpec::{
+                , service = Docker.Type.Daemon { network = spec.network }
+                , network = spec.network
+                , deb_codename = codename.DebVersion
+                , deb_profile = Profiles.fromNetwork spec.network
+                , deb_legacy_version = spec.deb_legacy_version
+                , step_key_suffix = "-${lowerNameCodename}-docker-image"
+                , size = spec.size
+                }
+
+          in  merge
+                { Amd64 =
+                  [ Command.build
+                      Command.Config::{
+                      , commands =
+                        [ Cmd.run
+                            "export MINA_DEB_CODENAME=${lowerNameCodename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                        , daemon.load
+                        , Cmd.runInDocker
+                            Cmd.Docker::{ image = daemon.image }
+                            "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                    spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputedBlockArg
+                                                                                                                                                                                                                                                    "--precomputed-block-prefix"
+                                                                                                                                                                                                                                                    spec} --reference-data-dir /var/storagebox/\\\${BUILDKITE_BUILD_ID}/hardfork/legacy --checks block,constants,artifacts --prefork-version ${spec.deb_legacy_version}"
+                        ]
+                      , label =
+                          "Verify packaged artifacts: Image check for ${lowerNameCodename}"
+                      , key = "verify-packaged-image-${lowerNameCodename}"
+                      , target = Size.Small
+                      , depends_on =
+                        [ { name = pipelineName
+                          , key = DockerImage.stepKey dockerDaemonSpec
+                          }
+                        , { name = pipelineName
+                          , key =
+                              "generate-reference-tarballs-${DebianVersions.lowerName
+                                                               firstCodename.DebVersion}"
+                          }
+                        ]
+                      }
+                  ]
+                , Arm64 = [] : List Command.Type
+                }
+                codename.Arch
 
 let generateHfRelatedStepsForCodename =
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
       ->  \(codenames : List DebianArchPair)
       ->  \(pipelineName : Text)
-      ->  let image =
-                Docker.fullDockerTag
-                  Docker.Tag::{
-                  , remove_profile_from_name = True
-                  , network = spec.network
-                  , version =
-                      merge
-                        { Some =
-                                \(v : Text)
-                            ->  "${v}-${DebianVersions.lowerName
-                                          codename.DebVersion}"
-                        , None = "\\\${MINA_DOCKER_TAG}"
-                        }
-                        spec.use_generic_dockers_from_version
-                  }
+      ->  let daemon = daemonImage spec codename
+
+          let image = daemon.image
+
+          let loadImage = daemon.load
 
           let profile = Profiles.fromNetwork spec.network
 
@@ -500,7 +663,12 @@ let generateHfRelatedStepsForCodename =
                 "generate-reference-tarballs-" ++ lowerNameCodename
 
           let dependsOnTest =
-                [ { name = pipelineName, key = dockerDaemonStep } ]
+              -- The verification reads the reference ledgers from the cache,
+              -- which the reference step writes and the image build does not
+              -- wait for.
+                [ { name = pipelineName, key = dockerDaemonStep }
+                , { name = pipelineName, key = referencesTarballStepKey }
+                ]
 
           let precomputed_block_prefix_arg =
                 merge
@@ -529,7 +697,9 @@ let generateHfRelatedStepsForCodename =
                     spec
                     codename
                     referencesTarballStepKey
-                    dependsOnArtifactsOrEmpty
+                    (   dependsOnArtifactsOrEmpty
+                      # [ { name = pipelineName, key = preflightKey } ]
+                    )
                 ]
 
           let cached_tarball_ledgers =
@@ -561,6 +731,7 @@ let generateHfRelatedStepsForCodename =
                           }
                           (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
                               , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              , "MINA_DEB_RELEASE=${debianChannel}"
                               ]
                             # DebianVersions.overrideEnvs
                           )
@@ -578,11 +749,12 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
-                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
-                                                                                                                                                                                                                                                                                                  spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                                                                                                                                                                  spec.network} --fork-config config.json --working-dir /workdir/verification --checks config)"
+                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                                                                                                                                                               spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                                                                                                                                                                                                               spec.network} --fork-config config.json --working-dir /workdir/verification --checks config --expect-config-mismatch"
                       ]
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
@@ -598,11 +770,12 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                    spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                   spec.network} --fork-config config.json  --cached-hardfork-data /workdir/hardfork --working-dir /workdir/verification ${precomputed_block_prefix_arg} ${cached_tarball_ledgers} ${cached_reference_ledgers} --checks config"
+                                                                                                                                                                                                                                                   spec.network} --fork-config config.json  --cached-hardfork-data /workdir/hardfork --working-dir /workdir/verification ${precomputed_block_prefix_arg} ${cached_tarball_ledgers} ${cached_reference_ledgers} --checks config,block,constants,artifacts --prefork-version ${spec.deb_legacy_version}"
                       ]
                     , label = "Verify packaged artifacts: Config check"
                     , key =
@@ -625,11 +798,12 @@ let generateHfRelatedStepsForCodename =
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                          , loadImage
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
                               "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && MINA_LOG_LEVEL=Spam FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                             spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                            spec.network} --fork-config config.json --cached-hardfork-data /workdir/hardfork --working-dir /workdir/hardfork ${precomputed_block_prefix_arg} ${cached_reference_ledgers} --checks ledgers  ${cached_tarball_ledgers}"
+                                                                                                                                                                                                                                                            spec.network} --fork-config config.json --cached-hardfork-data /workdir/hardfork --working-dir /workdir/hardfork ${precomputed_block_prefix_arg} ${cached_reference_ledgers} --checks ledgers,accounts  ${cached_tarball_ledgers}"
                           ]
                     , label = "Verify packaged artifacts: Ledgers check"
                     , key =
@@ -644,6 +818,7 @@ let generateHfRelatedStepsForCodename =
                       [ Cmd.run
                           "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                         codename.DebVersion} && source ./buildkite/scripts/export-git-env-vars.sh"
+                      , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
                           "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
@@ -686,11 +861,25 @@ let pipeline =
                           in    merge
                                   { Some =
                                           \(codename : DebianArchPair)
-                                      ->  generateHfRelatedStepsForCodename
-                                            spec
-                                            codename
-                                            spec.codenames
-                                            pipelineName
+                                      ->    [ preflightCommand spec codename ]
+                                          # generateHfRelatedStepsForCodename
+                                              spec
+                                              codename
+                                              spec.codenames
+                                              pipelineName
+                                          # List/concatMap
+                                              DebianArchPair
+                                              Command.Type
+                                              ( verifyImageCommand
+                                                  spec
+                                                  pipelineName
+                                                  codename
+                                              )
+                                              ( Prelude.List.drop
+                                                  1
+                                                  DebianArchPair
+                                                  spec.codenames
+                                              )
                                   , None = [] : List Command.Type
                                   }
                                   first
