@@ -57,19 +57,51 @@ CONFIG_DIR="$WORKDIR/config"
 mkdir -p "$CONFIG_DIR"
 
 echo "--- Downloading the hardfork config from $URL"
-curl -sSfL "$URL" | tar -xz -C "$CONFIG_DIR"
+curl -sSfL "$URL" -o "$WORKDIR/config.tar.gz"
+
+# The daemon writes only regular files and directories. Anything else is refused
+# before it is extracted: a symlink in place of a tarball would be followed by
+# the copies below, and a file of this agent uploaded publicly. The listing is
+# read first: under pipefail, `tar | grep -q` reports a match as a failure.
+listing=$(tar -tvzf "$WORKDIR/config.tar.gz")
+unexpected=$(grep -v '^[-d]' <<< "$listing" || true)
+if [[ -n "$unexpected" ]]; then
+  echo "❌ the hardfork config holds entries other than files and directories:" >&2
+  echo "$unexpected" >&2
+  exit 1
+fi
+tar -xzf "$WORKDIR/config.tar.gz" -C "$CONFIG_DIR" --no-same-owner --no-same-permissions
+unexpected=$(find "$CONFIG_DIR" ! -type f ! -type d)
+if [[ -n "$unexpected" ]]; then
+  echo "❌ the extracted config holds entries other than files and directories:" >&2
+  echo "$unexpected" >&2
+  exit 1
+fi
 
 echo "--- Checking the config directory"
 fail=0
-check() { if [[ ! -e "$CONFIG_DIR/$1" ]]; then echo "❌ missing: $1" >&2; fail=1; fi; }
+check() { if [[ ! -f "$CONFIG_DIR/$1" ]]; then echo "❌ missing: $1" >&2; fail=1; fi; }
 check activated
 check daemon.json
 check fork_validation/legacy/daemon.json
-for d in genesis fork_validation/legacy/genesis; do
-  n=$(find "$CONFIG_DIR/$d" -maxdepth 1 -name '*.tar.gz' 2>/dev/null | wc -l)
-  if [[ "$n" -ne 3 ]]; then echo "❌ $d holds $n ledger tarballs, expected 3" >&2; fail=1; fi
-done
 [[ "$fail" == 0 ]] || exit 1
+
+for dir in "" fork_validation/legacy/; do
+  if ! jq -e '[.ledger, .epoch_data.staking, .epoch_data.next] |
+              all(.hash, .s3_data_hash | type == "string" and length > 0)' \
+    "$CONFIG_DIR/${dir}daemon.json" > /dev/null; then
+    echo "❌ ${dir}daemon.json does not hold the hash and s3_data_hash of all three ledgers" >&2
+    exit 1
+  fi
+  # Equal staking and next ledgers share one tarball.
+  expected=$(jq -r '[.ledger.s3_data_hash, .epoch_data.staking.s3_data_hash, .epoch_data.next.s3_data_hash] |
+                    unique | length' "$CONFIG_DIR/${dir}daemon.json")
+  n=$(find "$CONFIG_DIR/${dir}genesis" -maxdepth 1 -type f -name '*.tar.gz' 2>/dev/null | wc -l)
+  if [[ "$n" -ne "$expected" ]]; then
+    echo "❌ ${dir}genesis holds $n ledger tarballs, expected $expected" >&2
+    exit 1
+  fi
+done
 
 echo "--- Checking that the config and the state dump describe the same fork block"
 CONFIG_STATE_HASH=$(jq -r '.proof.fork.state_hash // empty' "$CONFIG_DIR/daemon.json")
@@ -91,12 +123,6 @@ hashes_of() {
 }
 
 echo "--- Preparing the packaged config"
-for f in "$CONFIG_DIR/daemon.json" "$CONFIG_DIR/fork_validation/legacy/daemon.json"; do
-  if ! jq -e '[.ledger, .epoch_data.staking, .epoch_data.next] | all(.hash and .s3_data_hash)' "$f" > /dev/null; then
-    echo "❌ $f does not hold the hash and s3_data_hash of all three ledgers" >&2
-    exit 1
-  fi
-done
 mkdir -p "$WORKDIR/hardfork_ledgers" "$WORKDIR/legacy_ledgers"
 cp "$CONFIG_DIR"/genesis/*.tar.gz "$WORKDIR/hardfork_ledgers/"
 cp "$CONFIG_DIR"/fork_validation/legacy/genesis/*.tar.gz "$WORKDIR/legacy_ledgers/"
