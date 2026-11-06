@@ -2282,9 +2282,10 @@ module For_tests = struct
                 { Zkapp_account.default with
                   verification_key =
                     Some
-                      { With_hash.hash = Zkapp_basic.F.zero
-                      ; data = Side_loaded_verification_key.dummy
-                      }
+                      (Zkapp_account.with_current_version
+                         { With_hash.hash = Zkapp_basic.F.zero
+                         ; data = Side_loaded_verification_key.dummy
+                         } )
                 }
             else None
           in

@@ -519,7 +519,7 @@ end = struct
       let%bind location = location_of_account account_id in
       let%bind (account : Account.t) = get location in
       let%bind zkapp = account.zkapp in
-      zkapp.verification_key
+      Zkapp_account.verification_key_wire zkapp
     with
     | Some vk ->
         ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
@@ -539,7 +539,9 @@ end = struct
            let open Option.Let_syntax in
            let account = Option.value_exn account in
            let%bind zkapp = account.zkapp in
-           let%map verification_key = zkapp.verification_key in
+           let%map verification_key =
+             Zkapp_account.verification_key_wire zkapp
+           in
            (Account.identifier account, verification_key) )
     |> Account_id.Map.of_alist_exn
 

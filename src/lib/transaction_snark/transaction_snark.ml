@@ -4211,8 +4211,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               (find_index_exn witness.local_state_init.ledger account_id))
         in
         match
-          Option.value_map ~default:None account.zkapp ~f:(fun s ->
-              s.verification_key )
+          Option.value_map ~default:None account.zkapp
+            ~f:Zkapp_account.verification_key_wire
         with
         | None ->
             { With_hash.data =
@@ -5341,7 +5341,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let id = Account_id.create pk Token_id.default in
       { (Account.create id Balance.(of_mina_int_exn 1_000_000)) with
         permissions
-      ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
+      ; zkapp =
+          Some
+            { Zkapp_account.default with
+              verification_key = Some (Zkapp_account.with_current_version vk)
+            }
       }
 
     let create_trivial_zkapp_account

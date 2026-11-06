@@ -320,7 +320,7 @@ module Json_layout = struct
           let open Mina_base.Zkapp_account in
           { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
           ; verification_key =
-              Option.map zkapp.verification_key ~f:With_hash.data
+              Option.map (verification_key_wire zkapp) ~f:With_hash.data
           ; action_state =
               Pickles_types.Vector.Vector_5.to_list zkapp.action_state
           ; last_action_slot =

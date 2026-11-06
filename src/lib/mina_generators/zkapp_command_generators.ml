@@ -742,7 +742,9 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                 zkapp =
                   Some
                     { Zkapp_account.default with
-                      verification_key = Some verification_key
+                      verification_key =
+                        Some
+                          (Zkapp_account.with_current_version verification_key)
                     }
               }
             else account_with_pk
@@ -1855,7 +1857,9 @@ let%test_module _ =
       let zkapp_accounts =
         List.map zkapp_account_ids ~f:(fun id ->
             let account = Account.create id balance in
-            let verification_key = Some vk in
+            let verification_key =
+              Some (Zkapp_account.with_current_version vk)
+            in
             let zkapp = Some { Zkapp_account.default with verification_key } in
             { account with zkapp } )
       in

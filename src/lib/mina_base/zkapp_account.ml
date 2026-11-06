@@ -419,6 +419,24 @@ type t =
 
 let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
+(** The account's verification key, without its transaction version. *)
+let verification_key_wire (t : t) : Verification_key_wire.t option =
+  t.verification_key
+
+(** The transaction version of the account's verification key. *)
+let verification_key_txn_version (t : t) : Mina_numbers.Txn_version.t option =
+  Option.map t.verification_key ~f:(fun _ -> Mina_numbers.Txn_version.mesa)
+
+(** The verification key [vk], as an account holds it having set it under
+    [txn_version]. *)
+let with_version ~txn_version:(_ : Mina_numbers.Txn_version.t)
+    (vk : Verification_key_wire.t) =
+  vk
+
+(** The verification key [vk], as an account holds it having just set it. *)
+let with_current_version vk =
+  with_version ~txn_version:Mina_numbers.Txn_version.current vk
+
 (** As zkApp accounts are part of the protocol, we need to "snarkify" it. The
     following submodule contains the snarky version of the zkApp account.
     An instantiation using the [Step] backend is used; no backend using [Wrap]

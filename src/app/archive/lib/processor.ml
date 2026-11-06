@@ -2848,7 +2848,7 @@ module Zkapp_account = struct
     fun (module Conn : Mina_caqti.CONNECTION) zkapp_account ->
       let open Deferred.Result.Let_syntax in
       let ({ app_state
-           ; verification_key
+           ; verification_key = _
            ; action_state
            ; last_action_slot
            ; proved_state
@@ -2861,7 +2861,9 @@ module Zkapp_account = struct
         Zkapp_states.add_if_doesn't_exist (module Conn) app_state
       in
       let%bind verification_key_id =
-        Option.value_map verification_key ~default:(return None) ~f:(fun vk ->
+        Option.value_map
+          (Mina_base.Zkapp_account.verification_key_wire zkapp_account)
+          ~default:(return None) ~f:(fun vk ->
             let%map id =
               Zkapp_verification_keys.add_if_doesn't_exist (module Conn) vk
             in

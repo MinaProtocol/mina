@@ -5261,7 +5261,8 @@ let%test_module "staged ledger tests" =
                       zkapp =
                         Some
                           { (Option.value_exn account.zkapp) with
-                            verification_key = Some vk
+                            verification_key =
+                              Some (Zkapp_account.with_current_version vk)
                           }
                     } ;
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
