@@ -6,9 +6,14 @@ lacks and restores them from a bucket of block files.
 
 It runs `mina-missing-blocks-auditor` to find the first block whose parent
 is missing, downloads that parent as
-`<network>-<height>-<state hash>.json` from the bucket, writes it with
-`mina-archive-blocks`, and repeats until the auditor reports no missing
-parent.
+`<network>-<height>-<state hash>.json` from the bucket, writes it to the
+database with the library of `mina-archive-blocks`, and repeats until the
+auditor reports no missing parent.
+
+The guardian needs a profile, as `mina-archive-blocks` does: `MINA_PROFILE`,
+or the file `/etc/coda/build_config/PROFILE` that packages and configured
+docker images have. Without one it stops at start, before it reads its
+settings, for each subcommand.
 
 Subcommands
 -----------
@@ -31,7 +36,6 @@ variable. A variable set to the empty string counts as unset.
 | `--precomputed-blocks-url URL` | `PRECOMPUTED_BLOCKS_URL` | `single-run`, `daemon` | Bucket with the block files: an `http`, `https` or `file` URL. The block file names are added to this URL. |
 | `--network NAME` | `MINA_NETWORK` | `single-run`, `daemon` | Prefix of the block file names. |
 | `--block-format precomputed\|extensional` | `BLOCKS_FORMAT` | `single-run`, `daemon` | Format of the block files. Default `precomputed`. |
-| `--archive-blocks PATH` | `ARCHIVE_BLOCKS` | `single-run`, `daemon` | The program that writes blocks. Default `mina-archive-blocks`. |
 | `--interval SECONDS` | `TIMEOUT` | `daemon` | Time between two checks. Default 600. |
 | `--log-json`, `--log-level LEVEL` | none | all | Log format and level, as in the other Mina programs. |
 
@@ -78,10 +82,10 @@ A block cannot be restored when:
   404 when the file does not exist. The error page is not saved. The fatal
   line shows how the URL of the file was built from the bucket URL and the
   network name;
-- the auditor or `mina-archive-blocks` cannot be run, is killed, or logs an
-  error. `mina-archive-blocks` exits with 0 when it cannot add a block, so
-  its log decides. The fatal line of the guardian repeats the error of the
-  program, or its exit code and what it wrote to stderr;
+- the auditor cannot be run, is killed, or logs an error. The fatal line of
+  the guardian repeats the error of the program, or what it wrote to stderr;
+- the block file cannot be read or written to the database. The fatal line
+  has the reason;
 - after a block was added, the auditor still reports the same missing
   parent. That means the file in the bucket holds another block.
 
@@ -116,7 +120,8 @@ Modules
   report of the settings in use.
 - `config.ml`: the settings, their sources and their validation.
 - `auditor.ml`: runs the auditor and reads the missing parent from its log.
-- `archive_blocks.ml`: runs `mina-archive-blocks` and reads its log.
+- `archive_blocks.ml`: writes a block file to the database with the library
+  `archive_blocks_lib`.
 - `bucket.ml`: the names and the URLs of the block files in a bucket.
 - `app_log.ml`: parses the JSON log of a Mina program, relays it and finds
   the errors in it.
@@ -129,5 +134,4 @@ Tests
 
 `MINA_PROFILE=dev dune runtest src/app/missing_blocks_guardian` runs the
 unit tests of the settings, the log reading, the download with a local HTTP
-server, and the recovery with fake auditor and `mina-archive-blocks`
-programs.
+server, and the recovery with a fake auditor program.
