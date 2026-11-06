@@ -94,10 +94,6 @@ module Values (S : Sample) = struct
     bin_copy ~bin_class:Mina_numbers.Global_slot_span.Stable.Latest.bin_t
       Mina_numbers.Global_slot_span.zero
 
-  let zkapp_version () : Mina_numbers.Zkapp_version.t =
-    bin_copy ~bin_class:Mina_numbers.Zkapp_version.Stable.Latest.bin_t
-      Mina_numbers.Zkapp_version.zero
-
   let signed_command_memo () : Mina_base.Signed_command_memo.t =
     bin_copy ~bin_class:Mina_base.Signed_command_memo.Stable.Latest.bin_t
       Mina_base.Signed_command_memo.empty
@@ -247,7 +243,6 @@ module Values (S : Sample) = struct
                 ~f:(fun _ -> field ())
           ; verification_key = Some (verification_key ())
           ; zkapp_uri = zkapp_uri ()
-          ; zkapp_version = zkapp_version ()
           ; action_state =
               Pickles_types.Vector.init Pickles_types.Nat.N5.n ~f:(fun _ ->
                   field () )
