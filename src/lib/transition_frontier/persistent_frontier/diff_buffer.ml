@@ -1,4 +1,3 @@
-(* TODO: flush on timeout interval in addition to meeting flush capacity *)
 open Async_kernel
 open Core_kernel
 open Frontier_base
@@ -134,6 +133,7 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       (max_latency constraint_constants)
   in
   t.timer <- Some timer ;
+  Timer.start timer ;
   t
 
 let write t ~diffs =
