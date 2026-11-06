@@ -645,9 +645,9 @@ let generateHfRelatedStepsForCodename =
                       , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
-                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
-                                                                                                                                                                                                                                                                                                  spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                                                                                                                                                                  spec.network} --fork-config config.json --working-dir /workdir/verification --checks config)"
+                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                                                                                                                                                               spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                                                                                                                                                                                                               spec.network} --fork-config config.json --working-dir /workdir/verification --checks config --expect-config-mismatch"
                       ]
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
@@ -668,7 +668,7 @@ let generateHfRelatedStepsForCodename =
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                    spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                   spec.network} --fork-config config.json  --cached-hardfork-data /workdir/hardfork --working-dir /workdir/verification ${precomputed_block_prefix_arg} ${cached_tarball_ledgers} ${cached_reference_ledgers} --checks config"
+                                                                                                                                                                                                                                                   spec.network} --fork-config config.json  --cached-hardfork-data /workdir/hardfork --working-dir /workdir/verification ${precomputed_block_prefix_arg} ${cached_tarball_ledgers} ${cached_reference_ledgers} --checks config,block,constants,artifacts --prefork-version ${spec.deb_legacy_version}"
                       ]
                     , label = "Verify packaged artifacts: Config check"
                     , key =
@@ -696,7 +696,7 @@ let generateHfRelatedStepsForCodename =
                               Cmd.Docker::{ image = image }
                               "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && MINA_LOG_LEVEL=Spam FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                             spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                            spec.network} --fork-config config.json --cached-hardfork-data /workdir/hardfork --working-dir /workdir/hardfork ${precomputed_block_prefix_arg} ${cached_reference_ledgers} --checks ledgers  ${cached_tarball_ledgers}"
+                                                                                                                                                                                                                                                            spec.network} --fork-config config.json --cached-hardfork-data /workdir/hardfork --working-dir /workdir/hardfork ${precomputed_block_prefix_arg} ${cached_reference_ledgers} --checks ledgers,accounts  ${cached_tarball_ledgers}"
                           ]
                     , label = "Verify packaged artifacts: Ledgers check"
                     , key =
