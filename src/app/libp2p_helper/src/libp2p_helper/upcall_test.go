@@ -260,7 +260,7 @@ func TestUpcalls(t *testing.T) {
 	testStreamOpenSendReset(t, alice, alicePort, bob, bobPort, 11930, newProtocol, aTrap, bTrap)
 	// Bob initiates and then resets connection to Alice
 	testStreamOpenSendReset(t, bob, bobPort, alice, alicePort, 11940, newProtocol, bTrap, aTrap)
-	require.NoError(t, bob.P2p.Host.Close())
+	require.NoError(t, bob.P2p.Close())
 	for {
 		t.Logf("awaiting disconnect from Alice ...")
 		m := <-aTrap.PeerDisconnected
