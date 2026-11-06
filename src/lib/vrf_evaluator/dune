@@ -21,6 +21,7 @@
   interruptible
   signature_lib
   consensus
+  block_time
   mina_base
   child_processes
   mina_numbers
