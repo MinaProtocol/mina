@@ -2831,12 +2831,13 @@ module Zkapp_account = struct
     ; last_action_slot : int64
     ; proved_state : bool
     ; zkapp_uri_id : int
+    ; verification_key_txn_version : int64 option
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; option int; int64; int; int64; bool; int ]
+      Caqti_type.[ int; option int; int64; int; int64; bool; int; option int64 ]
 
   let table_name = "zkapp_accounts"
 
@@ -2879,6 +2880,13 @@ module Zkapp_account = struct
       let%bind zkapp_uri_id =
         Zkapp_uri.add_if_doesn't_exist (module Conn) zkapp_uri
       in
+      let verification_key_txn_version =
+        Option.map
+          (Mina_base.Zkapp_account.verification_key_txn_version zkapp_account)
+          ~f:(fun txn_version ->
+            Mina_numbers.Txn_version.to_uint32 txn_version
+            |> Unsigned.UInt32.to_int64 )
+      in
       select_insert.run
         (module Conn)
         { app_state_id
@@ -2889,6 +2897,7 @@ module Zkapp_account = struct
         ; last_action_slot
         ; proved_state
         ; zkapp_uri_id
+        ; verification_key_txn_version
         }
 
   let load =

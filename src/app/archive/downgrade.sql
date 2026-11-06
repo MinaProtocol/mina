@@ -4,6 +4,7 @@
 -- + drop the user_commands.{fee_payer_id,source_id,receiver_id} indexes
 -- + token_symbols.value, zkapp_uris.value: bytea -> text
 -- + drop genesis_accounts (4.0.2 does not have it)
+-- + drop zkapp_accounts.verification_key_txn_version
 -- + record status in migration_history
 --
 -- Reverse further steps of upgrade.sql here as they are added, and bump
@@ -26,7 +27,7 @@ SET archive.create_schema_protocol_version = '4.0.0';
 -- Protocol version this script moves the database to.
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.3';
+SET archive.migration_version = '0.0.4';
 
 -- TODO: put below in a common script
 
@@ -172,7 +173,13 @@ BEGIN
     END LOOP;
 END $$;
 
--- 5. Update schema_history
+-- 5. Drop zkapp_accounts.verification_key_txn_version: release 4.0.2 does not
+-- have it.
+
+ALTER TABLE zkapp_accounts
+    DROP COLUMN IF EXISTS verification_key_txn_version;
+
+-- 6. Update schema_history
 
 DO $$
 BEGIN

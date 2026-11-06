@@ -327,14 +327,15 @@ CREATE TABLE zkapp_account_precondition
 );
 
 CREATE TABLE zkapp_accounts
-( id                   serial  PRIMARY KEY
-, app_state_id         int     NOT NULL     REFERENCES zkapp_states(id)
-, verification_key_id  int                  REFERENCES zkapp_verification_keys(id)
-, zkapp_version        bigint  NOT NULL
-, action_state_id      int     NOT NULL     REFERENCES zkapp_action_states(id)
-, last_action_slot     bigint  NOT NULL
-, proved_state         bool    NOT NULL
-, zkapp_uri_id         int     NOT NULL     REFERENCES zkapp_uris(id)
+( id                            serial  PRIMARY KEY
+, app_state_id                  int     NOT NULL     REFERENCES zkapp_states(id)
+, verification_key_id           int                  REFERENCES zkapp_verification_keys(id)
+, zkapp_version                 bigint  NOT NULL
+, action_state_id               int     NOT NULL     REFERENCES zkapp_action_states(id)
+, last_action_slot              bigint  NOT NULL
+, proved_state                  bool    NOT NULL
+, zkapp_uri_id                  int     NOT NULL     REFERENCES zkapp_uris(id)
+, verification_key_txn_version  bigint
 );
 
 CREATE TABLE zkapp_token_id_bounds
