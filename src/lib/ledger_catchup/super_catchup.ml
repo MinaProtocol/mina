@@ -750,8 +750,12 @@ let create_node ~logger ~downloader t x =
   in
   upon (Ivar.read node.result) (fun _ ->
       Downloader.cancel downloader (h, blockchain_length) ) ;
-  Transition_frontier.Full_catchup_tree.add_state t.states node ;
-  Hashtbl.set t.nodes ~key:h ~data:node ;
+  ( match Hashtbl.find t.nodes h with
+  | Some { state = To_download job; _ } ->
+      Downloader.cancel downloader job.key
+  | Some _ | None ->
+      () ) ;
+  Transition_frontier.Full_catchup_tree.add_node t node ;
   ( try check_invariant ~downloader t
     with e ->
       [%log' debug t.logger]

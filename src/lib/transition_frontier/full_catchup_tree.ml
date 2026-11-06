@@ -317,6 +317,17 @@ let remove_node t h =
   | Some node ->
       remove_node' t node
 
+(** Make [node] the tree's node for its block, in place of the node there was
+    for it, if any. The replaced node gives up its block, if it holds one, and
+    those waiting for its result get [node]'s. *)
+let add_node t (node : Node.t) =
+  Option.iter (Hashtbl.find t.nodes node.state_hash) ~f:(fun replaced ->
+      remove_state t.states replaced ;
+      release_block t replaced ;
+      upon (Ivar.read node.result) (Ivar.fill_if_empty replaced.result) ) ;
+  add_state t.states node ;
+  Hashtbl.set t.nodes ~key:node.state_hash ~data:node
+
 (** Of the nodes with the given hashes and parents, those to end because the
     root has moved to [new_root] and the blocks [left] have left the frontier:
     the nodes for those blocks, and every node descending from one other than

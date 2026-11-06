@@ -36,22 +36,23 @@ let%test_module "Tracking the blocks the frontier adds" =
     let hash name =
       Quickcheck.random_value ~seed:(`Deterministic name) State_hash.gen
 
-    let downloading (t : Tree.t) h ~parent =
+    let downloading_node h ~parent : Tree.Node.t =
       let length = Mina_numbers.Length.zero in
-      let node : Tree.Node.t =
-        { state =
-            To_download
-              { Downloader.Job.key = (h, length)
-              ; attempts = Tree.Attempt_history.empty
-              ; res = Async_kernel.Ivar.create ()
-              }
-        ; attempts = Tree.Attempt_history.empty
-        ; state_hash = h
-        ; blockchain_length = length
-        ; parent
-        ; result = Async_kernel.Ivar.create ()
-        }
-      in
+      { state =
+          To_download
+            { Downloader.Job.key = (h, length)
+            ; attempts = Tree.Attempt_history.empty
+            ; res = Async_kernel.Ivar.create ()
+            }
+      ; attempts = Tree.Attempt_history.empty
+      ; state_hash = h
+      ; blockchain_length = length
+      ; parent
+      ; result = Async_kernel.Ivar.create ()
+      }
+
+    let downloading (t : Tree.t) h ~parent =
+      let node = downloading_node h ~parent in
       Tree.add_state t.states node ;
       Hashtbl.add_exn t.nodes ~key:h ~data:node ;
       node
@@ -79,4 +80,28 @@ let%test_module "Tracking the blocks the frontier adds" =
             true
         | Some (Error _) | None ->
             false )
+
+    let%test_unit "A replaced node's waiters get its replacement's result" =
+      let t = Tree.create ~logger:(Logger.null ()) ~release in
+      let replaced = downloading t (hash "block") ~parent:(hash "parent") in
+      let replacement =
+        downloading_node (hash "block") ~parent:(hash "parent")
+      in
+      Tree.add_node t replacement ;
+      assert (phys_equal (Hashtbl.find_exn t.nodes (hash "block")) replacement) ;
+      [%test_eq: int]
+        (Hashtbl.fold t.states ~init:0 ~f:(fun ~key:_ ~data n ->
+             n + Set.length data ) )
+        1 ;
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%map.Async_kernel.Deferred () =
+            Async_kernel.Ivar.fill replacement.result (Ok `Added_to_frontier) ;
+            Async.Scheduler.yield_until_no_jobs_remain ()
+          in
+          assert (
+            match Async_kernel.Ivar.peek replaced.result with
+            | Some (Ok `Added_to_frontier) ->
+                true
+            | Some (Error _) | None ->
+                false ) )
   end )
