@@ -558,7 +558,12 @@ let generateHfRelatedStepsForCodename =
                 "generate-reference-tarballs-" ++ lowerNameCodename
 
           let dependsOnTest =
-                [ { name = pipelineName, key = dockerDaemonStep } ]
+              -- The verification reads the reference ledgers from the cache,
+              -- which the reference step writes and the image build does not
+              -- wait for.
+                [ { name = pipelineName, key = dockerDaemonStep }
+                , { name = pipelineName, key = referencesTarballStepKey }
+                ]
 
           let precomputed_block_prefix_arg =
                 merge

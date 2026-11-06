@@ -13,7 +13,8 @@
 #   - MINA_RELEASE_CHANNEL, the variable the release pipelines read, reaches
 #     the package Suite, and MINA_RELEASE_DOCKER_REPO does not reach the tags;
 #   - a run that takes the generic images from a version in the registry does
-#     not look for their bases in the cache.
+#     not look for their bases in the cache;
+#   - the verification steps wait for the reference ledgers they read.
 #
 # Needs dhall-to-yaml, as the render does.
 
@@ -43,17 +44,34 @@ CLEAN=(env -u MINA_RELEASE_CHANNEL -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_D
        -u MINA_RELEASE_DEBIAN_REPO -u MINA_RELEASE_DEBIAN_MIRROR
        -u USE_GENERIC_DOCKERS_FROM_VERSION -u USE_ARTIFACTS_FROM_BUILDKITE_BUILD)
 
-# render <VAR=value>...: the pipeline YAML for a mainnet noble run
+# render <VAR=value>...: the pipeline YAML for a mainnet noble run. dhall-to-yaml
+# 1.6 quotes the keys and step names with ', 1.7 with ". The checks read ', so
+# they pass with both.
 render() {
   "${CLEAN[@]}" "$@" \
     CODENAMES_CONFIG=Noble_Amd64 NETWORK=Mainnet \
     GENESIS_TIMESTAMP=2026-10-29T18:00:00Z \
     CONFIG_JSON_GZ_URL=https://example.invalid/config.json.gz \
     PRECOMPUTED_FORK_BLOCK_PREFIX=gs://example/mainnet \
-    ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null
+    ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null \
+    | sed -E "s/^( *(- )?'(key|step)': )\"([^\"]*)\"$/\1'\4'/"
 }
 
 keys() { grep -oE "'key': [\"'][^\"']*[\"']" | sed -E "s/'key': [\"']//; s/[\"']\$//" | sort -u; }
+
+# deps_of <key>: the depends_on targets of the step with that key in $yaml,
+# one per line. A step is one "  - " item of the quoted YAML; each of its
+# depends_on entries is an item holding a "'step': '...'" line.
+deps_of() {
+  awk -v want="$1" <<< "$yaml" '
+    /^  - / { if (key == want) printf "%s", deps; key = ""; deps = ""; indeps = 0 }
+    /^    .depends_on.:/ { indeps = 1; next }
+    /^    [^ ]/ { indeps = 0 }
+    indeps && /^        .step.: / { sub(/^        .step.: \x27/, ""); sub(/\x27$/, ""); deps = deps $0 "\n" }
+    /^    .key.: / { sub(/^    .key.: \x27/, ""); sub(/\x27$/, ""); key = $0 }
+    END { if (key == want) printf "%s", deps }
+  ' | grep . || true
+}
 
 # Each build.sh invocation is one line of the YAML. Every command is also
 # echoed ("-- Running: ...") by the step; those lines are left out.
@@ -119,6 +137,17 @@ expect "the configured images still go to the build cache" \
   test "$(grep -c -- '--build-cache-dir' <<< "$builds")" -eq "$n"
 expect "verification loads the versioned image" \
   grep -q "load_from_cache.sh europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-daemon:4.0.4-c9e2eac-noble-mainnet" <<< "$yaml"
+
+echo "TEST: the verification steps wait for the reference ledgers they read"
+yaml="$(render)"
+for check in config ledgers tarballs; do
+  expect "the $check check waits for the reference step" \
+    grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-artifacts-$check-noble")"
+done
+expect "the corrupted-artifacts check waits for it too" \
+  grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-assert-unverify-corrupted-packaged-artifacts-noble")"
+expect "the packaging waits for the generation step" \
+  grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-build-hf-debian")"
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"
