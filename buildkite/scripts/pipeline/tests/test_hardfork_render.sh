@@ -16,7 +16,9 @@
 #     not look for their bases in the cache;
 #   - the verification steps wait for the reference ledgers they read;
 #   - each verification step runs the checks it has the inputs for, and the
-#     corrupted config must fail on the hash mismatch alone.
+#     corrupted config must fail on the hash mismatch alone;
+#   - the state dump is checked at once, by a step nothing waits for, and every
+#     amd64 codename has its image checked.
 #
 # Needs dhall-to-yaml, as the render does.
 
@@ -48,11 +50,12 @@ CLEAN=(env -u MINA_RELEASE_CHANNEL -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_D
 
 # render <VAR=value>...: the pipeline YAML for a mainnet noble run
 render() {
-  "${CLEAN[@]}" "$@" \
+  "${CLEAN[@]}" \
     CODENAMES_CONFIG=Noble_Amd64 NETWORK=Mainnet \
     GENESIS_TIMESTAMP=2026-10-29T18:00:00Z \
     CONFIG_JSON_GZ_URL=https://example.invalid/config.json.gz \
     PRECOMPUTED_FORK_BLOCK_PREFIX=gs://example/mainnet \
+    "$@" \
     ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null
 }
 
@@ -158,6 +161,81 @@ expect "the config step compares the package with the fork block" \
   grep -q -- "--checks config,block,constants,artifacts --prefork-version 4.0.3-73134bf" <<< "$step_commands"
 expect "the ledgers step compares the accounts with the fork config" \
   grep -q -- "--checks ledgers,accounts" <<< "$step_commands"
+
+echo "TEST: the state dump is checked at once, and blocks nothing"
+yaml="$(render)"
+expect "the preflight runs" grep -q "check-fork-dump.py --config-url https://example.invalid/config.json.gz --block-prefix gs://example/mainnet" <<< "$(commands <<< "$yaml")"
+expect "the preflight waits for nothing" test -z "$(deps_of "_GenerateHardforkPackage-preflight-state-dump")"
+expect_not "no step waits for the preflight" grep -q "'step': '_GenerateHardforkPackage-preflight-state-dump'" <<< "$yaml"
+
+echo "TEST: every amd64 codename has its image checked"
+yaml="$(render CODENAMES_CONFIG=Noble_Amd64,Jammy_Amd64,Bookworm_Arm64)"
+undefined="$(comm -23 \
+  <(grep -oE "_GenerateHardforkPackage-[A-Za-z0-9_-]+" <<< "$yaml" | sort -u) \
+  <(keys <<< "$yaml"))"
+expect "no undefined depends_on target (got: ${undefined:-none})" test -z "$undefined"
+deps="$(deps_of "_GenerateHardforkPackage-verify-packaged-image-jammy")"
+expect "the jammy check waits for the jammy image" grep -qx "_GenerateHardforkPackage-daemon_config-mainnet-jammy-docker-image" <<< "$deps"
+expect "the jammy check waits for the reference ledgers" grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$deps"
+expect_not "the first codename is not checked twice" grep -q "verify-packaged-image-noble" <<< "$yaml"
+expect_not "arm64 is left out: the verification runs on amd64 agents" grep -q "verify-packaged-image-bookworm" <<< "$yaml"
+
+echo "TEST: check-fork-dump.py"
+fixtures="$(mktemp -d)"
+trap 'rm -rf "$fixtures"' EXIT
+python3 - "$fixtures" <<'PYTHON'
+import gzip
+import json
+import sys
+
+d = sys.argv[1]
+token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+
+
+def account(balance, symbol=""):
+    return {"pk": "B62q", "token": token, "balance": balance, "token_symbol": symbol}
+
+
+def config(**changes):
+    c = {
+        "proof": {"fork": {"state_hash": "3Nfork", "blockchain_length": 7, "global_slot_since_genesis": 9}},
+        "ledger": {"hash": "jwledger", "accounts": [account("1")]},
+        "epoch_data": {
+            "staking": {"seed": "s", "accounts": [account("1.5", changes.get("symbol", "")), account("2")]},
+            "next": {"seed": "n", "accounts": [account("4")]},
+        },
+    }
+    return c
+
+
+def block(next_total="4000000000"):
+    return {"data": {"protocol_state": {"body": {
+        "blockchain_state": {"staged_ledger_hash": {"non_snark": {"ledger_hash": "jwledger"}}},
+        "consensus_state": {
+            "blockchain_length": "7",
+            "global_slot_since_genesis": "9",
+            "staking_epoch_data": {"seed": "s", "ledger": {"total_currency": "3500000000"}},
+            "next_epoch_data": {"seed": "n", "ledger": {"total_currency": next_total}},
+        }}}}}
+
+
+def dump(name, value):
+    text = json.dumps(value, ensure_ascii=False)
+    with gzip.open(f"{d}/{name}.json.gz", "wb") as f:
+        f.write(text.encode("utf-8", "surrogateescape"))
+
+
+dump("good", config())
+dump("raw", config(symbol="\udcff"))
+dump("replaced", config(symbol="\ufffd"))
+json.dump(block(), open(f"{d}/ok-7-3Nfork.json", "w"))
+json.dump(block("4000000001"), open(f"{d}/supply-7-3Nfork.json", "w"))
+PYTHON
+check_dump() { ./scripts/hardfork/release/check-fork-dump.py --config-url "file://$fixtures/$1.json.gz" --block-prefix "file://$fixtures/$2" > /dev/null 2>&1; }
+expect "a good dump passes" check_dump good ok
+expect "a raw 0xff is legitimate" check_dump raw ok
+expect_not "U+FFFD fails" check_dump replaced ok
+expect_not "a supply that is one nanomina off fails" check_dump good supply
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"
