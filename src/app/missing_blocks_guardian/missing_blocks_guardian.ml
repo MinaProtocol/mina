@@ -69,8 +69,12 @@ let bootstrap ~logger ~pool (archive : Config.archive) (blocks : Config.blocks)
   let%bind () = log_top_blocks ~logger ~pool ~when_:"before the recovery" in
   [%log info] "Restoring blocks one by one from $url"
     ~metadata:[ ("url", `String blocks.url) ] ;
+  let add_block =
+    Archive_blocks.add_block ~logger ~pool ~format:blocks.format
+  in
   let%bind () =
-    Recovery.restore ~logger archive blocks parent >>= or_exit ~logger
+    Recovery.restore ~logger ~add_block archive blocks parent
+    >>= or_exit ~logger
   in
   log_top_blocks ~logger ~pool ~when_:"after the recovery"
 

@@ -1,42 +1,36 @@
-(* archive_blocks.ml -- run mina-archive-blocks and read its log *)
+(* archive_blocks.ml -- write block files to the archive database *)
 
 open Core
 open Async
+module Block_file = Archive_blocks_lib.Block_file
 
-(* Writes [file] to the archive and relays the log of the program. Its exit
-   code is 0 even when the block was not added, so an error in its log is a
-   failure. A failure is an [Error] with the reason. *)
-let add ~logger ~prog ~format ~archive_uri file =
-  let uri = Uri.to_string archive_uri in
-  let failed error =
-    Error
-      (sprintf "%s could not add %s: %s. The database remains unhealthy." prog
-         file error )
-  in
-  match%map
-    Subprocess.run ~logger ~secrets:[ uri ] ~prog
-      ~args:
-        [ "--" ^ Config.Block_format.to_string format
-        ; "--archive-uri"
-        ; uri
-        ; file
-        ]
-      ()
-  with
-  | Error err ->
-      failed (sprintf "it could not be run: %s" (Error.to_string_hum err))
-  | Ok output -> (
-      let messages, other_lines = App_log.parse output.stdout in
-      App_log.relay ~logger messages ;
-      App_log.warn_other_lines ~logger ~prog other_lines ;
-      match (App_log.first_error messages, output.exit_status) with
-      | Some message, _ ->
-          failed (App_log.describe message)
-      | None, Error (`Exit_non_zero code) ->
-          failed (sprintf "it exited with %d%s" code (Subprocess.wrote output))
-      | None, Error (`Signal signal) ->
-          failed
-            (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
-               (Subprocess.wrote output) )
-      | None, Ok () ->
-          Ok () )
+let block_file_format : Config.Block_format.t -> Block_file.Format.t = function
+  | Precomputed ->
+      Precomputed
+  | Extensional ->
+      Extensional
+
+(* Returns the function that adds a block file to the database of [pool]. A
+   block that cannot be added is an [Error] with the reason. *)
+let add_block ~logger ~pool ~format =
+  let (module G) = Genesis_constants.profiled () in
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let format = block_file_format format in
+  fun file ->
+    let failed error =
+      Error
+        (sprintf "Could not add %s: %s. The database remains unhealthy." file
+           error )
+    in
+    match%map
+      Monitor.try_with_or_error (fun () ->
+          Block_file.add ~logger ~pool ~proof_cache_db
+            ~genesis_constants:G.genesis_constants
+            ~constraint_constants:G.constraint_constants ~format file )
+    with
+    | Ok (Ok ()) ->
+        Ok ()
+    | Ok (Error { message; error }) ->
+        failed (message ^ ": " ^ error)
+    | Error err ->
+        failed (Error.to_string_hum err)

@@ -25,8 +25,6 @@ end
 module Default = struct
   let auditor = "mina-missing-blocks-auditor"
 
-  let archive_blocks = "mina-archive-blocks"
-
   let format = Block_format.Precomputed
 
   let interval = 600
@@ -38,13 +36,8 @@ end
 (* The archive database and the program that audits it. *)
 type archive = { uri : Uri.t; auditor : string }
 
-(* Where the missing blocks come from and the program that writes them. *)
-type blocks =
-  { url : string
-  ; network : string
-  ; format : Block_format.t
-  ; archive_blocks : string
-  }
+(* Where the missing blocks come from. *)
+type blocks = { url : string; network : string; format : Block_format.t }
 
 (* A lookup of the environment. A variable set to the empty string counts as
    unset. *)
@@ -231,7 +224,7 @@ let archive ~env ~uri ~auditor : archive result =
   | Error problems ->
       Error problems
 
-let blocks ~env ~url ~network ~format ~archive_blocks : blocks result =
+let blocks ~env ~url ~network ~format : blocks result =
   let url =
     setting ~env ~flag:"--precomputed-blocks-url" ~var:"PRECOMPUTED_BLOCKS_URL"
       ~parse:blocks_url url
@@ -244,13 +237,9 @@ let blocks ~env ~url ~network ~format ~archive_blocks : blocks result =
     setting ~env ~flag:"--block-format" ~var:"BLOCKS_FORMAT"
       ~default:Default.format ~parse:Block_format.of_string format
   in
-  let archive_blocks =
-    setting ~env ~flag:"--archive-blocks" ~var:"ARCHIVE_BLOCKS"
-      ~default:Default.archive_blocks ~parse:program archive_blocks
-  in
-  match both (both url network) (both format archive_blocks) with
-  | Ok ((url, network), (format, archive_blocks)) ->
-      Ok { url; network; format; archive_blocks }
+  match both (both url network) format with
+  | Ok ((url, network), format) ->
+      Ok { url; network; format }
   | Error problems ->
       Error problems
 
