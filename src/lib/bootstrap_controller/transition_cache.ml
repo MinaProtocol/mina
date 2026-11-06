@@ -49,32 +49,35 @@ let merge (old_env, old_vc) (new_env, new_vc) =
         match new_b with `Block _ -> new_b | _ -> old_b )
   , vc )
 
+(** [children] with [new_child] merged into the child [equal] to it, or added
+    if there is none. *)
+let add_child ~equal ~merge children new_child =
+  let children', b =
+    List.fold children ~init:([], false) ~f:(fun (acc, b) child ->
+        (* If state hash was already among children, existing child is
+           merged with the new transition.
+           It's needed to maintain consistency about transitions that may
+           come from gossip or other ways; we want to preserve some
+           validation callback (and we don't expect two gossips for the
+           same).
+           Also, if we received a block after receiving a header
+           (possible when we'll simultaneously support both old and new
+           gossip topics), we want to preserve a block because it's more
+           than a header. *)
+        if (not b) && equal child new_child then
+          (merge child new_child :: acc, true)
+        else (acc, b) )
+  in
+  if b then children' else new_child :: children
+
 let add (t : t) ~parent new_child =
-  State_hash.Table.update t parent ~f:(function
-    | None ->
-        [ new_child ]
-    | Some children ->
-        let children', b =
-          List.fold children ~init:([], false) ~f:(fun (acc, b) child ->
-              (* If state hash was already among children, existing child is
-                 merged with the new transition.
-                 It's needed to maintain consistency about transitions that may
-                 come from gossip or other ways; we want to preserve some
-                 validation callback (and we don't expect two gossips for the
-                 same).
-                 Also, if we received a block after receiving a header
-                 (possible when we'll simultaneously support both old and new
-                 gossip topics), we want to preserve a block because it's more
-                 than a header. *)
-              if
-                (not b)
-                && State_hash.equal
-                     (state_hash @@ fst child)
-                     (state_hash @@ fst new_child)
-              then (merge child new_child :: acc, true)
-              else (acc, b) )
-        in
-        if b then children' else new_child :: children )
+  State_hash.Table.update t parent ~f:(fun children ->
+      add_child
+        ~equal:(fun x y ->
+          State_hash.equal (state_hash @@ fst x) (state_hash @@ fst y) )
+        ~merge
+        (Option.value children ~default:[])
+        new_child )
 
 let data t =
   let collected_transitions = State_hash.Table.data t |> List.concat in
