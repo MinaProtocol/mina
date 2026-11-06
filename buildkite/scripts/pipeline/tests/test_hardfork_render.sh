@@ -53,7 +53,7 @@ render() {
     ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null
 }
 
-keys() { grep -o "'key': '[^']*'" | sed "s/'key': '//; s/'$//" | sort -u; }
+keys() { grep -oE "'key': [\"'][^\"']*[\"']" | sed -E "s/'key': [\"']//; s/[\"']\$//" | sort -u; }
 
 # Each build.sh invocation is one line of the YAML. Every command is also
 # echoed ("-- Running: ...") by the step; those lines are left out.
