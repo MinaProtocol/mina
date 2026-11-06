@@ -66,7 +66,7 @@ let add_child ~equal ~merge children new_child =
            than a header. *)
         if (not b) && equal child new_child then
           (merge child new_child :: acc, true)
-        else (acc, b) )
+        else (child :: acc, b) )
   in
   if b then children' else new_child :: children
 
@@ -87,3 +87,23 @@ let data t =
     = 0 )
   (* TODO: make this assertion more efficient *) ;
   collected_transitions
+
+let%test_module "Adding to the transition cache" =
+  ( module struct
+    let add_child =
+      add_child
+        ~equal:(fun (x, _) (y, _) -> Int.equal x y)
+        ~merge:(fun (x, old) (_, new_) -> (x, old ^ new_))
+
+    let sorted = List.sort ~compare:[%compare: int * string]
+
+    let%test_unit "A child already present is merged, and its siblings kept" =
+      [%test_eq: (int * string) list]
+        (sorted (add_child [ (1, "a"); (2, "b"); (3, "c") ] (2, "d")))
+        [ (1, "a"); (2, "bd"); (3, "c") ]
+
+    let%test_unit "A new child is added" =
+      [%test_eq: (int * string) list]
+        (sorted (add_child [ (1, "a") ] (2, "b")))
+        [ (1, "a"); (2, "b") ]
+  end )
