@@ -37,7 +37,7 @@ module Stable = struct
     type t =
       { snark_transition : Snark_transition.Value.Stable.V3.t
       ; ledger_proof : Ledger_proof.Stable.V3.t option
-      ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
+      ; prover_state : Consensus.Data.Prover_state.Stable.V4.t
       ; staged_ledger_diff : Staged_ledger_diff.Stable.V4.t
       }
 
@@ -59,7 +59,8 @@ module Stable = struct
           Snark_transition.Value.Stable.V2.to_latest snark_transition
       ; ledger_proof =
           Option.map ledger_proof ~f:Ledger_proof.Stable.V2.to_latest
-      ; prover_state
+      ; prover_state =
+          Consensus.Data.Prover_state.Stable.V3.to_latest prover_state
       ; staged_ledger_diff =
           Staged_ledger_diff.Stable.V3.to_latest staged_ledger_diff
       }

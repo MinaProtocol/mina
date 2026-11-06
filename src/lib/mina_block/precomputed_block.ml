@@ -138,7 +138,9 @@ module Stable = struct
       ; delta_transition_chain_proof
       ; protocol_version
       ; proposed_protocol_version
-      ; accounts_accessed
+      ; accounts_accessed =
+          List.map accounts_accessed
+            ~f:(Tuple2.map_snd ~f:Account.Stable.V3.to_latest)
       ; accounts_created
       ; tokens_used
       }

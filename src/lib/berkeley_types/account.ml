@@ -1,6 +1,6 @@
 (* The account of the Berkeley era, as precomputed blocks list it in
-   [accounts_accessed]. It differs from the current account only in the length
-   of its zkApp state. *)
+   [accounts_accessed]. It differs from the Mesa account only in the length of
+   its zkApp state. *)
 
 open Core_kernel
 module Public_key = Signature_lib.Public_key
@@ -33,7 +33,7 @@ module Zkapp_account = struct
        ; proved_state
        ; zkapp_uri
        } :
-        Stable.V2.t ) : Mina_base.Zkapp_account.Stable.Latest.t =
+        Stable.V2.t ) : Mina_base.Zkapp_account.Stable.V3.t =
     { app_state = Zkapp_state.Value.to_mesa app_state
     ; verification_key
     ; zkapp_version
@@ -82,7 +82,7 @@ let to_mesa
      ; permissions
      ; zkapp
      } :
-      Stable.V2.t ) : Mina_base.Account.Stable.Latest.t =
+      Stable.V2.t ) : Mina_base.Account.Stable.V3.t =
   { public_key
   ; token_id
   ; token_symbol
