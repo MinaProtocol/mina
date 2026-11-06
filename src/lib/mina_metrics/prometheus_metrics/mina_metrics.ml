@@ -1387,6 +1387,54 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
+  let proposed_protocol_version_labels = 3
+
+  (* (label, number of blocks), as last reported to
+     [update_proposed_protocol_versions] *)
+  let proposed_protocol_version_blocks : (string * int) list ref = ref []
+
+  let update_proposed_protocol_versions versions =
+    let counts =
+      List.fold versions ~init:String.Map.empty ~f:(fun counts version ->
+          Map.update counts (Option.value version ~default:"none")
+            ~f:(fun count -> 1 + Option.value count ~default:0) )
+      |> Map.to_alist
+      |> List.sort ~compare:(fun (v1, n1) (v2, n2) ->
+             match Int.compare n2 n1 with 0 -> String.compare v1 v2 | c -> c )
+    in
+    let labelled, rest = List.split_n counts proposed_protocol_version_labels in
+    let other = List.sum (module Int) rest ~f:snd in
+    proposed_protocol_version_blocks :=
+      if other > 0 then labelled @ [ ("other", other) ] else labelled
+
+  (* A custom collector, rather than a labelled gauge, so that a version
+     dropping out of the most common ones stops being reported. *)
+  let () =
+    let info : MetricInfo.t =
+      { name =
+          MetricName.v
+            (Printf.sprintf "%s_%s_proposed_protocol_version_blocks" namespace
+               subsystem )
+      ; help =
+          Printf.sprintf
+            "# of blocks in the best chain of the transition frontier that \
+             signal each proposed protocol version (\"none\" if not \
+             signalled), for the %d most common versions, with the rest \
+             counted as \"other\""
+            proposed_protocol_version_labels
+      ; metric_type = Gauge
+      ; label_names = [ LabelName.v "version" ]
+      }
+    in
+    let collect () =
+      List.fold !proposed_protocol_version_blocks ~init:LabelSetMap.empty
+        ~f:(fun samples (label, count) ->
+          LabelSetMap.add [ label ]
+            [ Sample_set.sample (Float.of_int count) ]
+            samples )
+    in
+    CollectorRegistry.register CollectorRegistry.default info collect
+
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
 
