@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Repository hook: runs on the agent at the end of every step, after the
+# command, whatever its exit status. Removes the images the step recorded in
+# OWNED_REFS_FILE (see pre-command). Never fatal: remove-owned-images.sh
+# tolerates a missing file and a ref another job still runs.
+
+if [[ -n "${OWNED_REFS_FILE:-}" ]]; then
+  "${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}/buildkite/scripts/docker/remove-owned-images.sh" "$OWNED_REFS_FILE" || true
+fi
