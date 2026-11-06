@@ -1062,7 +1062,21 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     run_node node
   and on_built node ~start_time ~sender ~parent_hash c result =
     match result with
-    | Error e ->
+    | Error `Parent_breadcrumb_not_found ->
+        [%log' info t.logger]
+          "Parent $parent_hash of block $state_hash has left the frontier"
+          ~metadata:
+            [ ("state_hash", State_hash.to_yojson node.state_hash)
+            ; ("parent_hash", State_hash.to_yojson parent_hash)
+            ] ;
+        Transition_handler.Block_registry.finish block_registry c `Ignored ;
+        finish t node ~is_error:true
+    | Error
+        ( ( `Exn _
+          | `Fatal_error _
+          | `Invalid_staged_ledger_diff _
+          | `Invalid_staged_ledger_hash _
+          | `Invalid_body_reference ) as e ) ->
         (* TODO consider rejecting the callback in some cases,
            see https://github.com/MinaProtocol/mina/issues/11087 *)
         Transition_handler.Block_registry.finish block_registry c
@@ -1072,8 +1086,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           | `Exn _
           | `Fatal_error _
           | `Invalid_staged_ledger_diff _
-          | `Invalid_staged_ledger_hash _
-          | `Parent_breadcrumb_not_found ->
+          | `Invalid_staged_ledger_hash _ ->
               `Ignored ) ;
         let e =
           match e with
@@ -1087,12 +1100,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               Error.tag e ~tag:"invalid staged ledger hash"
           | `Invalid_body_reference ->
               Error.of_string "invalid body reference"
-          | `Parent_breadcrumb_not_found ->
-              Error.tag
-                (Error.of_string
-                   (sprintf "Parent breadcrumb with state_hash %s not found"
-                      (State_hash.to_base58_check parent_hash) ) )
-                ~tag:"parent breadcrumb not found"
         in
         failed node ~error:e ~sender `Build_breadcrumb
     | Ok breadcrumb ->
