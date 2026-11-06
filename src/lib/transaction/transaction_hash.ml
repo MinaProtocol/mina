@@ -165,6 +165,14 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
               with _ ->
                 Or_error.error_string
                   "Could not decode serialized signed command (version 2)" )
+          | 3 -> (
+              (* must be a zkApp command, as signed commands stop at V2 *)
+              try
+                let cmd = Zkapp_command.Stable.V3.bin_read_t ~pos_ref buf in
+                Ok (hash_zkapp_command cmd)
+              with _ ->
+                Or_error.error_string
+                  "Could not decode serialized zkApp command (version 3)" )
           | _ ->
               Or_error.error_string
                 (sprintf
@@ -311,6 +319,10 @@ let%test_module "Transaction hashes" =
       let decoded = List.map v1_hashes ~f:of_base58_check_exn_v1 in
       let recoded = List.map decoded ~f:to_base58_check_v1 in
       List.equal String.equal v1_hashes recoded
+
+    let%test "zkApp command v3 hash from transaction id" =
+      let transaction_id = Zkapp_command.to_base64 new_zkapp_txn in
+      run_test ~transaction_id ~expected_hash:(new_zkapp_txn_hash ()) ()
 
     let%test "signed command v1 hash from transaction id" =
       let transaction_id =
