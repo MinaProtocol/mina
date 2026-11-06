@@ -179,10 +179,27 @@ for archive in "${SELECTED[@]}"; do
     exit 1
   fi
   loaded=("${tags[@]}")
-  if [[ "$KEEP_HASH_TAG" != "1" && ${#tags[@]} -gt 1 ]]; then
-    # build.sh saves the version tag first, then the hash tag.
-    echo "    not for this registry: ${tags[*]:1}"
-    tags=("${tags[0]}")
+  if [[ "$KEEP_HASH_TAG" != "1" ]]; then
+    # build.sh names the archive after the version tag. Keep that one, in
+    # whatever order docker load prints the tags.
+    version="$(basename "$archive" .tar.zst)"
+    kept=()
+    dropped=()
+    for tag in "${tags[@]}"; do
+      if [[ "${tag##*:}" == "$version" ]]; then
+        kept+=("$tag")
+      else
+        dropped+=("$tag")
+      fi
+    done
+    if [[ ${#kept[@]} -eq 0 ]]; then
+      echo "❌ ${archive} holds no ${version} tag: ${tags[*]}" >&2
+      exit 1
+    fi
+    if [[ ${#dropped[@]} -gt 0 ]]; then
+      echo "    not for this registry: ${dropped[*]}"
+    fi
+    tags=("${kept[@]}")
   fi
   if [[ -n "$TARGET_REGISTRY" ]]; then
     # The archive holds the tags of the registry packaging was told about.
@@ -195,7 +212,7 @@ for archive in "${SELECTED[@]}"; do
       fi
       retagged+=("$target")
     done
-    if [[ "${retagged[0]}" != "${tags[0]}" ]]; then
+    if [[ "$(registry_of "${retagged[0]}")" != "$(registry_of "${tags[0]}")" ]]; then
       echo "    tagged for $(registry_of "${tags[0]}"), publishing to ${TARGET_REGISTRY}"
     fi
     tags=("${retagged[@]}")
