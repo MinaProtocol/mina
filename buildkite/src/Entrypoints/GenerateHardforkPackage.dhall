@@ -489,11 +489,12 @@ let generateDockerForCodename =
                   )
                   dockerSpecs
 
-let generateHfRelatedStepsForCodename =
+let daemonImage =
+    -- The configured daemon image of one codename, and how to load it. The
+    -- verification takes it from this build's cache, where its build step
+    -- wrote it, so it runs the image that was built here.
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
-      ->  \(codenames : List DebianArchPair)
-      ->  \(pipelineName : Text)
       ->  let imageTag =
                 Docker.Tag::{
                 , remove_profile_from_name = True
@@ -515,11 +516,115 @@ let generateHfRelatedStepsForCodename =
                                      imageTag.package}:${Docker.dockerTag
                                                            imageTag}"
 
-          let loadImage =
-              -- The daemon image is never pushed; the verification takes it
-              -- from this build's cache, where its build step wrote it.
-                Cmd.run
-                  "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
+          in  { image = image
+              , load =
+                  Cmd.run
+                    "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
+              }
+
+let precomputedBlockArg =
+          \(flag : Text)
+      ->  \(spec : Spec.Type)
+      ->  merge
+            { Some = \(prefix : Text) -> "${flag} ${prefix}", None = "" }
+            spec.precomputed_block_prefix
+
+let preflightKey = "preflight-state-dump"
+
+let preflightCommand =
+    -- The dump is checked before anything is built from it, beside the build
+    -- and not ahead of it: no deb or image waits for this step. The reference
+    -- tarballs do, and the verification with them, so a bad dump stops those
+    -- within seconds and the builds carry on.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                Toolchain.select
+                  Toolchain.Spec::{
+                  , debVersion = codename.DebVersion
+                  , arch = codename.Arch
+                  }
+                  ([] : List Text)
+                  "./scripts/hardfork/release/check-fork-dump.py --network ${Network.lowerName
+                                                                               spec.network} --config-url ${spec.config_json_gz_url} ${precomputedBlockArg
+                                                                                                                                         "--block-prefix"
+                                                                                                                                         spec}"
+            , label = "Preflight: check the state dump"
+            , key = preflightKey
+            , target = Size.Small
+            }
+
+let verifyImageCommand =
+    -- The full verification runs for the first codename. Every other codename
+    -- has its own image, with its own binary and packages, so it gets the
+    -- checks that read the image. amd64 only: the verification runs on amd64
+    -- agents.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  \(firstCodename : DebianArchPair)
+      ->  \(codename : DebianArchPair)
+      ->  let daemon = daemonImage spec codename
+
+          let lowerNameCodename = DebianVersions.lowerName codename.DebVersion
+
+          let dockerDaemonSpec =
+                DockerImage.ReleaseSpec::{
+                , service = Docker.Type.Daemon { network = spec.network }
+                , network = spec.network
+                , deb_codename = codename.DebVersion
+                , deb_profile = Profiles.fromNetwork spec.network
+                , deb_legacy_version = spec.deb_legacy_version
+                , step_key_suffix = "-${lowerNameCodename}-docker-image"
+                , size = spec.size
+                }
+
+          in  merge
+                { Amd64 =
+                  [ Command.build
+                      Command.Config::{
+                      , commands =
+                        [ Cmd.run
+                            "export MINA_DEB_CODENAME=${lowerNameCodename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                        , daemon.load
+                        , Cmd.runInDocker
+                            Cmd.Docker::{ image = daemon.image }
+                            "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                    spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputedBlockArg
+                                                                                                                                                                                                                                                    "--precomputed-block-prefix"
+                                                                                                                                                                                                                                                    spec} --reference-data-dir /var/storagebox/\\\${BUILDKITE_BUILD_ID}/hardfork/legacy --checks block,constants,artifacts --prefork-version ${spec.deb_legacy_version}"
+                        ]
+                      , label =
+                          "Verify packaged artifacts: Image check for ${lowerNameCodename}"
+                      , key = "verify-packaged-image-${lowerNameCodename}"
+                      , target = Size.Small
+                      , depends_on =
+                        [ { name = pipelineName
+                          , key = DockerImage.stepKey dockerDaemonSpec
+                          }
+                        , { name = pipelineName
+                          , key =
+                              "generate-reference-tarballs-${DebianVersions.lowerName
+                                                               firstCodename.DebVersion}"
+                          }
+                        ]
+                      }
+                  ]
+                , Arm64 = [] : List Command.Type
+                }
+                codename.Arch
+
+let generateHfRelatedStepsForCodename =
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  \(codenames : List DebianArchPair)
+      ->  \(pipelineName : Text)
+      ->  let daemon = daemonImage spec codename
+
+          let image = daemon.image
+
+          let loadImage = daemon.load
 
           let profile = Profiles.fromNetwork spec.network
 
@@ -592,7 +697,9 @@ let generateHfRelatedStepsForCodename =
                     spec
                     codename
                     referencesTarballStepKey
-                    dependsOnArtifactsOrEmpty
+                    (   dependsOnArtifactsOrEmpty
+                      # [ { name = pipelineName, key = preflightKey } ]
+                    )
                 ]
 
           let cached_tarball_ledgers =
@@ -754,11 +861,25 @@ let pipeline =
                           in    merge
                                   { Some =
                                           \(codename : DebianArchPair)
-                                      ->  generateHfRelatedStepsForCodename
-                                            spec
-                                            codename
-                                            spec.codenames
-                                            pipelineName
+                                      ->    [ preflightCommand spec codename ]
+                                          # generateHfRelatedStepsForCodename
+                                              spec
+                                              codename
+                                              spec.codenames
+                                              pipelineName
+                                          # List/concatMap
+                                              DebianArchPair
+                                              Command.Type
+                                              ( verifyImageCommand
+                                                  spec
+                                                  pipelineName
+                                                  codename
+                                              )
+                                              ( Prelude.List.drop
+                                                  1
+                                                  DebianArchPair
+                                                  spec.codenames
+                                              )
                                   , None = [] : List Command.Type
                                   }
                                   first

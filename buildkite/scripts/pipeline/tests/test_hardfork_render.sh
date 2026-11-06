@@ -16,7 +16,9 @@
 #     not look for their bases in the cache;
 #   - the verification steps wait for the reference ledgers they read;
 #   - each verification step runs the checks it has the inputs for, and the
-#     corrupted config must fail on the hash mismatch alone.
+#     corrupted config must fail on the hash mismatch alone;
+#   - the state dump is checked at once, no build waits for that step, and every
+#     amd64 codename has its image checked.
 #
 # Needs dhall-to-yaml, as the render does.
 
@@ -50,11 +52,12 @@ CLEAN=(env -u MINA_RELEASE_CHANNEL -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_D
 # 1.6 quotes the keys and step names with ', 1.7 with ". The checks read ', so
 # they pass with both.
 render() {
-  "${CLEAN[@]}" "$@" \
+  "${CLEAN[@]}" \
     CODENAMES_CONFIG=Noble_Amd64 NETWORK=Mainnet \
     GENESIS_TIMESTAMP=2026-10-29T18:00:00Z \
     CONFIG_JSON_GZ_URL=https://example.invalid/config.json.gz \
     PRECOMPUTED_FORK_BLOCK_PREFIX=gs://example/mainnet \
+    "$@" \
     ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null \
     | sed -E "s/^( *(- )?'(key|step)': )\"([^\"]*)\"$/\1'\4'/"
 }
@@ -161,6 +164,32 @@ expect "the config step compares the package with the fork block" \
   grep -q -- "--checks config,block,constants,artifacts --prefork-version 4.0.3-73134bf" <<< "$step_commands"
 expect "the ledgers step compares the accounts with the fork config" \
   grep -q -- "--checks ledgers,accounts" <<< "$step_commands"
+
+echo "TEST: the state dump is checked at once, and no build waits for it"
+yaml="$(render)"
+expect "the preflight runs" grep -q "check-fork-dump.py --network mainnet --config-url https://example.invalid/config.json.gz --block-prefix gs://example/mainnet" <<< "$(commands <<< "$yaml")"
+expect "the preflight waits for nothing" test -z "$(deps_of "_GenerateHardforkPackage-preflight-state-dump")"
+expect "the reference tarballs wait for it, and the verification with them" \
+  grep -qx "_GenerateHardforkPackage-preflight-state-dump" <<< "$(deps_of "_GenerateHardforkPackage-generate-reference-tarballs-noble")"
+waiting="$(awk '
+  /^  - / { key = "" }
+  /^    .key.: / { sub(/^    .key.: \x27/, ""); sub(/\x27$/, ""); key = $0; if (w) print key; w = 0 }
+  /.step.: .*preflight-state-dump/ { w = 1 }
+' <<< "$yaml")"
+expect "nothing else waits for it, so no deb or image is delayed (got: $waiting)" \
+  test "$waiting" = "_GenerateHardforkPackage-generate-reference-tarballs-noble"
+
+echo "TEST: every amd64 codename has its image checked"
+yaml="$(render CODENAMES_CONFIG=Noble_Amd64,Jammy_Amd64,Bookworm_Arm64)"
+undefined="$(comm -23 \
+  <(grep -oE "_GenerateHardforkPackage-[A-Za-z0-9_-]+" <<< "$yaml" | sort -u) \
+  <(keys <<< "$yaml"))"
+expect "no undefined depends_on target (got: ${undefined:-none})" test -z "$undefined"
+deps="$(deps_of "_GenerateHardforkPackage-verify-packaged-image-jammy")"
+expect "the jammy check waits for the jammy image" grep -qx "_GenerateHardforkPackage-daemon_config-mainnet-jammy-docker-image" <<< "$deps"
+expect "the jammy check waits for the reference ledgers" grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$deps"
+expect_not "the first codename is not checked twice" grep -q "verify-packaged-image-noble" <<< "$yaml"
+expect_not "arm64 is left out: the verification runs on amd64 agents" grep -q "verify-packaged-image-bookworm" <<< "$yaml"
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"
