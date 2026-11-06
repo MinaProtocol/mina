@@ -73,6 +73,9 @@ module Cached = struct
 
     val was_consumed : (_, _) t -> bool
 
+    (** Whether [c], or a value transformed from it, has been invalidated. *)
+    val was_finalized : (_, _) t -> bool
+
     (** [transform c ~f ~logger] maps the value of [c] over
      *  [f], consuming [c]. *)
     val transform : ('t0, 'cache_t) t -> f:('t0 -> 't1) -> ('t1, 'cache_t) t

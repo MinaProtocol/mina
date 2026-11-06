@@ -63,6 +63,18 @@ type t =
       Capped_supervisor.t
   }
 
+(* Release a block that won't be built, along with its validation callback. A
+   failed build may already have released it. *)
+let release_unbuilt (cached_transition, vc) =
+  (* TODO consider rejecting the callback in some cases,
+     see https://github.com/MinaProtocol/mina/issues/11087 *)
+  Option.value_map vc ~default:ignore
+    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
+  if not (Cached.was_finalized cached_transition) then
+    ignore
+      ( Cached.invalidate_with_failure cached_transition
+        : Mina_block.initial_valid_block Envelope.Incoming.t )
+
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
@@ -113,16 +125,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree
-                  ~f:(fun (cached_transition, vc) ->
-                    (* TODO consider rejecting the callback in some cases,
-                       see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore
-                      ( Cached.invalidate_with_failure cached_transition
-                        : Mina_block.initial_valid_block Envelope.Incoming.t ) ) ) )
+                Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) )
   in
   { logger
   ; collected_transitions
@@ -393,6 +396,28 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         |> Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
+
+    let%test_unit "Blocks from a failed build are released once" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
+        ~f:(fun (_frontier, branch) ->
+          let cache =
+            Unprocessed_transition_cache.create ~logger ~cache_exceptions:true
+          in
+          let[@warning "-8"] [ failed; unbuilt ] =
+            List.map branch ~f:(fun breadcrumb ->
+                downcast_breadcrumb breadcrumb
+                |> Unprocessed_transition_cache.register_exn cache )
+          in
+          (* As a build that fails does: the block is transformed into the
+             result of building it, which is then invalidated. *)
+          ignore
+            ( Cached.invalidate_with_failure (Cached.transform failed ~f:Fn.id)
+              : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+          release_unbuilt (failed, None) ;
+          release_unbuilt (unbuilt, None) ;
+          assert (Cached.was_finalized unbuilt) )
 
     let%test_unit "catchup jobs fire after the timeout" =
       let timeout_duration = Block_time.Span.of_ms 200L in
