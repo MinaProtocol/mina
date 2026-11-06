@@ -44,6 +44,13 @@ let%test_module "Tokens test" =
 
     let vk =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          (* Compiling the tokens rules starts the compilation of the recursive
+             transfer rule they depend on. Snarky can only run one circuit at a
+             time, so finish the recursive transfer rule's keys before starting
+             on the tokens rules' own, rather than letting the two interleave. *)
+          let%bind.Async.Deferred _ =
+            Lazy.force Zkapps_tokens.Transfer_recursive.vk
+          in
           Lazy.force Zkapps_tokens.vk )
 
     let mint_to_keys = gen_keys ()
