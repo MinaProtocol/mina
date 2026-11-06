@@ -112,6 +112,7 @@ module Accounts = struct
         | Some
             { app_state
             ; verification_key
+            ; verification_key_txn_version
             ; action_state
             ; last_action_slot
             ; proved_state
@@ -138,8 +139,12 @@ module Accounts = struct
             in
 
             let verification_key =
-              Option.map verification_key
-                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
+              Option.map verification_key ~f:(fun vk ->
+                  Zkapp_account.with_version
+                    ~txn_version:
+                      (Option.value verification_key_txn_version
+                         ~default:Mina_numbers.Txn_version.mesa )
+                    (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk) )
             in
             let%map action_state =
               if
@@ -281,6 +286,8 @@ module Accounts = struct
             in
             { Runtime_config.Accounts.Single.Zkapp_account.app_state
             ; verification_key
+            ; verification_key_txn_version =
+                Zkapp_account.verification_key_txn_version zkapp
             ; action_state
             ; last_action_slot
             ; proved_state

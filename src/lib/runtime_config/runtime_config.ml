@@ -304,7 +304,12 @@ module Json_layout = struct
 
         type t =
           { app_state : Field.t list
-          ; verification_key : Verification_key.t option [@default None]
+          ; verification_key : Verification_key.t option
+                [@default None]
+                (* The version of [verification_key]. Accounts from before the
+                   field existed hold their key at the Mesa version. *)
+          ; verification_key_txn_version : Permissions.Txn_version.t option
+                [@default None]
           ; action_state : Field.t list
           ; last_action_slot : int
           ; proved_state : bool
@@ -321,6 +326,7 @@ module Json_layout = struct
           { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
           ; verification_key =
               Option.map (verification_key_wire zkapp) ~f:With_hash.data
+          ; verification_key_txn_version = verification_key_txn_version zkapp
           ; action_state =
               Pickles_types.Vector.Vector_5.to_list zkapp.action_state
           ; last_action_slot =
@@ -733,7 +739,7 @@ module Accounts = struct
       in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
-          , Mina_base.Verification_key_wire.t option
+          , _
           , Zkapp_account.Field.t
           , Mina_numbers.Global_slot_since_genesis.t
           , bool
@@ -745,7 +751,12 @@ module Accounts = struct
               Mina_base.Zkapp_state.V.of_list_exn
               @@ pad_app_state_do app.app_state
           ; verification_key =
-              Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
+              Option.map app.verification_key ~f:(fun vk ->
+                  Mina_base.Zkapp_account.with_version
+                    ~txn_version:
+                      (Option.value app.verification_key_txn_version
+                         ~default:Mina_numbers.Txn_version.mesa )
+                    (With_hash.of_data ~hash_data vk) )
           ; action_state =
               Pickles_types.Vector.Vector_5.of_list_exn app.action_state
           ; last_action_slot =
