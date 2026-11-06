@@ -529,10 +529,13 @@ let precomputedBlockArg =
             { Some = \(prefix : Text) -> "${flag} ${prefix}", None = "" }
             spec.precomputed_block_prefix
 
+let preflightKey = "preflight-state-dump"
+
 let preflightCommand =
     -- The dump is checked before anything is built from it, beside the build
-    -- and not ahead of it: nothing depends on this step. A bad dump shows red
-    -- within seconds, and the build carries on until someone cancels it.
+    -- and not ahead of it: no deb or image waits for this step. The reference
+    -- tarballs do, and the verification with them, so a bad dump stops those
+    -- within seconds and the builds carry on.
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
       ->  Command.build
@@ -544,11 +547,12 @@ let preflightCommand =
                   , arch = codename.Arch
                   }
                   ([] : List Text)
-                  "./scripts/hardfork/release/check-fork-dump.py --config-url ${spec.config_json_gz_url} ${precomputedBlockArg
-                                                                                                             "--block-prefix"
-                                                                                                             spec}"
+                  "./scripts/hardfork/release/check-fork-dump.py --network ${Network.lowerName
+                                                                               spec.network} --config-url ${spec.config_json_gz_url} ${precomputedBlockArg
+                                                                                                                                         "--block-prefix"
+                                                                                                                                         spec}"
             , label = "Preflight: check the state dump"
-            , key = "preflight-state-dump"
+            , key = preflightKey
             , target = Size.Small
             }
 
@@ -693,7 +697,9 @@ let generateHfRelatedStepsForCodename =
                     spec
                     codename
                     referencesTarballStepKey
-                    dependsOnArtifactsOrEmpty
+                    (   dependsOnArtifactsOrEmpty
+                      # [ { name = pipelineName, key = preflightKey } ]
+                    )
                 ]
 
           let cached_tarball_ledgers =

@@ -148,6 +148,15 @@ if [ "${#deb_files[@]}" -eq 0 ]; then
   exit 1
 fi
 
+# Several versions of one package means the caller did not pin it, and apt would
+# install one of them by file order. Refuse rather than guess.
+duplicate_packages=$(printf '%s\n' "${deb_files[@]##*/}" | cut -d_ -f1 | sort | uniq -d)
+if [ -n "$duplicate_packages" ]; then
+  echo "Several versions staged for: ${duplicate_packages//$'\n'/ }. Set FORCE_VERSION to the one to install." >&2
+  printf '  %s\n' "${deb_files[@]}" >&2
+  exit 1
+fi
+
 # Install debians
 echo "Installing mina packages: $DEBS"
 echo "Installing the following local .deb files:"

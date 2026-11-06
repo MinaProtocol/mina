@@ -14,7 +14,10 @@ seconds. It compares:
 
 The dump is read byte for byte, as bytes that are not UTF-8 are legitimate.
 
-Usage: check-fork-dump.py --config-url URL [--block-prefix gs://bucket/network]
+The fork block comes from --block-prefix, by default from the bucket the
+hardfork verifier falls back to.
+
+Usage: check-fork-dump.py --network NAME --config-url URL [--block-prefix gs://bucket/network]
 """
 import argparse
 import gzip
@@ -76,6 +79,7 @@ def compare_with_block(config, block):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--network", required=True)
     parser.add_argument("--config-url", required=True)
     parser.add_argument("--block-prefix")
     args = parser.parse_args()
@@ -90,16 +94,14 @@ def main():
 
     config = json.loads(dump.decode("utf-8", "surrogateescape"))
 
-    if args.block_prefix:
-        fork = config["proof"]["fork"]
-        url = block_url(args.block_prefix, fork["blockchain_length"], fork["state_hash"])
-        print(f"fork block: {url}")
-        block = json.loads(fetch(url))
-        for name, in_dump, in_block in compare_with_block(config, block):
-            if str(in_dump) != str(in_block):
-                failures.append(f"{name}: dump {in_dump}, fork block {in_block}")
-    else:
-        print("no block prefix: comparing the bytes only")
+    prefix = args.block_prefix or f"gs://mina_network_block_data/{args.network}"
+    fork = config["proof"]["fork"]
+    url = block_url(prefix, fork["blockchain_length"], fork["state_hash"])
+    print(f"fork block: {url}")
+    block = json.loads(fetch(url))
+    for name, in_dump, in_block in compare_with_block(config, block):
+        if str(in_dump) != str(in_block):
+            failures.append(f"{name}: dump {in_dump}, fork block {in_block}")
 
     for failure in failures:
         print(f"Error: {failure}", file=sys.stderr)
