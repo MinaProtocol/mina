@@ -250,6 +250,25 @@ module GetFilteredLogEntries =
   }
 |}]
 
+(* A query of its own: a daemon without these fields rejects the whole query, and
+   Account has to keep working against released daemons. *)
+module Account_bytes =
+[%graphql
+{|
+  query ($public_key: PublicKey!, $token: UInt64) {
+    account (publicKey : $public_key, token : $token) {
+      tokenSymbol
+      tokenSymbolBytes { hex
+                         utf8
+                       }
+      zkappUri
+      zkappUriBytes { hex
+                      utf8
+                    }
+    }
+  }
+|}]
+
 module Account =
 [%graphql
 {|
