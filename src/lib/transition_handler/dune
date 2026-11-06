@@ -16,6 +16,7 @@
   integers
   result
   ;; local libraries
+  block_outcome_log
   error_json
   data_hash_lib
   block_time
