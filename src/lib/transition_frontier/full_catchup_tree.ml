@@ -287,10 +287,8 @@ let block_added (t : t) h =
       Hashtbl.remove t.nodes h ;
       remove_state t.states node )
 
-let remove_node' t (node : Node.t) =
-  Hashtbl.remove t.nodes node.state_hash ;
-  remove_state t.states node ;
-  Ivar.fill_if_empty node.result (Error node.attempts) ;
+(** Give up the block [node] holds, if it holds one. *)
+let release_block t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
@@ -306,12 +304,34 @@ let remove_node' t (node : Node.t) =
   | To_build_breadcrumb (_parent, c) ->
       t.release.release c
 
+let remove_node' t (node : Node.t) =
+  Hashtbl.remove t.nodes node.state_hash ;
+  remove_state t.states node ;
+  Ivar.fill_if_empty node.result (Error node.attempts) ;
+  release_block t node
+
 let remove_node t h =
   match Hashtbl.find t.nodes h with
   | None ->
       ()
   | Some node ->
       remove_node' t node
+
+(** Make [node] the tree's node for its block, in place of the node there was
+    for it, if any. The replaced node gives up its block, if it holds one, and
+    those waiting for its result get [node]'s. *)
+let add_node t (node : Node.t) =
+  Option.iter (Hashtbl.find t.nodes node.state_hash) ~f:(fun replaced ->
+      remove_state t.states replaced ;
+      release_block t replaced ;
+      upon (Ivar.read node.result) (Ivar.fill_if_empty replaced.result) ) ;
+  add_state t.states node ;
+  Hashtbl.set t.nodes ~key:node.state_hash ~data:node
+
+(** Whether [node] is the tree's node for its block: it has been neither
+    removed nor replaced. *)
+let is_current t (node : Node.t) =
+  Option.exists (Hashtbl.find t.nodes node.state_hash) ~f:(phys_equal node)
 
 (** Of the nodes with the given hashes and parents, those to end because the
     root has moved to [new_root] and the blocks [left] have left the frontier:

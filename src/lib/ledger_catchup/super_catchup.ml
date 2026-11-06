@@ -750,8 +750,12 @@ let create_node ~logger ~downloader t x =
   in
   upon (Ivar.read node.result) (fun _ ->
       Downloader.cancel downloader (h, blockchain_length) ) ;
-  Transition_frontier.Full_catchup_tree.add_state t.states node ;
-  Hashtbl.set t.nodes ~key:h ~data:node ;
+  ( match Hashtbl.find t.nodes h with
+  | Some { state = To_download job; _ } ->
+      Downloader.cancel downloader job.key
+  | Some _ | None ->
+      () ) ;
+  Transition_frontier.Full_catchup_tree.add_node t node ;
   ( try check_invariant ~downloader t
     with e ->
       [%log' debug t.logger]
@@ -827,7 +831,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "set_state $exn"
   in
-  let resume = create_resumption_queue ~schedule in
+  let resume =
+    let queue = create_resumption_queue ~schedule in
+    fun (node : Node.t) f ->
+      queue ~finished:node.result (fun () ->
+          if Transition_frontier.Full_catchup_tree.is_current t node then f () )
+  in
   let rec failed (node : Node.t) ?error ~sender failure_reason =
     [%log' debug t.logger] "failed with $error"
       ~metadata:
@@ -858,11 +867,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     (* TODO: See if the bail out is happening. *)
     upon
       (Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ])
-      (function
-        | Ok x ->
-            resume ~finished:node.result (fun () -> f x)
-        | Error `Finished ->
-            () )
+      (function Ok x -> resume node (fun () -> f x) | Error `Finished -> ())
   and retry node =
     step node
       (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
@@ -999,15 +1004,11 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         | `In_frontier hash -> (
             match Transition_frontier.find frontier hash with
             | None ->
-                [%log' error t.logger]
-                  "Failed to find transition in frontier despite In_frontier \
-                   result"
+                [%log' info t.logger]
+                  "Block $state_hash was added to the frontier, but has since \
+                   left it"
                   ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-                failwithf
-                  "Failed to find transition %s in frontier despite \
-                   In_frontier result"
-                  (State_hash.to_base58_check hash)
-                  ()
+                finish t node ~is_error:true
             | Some _ ->
                 finish t node ~is_error:false )
         | `Building_path tv ->
@@ -1061,7 +1062,21 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     run_node node
   and on_built node ~start_time ~sender ~parent_hash c result =
     match result with
-    | Error e ->
+    | Error `Parent_breadcrumb_not_found ->
+        [%log' info t.logger]
+          "Parent $parent_hash of block $state_hash has left the frontier"
+          ~metadata:
+            [ ("state_hash", State_hash.to_yojson node.state_hash)
+            ; ("parent_hash", State_hash.to_yojson parent_hash)
+            ] ;
+        Transition_handler.Block_registry.finish block_registry c `Ignored ;
+        finish t node ~is_error:true
+    | Error
+        ( ( `Exn _
+          | `Fatal_error _
+          | `Invalid_staged_ledger_diff _
+          | `Invalid_staged_ledger_hash _
+          | `Invalid_body_reference ) as e ) ->
         (* TODO consider rejecting the callback in some cases,
            see https://github.com/MinaProtocol/mina/issues/11087 *)
         Transition_handler.Block_registry.finish block_registry c
@@ -1071,8 +1086,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           | `Exn _
           | `Fatal_error _
           | `Invalid_staged_ledger_diff _
-          | `Invalid_staged_ledger_hash _
-          | `Parent_breadcrumb_not_found ->
+          | `Invalid_staged_ledger_hash _ ->
               `Ignored ) ;
         let e =
           match e with
@@ -1086,12 +1100,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               Error.tag e ~tag:"invalid staged ledger hash"
           | `Invalid_body_reference ->
               Error.of_string "invalid body reference"
-          | `Parent_breadcrumb_not_found ->
-              Error.tag
-                (Error.of_string
-                   (sprintf "Parent breadcrumb with state_hash %s not found"
-                      (State_hash.to_base58_check parent_hash) ) )
-                ~tag:"parent breadcrumb not found"
         in
         failed node ~error:e ~sender `Build_breadcrumb
     | Ok breadcrumb ->
@@ -1099,8 +1107,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           Gauge.set Catchup.build_breadcrumb_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         upon (Scheduler.yield ()) (fun () ->
-            resume ~finished:node.result (fun () ->
-                on_yielded node c breadcrumb ) )
+            resume node (fun () -> on_yielded node c breadcrumb) )
   and on_yielded node c breadcrumb =
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
