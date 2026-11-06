@@ -280,6 +280,18 @@ if checks_contains config; then
         echo "Hashes in config $FORK_CONFIG don't match hashes from the precomputed block $PRECOMPUTED_FORK_BLOCK" >&2
         exit 1
     fi
+
+    # What create_runtime_config.sh carries over: these two keys, when the old
+    # network has them, and no stop slot of the old network.
+    result=$(jq --slurpfile prefork "$FORKING_FROM_CONFIG_JSON" '
+    .daemon == ($prefork[0] | (.daemon // {}) | {network_id, peer_list_url} |
+                with_entries(select(.value != null)) |
+                if . == {} then null else . end)' "$PACKAGED_DAEMON_CONFIG")
+
+    if [ "$result" != "true" ]; then
+        echo "The daemon section of $PACKAGED_DAEMON_CONFIG is not network_id and peer_list_url of $FORKING_FROM_CONFIG_JSON" >&2
+        exit 1
+    fi
 else
     echo "Skipping config validation as per --checks option" >&2
 fi
@@ -290,6 +302,7 @@ if checks_contains ledgers; then
     FORK_CONFIG_JSON="$FORK_CONFIG" \
     LEDGER_HASHES_JSON="$WORKDIR/hashes.json" \
     GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
+    FORKING_FROM_CONFIG_JSON="" \
     "$CREATE_RUNTIME_CONFIG" > "$WORKDIR/config-substituted.json"
 
     echo "exporting ledgers from running node ... (this may take a while)" >&2
@@ -303,6 +316,13 @@ if checks_contains ledgers; then
 
     mkdir -p "$WORKDIR/ledgers-downloaded"
 
+    # The daemons below only export ledgers, and each one also auto-loads the
+    # packaged config. They must not fetch its peer list: that reaches the real
+    # network, and a failed download kills the daemon.
+    cp "$PACKAGED_DAEMON_CONFIG" "$WORKDIR/config-with-daemon.json"
+    trap 'cp "$WORKDIR/config-with-daemon.json" "$PACKAGED_DAEMON_CONFIG" || true' EXIT
+    jq 'del(.daemon)' "$WORKDIR/config-with-daemon.json" > "$PACKAGED_DAEMON_CONFIG"
+
     mv -t "$WORKDIR/ledgers-backup" "$GENESIS_LEDGER_DIR"/*.tar.gz
     if [ -z ${NO_TEST_LEDGER_DOWNLOAD+z} ]; then
         # We removed all *.tar.gz from GENESIS_LEDGER_DIR (in case it's one of default paths)
@@ -313,6 +333,9 @@ if checks_contains ledgers; then
     extract_ledgers "$WORKDIR/config-substituted.json" "$WORKDIR/ledgers" "$WORKDIR/reference"
     mv -t "$GENESIS_LEDGER_DIR" "$WORKDIR/ledgers-backup"/*
     extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$WORKDIR/packaged"
+
+    cp "$WORKDIR/config-with-daemon.json" "$PACKAGED_DAEMON_CONFIG"
+    trap - EXIT
 
     echo "Performing final comparisons..." >&2
 

@@ -12,7 +12,20 @@ FORK_CONFIG_TO_PATCH=${FORK_CONFIG_JSON:=fork_config.json}
 POSTFORK_GENESIS_LEDGER_HASHES=${LEDGER_HASHES_JSON:=ledger_hashes.json}
 # Genesis timestamp of the postfork network, defaults to 10mins in the future
 POSTFORK_GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mins")}
+# The config of the network we fork from, genesis_ledgers/<network>.json.
+# Optional: without it the output has no daemon section.
+PREFORK_CONFIG=${FORKING_FROM_CONFIG_JSON:-}
 # ===============================================================
+
+# Only network_id and peer_list_url carry over to the new network. The rest of
+# the daemon section belongs to the old one: it has held slot_tx_end and
+# slot_chain_end, which would stop the new network at the old stop slots.
+POSTFORK_DAEMON='{}'
+if [[ -n "$PREFORK_CONFIG" ]]; then
+  POSTFORK_DAEMON=$(jq -c '
+    (.daemon // {}) | {network_id, peer_list_url} |
+    with_entries(select(.value != null))' "$PREFORK_CONFIG")
+fi
 
 # The fork slot is taken verbatim from the fork config's
 # proof.fork.global_slot_since_genesis (the same authoritative source we already
@@ -28,6 +41,7 @@ POSTFORK_GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 
 jq -M \
   --arg genesis_timestamp "$POSTFORK_GENESIS_TIMESTAMP" \
   --slurpfile hashes "$POSTFORK_GENESIS_LEDGER_HASHES" \
+  --argjson daemon "$POSTFORK_DAEMON" \
   '
   {
     genesis: {
@@ -57,5 +71,5 @@ jq -M \
         s3_data_hash: $hashes[0].epoch_data.next.s3_data_hash
       }
     }
-  }
+  } + (if $daemon == {} then {} else {daemon: $daemon} end)
   ' "$FORK_CONFIG_TO_PATCH"

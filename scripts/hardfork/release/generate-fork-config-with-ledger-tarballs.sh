@@ -113,6 +113,9 @@ mkdir "$OUTPUT_DIR"
 # --prefork-genesis-config, so none is passed.
 "$RUNTIME_GENESIS_LEDGER" --identity-conversion --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
+# create_runtime_config.sh takes network_id and peer_list_url from it.
+export FORKING_FROM_CONFIG_JSON
+
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
