@@ -26,6 +26,8 @@ let to_utf8 s =
 
 let to_hex s = Hex.encode s
 
+let of_hex s = Hex.decode ~init:String.init s
+
 (* The bytes as text when they are valid UTF-8, else [None]. *)
 let utf8_opt s = if Stdlib.String.is_valid_utf_8 s then Some s else None
 
@@ -51,6 +53,11 @@ let%test_module "arbitrary bytes" =
 
     let%test "hex keeps the exact bytes" =
       String.equal (to_hex "\xff") "ff" && String.equal (to_hex "") ""
+
+    let%test "of_hex gives the bytes back" =
+      Quickcheck.test (String.gen_with_length 6 Char.quickcheck_generator)
+        ~f:(fun s -> assert (String.equal (of_hex (to_hex s)) s)) ;
+      String.equal (of_hex "") ""
 
     let%test "utf8_opt keeps valid UTF-8 and drops the rest" =
       Option.equal String.equal (utf8_opt "MINA") (Some "MINA")

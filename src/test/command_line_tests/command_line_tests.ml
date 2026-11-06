@@ -1276,7 +1276,7 @@ module GraphqlTokenSymbolBytes = struct
         (Public_key.Compressed.of_base58_check_exn pk)
         Mina_base.Token_id.default
     in
-    let%bind obj = GC.get_account ~logger node_uri ~account_id in
+    let%bind obj = GC.get_account_bytes ~logger node_uri ~account_id in
     Deferred.return
     @@
     match obj.account with
