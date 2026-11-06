@@ -112,8 +112,10 @@ else
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${network_pkg}-config*"
       ;;
       mina-*-prefork*)
-        # Download mina-logproc legacy too
-        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}*"
+        # The legacy cache keeps several versions. Fetch only the pinned one:
+        # every .deb fetched here goes to apt-get, which installs one of them,
+        # and the file order decides which.
+        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${FORCE_VERSION:-*}_*"
     esac
     fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*"
   done

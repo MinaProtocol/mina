@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-# Take a ready hardfork config, as scripts/hardfork/release/publish-hardfork-config.sh
-# uploaded it, and write it to this build's cache in the layout the packaging
-# and the verification steps read, the same layout
-# generate-fork-config-and-ledger-tarballs.sh and its legacy-app twin write:
+# Take a ready hardfork config, the archive of the directory
+# `mina advanced generate-hardfork-config` writes, which the mina-state-dump job
+# uploads, and write it to this build's cache in the layout the packaging and
+# the verification read, the same layout generate-fork-config-and-ledger-tarballs.sh
+# and its legacy-app twin write:
 #
 #   <prefix>/new_config.json           the runtime config that goes into the package
 #   <prefix>/hashes.json               the ledger hashes, as mina-create-genesis writes them
@@ -11,14 +12,10 @@
 #   <prefix>/legacy/legacy_hashes.json the legacy ledger hashes
 #   <prefix>/legacy/*.tar.gz           the legacy ledger tarballs
 #
-# So the packages are built from the ready config, in seconds, instead of
-# waiting for the ledgers to be rebuilt from the state dump. The rebuild still
-# runs, in parallel, as a check (compare-hardfork-data.sh).
-#
-# The config must come from the same tip as the state dump the verification
-# steps use: the fork block state hash in daemon.json must equal the one in the
-# dump, or this script stops. A config taken one block later than the dump is
-# the first thing this catches.
+# Nothing is rebuilt from the state dump. The verification compares the package
+# with the fork block (the block check) and every account with the dump (the
+# accounts check), so the dump must be from the same fork block as the config.
+# This script stops if it is not.
 #
 # The ledger tarballs are uploaded to MINA_LEDGER_S3_BUCKET, where a daemon
 # downloads them when they are not packaged, exactly as the generation step
@@ -94,6 +91,12 @@ hashes_of() {
 }
 
 echo "--- Preparing the packaged config"
+for f in "$CONFIG_DIR/daemon.json" "$CONFIG_DIR/fork_validation/legacy/daemon.json"; do
+  if ! jq -e '[.ledger, .epoch_data.staking, .epoch_data.next] | all(.hash and .s3_data_hash)' "$f" > /dev/null; then
+    echo "❌ $f does not hold the hash and s3_data_hash of all three ledgers" >&2
+    exit 1
+  fi
+done
 mkdir -p "$WORKDIR/hardfork_ledgers" "$WORKDIR/legacy_ledgers"
 cp "$CONFIG_DIR"/genesis/*.tar.gz "$WORKDIR/hardfork_ledgers/"
 cp "$CONFIG_DIR"/fork_validation/legacy/genesis/*.tar.gz "$WORKDIR/legacy_ledgers/"

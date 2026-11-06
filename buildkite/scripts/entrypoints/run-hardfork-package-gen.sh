@@ -20,12 +20,11 @@ set -euox pipefail
 #   PRECOMPUTED_FORK_BLOCK_PREFIX      - (Optional) Prefix for precomputed fork block URLs (e.g., "gs://mina_network_block_data/mainnet")
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
-#   HARDFORK_CONFIG_URL                - (Optional) URL of a ready hardfork config archive, as
-#                                        scripts/hardfork/release/publish-hardfork-config.sh uploads it from a node's
-#                                        `mina advanced generate-hardfork-config` directory. The packages are then built
-#                                        from it at once, and the ledgers are still rebuilt from CONFIG_JSON_GZ_URL
-#                                        beside it, as a check that must agree. Without it the ledgers are built from
-#                                        CONFIG_JSON_GZ_URL and the packaging waits for them.
+#   HARDFORK_CONFIG_URL                - (Optional) URL of a ready hardfork config archive, which the mina-state-dump job
+#                                        uploads from a node's `mina advanced generate-hardfork-config` directory. The
+#                                        packages are then built from it, and the ledgers are not rebuilt from
+#                                        CONFIG_JSON_GZ_URL. That dump must be from the same fork block: the verification
+#                                        still compares against it.
 #
 # READ BY THE RENDER, SHARED WITH THE RELEASE PIPELINES:
 #   MINA_RELEASE_CHANNEL               - (Optional) The channel the packages are built for (their Suite), which is
@@ -88,7 +87,7 @@ function usage() {
   PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
   USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
-  HARDFORK_CONFIG_URL                (Optional) URL of a ready hardfork config archive; the state dump is then only a check
+  HARDFORK_CONFIG_URL                (Optional) URL of a ready hardfork config archive, used instead of rebuilding the ledgers
 EOF
   exit 1
 }

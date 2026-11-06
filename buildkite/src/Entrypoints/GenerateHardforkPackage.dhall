@@ -132,7 +132,6 @@ let generateReferenceTarballsCommand =
       ->  \ ( codename
             : { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
             )
-      ->  \(cachePrefix : Text)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
       ->  let cacheArg =
@@ -155,7 +154,7 @@ let generateReferenceTarballsCommand =
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
                                                                                                                                        spec.network} --version ${spec.deb_legacy_version}  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} --cache-prefix ${cachePrefix} ${cacheArg}"
+                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename.DebVersion}"
@@ -168,8 +167,6 @@ let generateTarballsCommand =
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
       ->  \(codenames : List DebianArchPair)
-      ->  \(cachePrefix : Text)
-      ->  \(upload : Bool)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
       ->  let cacheArg =
@@ -207,8 +204,6 @@ let generateTarballsCommand =
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName
                                             codename.DebVersion} "
-                        ++  "--cache-prefix ${cachePrefix} "
-                        ++  (if upload then "" else "--no-upload ")
                         ++  "${cacheArg}"
                       )
                 , label =
@@ -218,77 +213,6 @@ let generateTarballsCommand =
                 , depends_on = depends_on
                 , target = Size.Large
                 }
-
-let fetchHardforkConfigCommand =
-    -- The ready config (scripts/hardfork/release/publish-hardfork-config.sh)
-    -- written to the cache in the layout the packaging reads, in seconds.
-    -- It takes the key of the generation step, so that the packaging step
-    -- waits for it exactly as it waits for a generated config. It depends on
-    -- nothing: it needs no package of this build.
-          \(spec : Spec.Type)
-      ->  \(codename : DebianArchPair)
-      ->  \(url : Text)
-      ->  \(key : Text)
-      ->  let genesis_timestamp_env =
-                merge
-                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
-                  , None = [] : List Text
-                  }
-                  spec.genesis_timestamp
-
-          in  Command.build
-                Command.Config::{
-                , commands =
-                    Toolchain.select
-                      Toolchain.Spec::{
-                      , debVersion = codename.DebVersion
-                      , arch = codename.Arch
-                      , submodules = True
-                      }
-                      (   [ "AWS_ACCESS_KEY_ID"
-                          , "AWS_SECRET_ACCESS_KEY"
-                          , "GENESIS_TIMESTAMP"
-                          ]
-                        # genesis_timestamp_env
-                      )
-                      (     "./buildkite/scripts/hardfork/release/fetch-hardfork-config.sh "
-                        ++  "--network ${Network.lowerName spec.network} "
-                        ++  "--url ${url} "
-                        ++  "--config-json-gz-url ${spec.config_json_gz_url}"
-                      )
-                , label =
-                    "Fetch the hardfork config for ${DebianVersions.lowerName
-                                                       codename.DebVersion}"
-                , key = key
-                , target = Size.Small
-                }
-
-let compareHardforkDataCommand =
-    -- The ready config against the one rebuilt from the state dump: same
-    -- ledger roots, same fork block, or the build is red.
-          \(codename : DebianArchPair)
-      ->  \(readyPrefix : Text)
-      ->  \(recomputedPrefix : Text)
-      ->  \(key : Text)
-      ->  \(depends_on : List Command.TaggedKey.Type)
-      ->  Command.build
-            Command.Config::{
-            , commands =
-                Toolchain.select
-                  Toolchain.Spec::{
-                  , debVersion = codename.DebVersion
-                  , arch = codename.Arch
-                  , submodules = True
-                  }
-                  ([] : List Text)
-                  "./buildkite/scripts/hardfork/release/compare-hardfork-data.sh --ready ${readyPrefix} --recomputed ${recomputedPrefix}"
-            , label =
-                "Check the hardfork config against the state dump for ${DebianVersions.lowerName
-                                                                          codename.DebVersion}"
-            , key = key
-            , depends_on = depends_on
-            , target = Size.Small
-            }
 
 let generateDockerForCodename =
           \(spec : Spec.Type)
@@ -567,11 +491,72 @@ let generateDockerForCodename =
                   )
                   dockerSpecs
 
-let generateHfRelatedStepsForCodename =
+let fetchHardforkConfigCommand =
+    -- The ready config, which the mina-state-dump job uploads, written to the
+    -- cache in the layout the packaging reads. It takes the key of the
+    -- generation step, so the packaging waits for it as for a generated
+    -- config, and it needs no package of this build. The ledgers are not
+    -- rebuilt from the dump: the verification compares the package with the
+    -- fork block and the dump directly.
           \(spec : Spec.Type)
       ->  \(codename : DebianArchPair)
-      ->  \(codenames : List DebianArchPair)
-      ->  \(pipelineName : Text)
+      ->  \(url : Text)
+      ->  \(key : Text)
+      ->  let genesis_timestamp_env =
+                merge
+                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
+                  , None = [] : List Text
+                  }
+                  spec.genesis_timestamp
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                    Toolchain.select
+                      Toolchain.Spec::{
+                      , debVersion = codename.DebVersion
+                      , arch = codename.Arch
+                      , submodules = True
+                      }
+                      (   [ "AWS_ACCESS_KEY_ID"
+                          , "AWS_SECRET_ACCESS_KEY"
+                          , "GENESIS_TIMESTAMP"
+                          ]
+                        # genesis_timestamp_env
+                      )
+                      (     "./buildkite/scripts/hardfork/release/fetch-hardfork-config.sh "
+                        ++  "--network ${Network.lowerName spec.network} "
+                        ++  "--url ${url} "
+                        ++  "--config-json-gz-url ${spec.config_json_gz_url}"
+                      )
+                , label =
+                    "Fetch the hardfork config for ${DebianVersions.lowerName
+                                                       codename.DebVersion}"
+                , key = key
+                , target = Size.Small
+                }
+
+let referenceLedgersKey =
+    -- The step that writes the reference ledgers the verification reads: the
+    -- fetch step with a ready config, the reference generation otherwise.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  let lowerNameCodename = DebianVersions.lowerName codename.DebVersion
+
+          in  merge
+                { Some =
+                        \(_ : Text)
+                    ->  "generate-hardfork-tarballs-${lowerNameCodename}"
+                , None = "generate-reference-tarballs-${lowerNameCodename}"
+                }
+                spec.hardfork_config_url
+
+let daemonImage =
+    -- The configured daemon image of one codename, and how to load it. The
+    -- verification takes it from this build's cache, where its build step
+    -- wrote it, so it runs the image that was built here.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
       ->  let imageTag =
                 Docker.Tag::{
                 , remove_profile_from_name = True
@@ -593,11 +578,109 @@ let generateHfRelatedStepsForCodename =
                                      imageTag.package}:${Docker.dockerTag
                                                            imageTag}"
 
-          let loadImage =
-              -- The daemon image is never pushed; the verification takes it
-              -- from this build's cache, where its build step wrote it.
-                Cmd.run
-                  "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
+          in  { image = image
+              , load =
+                  Cmd.run
+                    "CACHE_ROOT=${buildCacheDir} ./buildkite/scripts/docker/load_from_cache.sh ${image}"
+              }
+
+let precomputedBlockArg =
+          \(flag : Text)
+      ->  \(spec : Spec.Type)
+      ->  merge
+            { Some = \(prefix : Text) -> "${flag} ${prefix}", None = "" }
+            spec.precomputed_block_prefix
+
+let preflightCommand =
+    -- The dump is checked before anything is built from it, beside the build
+    -- and not ahead of it: nothing depends on this step. A bad dump shows red
+    -- within seconds, and the build carries on until someone cancels it.
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                Toolchain.select
+                  Toolchain.Spec::{
+                  , debVersion = codename.DebVersion
+                  , arch = codename.Arch
+                  }
+                  ([] : List Text)
+                  "./scripts/hardfork/release/check-fork-dump.py --config-url ${spec.config_json_gz_url} ${precomputedBlockArg
+                                                                                                             "--block-prefix"
+                                                                                                             spec}"
+            , label = "Preflight: check the state dump"
+            , key = "preflight-state-dump"
+            , target = Size.Small
+            }
+
+let verifyImageCommand =
+    -- The full verification runs for the first codename. Every other codename
+    -- has its own image, with its own binary and packages, so it gets the
+    -- checks that read the image. amd64 only: the verification runs on amd64
+    -- agents.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  \(firstCodename : DebianArchPair)
+      ->  \(codename : DebianArchPair)
+      ->  let daemon = daemonImage spec codename
+
+          let lowerNameCodename = DebianVersions.lowerName codename.DebVersion
+
+          let dockerDaemonSpec =
+                DockerImage.ReleaseSpec::{
+                , service = Docker.Type.Daemon { network = spec.network }
+                , network = spec.network
+                , deb_codename = codename.DebVersion
+                , deb_profile = Profiles.fromNetwork spec.network
+                , deb_legacy_version = spec.deb_legacy_version
+                , step_key_suffix = "-${lowerNameCodename}-docker-image"
+                , size = spec.size
+                }
+
+          in  merge
+                { Amd64 =
+                  [ Command.build
+                      Command.Config::{
+                      , commands =
+                        [ Cmd.run
+                            "export MINA_DEB_CODENAME=${lowerNameCodename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                        , daemon.load
+                        , Cmd.runInDocker
+                            Cmd.Docker::{ image = daemon.image }
+                            "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                    spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputedBlockArg
+                                                                                                                                                                                                                                                    "--precomputed-block-prefix"
+                                                                                                                                                                                                                                                    spec} --reference-data-dir /var/storagebox/\\\${BUILDKITE_BUILD_ID}/hardfork/legacy --checks block,constants,artifacts --prefork-version ${spec.deb_legacy_version}"
+                        ]
+                      , label =
+                          "Verify packaged artifacts: Image check for ${lowerNameCodename}"
+                      , key = "verify-packaged-image-${lowerNameCodename}"
+                      , target = Size.Small
+                      , depends_on =
+                        [ { name = pipelineName
+                          , key = DockerImage.stepKey dockerDaemonSpec
+                          }
+                        , { name = pipelineName
+                          , key = referenceLedgersKey spec firstCodename
+                          }
+                        ]
+                      }
+                  ]
+                , Arm64 = [] : List Command.Type
+                }
+                codename.Arch
+
+let generateHfRelatedStepsForCodename =
+          \(spec : Spec.Type)
+      ->  \(codename : DebianArchPair)
+      ->  \(codenames : List DebianArchPair)
+      ->  \(pipelineName : Text)
+      ->  let daemon = daemonImage spec codename
+
+          let image = daemon.image
+
+          let loadImage = daemon.load
 
           let profile = Profiles.fromNetwork spec.network
 
@@ -636,19 +719,14 @@ let generateHfRelatedStepsForCodename =
                 "generate-reference-tarballs-" ++ lowerNameCodename
 
           let dependsOnTest =
-              -- The verification reads the reference ledgers from the cache.
-              -- With a generated config they come from the reference step,
-              -- which the image build does not wait for; with a ready config
-              -- they come from the fetch step, which the packaging, and so
-              -- the image, already waits for.
-                  [ { name = pipelineName, key = dockerDaemonStep } ]
-                # merge
-                    { None =
-                      [ { name = pipelineName, key = referencesTarballStepKey }
-                      ]
-                    , Some = \(_ : Text) -> [] : List Command.TaggedKey.Type
-                    }
-                    spec.hardfork_config_url
+              -- The verification reads the reference ledgers from the cache,
+              -- which the reference step writes and the image build does not
+              -- wait for.
+                [ { name = pipelineName, key = dockerDaemonStep }
+                , { name = pipelineName
+                  , key = referenceLedgersKey spec codename
+                  }
+                ]
 
           let precomputed_block_prefix_arg =
                 merge
@@ -666,34 +744,18 @@ let generateHfRelatedStepsForCodename =
                   }
                   spec.use_artifacts_from_buildkite_build
 
-          let recomputedPrefix = "hardfork-recomputed"
-
-          let recomputeTarballsKey =
-                "recompute-hardfork-tarballs-${lowerNameCodename}"
-
-          let recomputeReferenceKey =
-                "recompute-reference-tarballs-${lowerNameCodename}"
-
           let generateTarballs =
-              -- Without a ready config the ledgers are built from the state
-              -- dump, and the packaging waits for them. With one, the
-              -- packaging starts from the ready config at once, and the same
-              -- rebuild runs beside it as a check, into its own cache prefix,
-              -- without uploading its tarballs.
                 merge
                   { None =
                     [ generateTarballsCommand
                         spec
                         codename
                         codenames
-                        "hardfork"
-                        True
                         tarballGenKey
                         dependsOnArtifactsOrEmpty
                     , generateReferenceTarballsCommand
                         spec
                         codename
-                        "hardfork"
                         referencesTarballStepKey
                         dependsOnArtifactsOrEmpty
                     ]
@@ -704,32 +766,6 @@ let generateHfRelatedStepsForCodename =
                               codename
                               url
                               tarballGenKey
-                          , generateTarballsCommand
-                              spec
-                              codename
-                              codenames
-                              recomputedPrefix
-                              False
-                              recomputeTarballsKey
-                              dependsOnArtifactsOrEmpty
-                          , generateReferenceTarballsCommand
-                              spec
-                              codename
-                              recomputedPrefix
-                              recomputeReferenceKey
-                              dependsOnArtifactsOrEmpty
-                          , compareHardforkDataCommand
-                              codename
-                              "hardfork"
-                              recomputedPrefix
-                              "check-hardfork-config-${lowerNameCodename}"
-                              [ { name = pipelineName
-                                , key = recomputeTarballsKey
-                                }
-                              , { name = pipelineName
-                                , key = recomputeReferenceKey
-                                }
-                              ]
                           ]
                   }
                   spec.hardfork_config_url
@@ -773,7 +809,7 @@ let generateHfRelatedStepsForCodename =
                         "Create hardfork packages for ${lowerNameCodename}"
                     , key = buildHfDebian
                     , target = Size.Large
-                    , depends_on = dependsOnTarballs
+                    , depends_on = dependsOnTarballs # dependsOnArtifactsOrEmpty
                     }
                 , Command.build
                     Command.Config::{
@@ -784,9 +820,9 @@ let generateHfRelatedStepsForCodename =
                       , loadImage
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
-                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
-                                                                                                                                                                                                                                                                                                  spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                                                                                                                                                                  spec.network} --fork-config config.json --working-dir /workdir/verification --checks config)"
+                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                                                                                                                                                               spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                                                                                                                                                                                                               spec.network} --fork-config config.json --working-dir /workdir/verification --checks config --expect-config-mismatch"
                       ]
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
@@ -807,7 +843,7 @@ let generateHfRelatedStepsForCodename =
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                    spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                   spec.network} --fork-config config.json  --cached-hardfork-data /workdir/hardfork --working-dir /workdir/verification ${precomputed_block_prefix_arg} ${cached_tarball_ledgers} ${cached_reference_ledgers} --checks config"
+                                                                                                                                                                                                                                                   spec.network} --fork-config config.json  --cached-hardfork-data /workdir/hardfork --working-dir /workdir/verification ${precomputed_block_prefix_arg} ${cached_tarball_ledgers} ${cached_reference_ledgers} --checks config,block,constants,artifacts --prefork-version ${spec.deb_legacy_version}"
                       ]
                     , label = "Verify packaged artifacts: Config check"
                     , key =
@@ -835,7 +871,7 @@ let generateHfRelatedStepsForCodename =
                               Cmd.Docker::{ image = image }
                               "curl -sL ${spec.config_json_gz_url} | gunzip > config.json && MINA_LOG_LEVEL=Spam FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                             spec.network}.old.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                                                            spec.network} --fork-config config.json --cached-hardfork-data /workdir/hardfork --working-dir /workdir/hardfork ${precomputed_block_prefix_arg} ${cached_reference_ledgers} --checks ledgers  ${cached_tarball_ledgers}"
+                                                                                                                                                                                                                                                            spec.network} --fork-config config.json --cached-hardfork-data /workdir/hardfork --working-dir /workdir/hardfork ${precomputed_block_prefix_arg} ${cached_reference_ledgers} --checks ledgers,accounts  ${cached_tarball_ledgers}"
                           ]
                     , label = "Verify packaged artifacts: Ledgers check"
                     , key =
@@ -893,11 +929,25 @@ let pipeline =
                           in    merge
                                   { Some =
                                           \(codename : DebianArchPair)
-                                      ->  generateHfRelatedStepsForCodename
-                                            spec
-                                            codename
-                                            spec.codenames
-                                            pipelineName
+                                      ->    [ preflightCommand spec codename ]
+                                          # generateHfRelatedStepsForCodename
+                                              spec
+                                              codename
+                                              spec.codenames
+                                              pipelineName
+                                          # List/concatMap
+                                              DebianArchPair
+                                              Command.Type
+                                              ( verifyImageCommand
+                                                  spec
+                                                  pipelineName
+                                                  codename
+                                              )
+                                              ( Prelude.List.drop
+                                                  1
+                                                  DebianArchPair
+                                                  spec.codenames
+                                              )
                                   , None = [] : List Command.Type
                                   }
                                   first
