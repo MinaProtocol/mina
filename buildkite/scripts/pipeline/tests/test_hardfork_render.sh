@@ -17,7 +17,7 @@
 #   - the verification steps wait for the reference ledgers they read;
 #   - each verification step runs the checks it has the inputs for, and the
 #     corrupted config must fail on the hash mismatch alone;
-#   - the state dump is checked at once, by a step nothing waits for, and every
+#   - the state dump is checked at once, no build waits for that step, and every
 #     amd64 codename has its image checked;
 #   - with a ready config (HARDFORK_CONFIG_URL) nothing rebuilds the ledgers, and
 #     the images still wait for the packages.
@@ -51,7 +51,9 @@ CLEAN=(env -u MINA_RELEASE_CHANNEL -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_D
        -u USE_GENERIC_DOCKERS_FROM_VERSION -u USE_ARTIFACTS_FROM_BUILDKITE_BUILD
        -u HARDFORK_CONFIG_URL)
 
-# render <VAR=value>...: the pipeline YAML for a mainnet noble run
+# render <VAR=value>...: the pipeline YAML for a mainnet noble run. dhall-to-yaml
+# 1.6 quotes the keys and step names with ', 1.7 with ". The checks read ', so
+# they pass with both.
 render() {
   "${CLEAN[@]}" \
     CODENAMES_CONFIG=Noble_Amd64 NETWORK=Mainnet \
@@ -59,7 +61,8 @@ render() {
     CONFIG_JSON_GZ_URL=https://example.invalid/config.json.gz \
     PRECOMPUTED_FORK_BLOCK_PREFIX=gs://example/mainnet \
     "$@" \
-    ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null
+    ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null \
+    | sed -E "s/^( *(- )?'(key|step)': )\"([^\"]*)\"$/\1'\4'/"
 }
 
 keys() { grep -o "'key': '[^']*'" | sed "s/'key': '//; s/'$//" | sort -u; }
@@ -165,11 +168,19 @@ expect "the config step compares the package with the fork block" \
 expect "the ledgers step compares the accounts with the fork config" \
   grep -q -- "--checks ledgers,accounts" <<< "$step_commands"
 
-echo "TEST: the state dump is checked at once, and blocks nothing"
+echo "TEST: the state dump is checked at once, and no build waits for it"
 yaml="$(render)"
-expect "the preflight runs" grep -q "check-fork-dump.py --config-url https://example.invalid/config.json.gz --block-prefix gs://example/mainnet" <<< "$(commands <<< "$yaml")"
+expect "the preflight runs" grep -q "check-fork-dump.py --network mainnet --config-url https://example.invalid/config.json.gz --block-prefix gs://example/mainnet" <<< "$(commands <<< "$yaml")"
 expect "the preflight waits for nothing" test -z "$(deps_of "_GenerateHardforkPackage-preflight-state-dump")"
-expect_not "no step waits for the preflight" grep -q "'step': '_GenerateHardforkPackage-preflight-state-dump'" <<< "$yaml"
+expect "the reference tarballs wait for it, and the verification with them" \
+  grep -qx "_GenerateHardforkPackage-preflight-state-dump" <<< "$(deps_of "_GenerateHardforkPackage-generate-reference-tarballs-noble")"
+waiting="$(awk '
+  /^  - / { key = "" }
+  /^    .key.: / { sub(/^    .key.: \x27/, ""); sub(/\x27$/, ""); key = $0; if (w) print key; w = 0 }
+  /.step.: .*preflight-state-dump/ { w = 1 }
+' <<< "$yaml")"
+expect "nothing else waits for it, so no deb or image is delayed (got: $waiting)" \
+  test "$waiting" = "_GenerateHardforkPackage-generate-reference-tarballs-noble"
 
 echo "TEST: every amd64 codename has its image checked"
 yaml="$(render CODENAMES_CONFIG=Noble_Amd64,Jammy_Amd64,Bookworm_Arm64)"

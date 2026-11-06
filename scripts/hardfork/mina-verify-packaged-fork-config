@@ -166,6 +166,11 @@ function checks_contains() {
     return 1
 }
 
+if [ "$EXPECT_CONFIG_MISMATCH" -eq 1 ] && ! checks_contains config; then
+    echo "Error: --expect-config-mismatch needs config in --checks" >&2
+    exit 1
+fi
+
 source_build_fallback() {
     v=$(command -v "$1")
     if [ ! -x "$v" ]; then
@@ -334,6 +339,13 @@ if checks_contains config; then
 
     fork_block
 
+    # A missing hash would compare unequal, which reads as a mismatch.
+    if ! jq -e '[.ledger.hash, .epoch_data.staking.hash, .epoch_data.next.hash] | all(type == "string" and length > 0)' \
+        "$REFERENCE_DATA_DIR/legacy_hashes.json" > /dev/null; then
+        echo "Error: $REFERENCE_DATA_DIR/legacy_hashes.json lacks a ledger hash" >&2
+        exit 1
+    fi
+
     result=$(jq --slurpfile block "$WORKDIR/precomputed_fork_block.json" \
     --slurpfile legacy_hashes "$REFERENCE_DATA_DIR/legacy_hashes.json" -n '
     ($legacy_hashes[0].epoch_data.staking.hash == $block[0].data.protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
@@ -354,9 +366,12 @@ if checks_contains config; then
         exit 1
     fi
 
-    # Exactly these two keys: none missing, and no stop slot of the old network.
+    # What create_runtime_config.sh carries over: these two keys, when the old
+    # network has them, and no stop slot of the old network.
     result=$(jq --slurpfile prefork "$FORKING_FROM_CONFIG_JSON" '
-    .daemon == ($prefork[0].daemon | {network_id, peer_list_url})' "$PACKAGED_DAEMON_CONFIG")
+    .daemon == ($prefork[0] | (.daemon // {}) | {network_id, peer_list_url} |
+                with_entries(select(.value != null)) |
+                if . == {} then null else . end)' "$PACKAGED_DAEMON_CONFIG")
 
     if [ "$result" != "true" ]; then
         echo "The daemon section of $PACKAGED_DAEMON_CONFIG is not network_id and peer_list_url of $FORKING_FROM_CONFIG_JSON" >&2
@@ -420,11 +435,12 @@ fi
 if checks_contains artifacts; then
     echo "Validating the packaged artifacts..." >&2
 
+    # Unique: equal staking and next ledgers share one tarball.
     expected_tarballs=$(jq -r '.ledger.s3_data_hash, .epoch_data.staking.s3_data_hash, .epoch_data.next.s3_data_hash' \
-        "$PACKAGED_DAEMON_CONFIG" | sort)
+        "$PACKAGED_DAEMON_CONFIG" | sort -u)
     actual_tarballs=$(for file in "$GENESIS_LEDGER_DIR"/*.tar.gz; do
         openssl dgst -r -sha3-256 "$file" | cut -d' ' -f1
-    done | sort)
+    done | sort -u)
     if [ "$actual_tarballs" != "$expected_tarballs" ]; then
         report_mismatches "the tarballs in $GENESIS_LEDGER_DIR are not those of $PACKAGED_DAEMON_CONFIG" \
             "tarballs: $(echo "$actual_tarballs" | tr '\n' ' ')config: $(echo "$expected_tarballs" | tr '\n' ' ')"
@@ -466,6 +482,7 @@ if checks_contains ledgers; then
     # packaged config. They must not fetch its peer list: that reaches the real
     # network, and a failed download kills the daemon.
     cp "$PACKAGED_DAEMON_CONFIG" "$WORKDIR/config-with-daemon.json"
+    trap 'cp "$WORKDIR/config-with-daemon.json" "$PACKAGED_DAEMON_CONFIG" || true' EXIT
     jq 'del(.daemon)' "$WORKDIR/config-with-daemon.json" > "$PACKAGED_DAEMON_CONFIG"
 
     mv -t "$WORKDIR/ledgers-backup" "$GENESIS_LEDGER_DIR"/*.tar.gz
@@ -480,6 +497,7 @@ if checks_contains ledgers; then
     extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$WORKDIR/packaged" "$WORKDIR/genesis-block.json"
 
     cp "$WORKDIR/config-with-daemon.json" "$PACKAGED_DAEMON_CONFIG"
+    trap - EXIT
 
     echo "Performing final comparisons..." >&2
 
