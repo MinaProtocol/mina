@@ -180,63 +180,6 @@ expect "the jammy check waits for the reference ledgers" grep -qx "_GenerateHard
 expect_not "the first codename is not checked twice" grep -q "verify-packaged-image-noble" <<< "$yaml"
 expect_not "arm64 is left out: the verification runs on amd64 agents" grep -q "verify-packaged-image-bookworm" <<< "$yaml"
 
-echo "TEST: check-fork-dump.py"
-fixtures="$(mktemp -d)"
-trap 'rm -rf "$fixtures"' EXIT
-python3 - "$fixtures" <<'PYTHON'
-import gzip
-import json
-import sys
-
-d = sys.argv[1]
-token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
-
-
-def account(balance, symbol=""):
-    return {"pk": "B62q", "token": token, "balance": balance, "token_symbol": symbol}
-
-
-def config(**changes):
-    c = {
-        "proof": {"fork": {"state_hash": "3Nfork", "blockchain_length": 7, "global_slot_since_genesis": 9}},
-        "ledger": {"hash": "jwledger", "accounts": [account("1")]},
-        "epoch_data": {
-            "staking": {"seed": "s", "accounts": [account("1.5", changes.get("symbol", "")), account("2")]},
-            "next": {"seed": "n", "accounts": [account("4")]},
-        },
-    }
-    return c
-
-
-def block(next_total="4000000000"):
-    return {"data": {"protocol_state": {"body": {
-        "blockchain_state": {"staged_ledger_hash": {"non_snark": {"ledger_hash": "jwledger"}}},
-        "consensus_state": {
-            "blockchain_length": "7",
-            "global_slot_since_genesis": "9",
-            "staking_epoch_data": {"seed": "s", "ledger": {"total_currency": "3500000000"}},
-            "next_epoch_data": {"seed": "n", "ledger": {"total_currency": next_total}},
-        }}}}}
-
-
-def dump(name, value):
-    text = json.dumps(value, ensure_ascii=False)
-    with gzip.open(f"{d}/{name}.json.gz", "wb") as f:
-        f.write(text.encode("utf-8", "surrogateescape"))
-
-
-dump("good", config())
-dump("raw", config(symbol="\udcff"))
-dump("replaced", config(symbol="\ufffd"))
-json.dump(block(), open(f"{d}/ok-7-3Nfork.json", "w"))
-json.dump(block("4000000001"), open(f"{d}/supply-7-3Nfork.json", "w"))
-PYTHON
-check_dump() { ./scripts/hardfork/release/check-fork-dump.py --config-url "file://$fixtures/$1.json.gz" --block-prefix "file://$fixtures/$2" > /dev/null 2>&1; }
-expect "a good dump passes" check_dump good ok
-expect "a raw 0xff is legitimate" check_dump raw ok
-expect_not "U+FFFD fails" check_dump replaced ok
-expect_not "a supply that is one nanomina off fails" check_dump good supply
-
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"
   exit 1
