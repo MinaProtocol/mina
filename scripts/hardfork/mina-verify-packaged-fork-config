@@ -10,13 +10,29 @@ Required:
   --network                   Name of the network
   --fork-config               Path to fork_config.json
   --working-dir               Working directory
-  --checks                    Checks to perform (comma-separated list). Available checks:
-                                config,tarballs,ledgers. Default: all
+  --checks                    Checks to perform (comma-separated list). Default: all
+                                config    the fork config rebuilds the ledgers of the fork block
+                                block     the packaged config holds the seeds, fork point and
+                                          ledger hashes of the fork block
+                                constants the binary's consensus constants are those of the block
+                                artifacts the packaged tarballs are those of the packaged config,
+                                          and the prefork package is the pinned one
+                                tarballs  packaged, generated and downloaded tarballs are the same
+                                ledgers   a daemon on the packaged config exports the same ledgers
+                                          as the reference, and starts at the fork point
+                                accounts  balances and timing in those exports are those of the
+                                          fork config (needs ledgers in the same run)
 
 Optional:
   --precomputed-block-prefix  Precomputed block prefix
   --reference-data-dir        Reference data directory. Defaults to empty, which skips comparison with reference data.
   --cached-hardfork-data      Path to cached hardfork data directory
+  --expect-config-mismatch    Succeed only if the config check finds a hash mismatch: the fork
+                              config is corrupted on purpose. Any other failure stays a failure.
+  --ledger-migration          The fork changes the account format, so ledger hashes and accounts
+                              differ from the fork block by design. Skips comparing them.
+  --changed-constants LIST    Comma-separated consensus constants this fork changes on purpose
+  --prefork-version VERSION   The version the prefork genesis package must have
 
 This script is used to validate that an installed package is correct
 according to an exported fork_config.json file.
@@ -55,7 +71,11 @@ EOF
 
 PRECOMPUTED_BLOCK_PREFIX=""
 CACHED_HARDFORK_DATA=""
-CHECKS="config,tarballs,ledgers"
+CHECKS="config,block,constants,artifacts,tarballs,ledgers,accounts"
+EXPECT_CONFIG_MISMATCH=0
+LEDGER_MIGRATION=0
+CHANGED_CONSTANTS=""
+PREFORK_VERSION=""
 
 # Track if any errors occurred
 error=0
@@ -89,6 +109,22 @@ while [[ $# -gt 0 ]]; do
             ;;
         --checks)
             CHECKS="$2"
+            shift 2
+            ;;
+        --expect-config-mismatch)
+            EXPECT_CONFIG_MISMATCH=1
+            shift
+            ;;
+        --ledger-migration)
+            LEDGER_MIGRATION=1
+            shift
+            ;;
+        --changed-constants)
+            CHANGED_CONSTANTS="$2"
+            shift 2
+            ;;
+        --prefork-version)
+            PREFORK_VERSION="$2"
             shift 2
             ;;
         -*)
@@ -129,6 +165,11 @@ function checks_contains() {
     done
     return 1
 }
+
+if [ "$EXPECT_CONFIG_MISMATCH" -eq 1 ] && ! checks_contains config; then
+    echo "Error: --expect-config-mismatch needs config in --checks" >&2
+    exit 1
+fi
 
 source_build_fallback() {
     v=$(command -v "$1")
@@ -174,8 +215,8 @@ export MINA_LIBP2P_PASS=''
 mkdir -p "$WORKDIR"/{ledgers{,-backup},keys}
 chmod 700 "$WORKDIR/keys"
 
-fork_block_state_hash=$(jq -r '.proof.fork.state_hash' "$FORK_CONFIG")
-fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$FORK_CONFIG")
+fork_point=$(jq -r '.proof.fork | [.state_hash, .blockchain_length, .global_slot_since_genesis] | @tsv' "$FORK_CONFIG")
+read -r fork_block_state_hash fork_block_length fork_global_slot <<< "$fork_point"
 
 # Fetch the precomputed fork block from local file or gcloud
 fetch_precomputed_fork_block() {
@@ -198,11 +239,33 @@ fetch_precomputed_fork_block() {
     fi
 }
 
+# The fork block, once per run.
+function fork_block() {
+    local dst="$WORKDIR/precomputed_fork_block.json"
+    if [ ! -e "$dst" ]; then
+        fetch_precomputed_fork_block "$NETWORK_NAME" "$fork_block_length" "$fork_block_state_hash" "$PRECOMPUTED_BLOCK_PREFIX" "$dst"
+    fi
+}
+
+# Records one failed comparison. Later checks still run, so that a run reports
+# every mismatch at once. Callers assign the mismatches to a variable first: a
+# failed command in an argument would not stop the script, and an empty result
+# reads as a pass.
+function report_mismatches() {
+    local what=$1 mismatches=$2
+    if [ -n "$mismatches" ]; then
+        echo "Error: $what:" >&2
+        echo "$mismatches" >&2
+        error=1
+    fi
+}
+
 # export the packaged ledgers in a way where we know which one is which
 function extract_ledgers() {
     config_file=$1
     ledger_dir=$2
     json_prefix=$3
+    genesis_block_json=${4:-}
 
     "$MINA_EXE" daemon --libp2p-keypair "$WORKDIR/keys/p2p" \
       --config-file "$config_file" --config-file "$override_file" \
@@ -219,6 +282,12 @@ function extract_ledgers() {
 
     "$MINA_EXE" ledger export staking-epoch-ledger | jq . > "$json_prefix-staking.json"
     "$MINA_EXE" ledger export next-epoch-ledger | jq . > "$json_prefix-next.json"
+
+    if [ -n "$genesis_block_json" ]; then
+        curl -sf -H 'Content-Type: application/json' \
+            -d '{"query":"{genesisBlock{protocolState{consensusState{blockHeight slotSinceGenesis slot totalCurrency}}}}"}' \
+            http://127.0.0.1:3085/graphql > "$genesis_block_json"
+    fi
 
     "$MINA_EXE" client stop
 }
@@ -268,7 +337,14 @@ fi
 if checks_contains config; then
     echo "Validating config..." >&2
 
-    fetch_precomputed_fork_block "$NETWORK_NAME" "$fork_block_length" "$fork_block_state_hash" "$PRECOMPUTED_BLOCK_PREFIX" "$WORKDIR/precomputed_fork_block.json"
+    fork_block
+
+    # A missing hash would compare unequal, which reads as a mismatch.
+    if ! jq -e '[.ledger.hash, .epoch_data.staking.hash, .epoch_data.next.hash] | all(type == "string" and length > 0)' \
+        "$REFERENCE_DATA_DIR/legacy_hashes.json" > /dev/null; then
+        echo "Error: $REFERENCE_DATA_DIR/legacy_hashes.json lacks a ledger hash" >&2
+        exit 1
+    fi
 
     result=$(jq --slurpfile block "$WORKDIR/precomputed_fork_block.json" \
     --slurpfile legacy_hashes "$REFERENCE_DATA_DIR/legacy_hashes.json" -n '
@@ -278,6 +354,15 @@ if checks_contains config; then
 
     if [ "$result" != "true" ]; then
         echo "Hashes in config $FORK_CONFIG don't match hashes from the precomputed block $PRECOMPUTED_FORK_BLOCK" >&2
+        if [ "$EXPECT_CONFIG_MISMATCH" -eq 1 ]; then
+            echo "The mismatch was expected: the corrupted config is rejected" >&2
+            exit 0
+        fi
+        exit 1
+    fi
+
+    if [ "$EXPECT_CONFIG_MISMATCH" -eq 1 ]; then
+        echo "Error: the corrupted config $FORK_CONFIG was accepted" >&2
         exit 1
     fi
 
@@ -294,6 +379,83 @@ if checks_contains config; then
     fi
 else
     echo "Skipping config validation as per --checks option" >&2
+fi
+
+if checks_contains block; then
+    echo "Validating the packaged config against the fork block..." >&2
+
+    fork_block
+
+    # The ledger hashes here are the independent ones: the ledgers and tarballs
+    # checks compare the packaged ledgers with cached copies of themselves.
+    mismatches=$(
+    jq -r --slurpfile block "$WORKDIR/precomputed_fork_block.json" \
+    --arg state_hash "$fork_block_state_hash" --argjson migration "$LEDGER_MIGRATION" '
+    $block[0].data.protocol_state.body as $body |
+    $body.consensus_state as $c |
+    (   [ ["fork state hash", .proof.fork.state_hash, $state_hash]
+        , ["blockchain length", .proof.fork.blockchain_length, $c.blockchain_length]
+        , ["global slot since genesis", .proof.fork.global_slot_since_genesis, $c.global_slot_since_genesis]
+        , ["staking seed", .epoch_data.staking.seed, $c.staking_epoch_data.seed]
+        , ["next seed", .epoch_data.next.seed, $c.next_epoch_data.seed]
+        ]
+      + if $migration == 1 then [] else
+        [ ["ledger hash", .ledger.hash, $body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash]
+        , ["staking hash", .epoch_data.staking.hash, $c.staking_epoch_data.ledger.hash]
+        , ["next hash", .epoch_data.next.hash, $c.next_epoch_data.ledger.hash]
+        ] end
+    ) | .[] | select((.[1] | tostring) != (.[2] | tostring)) |
+    "\(.[0]): packaged \(.[1]), fork block \(.[2])"' "$PACKAGED_DAEMON_CONFIG")
+    report_mismatches "the packaged config is not the fork block" "$mismatches"
+else
+    echo "Skipping block validation as per --checks option" >&2
+fi
+
+if checks_contains constants; then
+    echo "Validating the consensus constants against the fork block..." >&2
+
+    fork_block
+
+    compiled_constants=$("$MINA_EXE" advanced compile-time-constants | tail -n 1)
+
+    mismatches=$(
+    jq -r --slurpfile block "$WORKDIR/precomputed_fork_block.json" --arg changed "$CHANGED_CONSTANTS" '
+    . as $compiled |
+    ($changed | split(",")) as $changed |
+    $block[0].data.protocol_state.body.constants as $chain |
+    ["k", "delta", "slots_per_sub_window", "slots_per_epoch"][] |
+    select(. as $name | $changed | index($name) | not) |
+    select(($compiled[.] | tostring) != ($chain[.] | tostring)) |
+    "\(.): binary \($compiled[.]), fork block \($chain[.])"' <<< "$compiled_constants")
+    report_mismatches "the binary's consensus constants are not those of the fork block" "$mismatches"
+else
+    echo "Skipping constants validation as per --checks option" >&2
+fi
+
+if checks_contains artifacts; then
+    echo "Validating the packaged artifacts..." >&2
+
+    # Unique: equal staking and next ledgers share one tarball.
+    expected_tarballs=$(jq -r '.ledger.s3_data_hash, .epoch_data.staking.s3_data_hash, .epoch_data.next.s3_data_hash' \
+        "$PACKAGED_DAEMON_CONFIG" | sort -u)
+    actual_tarballs=$(for file in "$GENESIS_LEDGER_DIR"/*.tar.gz; do
+        openssl dgst -r -sha3-256 "$file" | cut -d' ' -f1
+    done | sort -u)
+    if [ "$actual_tarballs" != "$expected_tarballs" ]; then
+        report_mismatches "the tarballs in $GENESIS_LEDGER_DIR are not those of $PACKAGED_DAEMON_CONFIG" \
+            "tarballs: $(echo "$actual_tarballs" | tr '\n' ' ')config: $(echo "$expected_tarballs" | tr '\n' ' ')"
+    fi
+
+    if [ -n "$PREFORK_VERSION" ]; then
+        prefork_package="mina-create-${NETWORK_NAME}-prefork-genesis-ledger"
+        installed_prefork=$(dpkg-query -W -f='${Version}' "$prefork_package")
+        if [ "$installed_prefork" != "$PREFORK_VERSION" ]; then
+            report_mismatches "the prefork package is not the pinned one" \
+                "$prefork_package: installed $installed_prefork, pinned $PREFORK_VERSION"
+        fi
+    fi
+else
+    echo "Skipping artifacts validation as per --checks option" >&2
 fi
 
 if checks_contains ledgers; then
@@ -332,7 +494,7 @@ if checks_contains ledgers; then
     fi
     extract_ledgers "$WORKDIR/config-substituted.json" "$WORKDIR/ledgers" "$WORKDIR/reference"
     mv -t "$GENESIS_LEDGER_DIR" "$WORKDIR/ledgers-backup"/*
-    extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$WORKDIR/packaged"
+    extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$WORKDIR/packaged" "$WORKDIR/genesis-block.json"
 
     cp "$WORKDIR/config-with-daemon.json" "$PACKAGED_DAEMON_CONFIG"
     trap - EXIT
@@ -365,8 +527,104 @@ if checks_contains ledgers; then
             fi
         fi
     done
+
+    mismatches=$(
+    jq -r --arg height "$fork_block_length" --arg slot "$fork_global_slot" '
+    .data.genesisBlock.protocolState.consensusState as $c |
+    [ ["block height", $c.blockHeight, ($height | tonumber + 1)]
+    , ["slot since genesis", $c.slotSinceGenesis, $slot]
+    , ["slot since the fork", $c.slot, 0]
+    ] | .[] | select((.[1] | tostring) != (.[2] | tostring)) |
+    "\(.[0]): daemon \(.[1]), expected \(.[2])"' "$WORKDIR/genesis-block.json")
+    report_mismatches "the daemon did not start at the fork point" "$mismatches"
 else
     echo "Skipping ledgers validation as per --checks option" >&2
+fi
+
+if checks_contains accounts; then
+    if ! checks_contains ledgers; then
+        echo "Error: the accounts check needs the ledgers check in the same run" >&2
+        exit 1
+    fi
+    if [ "$LEDGER_MIGRATION" -eq 1 ]; then
+        echo "Skipping accounts validation: the ledger migration changes them" >&2
+    else
+        echo "Validating accounts..." >&2
+
+        # python3 and not jq: token symbols are arbitrary bytes, and a balance
+        # sum does not fit a double. The sum is the genesis total currency.
+        if ! python3 - "$FORK_CONFIG" "$WORKDIR" "$WORKDIR/genesis-block.json" <<'PYTHON'
+import json
+import sys
+
+fork_config_path, workdir, genesis_block_path = sys.argv[1:]
+DEFAULT_TOKEN = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+
+
+def load(path):
+    with open(path, encoding="utf-8", errors="surrogateescape") as f:
+        return json.load(f)
+
+
+def nanomina(amount):
+    whole, _, fraction = str(amount).partition(".")
+    return int(whole) * 10**9 + int((fraction + "0" * 9)[:9])
+
+
+def timing(account):
+    t = account.get("timing")
+    if not t:
+        return None
+    return (
+        nanomina(t["initial_minimum_balance"]),
+        int(t["cliff_time"]),
+        nanomina(t["cliff_amount"]),
+        int(t["vesting_period"]),
+        nanomina(t["vesting_increment"]),
+    )
+
+
+def key(account):
+    return (account["pk"], account.get("token", DEFAULT_TOKEN))
+
+
+def summary(accounts):
+    return {key(a): (nanomina(a.get("balance", 0)), timing(a)) for a in accounts}
+
+
+fork_config = load(fork_config_path)
+ledgers = {
+    "staged": fork_config["ledger"]["accounts"],
+    "staking": fork_config["epoch_data"]["staking"]["accounts"],
+    "next": fork_config["epoch_data"]["next"]["accounts"],
+}
+
+failed = False
+for name, accounts in ledgers.items():
+    expected = summary(accounts)
+    exported = load(f"{workdir}/packaged-{name}.json")
+    actual = summary(exported)
+    different = [k for k in expected.keys() | actual.keys() if expected.get(k) != actual.get(k)]
+    print(f"{name}: {len(actual)} accounts, {len(different)} different", file=sys.stderr)
+    for k in sorted(different)[:5]:
+        print(f"  {k}: fork config {expected.get(k)}, exported {actual.get(k)}", file=sys.stderr)
+    failed = failed or bool(different)
+
+total = sum(balance for (_, token), (balance, _) in summary(load(f"{workdir}/packaged-staged.json")).items() if token == DEFAULT_TOKEN)
+state = load(genesis_block_path)["data"]["genesisBlock"]["protocolState"]["consensusState"]
+if total != int(state["totalCurrency"]):
+    print(f"balances sum to {total}, genesis total currency is {state['totalCurrency']}", file=sys.stderr)
+    failed = True
+
+sys.exit(1 if failed else 0)
+PYTHON
+        then
+            echo "Error: accounts differ from $FORK_CONFIG" >&2
+            error=1
+        fi
+    fi
+else
+    echo "Skipping accounts validation as per --checks option" >&2
 fi
 
 if checks_contains tarballs; then

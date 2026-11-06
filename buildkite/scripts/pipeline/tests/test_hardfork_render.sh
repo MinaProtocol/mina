@@ -14,7 +14,9 @@
 #     the package Suite, and MINA_RELEASE_DOCKER_REPO does not reach the tags;
 #   - a run that takes the generic images from a version in the registry does
 #     not look for their bases in the cache;
-#   - the verification steps wait for the reference ledgers they read.
+#   - the verification steps wait for the reference ledgers they read;
+#   - each verification step runs the checks it has the inputs for, and the
+#     corrupted config must fail on the hash mismatch alone.
 #
 # Needs dhall-to-yaml, as the render does.
 
@@ -148,6 +150,17 @@ expect "the corrupted-artifacts check waits for it too" \
   grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-assert-unverify-corrupted-packaged-artifacts-noble")"
 expect "the packaging waits for the generation step" \
   grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-build-hf-debian")"
+
+echo "TEST: each verification step runs its checks"
+yaml="$(render)"
+step_commands="$(commands <<< "$yaml")"
+expect "the corrupted config must fail on the hash mismatch, not on anything else" \
+  grep -q -- "--checks config --expect-config-mismatch" <<< "$step_commands"
+expect_not "no step counts any failure as a pass" grep -q "&& ! (FORKING_FROM_CONFIG_JSON" <<< "$step_commands"
+expect "the config step compares the package with the fork block" \
+  grep -q -- "--checks config,block,constants,artifacts --prefork-version 4.0.3-73134bf" <<< "$step_commands"
+expect "the ledgers step compares the accounts with the fork config" \
+  grep -q -- "--checks ledgers,accounts" <<< "$step_commands"
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"
