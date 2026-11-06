@@ -1,13 +1,12 @@
-(* Tests of the guardian's settings, of the reading of a child's log, of the
-   block download with [Mock_bucket] and of the recovery with [Fake_app]. *)
+(* Tests of the guardian's settings, of the block download with
+   [Mock_bucket] and of the recovery with a fake audit. *)
 
 open Core
 open Async
 module Config = Missing_blocks_guardian_lib.Config
-module App_log = Missing_blocks_guardian_lib.App_log
 module Download = Missing_blocks_guardian_lib.Download
-module Subprocess = Missing_blocks_guardian_lib.Subprocess
 module Archive_blocks = Missing_blocks_guardian_lib.Archive_blocks
+module Audit = Missing_blocks_auditor_lib.Audit
 module Auditor = Missing_blocks_guardian_lib.Auditor
 module Bucket = Missing_blocks_guardian_lib.Bucket
 module Recovery = Missing_blocks_guardian_lib.Recovery
@@ -174,34 +173,9 @@ let test_both_collects_problems () =
   expect_problems
     ~mentioning:[ "missing --archive-uri"; "missing --precomputed-blocks-url" ]
     (Config.both
-       (Config.archive ~env:no_env ~uri:None ~auditor:None)
+       (Config.archive_uri ~env:no_env None)
        (Config.blocks ~env:no_env ~url:None ~network:(Some "mainnet")
           ~format:None ) )
-
-let test_app_log () =
-  let output =
-    String.concat ~sep:"\n"
-      [ Fake_app.message ~level:"Info" ~text:"Querying missing blocks"
-          ~metadata:"{}"
-      ; "not a log line"
-      ; Fake_app.message ~level:"Error" ~text:"Error getting missing blocks"
-          ~metadata:{|{"error":"Failed to connect"}|}
-      ; ""
-      ]
-  in
-  let messages, other_lines = App_log.parse output in
-  Alcotest.(check int) "messages" 2 (List.length messages) ;
-  Alcotest.(check (list string)) "other lines" [ "not a log line" ] other_lines ;
-  match App_log.first_error messages with
-  | None ->
-      Alcotest.fail "expected an error"
-  | Some error ->
-      Alcotest.(check string)
-        "describe" "Error getting missing blocks: Failed to connect"
-        (App_log.describe error) ;
-      Alcotest.(check bool)
-        "no error among info messages" true
-        (Option.is_none (App_log.first_error [ List.hd_exn messages ]))
 
 (* Runs the flags of [param] on [argv] and returns what they map to. *)
 let parse_flags param argv =
@@ -223,9 +197,7 @@ let test_cli_flags () =
   let archive = expect_ok (archive ~env) in
   Alcotest.(check string)
     "archive uri from the flag" "postgres://mina:pw@db:5432/archive"
-    (Uri.to_string archive.uri) ;
-  Alcotest.(check string)
-    "auditor default" Config.Default.auditor archive.auditor ;
+    (Uri.to_string archive) ;
   let blocks =
     parse_flags Cli.blocks
       [ "--precomputed-blocks-url"
@@ -249,34 +221,6 @@ let test_cli_flags () =
     (expect_ok (interval ~env)) ;
   expect_problems ~mentioning:[ "--interval" ]
     (parse_flags Cli.interval [ "--interval"; "soon" ] ~env)
-
-(* A program that writes a secret to stderr and exits with 2: the secret is
-   hidden and the failure text has the stderr. *)
-let test_subprocess_failure () =
-  let logger = Logger.null () in
-  let output =
-    Thread_safe.block_on_async_exn (fun () ->
-        Subprocess.run ~logger ~secrets:[ "s3cret" ] ~prog:"sh"
-          ~args:[ "-c"; "echo 'cannot open s3cret' >&2; exit 2" ]
-          () )
-    |> Or_error.ok_exn
-  in
-  Alcotest.(check string) "stderr hidden" "cannot open <hidden>\n" output.stderr ;
-  Alcotest.(check string)
-    "wrote" " and wrote: cannot open <hidden>" (Subprocess.wrote output) ;
-  Alcotest.(check bool)
-    "exited with 2" true
-    ( match output.exit_status with
-    | Error (`Exit_non_zero 2) ->
-        true
-    | _ ->
-        false ) ;
-  let quiet =
-    Thread_safe.block_on_async_exn (fun () ->
-        Subprocess.run ~logger ~prog:"true" ~args:[] () )
-    |> Or_error.ok_exn
-  in
-  Alcotest.(check string) "nothing written" "" (Subprocess.wrote quiet)
 
 let test_bucket_block_url () =
   let file =
@@ -394,81 +338,72 @@ let test_download_missing_file_url () =
 
 let archive_uri = Uri.of_string "postgres://mina:secret@db:5432/archive"
 
-let check_auditor ~prog =
-  Auditor.check ~logger:(Logger.null ()) ~prog ~archive_uri
-
-let archive ~auditor : Config.archive = { uri = archive_uri; auditor }
-
 let blocks ~dir : Config.blocks =
   { url = "file://" ^ dir; network = "mainnet"; format = Config.Default.format }
 
-let test_auditor_missing_blocks () =
-  Fake_app.with_dir (fun ~dir ->
-      (* The auditor exits with 1 whenever blocks are missing: that is a
-         result, not a failure. *)
-      let%bind prog =
-        Fake_app.printing ~dir ~name:"auditor"
-          ~lines:
-            [ Fake_app.info_line
-            ; Fake_app.parent_lacking ~height:4 ~hash:"3NKfour"
-            ]
-          ~ending:"exit 1"
-      in
-      let%map result = check_auditor ~prog in
-      match result with
-      | Ok (Some parent) ->
-          Alcotest.(check string) "hash" "3NKfour" parent.hash ;
-          Alcotest.(check int) "height" 4 parent.height
-      | Ok None ->
-          Alcotest.fail "expected a missing parent"
-      | Error text ->
-          Alcotest.fail text )
+let healthy : Audit.report =
+  { missing_blocks = []
+  ; pending_blocks_below_canonical = false
+  ; chain_length_differs = false
+  ; chain_status_invalid = false
+  }
 
-let test_auditor_healthy () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind prog =
-        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
-          ~ending:"exit 0"
-      in
-      let%map result = check_auditor ~prog in
-      Alcotest.(check bool)
-        "no missing parent" true
-        (match result with Ok None -> true | _ -> false) )
+let missing ~parent_hash ~parent_height : Audit.missing_block =
+  { parent_hash; parent_height }
 
-let test_auditor_error_line () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind prog =
-        Fake_app.printing ~dir ~name:"auditor"
-          ~lines:
-            [ Fake_app.error_line
-            ; Fake_app.parent_lacking ~height:4 ~hash:"3NKfour"
-            ]
-          ~ending:"exit 1"
-      in
-      let%map result = check_auditor ~prog in
-      expect_error_with
-        ~substring:"Error getting missing blocks: Failed to connect" result )
+(* The auditor exits with a bit for each problem. Scripts read these codes. *)
+let test_audit_exit_code () =
+  let check name report expected =
+    Alcotest.(check int) name expected (Audit.exit_code report)
+  in
+  check "healthy" healthy 0 ;
+  check "missing blocks"
+    { healthy with
+      missing_blocks = [ missing ~parent_hash:"3NKfour" ~parent_height:4 ]
+    }
+    1 ;
+  check "pending blocks"
+    { healthy with pending_blocks_below_canonical = true }
+    2 ;
+  check "chain length" { healthy with chain_length_differs = true } 4 ;
+  check "chain status" { healthy with chain_status_invalid = true } 8 ;
+  check "all"
+    { missing_blocks = [ missing ~parent_hash:"3NKfour" ~parent_height:4 ]
+    ; pending_blocks_below_canonical = true
+    ; chain_length_differs = true
+    ; chain_status_invalid = true
+    }
+    15
 
-let test_auditor_no_log () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind prog = Fake_app.write_program ~dir ~name:"auditor" "exit 0" in
-      let%map result = check_auditor ~prog in
-      expect_error_with ~substring:"it wrote no log message" result )
+(* The guardian repairs only the first missing block. *)
+let test_first_missing_parent () =
+  Alcotest.(check bool)
+    "healthy" true
+    (Option.is_none (Auditor.first_missing_parent healthy)) ;
+  Alcotest.(check bool)
+    "other problems are not for the guardian" true
+    (Option.is_none
+       (Auditor.first_missing_parent
+          { healthy with chain_length_differs = true } ) ) ;
+  match
+    Auditor.first_missing_parent
+      { healthy with
+        missing_blocks =
+          [ missing ~parent_hash:"3NKfour" ~parent_height:4
+          ; missing ~parent_hash:"3NKnine" ~parent_height:9
+          ]
+      }
+  with
+  | None ->
+      Alcotest.fail "expected a missing parent"
+  | Some parent ->
+      Alcotest.(check string) "hash" "3NKfour" parent.hash ;
+      Alcotest.(check int) "height" 4 parent.height
 
-let test_auditor_signal () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind prog =
-        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
-          ~ending:"echo gone >&2\nkill -KILL $$"
-      in
-      let%map result = check_auditor ~prog in
-      expect_error_with ~substring:"it was killed by signal" result ;
-      expect_error_with ~substring:"and wrote: gone" result )
-
-let test_auditor_not_found () =
-  Fake_app.with_dir (fun ~dir ->
-      let%map result = check_auditor ~prog:(dir ^/ "absent") in
-      expect_error_with ~substring:"failed: " result )
+let with_dir f =
+  Thread_safe.block_on_async_exn (fun () ->
+      let%bind dir = Unix.mkdtemp "/tmp/missing_blocks_guardian_test" in
+      f ~dir )
 
 let block_name = "mainnet-5-3NKfive.json"
 
@@ -550,23 +485,32 @@ let recording_add_block () =
       return (Ok ()) )
   , fun () -> List.rev !added )
 
-let restore ~dir ~auditor ~add_block =
-  Recovery.restore ~logger:(Logger.null ()) ~add_block (archive ~auditor)
-    (blocks ~dir) block_at_five
+(* A fake audit that gives the entries of [results], one at each call. *)
+let check_in_turn results =
+  let results = ref results in
+  fun () ->
+    match !results with
+    | [] ->
+        Alcotest.fail "one audit too many"
+    | result :: rest ->
+        results := rest ;
+        return result
+
+let restore ~dir ~check ~add_block =
+  Recovery.restore ~logger:(Logger.null ()) ~add_block ~check (blocks ~dir)
+    block_at_five
+
+let lacking ~height ~hash : Auditor.missing_parent = { hash; height }
 
 let test_restore_follows_parents () =
-  Fake_app.with_dir (fun ~dir ->
+  with_dir (fun ~dir ->
       let%bind () = save_block ~dir ~height:5 ~hash:"3NKfive" in
       let%bind () = save_block ~dir ~height:4 ~hash:"3NKfour" in
-      let%bind auditor =
-        Fake_app.printing_in_turn ~dir ~name:"auditor"
-          ~runs:
-            [ [ Fake_app.parent_lacking ~height:4 ~hash:"3NKfour" ]
-            ; [ Fake_app.info_line ]
-            ]
+      let check =
+        check_in_turn [ Ok (Some (lacking ~height:4 ~hash:"3NKfour")); Ok None ]
       in
       let add_block, added = recording_add_block () in
-      let%map result = restore ~dir ~auditor ~add_block in
+      let%map result = restore ~dir ~check ~add_block in
       check_ok "restored" result ;
       Alcotest.(check (list string))
         "imports in order"
@@ -574,41 +518,32 @@ let test_restore_follows_parents () =
         (added ()) )
 
 let test_restore_no_progress () =
-  Fake_app.with_dir (fun ~dir ->
+  with_dir (fun ~dir ->
       let%bind () = save_block ~dir ~height:5 ~hash:"3NKfive" in
-      let%bind auditor =
-        Fake_app.printing ~dir ~name:"auditor"
-          ~lines:[ Fake_app.parent_lacking ~height:5 ~hash:"3NKfive" ]
-          ~ending:"exit 1"
+      let check =
+        check_in_turn [ Ok (Some (lacking ~height:5 ~hash:"3NKfive")) ]
       in
       let add_block, added = recording_add_block () in
-      let%map result = restore ~dir ~auditor ~add_block in
+      let%map result = restore ~dir ~check ~add_block in
       expect_error_with ~substring:"still lacks block 3NKfive at height 5"
         result ;
       Alcotest.(check (list string)) "one import" [ block_name ] (added ()) )
 
 let test_restore_block_not_in_bucket () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind auditor =
-        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
-          ~ending:"exit 0"
-      in
+  with_dir (fun ~dir ->
       let add_block, added = recording_add_block () in
-      let%map result = restore ~dir ~auditor ~add_block in
+      let%map result = restore ~dir ~check:(check_in_turn []) ~add_block in
       expect_error_with ~substring:"Could not download the block at height 5"
         result ;
       Alcotest.(check (list string)) "no import" [] (added ()) )
 
-let test_restore_auditor_fails () =
-  Fake_app.with_dir (fun ~dir ->
+let test_restore_audit_fails () =
+  with_dir (fun ~dir ->
       let%bind () = save_block ~dir ~height:5 ~hash:"3NKfive" in
-      let%bind auditor =
-        Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.error_line ]
-          ~ending:"exit 1"
-      in
+      let check = check_in_turn [ Error "The audit failed: no database" ] in
       let add_block, _added = recording_add_block () in
-      let%map result = restore ~dir ~auditor ~add_block in
-      expect_error_with ~substring:"Failed to connect" result )
+      let%map result = restore ~dir ~check ~add_block in
+      expect_error_with ~substring:"no database" result )
 
 let () =
   Alcotest.run "missing_blocks_guardian"
@@ -631,12 +566,7 @@ let () =
         ; Alcotest.test_case "both collects problems" `Quick
             test_both_collects_problems
         ] )
-    ; ("app_log", [ Alcotest.test_case "parse and errors" `Quick test_app_log ])
     ; ("cli", [ Alcotest.test_case "flags reach config" `Quick test_cli_flags ])
-    ; ( "subprocess"
-      , [ Alcotest.test_case "failure text has stderr, secrets hidden" `Quick
-            test_subprocess_failure
-        ] )
     ; ( "bucket"
       , [ Alcotest.test_case "block url" `Quick test_bucket_block_url
         ; Alcotest.test_case "listing" `Quick test_bucket_listing
@@ -650,15 +580,10 @@ let () =
         ; Alcotest.test_case "probe of the bucket" `Quick test_probe
         ] )
     ; ( "auditor"
-      , [ Alcotest.test_case "exit 1 with missing blocks is a result" `Quick
-            test_auditor_missing_blocks
-        ; Alcotest.test_case "healthy archive" `Quick test_auditor_healthy
-        ; Alcotest.test_case "error line is a failure" `Quick
-            test_auditor_error_line
-        ; Alcotest.test_case "no log is a failure" `Quick test_auditor_no_log
-        ; Alcotest.test_case "signal is a failure" `Quick test_auditor_signal
-        ; Alcotest.test_case "program not found is a failure" `Quick
-            test_auditor_not_found
+      , [ Alcotest.test_case "exit code of the audit" `Quick
+            test_audit_exit_code
+        ; Alcotest.test_case "first missing parent" `Quick
+            test_first_missing_parent
         ] )
     ; ( "populate"
       , [ Alcotest.test_case "success" `Quick test_populate_ok
@@ -675,7 +600,7 @@ let () =
             test_restore_no_progress
         ; Alcotest.test_case "stops when the block is not in the bucket" `Quick
             test_restore_block_not_in_bucket
-        ; Alcotest.test_case "stops when the auditor fails" `Quick
-            test_restore_auditor_fails
+        ; Alcotest.test_case "stops when the audit fails" `Quick
+            test_restore_audit_fails
         ] )
     ]
