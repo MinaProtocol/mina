@@ -29,7 +29,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_status :
-            Mina_transaction.Transaction.Stable.V3.t With_status.Stable.V2.t
+            Mina_transaction.Transaction.Stable.V4.t With_status.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V3.t
         ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
@@ -72,7 +72,9 @@ module Transaction_with_witness = struct
            ; block_global_slot
            } :
             t ) : Latest.t =
-        { transaction_with_status
+        { transaction_with_status =
+            With_status.map transaction_with_status
+              ~f:Mina_transaction.Transaction.Stable.V3.to_latest
         ; state_hash
         ; statement = Transaction_snark.Statement.Stable.V2.to_latest statement
         ; init_stack
