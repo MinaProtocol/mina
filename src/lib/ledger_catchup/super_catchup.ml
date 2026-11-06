@@ -1004,15 +1004,11 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         | `In_frontier hash -> (
             match Transition_frontier.find frontier hash with
             | None ->
-                [%log' error t.logger]
-                  "Failed to find transition in frontier despite In_frontier \
-                   result"
+                [%log' info t.logger]
+                  "Block $state_hash was added to the frontier, but has since \
+                   left it"
                   ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-                failwithf
-                  "Failed to find transition %s in frontier despite \
-                   In_frontier result"
-                  (State_hash.to_base58_check hash)
-                  ()
+                finish t node ~is_error:true
             | Some _ ->
                 finish t node ~is_error:false )
         | `Building_path tv ->
