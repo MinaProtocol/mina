@@ -328,6 +328,11 @@ let add_node t (node : Node.t) =
   add_state t.states node ;
   Hashtbl.set t.nodes ~key:node.state_hash ~data:node
 
+(** Whether [node] is the tree's node for its block: it has been neither
+    removed nor replaced. *)
+let is_current t (node : Node.t) =
+  Option.exists (Hashtbl.find t.nodes node.state_hash) ~f:(phys_equal node)
+
 (** Of the nodes with the given hashes and parents, those to end because the
     root has moved to [new_root] and the blocks [left] have left the frontier:
     the nodes for those blocks, and every node descending from one other than

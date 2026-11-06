@@ -831,7 +831,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "set_state $exn"
   in
-  let resume = create_resumption_queue ~schedule in
+  let resume =
+    let queue = create_resumption_queue ~schedule in
+    fun (node : Node.t) f ->
+      queue ~finished:node.result (fun () ->
+          if Transition_frontier.Full_catchup_tree.is_current t node then f () )
+  in
   let rec failed (node : Node.t) ?error ~sender failure_reason =
     [%log' debug t.logger] "failed with $error"
       ~metadata:
@@ -862,11 +867,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     (* TODO: See if the bail out is happening. *)
     upon
       (Deferred.any [ (Ivar.read node.result >>| fun _ -> Error `Finished); d ])
-      (function
-        | Ok x ->
-            resume ~finished:node.result (fun () -> f x)
-        | Error `Finished ->
-            () )
+      (function Ok x -> resume node (fun () -> f x) | Error `Finished -> ())
   and retry node =
     step node
       (after (Time.Span.of_sec 15.) |> Deferred.map ~f:Result.return)
@@ -1103,8 +1104,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           Gauge.set Catchup.build_breadcrumb_time
             Time.(Span.to_ms @@ diff (now ()) start_time)) ;
         upon (Scheduler.yield ()) (fun () ->
-            resume ~finished:node.result (fun () ->
-                on_yielded node c breadcrumb ) )
+            resume node (fun () -> on_yielded node c breadcrumb) )
   and on_yielded node c breadcrumb =
     let finished = Ivar.create () in
     let c = Cached.transform c ~f:(fun _ -> breadcrumb) in

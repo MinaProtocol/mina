@@ -88,7 +88,8 @@ let%test_module "Tracking the blocks the frontier adds" =
         downloading_node (hash "block") ~parent:(hash "parent")
       in
       Tree.add_node t replacement ;
-      assert (phys_equal (Hashtbl.find_exn t.nodes (hash "block")) replacement) ;
+      assert (Tree.is_current t replacement) ;
+      assert (not (Tree.is_current t replaced)) ;
       [%test_eq: int]
         (Hashtbl.fold t.states ~init:0 ~f:(fun ~key:_ ~data n ->
              n + Set.length data ) )
