@@ -5,14 +5,21 @@
 -- as the debians. Nightly and PR builds run packaging but select no publish
 -- stage, so they cannot push.
 --
--- Scope, tags and dirtyWhen as PublishDebians. The registry is in the image
--- tags, set at packaging time from MINA_RELEASE_DOCKER_REPO; the first step
--- pushes them as they are. MINA_RELEASE_DOCKER_MIRROR adds a second step that
--- retags the images for that registry and pushes the copy, narrowed by
+-- Scope, tags and dirtyWhen as PublishDebians. One step per registry, and the
+-- registry is decided here, by this pipeline's environment, as the debian
+-- repositories are: MINA_RELEASE_DOCKER_REPO names the first target (the
+-- internal euro registry unless it says otherwise, the same default as
+-- packaging) and MINA_RELEASE_DOCKER_MIRROR a second one, narrowed by
 -- MINA_RELEASE_DOCKER_MIRROR_TAGS, so a release can go to docker.io in full
--- and keep one codename on the internal registry. The two steps are
--- independent, as the two debian publishes are: a failure in one must not
--- hide the other.
+-- and keep one codename on the internal registry. Each step retags the cached
+-- images for its registry when they were tagged for another one. Packaging
+-- reads MINA_RELEASE_DOCKER_REPO too, for the tags it writes into the cache;
+-- the two pipelines should agree, but when they do not, this one wins and the
+-- step says so in its log. The public registry gets no hash tag
+-- (DockerRepo.hashTag), whatever the archive holds.
+--
+-- The two steps are independent, as the two debian publishes are: a failure
+-- in one must not hide the other.
 --
 -- Each step logs in to docker.io itself, as the image steps do. Without it
 -- the push runs with whatever credentials an earlier job left on the agent,
@@ -51,11 +58,23 @@ let publish =
             , target = Size.Small
             }
 
+let target =
+    -- The publish script's inputs for one registry.
+          \(repo : DockerRepo.Type)
+      ->      "MINA_PUBLISH_TARGET_REGISTRY=${DockerRepo.show repo}"
+          ++  " MINA_PUBLISH_HASH_TAG=${      if DockerRepo.hashTag repo
+
+                                        then  "1"
+
+                                        else  "0"}"
+
+let primaryRepo = DockerRepo.effective DockerRepo.Type.InternalEurope
+
 let primary =
       publish
-        "Publish: docker images"
+        "Publish: docker images to ${DockerRepo.show primaryRepo}"
         "publish-dockers"
-        "./buildkite/scripts/docker/publish_from_cache.sh"
+        "${target primaryRepo} ./buildkite/scripts/docker/publish_from_cache.sh"
 
 let mirrorSteps =
       merge
@@ -64,8 +83,8 @@ let mirrorSteps =
             ->  [ publish
                     "Publish: docker images to ${DockerRepo.show repo}"
                     "publish-dockers-mirror"
-                    "MINA_PUBLISH_TARGET_REGISTRY=${DockerRepo.show
-                                                      repo} ./buildkite/scripts/docker/publish_from_cache.sh"
+                    "${target
+                         repo} MINA_PUBLISH_MIRROR=1 ./buildkite/scripts/docker/publish_from_cache.sh"
                 ]
         , None = [] : List Command.Type
         }
