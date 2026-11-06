@@ -152,13 +152,15 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~network_transition_pipe ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~cache_exceptions ~best_seen_transition ~catchup_mode ~bootstrap_status =
+    ~cache_exceptions ~best_seen_transition ~best_seen_valid_cb ~catchup_mode
+    ~bootstrap_status =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   Bootstrap_status.start_bootstrap bootstrap_status ;
   producer_transition_writer_ref := None ;
   let f b_or_h =
-    Strict_pipe.Swappable.write network_transition_pipe (b_or_h, `Valid_cb None) ;
+    Strict_pipe.Swappable.write network_transition_pipe
+      (b_or_h, `Valid_cb best_seen_valid_cb) ;
     let sender =
       match b_or_h with
       | `Block b ->
@@ -417,6 +419,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         ~initial_root_transition ~catchup_mode ~bootstrap_status
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
+        ~best_seen_valid_cb:None
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)
@@ -445,6 +448,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         ~frontier_w ~initial_root_transition ~persistent_root
         ~persistent_frontier ~cache_exceptions ~catchup_mode ~bootstrap_status
         ~best_seen_transition:(Some (`Block best_tip))
+        ~best_seen_valid_cb:None
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
@@ -681,7 +685,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (b_or_h, `Valid_cb vc) ->
              don't_wait_for
-             @@ let%map () =
+             @@ let%map passed_to_bootstrap =
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
@@ -713,12 +717,17 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~clear_reader ~network_transition_pipe
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
-                             ~best_seen_transition:(Some b_or_h) ~catchup_mode
-                             ~bootstrap_status )
-                      else Deferred.unit
+                             ~best_seen_transition:(Some b_or_h)
+                             ~best_seen_valid_cb:(Some vc) ~catchup_mode
+                             ~bootstrap_status ;
+                        true )
+                      else Deferred.return false
                   | None ->
-                      Deferred.unit
+                      Deferred.return false
                 in
-                Strict_pipe.Swappable.write network_transition_pipe
-                  (b_or_h, `Valid_cb (Some vc)) ) ) ;
+                (* Bootstrap is given the block that started it, so it
+                   needs passing on only otherwise. *)
+                if not passed_to_bootstrap then
+                  Strict_pipe.Swappable.write network_transition_pipe
+                    (b_or_h, `Valid_cb (Some vc)) ) ) ;
   (verified_transition_reader, initialization_finish_signal)
