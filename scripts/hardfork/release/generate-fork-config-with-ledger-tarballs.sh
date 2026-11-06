@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -ex -o pipefail
 
 usage() {
   echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --logproc LOGPROC --output-dir OUTPUT_DIR"
@@ -84,7 +84,7 @@ echo "[INFO] Log Processor: $LOGPROC"
 
 # Clean up any existing config files
 echo "--- Clean up any existing config files"
-rm -f config.json config.json.gz
+rm -f config.json config.json.gz hashes.json new_config.json
 rm -rf "$OUTPUT_DIR"
 
 # Check that the network is a known one.
