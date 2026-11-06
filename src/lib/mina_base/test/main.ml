@@ -231,6 +231,7 @@ let () =
               check_two_elements_are_never_the_same
           ] )
     ; Valid_size.tests
+    ; Verification_key_wire_test.tests
     ; Nonce_related.tests
     ; Byte_value_test.
         ( "any-byte values"

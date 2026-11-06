@@ -72,7 +72,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let zkapp_accounts =
     List.map zkapp_account_ids ~f:(fun id ->
         let account = Account.create id initial_balance in
-        let verification_key = Some vk in
+        let verification_key = Some (Verification_key_wire.of_hashed vk) in
         let zkapp = Some { Zkapp_account.default with verification_key } in
         { account with zkapp } )
   in

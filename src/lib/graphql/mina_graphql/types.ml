@@ -1737,7 +1737,7 @@ module AccountObj = struct
               ( non_null
               @@ Pickles_graphql.Graphql_scalars.VerificationKeyHash.typ () )
             ~args:Arg.[]
-            ~resolve:(fun _ (vk : _ With_hash.t) -> vk.hash)
+            ~resolve:(fun _ vk -> Verification_key_wire.hash vk)
         ] )
 
   let rec account =

@@ -252,7 +252,9 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       ; set_voting_for = Either
       }
     in
-    let verification_key = Some verification_key in
+    let verification_key =
+      Some (Verification_key_wire.of_hashed verification_key)
+    in
     let zkapp = Some { Zkapp_account.default with verification_key } in
     { account with permissions; zkapp }
   in

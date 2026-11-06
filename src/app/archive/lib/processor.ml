@@ -629,17 +629,15 @@ module Zkapp_verification_keys = struct
         ~returning:("id", Caqti_type.int) ~table_name ~cols:(Fields.names, typ)
         ()
     in
-    fun (module Conn : Mina_caqti.CONNECTION)
-        (vk :
-          ( Pickles.Side_loaded.Verification_key.t
-          , Pickles.Backend.Tick.Field.t )
-          With_hash.t ) ->
+    fun (module Conn : Mina_caqti.CONNECTION) (vk : Verification_key_wire.t) ->
       let open Deferred.Result.Let_syntax in
       let verification_key =
         Pickles.Side_loaded.Verification_key.to_base64 vk.data
       in
       let%bind hash_id =
-        Zkapp_verification_key_hashes.add_if_doesn't_exist (module Conn) vk.hash
+        Zkapp_verification_key_hashes.add_if_doesn't_exist
+          (module Conn)
+          (Verification_key_wire.hash vk)
       in
       let value = { verification_key; hash_id } in
       upsert.run (module Conn) value

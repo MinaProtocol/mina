@@ -35,8 +35,7 @@ let update_json_roundtrip () =
            Pickles.Side_loaded.Verification_key.(
              dummy |> to_base58_check |> of_base58_check_exn)
          in
-         let hash = Zkapp_account.digest_vk data in
-         { With_hash.data; hash } )
+         Verification_key_wire.of_data data )
     in
     { app_state
     ; delegate = Set_or_keep.Set delegate

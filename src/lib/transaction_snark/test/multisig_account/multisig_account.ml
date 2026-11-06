@@ -313,7 +313,8 @@ let suite () =
                  ; zkapp =
                      Some
                        { (Option.value ~default:Zkapp_account.default a.zkapp) with
-                         verification_key = Some vk
+                         verification_key =
+                           Some (Verification_key_wire.of_hashed vk)
                        }
                  } ) ;
               let update_default_permissions =

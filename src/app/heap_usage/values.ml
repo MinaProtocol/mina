@@ -15,10 +15,10 @@ let account : Mina_base.Account.t =
       app_state = Mina_base.Zkapp_account.default.app_state
     ; verification_key =
         Some
-          With_hash.
-            { data = Pickles.Side_loaded.Verification_key.dummy
-            ; hash = Mina_base.Zkapp_account.dummy_vk_hash ()
-            }
+          (Mina_base.Verification_key_wire.of_hashed
+             { With_hash.data = Pickles.Side_loaded.Verification_key.dummy
+             ; hash = Mina_base.Zkapp_account.dummy_vk_hash ()
+             } )
     ; zkapp_uri =
         "https://www.example.com/this-is-a-decently-long-url/latest-zkapp-implementation.html"
     }
