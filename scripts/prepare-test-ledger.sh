@@ -19,7 +19,7 @@ require_external_commands() {
     fi
 }
 
-require_external_commands curl jq
+require_external_commands curl jq mina-json-bytes
 
 # Balance of keys to which delegation will happen
 KEY_BALANCE=${KEY_BALANCE:-1000}
@@ -158,8 +158,10 @@ keys_="${keys_:0:-1}"
 
 tmpfile=$(mktemp)
 
+# Token symbols and zkApp URIs are arbitrary bytes and must stay exact, so each
+# step that writes the ledger uses mina-json-bytes.
 # jq filter to exclude PKs from the ledger
-if ! <"$ledger_file" jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"; then
+if ! <"$ledger_file" mina-json-bytes jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"; then
   echo "Error: Failed to filter ledger with jq" >&2
   rm "$tmpfile"
   exit 1
@@ -207,7 +209,7 @@ expr="$expr | [.[] | select(.delegate | IN($keys_)) |= del(.receipt_chain_hash)]
 
 
 tmpfile2=$(mktemp)
-if ! <"$tmpfile" jq "$expr" >"$tmpfile2"; then
+if ! <"$tmpfile" mina-json-bytes jq "$expr" >"$tmpfile2"; then
   echo "Error: Failed to apply ledger transformations with jq" >&2
   rm "$tmpfile" "$tmpfile2"
   exit 1

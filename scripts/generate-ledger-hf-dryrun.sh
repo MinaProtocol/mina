@@ -15,6 +15,10 @@ check_basic_dependencies() {
     if ! command -v jq >/dev/null 2>&1; then
         missing_deps+=("jq")
     fi
+
+    if ! command -v mina-json-bytes >/dev/null 2>&1; then
+        missing_deps+=("mina-json-bytes")
+    fi
     
     if ! command -v date >/dev/null 2>&1; then
         missing_deps+=("date")
@@ -599,7 +603,7 @@ if [[ -n "$PLAIN_BALANCE" ]]; then
         INJECT_JSON=$(printf '%s\n' "${INJECT_ENTRIES[@]}" | jq -s '.')
         echo "Injecting $((PLAIN_KEYS - EXTRA_KEYS)) plain keys with balance $PLAIN_BALANCE MINA (no delegation)..."
         for ledger_file in genesis.json staking.json next.json; do
-            jq --argjson new "$INJECT_JSON" '. + $new' "$ledger_file" > "${ledger_file}.tmp" \
+            mina-json-bytes jq --argjson new "$INJECT_JSON" '. + $new' < "$ledger_file" > "${ledger_file}.tmp" \
                 && mv "${ledger_file}.tmp" "$ledger_file"
         done
     fi
@@ -608,7 +612,7 @@ fi
 # Generate full runtime configuration
 echo "Generating runtime configuration..."
 JQ_FULL_EXPR='{ledger:{add_genesis_winner:false, accounts: $genesis[0]},epoch_data:{staking:{seed:"'"$STAKING_SEED"'", accounts:$staking[0]}, next:{seed:"'"$NEXT_SEED"'", accounts:$next[0]}}}'
-jq --slurpfile genesis genesis.json --slurpfile staking staking.json --slurpfile next next.json -n "$JQ_FULL_EXPR" > runtime_config_full.json
+mina-json-bytes jq --slurpfile genesis genesis.json --slurpfile staking staking.json --slurpfile next next.json -n "$JQ_FULL_EXPR" > runtime_config_full.json
 
 # Validate cache directory can be created
 echo "Validating temporary directory access..."
