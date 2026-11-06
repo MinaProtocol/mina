@@ -287,10 +287,8 @@ let block_added (t : t) h =
       Hashtbl.remove t.nodes h ;
       remove_state t.states node )
 
-let remove_node' t (node : Node.t) =
-  Hashtbl.remove t.nodes node.state_hash ;
-  remove_state t.states node ;
-  Ivar.fill_if_empty node.result (Error node.attempts) ;
+(** Give up the block [node] holds, if it holds one. *)
+let release_block t (node : Node.t) =
   match node.state with
   | Root _ | Failed | Finished ->
       ()
@@ -305,6 +303,12 @@ let remove_node' t (node : Node.t) =
       t.release.release c
   | To_build_breadcrumb (_parent, c) ->
       t.release.release c
+
+let remove_node' t (node : Node.t) =
+  Hashtbl.remove t.nodes node.state_hash ;
+  remove_state t.states node ;
+  Ivar.fill_if_empty node.result (Error node.attempts) ;
+  release_block t node
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with
