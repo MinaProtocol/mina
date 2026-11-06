@@ -7377,6 +7377,53 @@
         },
         {
           "kind": "OBJECT",
+          "name": "ProtocolVersion",
+          "description": null,
+          "fields": [
+            {
+              "name": "transaction",
+              "description": "Transaction version, changed by hard forks",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "network",
+              "description": "Network version",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "patch",
+              "description": "Patch version",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "CompletedWork",
           "description": "Completed snark works",
           "fields": [
@@ -12206,6 +12253,36 @@
                     }
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "currentProtocolVersion",
+              "description":
+                "Protocol version that the block was produced under",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ProtocolVersion",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "proposedProtocolVersion",
+              "description":
+                "Protocol version signalled by the block producer, if any. This is carried in the block header outside of the protocol state, so it is not covered by the state hash or the proof",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProtocolVersion",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
