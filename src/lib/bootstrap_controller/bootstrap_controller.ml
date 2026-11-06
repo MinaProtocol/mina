@@ -414,7 +414,7 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition
-    ~bootstrap_status previous_cycles =
+    ~bootstrap_status ~transition_graph previous_cycles =
   let open Context in
   Bootstrap_status.start_bootstrap_attempt bootstrap_status ;
   (* The short-lived pipe allocated here will be closed
@@ -441,7 +441,6 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ; num_of_root_snarked_ledger_retargeted = 0
     }
   in
-  let transition_graph = Transition_cache.create () in
   let temp_persistent_root_instance =
     Transition_frontier.Persistent_root.create_instance_exn persistent_root
   in
@@ -707,6 +706,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~trust_system ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
       ~persistent_frontier ~initial_root_transition ~bootstrap_status
+      ~transition_graph:(Transition_cache.create ())
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
