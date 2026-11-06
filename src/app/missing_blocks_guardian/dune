@@ -13,13 +13,13 @@
   conduit-async
   core
   uri
-  yojson
   ;; local libraries
   archive_blocks_lib
   cli_lib
   genesis_constants
   logger
   mina_caqti
+  missing_blocks_auditor_lib
   proof_cache_tag)
  (instrumentation
   (backend bisect_ppx))

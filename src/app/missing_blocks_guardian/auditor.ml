@@ -1,47 +1,22 @@
-(* auditor.ml -- run mina-missing-blocks-auditor and read its log *)
+(* auditor.ml -- find the next missing block with the audit of the archive *)
 
 open Core
 open Async
+module Audit = Missing_blocks_auditor_lib.Audit
 
 type missing_parent = { hash : string; height : int } [@@deriving equal]
 
-(* The auditor logs each block whose parent is missing with the parent's
-   hash and height in the metadata. *)
-let missing_parent (message : Logger.Message.t) =
-  match
-    ( Map.find message.metadata "parent_hash"
-    , Map.find message.metadata "parent_height" )
-  with
-  | Some (`String hash), Some (`Int height) ->
-      Some { hash; height }
-  | _ ->
-      None
+(* The first block that the audit reports as missing. Other problems of the
+   audit are not for the guardian to repair. *)
+let first_missing_parent (report : Audit.report) =
+  Option.map (List.hd report.missing_blocks) ~f:(fun missing ->
+      { hash = missing.parent_hash; height = missing.parent_height } )
 
-(* Runs the auditor, relays its log and returns the first missing parent it
-   reports. Its exit code is a bit set of the problems it found, and a
-   database error also exits with 1, so its log tells whether it failed: an
-   error in the log, or no log at all, is an [Error] with the reason. *)
-let check ~logger ~prog ~archive_uri =
-  let uri = Uri.to_string archive_uri in
-  let failed error = Error (sprintf "%s failed: %s" prog error) in
-  match%map
-    Subprocess.run ~logger ~secrets:[ uri ] ~prog ~args:[ "--archive-uri"; uri ]
-      ()
-  with
-  | Error err ->
-      failed (sprintf "it could not be run: %s" (Error.to_string_hum err))
-  | Ok output -> (
-      let messages, other_lines = App_log.parse output.stdout in
-      App_log.relay ~logger messages ;
-      App_log.warn_other_lines ~logger ~prog other_lines ;
-      match (App_log.first_error messages, output.exit_status) with
-      | Some message, _ ->
-          failed (App_log.describe message)
-      | None, _ when List.is_empty messages ->
-          failed "it wrote no log message; is it mina-missing-blocks-auditor?"
-      | None, Error (`Signal signal) ->
-          failed
-            (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
-               (Subprocess.wrote output) )
-      | None, (Ok () | Error (`Exit_non_zero _)) ->
-          Ok (List.find_map messages ~f:missing_parent) )
+(* Audits the database of [pool] and returns the first missing parent. An
+   audit that cannot finish is an [Error] with the reason. *)
+let check ~logger ~pool =
+  match%map Audit.run ~logger ~pool with
+  | Ok report ->
+      Ok (first_missing_parent report)
+  | Error { message; error } ->
+      Error (sprintf "The audit failed: %s: %s" message error)

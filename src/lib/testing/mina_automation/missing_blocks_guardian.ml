@@ -21,8 +21,6 @@ module Env_var = struct
   let pgpassword = "PGPASSWORD"
 
   let blocks_format = "BLOCKS_FORMAT"
-
-  let missing_blocks_auditor = "MISSING_BLOCKS_AUDITOR"
 end
 
 module Config = struct
@@ -33,7 +31,6 @@ module Config = struct
     ; precomputed_blocks : Uri.t
     ; network : string
     ; run_mode : mode
-    ; missing_blocks_auditor : string
     ; block_format : [ `Precomputed | `Extensional ]
     }
 
@@ -42,12 +39,7 @@ module Config = struct
   let to_args t =
     match t.run_mode with
     | Audit ->
-        [ "audit"
-        ; "--archive-uri"
-        ; Uri.to_string t.archive_uri
-        ; "--missing-blocks-auditor"
-        ; t.missing_blocks_auditor
-        ]
+        [ "audit"; "--archive-uri"; Uri.to_string t.archive_uri ]
     | Run ->
         [ "single-run" ]
 
@@ -78,7 +70,6 @@ module Config = struct
                     "precomputed"
                 | `Extensional ->
                     "extensional" )
-            ; (Env_var.missing_blocks_auditor, t.missing_blocks_auditor)
             ] )
 end
 

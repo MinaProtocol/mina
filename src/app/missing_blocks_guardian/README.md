@@ -4,11 +4,12 @@ Missing Blocks Guardian
 `mina-missing-blocks-guardian` finds the blocks that an archive database
 lacks and restores them from a bucket of block files.
 
-It runs `mina-missing-blocks-auditor` to find the first block whose parent
-is missing, downloads that parent as
+It runs the audit of `mina-missing-blocks-auditor` in its own process, with
+the library `missing_blocks_auditor_lib`, to find the first block whose
+parent is missing. It downloads that parent as
 `<network>-<height>-<state hash>.json` from the bucket, writes it to the
 database with the library of `mina-archive-blocks`, and repeats until the
-auditor reports no missing parent.
+audit reports no missing parent.
 
 The guardian needs a profile, as `mina-archive-blocks` does: `MINA_PROFILE`,
 or the file `/etc/coda/build_config/PROFILE` that packages and configured
@@ -18,7 +19,10 @@ settings, for each subcommand.
 Subcommands
 -----------
 
-- `audit`: run the auditor and report whether blocks are missing.
+- `audit`: run the audit and report whether blocks are missing. The other
+  checks of the audit are logged but do not change the exit code. To use
+  them in a script, run `mina-missing-blocks-auditor`, which has a bit in
+  its exit code for each check.
 - `single-run`: audit, then restore the missing blocks once.
 - `daemon`: `single-run` every `--interval` seconds; after a recovery, six
   times longer.
@@ -32,7 +36,6 @@ variable. A variable set to the empty string counts as unset.
 | Flag | Environment variable | Subcommands | Meaning |
 | --- | --- | --- | --- |
 | `--archive-uri URI` | `DB_USERNAME`, `PGPASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME` | all | Archive database, `postgres://user:password@host:port/db`, or built from the five variables. |
-| `--missing-blocks-auditor PATH` | `MISSING_BLOCKS_AUDITOR` | all | The auditor program. Default `mina-missing-blocks-auditor`. |
 | `--precomputed-blocks-url URL` | `PRECOMPUTED_BLOCKS_URL` | `single-run`, `daemon` | Bucket with the block files: an `http`, `https` or `file` URL. The block file names are added to this URL. |
 | `--network NAME` | `MINA_NETWORK` | `single-run`, `daemon` | Prefix of the block file names. |
 | `--block-format precomputed\|extensional` | `BLOCKS_FORMAT` | `single-run`, `daemon` | Format of the block files. Default `precomputed`. |
@@ -48,7 +51,7 @@ Exit codes
 ----------
 
 - `audit`: 0 when the archive holds no block without a parent, 1 when it
-  does or when the auditor fails.
+  does or when the audit cannot finish.
 - `single-run`: 0 when the archive holds no block without a parent after
   the run, 1 when a block could not be restored.
 - `daemon`: runs until a block cannot be restored, then exits with 1. A
@@ -82,11 +85,11 @@ A block cannot be restored when:
   404 when the file does not exist. The error page is not saved. The fatal
   line shows how the URL of the file was built from the bucket URL and the
   network name;
-- the auditor cannot be run, is killed, or logs an error. The fatal line of
-  the guardian repeats the error of the program, or what it wrote to stderr;
+- the audit cannot finish, for example when the database does not answer or
+  has no canonical block. The fatal line has the reason;
 - the block file cannot be read or written to the database. The fatal line
   has the reason;
-- after a block was added, the auditor still reports the same missing
+- after a block was added, the audit still reports the same missing
   parent. That means the file in the bucket holds another block.
 
 Examples
@@ -119,13 +122,11 @@ Modules
 - `cli.ml`: the flags, the log setup, the check of the settings and the
   report of the settings in use.
 - `config.ml`: the settings, their sources and their validation.
-- `auditor.ml`: runs the auditor and reads the missing parent from its log.
+- `auditor.ml`: runs the audit and takes the first missing parent from its
+  report.
 - `archive_blocks.ml`: writes a block file to the database with the library
   `archive_blocks_lib`.
 - `bucket.ml`: the names and the URLs of the block files in a bucket.
-- `app_log.ml`: parses the JSON log of a Mina program, relays it and finds
-  the errors in it.
-- `subprocess.ml`: runs a program and collects its output.
 - `download.ml`: fetches a block file; HTTPS checks the host name.
 - `sql.ml`: the queries on the archive database.
 
@@ -134,4 +135,5 @@ Tests
 
 `MINA_PROFILE=dev dune runtest src/app/missing_blocks_guardian` runs the
 unit tests of the settings, the log reading, the download with a local HTTP
-server, and the recovery with a fake auditor program.
+server, and the recovery with a fake audit. The audit needs a database, so
+the patch archive test covers it.

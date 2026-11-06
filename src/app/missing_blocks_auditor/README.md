@@ -9,6 +9,10 @@ with the archive database.
 This tool is crucial for maintaining the integrity of archive databases,
 especially those used for transaction history, analytics, or network monitoring.
 
+The checks are in the library `missing_blocks_auditor_lib`, which
+`mina-missing-blocks-guardian` also uses. This program is the command line
+around it: it logs the results and sets the exit code.
+
 Problems Detected
 ----------------
 

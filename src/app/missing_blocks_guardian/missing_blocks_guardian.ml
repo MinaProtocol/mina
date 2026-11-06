@@ -9,8 +9,8 @@ open Missing_blocks_guardian_lib
 
 let top_blocks_count = 10
 
-let connect ~logger (archive : Config.archive) =
-  match Mina_caqti.connect_pool archive.uri with
+let connect ~logger archive_uri =
+  match Mina_caqti.connect_pool archive_uri with
   | Ok pool ->
       pool
   | Error err ->
@@ -45,9 +45,7 @@ let or_exit ~logger = function
       [%log fatal] "%s" reason ;
       exit 1
 
-let check ~logger (archive : Config.archive) =
-  Auditor.check ~logger ~prog:archive.auditor ~archive_uri:archive.uri
-  >>= or_exit ~logger
+let check ~logger ~pool = Auditor.check ~logger ~pool >>= or_exit ~logger
 
 (* The bucket must answer at start, so that a wrong URL is reported as such
    and not later as a block that cannot be downloaded. *)
@@ -63,7 +61,7 @@ let check_bucket ~logger (blocks : Config.blocks) =
         blocks.url (Error.to_string_hum err) ;
       exit 1
 
-let bootstrap ~logger ~pool (archive : Config.archive) (blocks : Config.blocks)
+let bootstrap ~logger ~pool (blocks : Config.blocks)
     (parent : Auditor.missing_parent) =
   [%log info] "Some blocks are missing, moving to recovery" ;
   let%bind () = log_top_blocks ~logger ~pool ~when_:"before the recovery" in
@@ -73,14 +71,17 @@ let bootstrap ~logger ~pool (archive : Config.archive) (blocks : Config.blocks)
     Archive_blocks.add_block ~logger ~pool ~format:blocks.format
   in
   let%bind () =
-    Recovery.restore ~logger ~add_block archive blocks parent
+    Recovery.restore ~logger ~add_block
+      ~check:(fun () -> Auditor.check ~logger ~pool)
+      blocks parent
     >>= or_exit ~logger
   in
   log_top_blocks ~logger ~pool ~when_:"after the recovery"
 
 (* Exits 0 when no block is missing and 1 when some are. *)
-let audit ~logger archive =
-  match%bind check ~logger archive with
+let audit ~logger archive_uri =
+  let pool = connect ~logger archive_uri in
+  match%bind check ~logger ~pool with
   | Some _ ->
       [%log info] "Some blocks are missing" ;
       exit 1
@@ -88,10 +89,10 @@ let audit ~logger archive =
       [%log info] "The archive has no missing blocks back to genesis" ;
       return ()
 
-let recover ~logger ~pool archive blocks =
-  match%bind check ~logger archive with
+let recover ~logger ~pool blocks =
+  match%bind check ~logger ~pool with
   | Some parent ->
-      let%map () = bootstrap ~logger ~pool archive blocks parent in
+      let%map () = bootstrap ~logger ~pool blocks parent in
       [%log info]
         "The recovery finished, the archive has no missing blocks back to \
          genesis" ;
@@ -103,7 +104,7 @@ let recover ~logger ~pool archive blocks =
 let single_run ~logger archive blocks =
   let pool = connect ~logger archive in
   let%bind () = check_bucket ~logger blocks in
-  Deferred.ignore_m (recover ~logger ~pool archive blocks)
+  Deferred.ignore_m (recover ~logger ~pool blocks)
 
 (* Checks every [interval] seconds forever; after a recovery, waits
    [recovery_sleep_factor] times longer. *)
@@ -111,7 +112,7 @@ let daemon ~logger ~interval archive blocks =
   let pool = connect ~logger archive in
   let%bind () = check_bucket ~logger blocks in
   let rec loop () =
-    let%bind recovered = recover ~logger ~pool archive blocks in
+    let%bind recovered = recover ~logger ~pool blocks in
     let sleep =
       if recovered then Config.Default.recovery_sleep_factor * interval
       else interval
