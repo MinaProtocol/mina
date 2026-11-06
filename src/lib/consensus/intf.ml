@@ -672,7 +672,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V3 : sig
+        module V4 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
