@@ -44,14 +44,17 @@ CLEAN=(env -u MINA_RELEASE_CHANNEL -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_D
        -u MINA_RELEASE_DEBIAN_REPO -u MINA_RELEASE_DEBIAN_MIRROR
        -u USE_GENERIC_DOCKERS_FROM_VERSION -u USE_ARTIFACTS_FROM_BUILDKITE_BUILD)
 
-# render <VAR=value>...: the pipeline YAML for a mainnet noble run
+# render <VAR=value>...: the pipeline YAML for a mainnet noble run. dhall-to-yaml
+# 1.6 quotes the keys and step names with ', 1.7 with ". The checks read ', so
+# they pass with both.
 render() {
   "${CLEAN[@]}" "$@" \
     CODENAMES_CONFIG=Noble_Amd64 NETWORK=Mainnet \
     GENESIS_TIMESTAMP=2026-10-29T18:00:00Z \
     CONFIG_JSON_GZ_URL=https://example.invalid/config.json.gz \
     PRECOMPUTED_FORK_BLOCK_PREFIX=gs://example/mainnet \
-    ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null
+    ./buildkite/scripts/entrypoints/run-hardfork-package-gen.sh 2>/dev/null \
+    | sed -E "s/^( *(- )?'(key|step)': )\"([^\"]*)\"$/\1'\4'/"
 }
 
 keys() { grep -o "'key': '[^']*'" | sed "s/'key': '//; s/'$//" | sort -u; }
