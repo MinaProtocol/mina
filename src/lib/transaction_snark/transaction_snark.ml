@@ -4712,12 +4712,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             verification_key = Zkapp_basic.Set_or_keep.Set vk
           ; permissions =
               Zkapp_basic.Set_or_keep.Set
-                (Option.value permissions
-                   ~default:
-                     { Permissions.user_default with
-                       edit_state = Permissions.Auth_required.Proof
-                     ; edit_action_state = Proof
-                     } )
+                (Permissions.Update.of_account
+                   (Option.value permissions
+                      ~default:
+                        { Permissions.user_default with
+                          edit_state = Permissions.Auth_required.Proof
+                        ; edit_action_state = Proof
+                        } ) )
           }
       in
       let ( `Zkapp_command
@@ -5274,7 +5275,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           { Permissions.user_default with
             send = Permissions.Auth_required.Proof
           }
-          |> Zkapp_basic.Set_or_keep.Set
+          |> Permissions.Update.of_account |> Zkapp_basic.Set_or_keep.Set
         in
         { Account_update.Update.dummy with permissions }
       in

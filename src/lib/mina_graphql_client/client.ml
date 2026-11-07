@@ -398,7 +398,10 @@ let get_account_update ~logger t ~account_id =
       let%bind permissions =
         match account.permissions with
         | Some perms ->
-            return @@ Set (permissions_of_account_permissions perms)
+            return
+            @@ Set
+                 (Mina_base.Permissions.Update.of_account
+                    (permissions_of_account_permissions perms) )
         | None ->
             fail (Error.of_string "Expected permissions in account")
       in

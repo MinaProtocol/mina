@@ -82,7 +82,11 @@ let suite () =
         ; update =
             { Account_update.Update.dummy with
               permissions =
-                Set { Permissions.user_default with access = access_permission }
+                Set
+                  (Permissions.Update.of_account
+                     { Permissions.user_default with
+                       access = access_permission
+                     } )
             ; verification_key = Set { data = vk; hash = vk_hash }
             }
         ; preconditions =
