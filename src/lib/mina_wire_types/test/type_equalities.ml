@@ -193,7 +193,7 @@ module Mina_base = struct
       (O.Zkapp_basic.Set_or_keep.Stable)
       (W.Zkapp_basic.Set_or_keep)
   include Assert_equal0V1 (O.Zkapp_basic.F.Stable) (W.Zkapp_basic.F)
-  include Assert_equal0V2 (O.Permissions.Stable) (W.Permissions)
+  include Assert_equal0V3 (O.Permissions.Stable) (W.Permissions)
   include
     Assert_equal0V1 (O.Account.Token_symbol.Stable) (W.Account.Token_symbol)
   include
@@ -201,7 +201,7 @@ module Mina_base = struct
       (O.Account_update.Update.Timing_info.Stable)
       (W.Account_update.Update.Timing_info)
   include
-    Assert_equal0V2 (O.Account_update.Update.Stable) (W.Account_update.Update)
+    Assert_equal0V3 (O.Account_update.Update.Stable) (W.Account_update.Update)
   include
     Assert_equal0V1
       (O.Account_update.Body.Events'.Stable)
@@ -238,7 +238,7 @@ module Mina_base = struct
     Assert_equal0V2
       (O.Account_update.Preconditions.Stable)
       (W.Account_update.Preconditions)
-  include Assert_equal0V2 (O.Account_update.Body.Stable) (W.Account_update.Body)
+  include Assert_equal0V3 (O.Account_update.Body.Stable) (W.Account_update.Body)
   include Assert_equal0V2 (O.Fee_transfer.Single.Stable) (W.Fee_transfer.Single)
   include Assert_equal0V2 (O.Fee_transfer.Stable) (W.Fee_transfer)
   include

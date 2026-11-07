@@ -86,6 +86,24 @@ end
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        { sequence_no : int
+        ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Body.Simple.Stable.V3.t list
+        ; memo : Signed_command_memo.Stable.V1.t
+        ; hash : Transaction_hash.Stable.V1.t
+              [@to_yojson Transaction_hash.to_yojson]
+              [@of_yojson Transaction_hash.of_yojson]
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
+        ; failure_reasons :
+            Transaction_status.Failure.Collection.Display.Stable.V1.t option
+        }
+      [@@deriving yojson, equal]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         { sequence_no : int
@@ -101,7 +119,26 @@ module Zkapp_command = struct
         }
       [@@deriving yojson, equal]
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ sequence_no
+           ; fee_payer
+           ; account_updates
+           ; memo
+           ; hash
+           ; status
+           ; failure_reasons
+           } :
+            t ) : Latest.t =
+        { sequence_no
+        ; fee_payer
+        ; account_updates =
+            List.map account_updates
+              ~f:Account_update.Body.Simple.Stable.V2.to_latest
+        ; memo
+        ; hash
+        ; status
+        ; failure_reasons
+        }
     end
   end]
 
@@ -141,7 +178,7 @@ module Block = struct
         ; timestamp : Block_time.Stable.V1.t
         ; user_cmds : User_command.Stable.V2.t list
         ; internal_cmds : Internal_command.Stable.V2.t list
-        ; zkapp_cmds : Zkapp_command.Stable.V2.t list
+        ; zkapp_cmds : Zkapp_command.Stable.V3.t list
         ; protocol_version : Protocol_version.Stable.V2.t
         ; proposed_protocol_version : Protocol_version.Stable.V2.t option
         ; chain_status : Chain_status.Stable.V1.t
@@ -239,7 +276,7 @@ module Block = struct
         ; timestamp
         ; user_cmds
         ; internal_cmds
-        ; zkapp_cmds
+        ; zkapp_cmds = List.map zkapp_cmds ~f:Zkapp_command.Stable.V2.to_latest
         ; protocol_version
         ; proposed_protocol_version
         ; chain_status

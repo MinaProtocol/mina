@@ -80,12 +80,24 @@ let gen =
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  module V4 = struct
+    type t =
+      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V3.t) Poly.Stable.V2.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V3 = struct
     type t =
       (Signed_command.Stable.V2.t, Zkapp_command.Stable.V2.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
-    let to_latest = Fn.id
+    let to_latest : t -> Latest.t = function
+      | Signed_command command ->
+          Signed_command command
+      | Zkapp_command command ->
+          Zkapp_command (Zkapp_command.Stable.V2.to_latest command)
   end
 end]
 

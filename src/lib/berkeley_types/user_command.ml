@@ -43,7 +43,7 @@ let hash : t -> Mina_transaction.Transaction_hash.t = function
   | Zkapp_command zkapp_command ->
       Zkapp_command.hash (forget_digests zkapp_command)
 
-let to_mesa : t -> Mina_base.User_command.Stable.Latest.t = function
+let to_mesa : t -> Mina_base.User_command.Stable.V3.t = function
   | Signed_command signed_command ->
       Signed_command signed_command
   | Zkapp_command zkapp_command ->

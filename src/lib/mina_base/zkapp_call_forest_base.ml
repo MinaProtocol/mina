@@ -584,6 +584,17 @@ module With_hashes = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t =
+        ( Account_update.Stable.V3.t
+        , Digest.Account_update.Stable.V1.t
+        , Digest.Forest.Stable.V1.t )
+        Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Account_update.Stable.V2.t
@@ -592,7 +603,8 @@ module With_hashes = struct
         Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : Latest.t =
+        map t ~f:Account_update.Stable.V2.to_latest
     end
   end]
 
