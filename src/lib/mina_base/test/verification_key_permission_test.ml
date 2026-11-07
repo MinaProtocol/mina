@@ -13,7 +13,10 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
             { Account_update.Body.dummy.update with
               permissions =
                 Set
-                  { Permissions.user_default with set_verification_key = auth }
+                  (Permissions.Update.of_account
+                     { Permissions.user_default with
+                       set_verification_key = auth
+                     } )
             }
         }
       ~authorization:(Control.Poly.Signature Signature.dummy)

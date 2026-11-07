@@ -310,37 +310,42 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { Account_update.Update.dummy with
           permissions =
             Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                set_verification_key = (Proof, invalid_version)
-              }
+              (Permissions.Update.of_account
+                 { Permissions.user_default with
+                   set_verification_key = (Proof, invalid_version)
+                 } )
         }
       in
       let invalid_snapp_update_impossible =
         { Account_update.Update.dummy with
           permissions =
             Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                set_verification_key = (Impossible, invalid_version)
-              }
+              (Permissions.Update.of_account
+                 { Permissions.user_default with
+                   set_verification_key = (Impossible, invalid_version)
+                 } )
         }
       in
       let snapp_update_proof =
         { Account_update.Update.dummy with
           permissions =
             Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                set_verification_key = (Proof, Mina_numbers.Txn_version.current)
-              }
+              (Permissions.Update.of_account
+                 { Permissions.user_default with
+                   set_verification_key =
+                     (Proof, Mina_numbers.Txn_version.current)
+                 } )
         }
       in
       let snapp_update_impossible =
         { Account_update.Update.dummy with
           permissions =
             Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                set_verification_key =
-                  (Impossible, Mina_numbers.Txn_version.current)
-              }
+              (Permissions.Update.of_account
+                 { Permissions.user_default with
+                   set_verification_key =
+                     (Impossible, Mina_numbers.Txn_version.current)
+                 } )
         }
       in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in

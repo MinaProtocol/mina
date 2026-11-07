@@ -318,7 +318,8 @@ let suite () =
                  } ) ;
               let update_default_permissions =
                 let permissions =
-                  Zkapp_basic.Set_or_keep.Set Permissions.user_default
+                  Zkapp_basic.Set_or_keep.Set
+                    (Permissions.Update.of_account Permissions.user_default)
                 in
                 { Account_update.Update.noop with permissions }
               in

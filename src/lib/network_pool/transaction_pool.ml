@@ -3010,7 +3010,7 @@ let%test_module _ =
           | None ->
               Zkapp_basic.Set_or_keep.Keep
           | Some perms ->
-              Zkapp_basic.Set_or_keep.Set perms
+              Zkapp_basic.Set_or_keep.Set (Permissions.Update.of_account perms)
         in
         { Account_update.Update.noop with permissions }
       in

@@ -1442,7 +1442,8 @@ module Make (L : Ledger_intf.S) :
           account_update.body.update.voting_for
 
         let permissions (account_update : t) =
-          account_update.body.update.permissions
+          Set_or_keep.map account_update.body.update.permissions
+            ~f:Permissions.Update.to_account
       end
     end
 
