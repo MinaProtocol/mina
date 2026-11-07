@@ -9,7 +9,6 @@
 open Core_kernel
 
 let () =
-  Format.eprintf "Profile: %s@." Node_config.profile ;
   let (module G) = Genesis_constants.profiled () in
   let constraint_system_digests =
     Genesis_proof.constraint_system_digests

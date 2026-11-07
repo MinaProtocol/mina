@@ -9,7 +9,6 @@
   coda_genesis_proof
   consensus
   genesis_constants
-  mina_node_config
   mina_signature_kind)
  (instrumentation
   (backend bisect_ppx))
