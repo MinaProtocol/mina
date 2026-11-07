@@ -304,7 +304,8 @@ module Values (S : Sample) = struct
                   ~f:(fun _ -> Mina_base.Zkapp_basic.Set_or_keep.Set (field ()))
             ; delegate = Set (public_key ())
             ; verification_key = Set (verification_key ())
-            ; permissions = Set (permissions ())
+            ; permissions =
+                Set (Mina_base.Permissions.Update.of_account (permissions ()))
             ; zkapp_uri = Set (zkapp_uri ())
             ; token_symbol = Set (token_symbol ())
             ; timing = Set (timing_info ())

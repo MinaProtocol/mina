@@ -233,7 +233,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; new_zkapp_account = false
         ; snapp_update =
             { Account_update.Update.dummy with
-              permissions = Set new_permissions
+              permissions = Set (Permissions.Update.of_account new_permissions)
             }
         ; current_auth =
             (* current set_permissions permission requires Signature *)
@@ -291,7 +291,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { app_state
         ; delegate = Set new_delegate
         ; verification_key = Set new_verification_key
-        ; permissions = Set new_permissions
+        ; permissions = Set (Permissions.Update.of_account new_permissions)
         ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol
         ; timing = (* timing can't be updated for an existing account *)
@@ -643,7 +643,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let permissions_compat =
         compatible requested_update.permissions ledger_update.permissions
-          ~equal:Permissions.equal
+          ~equal:Permissions.Update.equal
       in
       let zkapp_uris_compat =
         compatible requested_update.zkapp_uri ledger_update.zkapp_uri
