@@ -663,6 +663,46 @@ let deriver obj =
     ~access:!.auth_required
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
+module Update = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Auth_required.Stable.V2.t
+        , Mina_numbers.Txn_version.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let of_account : Stable.Latest.t -> t = Fn.id
+
+  let to_account : t -> Stable.Latest.t = Fn.id
+
+  let gen ~auth_tag = Quickcheck.Generator.map (gen ~auth_tag) ~f:of_account
+
+  let to_input t = to_input (to_account t)
+
+  module Checked = struct
+    type t = Checked.t
+
+    let to_account : t -> Checked.t = Fn.id
+
+    let of_account : Checked.t -> t = Fn.id
+
+    let to_input t = Checked.to_input (to_account t)
+  end
+
+  let typ =
+    Typ.transport typ ~there:to_account ~back:of_account
+    |> Typ.transport_var ~there:Checked.to_account ~back:Checked.of_account
+
+  let dummy_value_for_set_or_keep_placeholder_only =
+    of_account dummy_value_for_set_or_keep_placeholder_only
+end
+
 let%test_unit "json roundtrip" =
   let open Fields_derivers_zkapps.Derivers in
   let full = o () in
