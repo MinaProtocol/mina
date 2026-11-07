@@ -939,7 +939,8 @@ module Zkapp_updates = struct
       let%bind permissions_id =
         Mina_caqti.add_if_zkapp_set
           (Zkapp_permissions.add_if_doesn't_exist (module Conn))
-          update.permissions
+          (Zkapp_basic.Set_or_keep.map update.permissions
+             ~f:Permissions.Update.to_account )
       in
       let%bind timing_id =
         Mina_caqti.add_if_zkapp_set
