@@ -21,15 +21,12 @@
 ; After an intended change, update the expected values with `dune promote`.
 
 (rule
- (target dev_chain_id.txt.computed)
- (deps print_chain_id.exe)
- (action
+ (with-stdout-to
+  dev_chain_id.txt.computed
   (setenv
    MINA_PROFILE
    dev
-   (with-stdout-to
-    %{target}
-    (run %{deps})))))
+   (run ./print_chain_id.exe))))
 
 (rule
  (alias runtest)
@@ -37,15 +34,12 @@
   (diff dev_chain_id.txt dev_chain_id.txt.computed)))
 
 (rule
- (target devnet_chain_id.txt.computed)
- (deps print_chain_id.exe)
- (action
+ (with-stdout-to
+  devnet_chain_id.txt.computed
   (setenv
    MINA_PROFILE
    devnet
-   (with-stdout-to
-    %{target}
-    (run %{deps})))))
+   (run ./print_chain_id.exe))))
 
 (rule
  (alias runtest)
@@ -53,15 +47,12 @@
   (diff devnet_chain_id.txt devnet_chain_id.txt.computed)))
 
 (rule
- (target mainnet_chain_id.txt.computed)
- (deps print_chain_id.exe)
- (action
+ (with-stdout-to
+  mainnet_chain_id.txt.computed
   (setenv
    MINA_PROFILE
    mainnet
-   (with-stdout-to
-    %{target}
-    (run %{deps})))))
+   (run ./print_chain_id.exe))))
 
 (rule
  (alias runtest)
