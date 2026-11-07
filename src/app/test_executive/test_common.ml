@@ -385,7 +385,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let permissions_compat =
       compatible_item requested_update.permissions ledger_update.permissions
-        ~equal:Mina_base.Permissions.equal
+        ~equal:Mina_base.Permissions.Update.equal
     in
     let zkapp_uris_compat =
       compatible_item requested_update.zkapp_uri ledger_update.zkapp_uri

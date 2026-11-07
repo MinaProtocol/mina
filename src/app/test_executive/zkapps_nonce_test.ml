@@ -208,7 +208,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~update:
                      { Account_update.Update.dummy with
                        permissions =
-                         Set { Permissions.user_default with send = Proof }
+                         Set
+                           (Permissions.Update.of_account
+                              { Permissions.user_default with send = Proof } )
                      } )
                 []
             ]

@@ -358,7 +358,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let constraint_constants = Network.constraint_constants network in
       let snapp_update =
         { Account_update.Update.dummy with
-          permissions = Zkapp_basic.Set_or_keep.Set Permissions.user_default
+          permissions =
+            Zkapp_basic.Set_or_keep.Set
+              (Permissions.Update.of_account Permissions.user_default)
         }
       in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
