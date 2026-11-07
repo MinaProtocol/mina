@@ -16,25 +16,54 @@
  (preprocess
   (pps mina_ppx)))
 
-; Generate the chain ID for the current dune profile, which also sets MINA_PROFILE.
-; The output file name includes the profile to allow profile-specific regression testing.
-; After an intended change, update the expected value with `dune promote`.
+; Generate the chain ID for each profile. MINA_PROFILE selects the profile at runtime, so
+; `dune runtest` checks all of them, whichever profile it was built with.
+; After an intended change, update the expected values with `dune promote`.
 
 (rule
- (target %{profile}_chain_id.txt.computed)
+ (target dev_chain_id.txt.computed)
  (deps print_chain_id.exe)
  (action
   (setenv
    MINA_PROFILE
-   %{profile}
+   dev
    (with-stdout-to
     %{target}
     (run %{deps})))))
 
 (rule
- (deps
-  (:orig %{profile}_chain_id.txt)
-  (:computed %{profile}_chain_id.txt.computed))
  (alias runtest)
  (action
-  (diff %{orig} %{computed})))
+  (diff dev_chain_id.txt dev_chain_id.txt.computed)))
+
+(rule
+ (target devnet_chain_id.txt.computed)
+ (deps print_chain_id.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   devnet
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff devnet_chain_id.txt devnet_chain_id.txt.computed)))
+
+(rule
+ (target mainnet_chain_id.txt.computed)
+ (deps print_chain_id.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   mainnet
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff mainnet_chain_id.txt mainnet_chain_id.txt.computed)))

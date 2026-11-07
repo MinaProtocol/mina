@@ -24,5 +24,4 @@ echo "--- Run profile-dependent tests"
 # times.
 time dune runtest -f \
     src/lib/blockchain_snark/tests \
-    src/lib/chain_id/tests \
     src/lib/transaction_snark/test/print_transaction_snark_vk
