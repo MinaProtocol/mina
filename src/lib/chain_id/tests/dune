@@ -1,12 +1,59 @@
-(tests
- (names test_chain_id)
+(executable
+ (name print_chain_id)
  (libraries
   ;; opam libraries
-  alcotest
+  core_kernel
   ;; local libraries
   chain_id
-  precomputed_values)
+  coda_genesis_ledger
+  coda_genesis_proof
+  consensus
+  genesis_constants
+  mina_signature_kind)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps mina_ppx)))
+
+; Generate the chain ID for each profile. MINA_PROFILE selects the profile at runtime, so
+; `dune runtest` checks all of them, whichever profile it was built with.
+; After an intended change, update the expected values with `dune promote`.
+
+(rule
+ (with-stdout-to
+  dev_chain_id.txt.computed
+  (setenv
+   MINA_PROFILE
+   dev
+   (run ./print_chain_id.exe))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff dev_chain_id.txt dev_chain_id.txt.computed)))
+
+(rule
+ (with-stdout-to
+  devnet_chain_id.txt.computed
+  (setenv
+   MINA_PROFILE
+   devnet
+   (run ./print_chain_id.exe))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff devnet_chain_id.txt devnet_chain_id.txt.computed)))
+
+(rule
+ (with-stdout-to
+  mainnet_chain_id.txt.computed
+  (setenv
+   MINA_PROFILE
+   mainnet
+   (run ./print_chain_id.exe))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff mainnet_chain_id.txt mainnet_chain_id.txt.computed)))
