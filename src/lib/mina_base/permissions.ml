@@ -664,33 +664,180 @@ let deriver obj =
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
 module Update = struct
+  type account = t
+
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        ( Auth_required.Stable.V2.t
-        , Mina_numbers.Txn_version.Stable.V1.t )
-        Poly.Stable.V2.t
+      type t = Mina_wire_types.Mina_base.Permissions.Update.V1.t =
+        { edit_state : Auth_required.Stable.V2.t
+        ; access : Auth_required.Stable.V2.t
+        ; send : Auth_required.Stable.V2.t
+        ; receive : Auth_required.Stable.V2.t
+        ; set_delegate : Auth_required.Stable.V2.t
+        ; set_permissions : Auth_required.Stable.V2.t
+        ; set_verification_key :
+            Auth_required.Stable.V2.t * Mina_numbers.Txn_version.Stable.V1.t
+        ; set_zkapp_uri : Auth_required.Stable.V2.t
+        ; edit_action_state : Auth_required.Stable.V2.t
+        ; set_token_symbol : Auth_required.Stable.V2.t
+        ; increment_nonce : Auth_required.Stable.V2.t
+        ; set_voting_for : Auth_required.Stable.V2.t
+        ; set_timing : Auth_required.Stable.V2.t
+        }
       [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  let of_account : Stable.Latest.t -> t = Fn.id
+  let of_account
+      ({ edit_state
+       ; access
+       ; send
+       ; receive
+       ; set_delegate
+       ; set_permissions
+       ; set_verification_key
+       ; set_zkapp_uri
+       ; edit_action_state
+       ; set_token_symbol
+       ; increment_nonce
+       ; set_voting_for
+       ; set_timing
+       } :
+        account ) : t =
+    { edit_state
+    ; access
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key
+    ; set_zkapp_uri
+    ; edit_action_state
+    ; set_token_symbol
+    ; increment_nonce
+    ; set_voting_for
+    ; set_timing
+    }
 
-  let to_account : t -> Stable.Latest.t = Fn.id
+  let to_account
+      ({ edit_state
+       ; access
+       ; send
+       ; receive
+       ; set_delegate
+       ; set_permissions
+       ; set_verification_key
+       ; set_zkapp_uri
+       ; edit_action_state
+       ; set_token_symbol
+       ; increment_nonce
+       ; set_voting_for
+       ; set_timing
+       } :
+        t ) : account =
+    { edit_state
+    ; access
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key
+    ; set_zkapp_uri
+    ; edit_action_state
+    ; set_token_symbol
+    ; increment_nonce
+    ; set_voting_for
+    ; set_timing
+    }
 
   let gen ~auth_tag = Quickcheck.Generator.map (gen ~auth_tag) ~f:of_account
 
   let to_input t = to_input (to_account t)
 
   module Checked = struct
-    type t = Checked.t
+    type account = Checked.t
 
-    let to_account : t -> Checked.t = Fn.id
+    type t =
+      { edit_state : Auth_required.Checked.t
+      ; access : Auth_required.Checked.t
+      ; send : Auth_required.Checked.t
+      ; receive : Auth_required.Checked.t
+      ; set_delegate : Auth_required.Checked.t
+      ; set_permissions : Auth_required.Checked.t
+      ; set_verification_key :
+          Auth_required.Checked.t * Mina_numbers.Txn_version.Checked.t
+      ; set_zkapp_uri : Auth_required.Checked.t
+      ; edit_action_state : Auth_required.Checked.t
+      ; set_token_symbol : Auth_required.Checked.t
+      ; increment_nonce : Auth_required.Checked.t
+      ; set_voting_for : Auth_required.Checked.t
+      ; set_timing : Auth_required.Checked.t
+      }
 
-    let of_account : Checked.t -> t = Fn.id
+    let of_account
+        ({ edit_state
+         ; access
+         ; send
+         ; receive
+         ; set_delegate
+         ; set_permissions
+         ; set_verification_key
+         ; set_zkapp_uri
+         ; edit_action_state
+         ; set_token_symbol
+         ; increment_nonce
+         ; set_voting_for
+         ; set_timing
+         } :
+          account ) : t =
+      { edit_state
+      ; access
+      ; send
+      ; receive
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      }
+
+    let to_account
+        ({ edit_state
+         ; access
+         ; send
+         ; receive
+         ; set_delegate
+         ; set_permissions
+         ; set_verification_key
+         ; set_zkapp_uri
+         ; edit_action_state
+         ; set_token_symbol
+         ; increment_nonce
+         ; set_voting_for
+         ; set_timing
+         } :
+          t ) : account =
+      { edit_state
+      ; access
+      ; send
+      ; receive
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      }
 
     let to_input t = Checked.to_input (to_account t)
   end
@@ -734,3 +881,14 @@ let%test_unit "json value" =
         setTiming: "Signature"
       }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
+
+let%test_unit "Update has the same encodings as the account permissions" =
+  Quickcheck.test (gen ~auth_tag:Control.Tag.Proof) ~f:(fun t ->
+      let update = Update.of_account t in
+      [%test_eq: t] t (Update.to_account update) ;
+      [%test_eq: string]
+        (Binable.to_string (module Stable.Latest) t)
+        (Binable.to_string (module Update.Stable.Latest) update) ;
+      [%test_eq: string]
+        (Yojson.Safe.to_string (to_yojson t))
+        (Yojson.Safe.to_string (Update.to_yojson update)) )

@@ -57,7 +57,8 @@ module Update = struct
           Mina_base_verification_key_wire.V1.t
           Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; permissions :
-          Mina_base_permissions.V3.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+          Mina_base_permissions.Update.V1.t
+          Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; zkapp_uri : string Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; token_symbol :
           Mina_base_account.Token_symbol.V1.t

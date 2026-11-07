@@ -161,10 +161,22 @@ module Update : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t =
-        ( Auth_required.Stable.V2.t
-        , Mina_numbers.Txn_version.Stable.V1.t )
-        Poly.Stable.V2.t
+      type t = Mina_wire_types.Mina_base.Permissions.Update.V1.t =
+        { edit_state : Auth_required.Stable.V2.t
+        ; access : Auth_required.Stable.V2.t
+        ; send : Auth_required.Stable.V2.t
+        ; receive : Auth_required.Stable.V2.t
+        ; set_delegate : Auth_required.Stable.V2.t
+        ; set_permissions : Auth_required.Stable.V2.t
+        ; set_verification_key :
+            Auth_required.Stable.V2.t * Mina_numbers.Txn_version.Stable.V1.t
+        ; set_zkapp_uri : Auth_required.Stable.V2.t
+        ; edit_action_state : Auth_required.Stable.V2.t
+        ; set_token_symbol : Auth_required.Stable.V2.t
+        ; increment_nonce : Auth_required.Stable.V2.t
+        ; set_voting_for : Auth_required.Stable.V2.t
+        ; set_timing : Auth_required.Stable.V2.t
+        }
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]

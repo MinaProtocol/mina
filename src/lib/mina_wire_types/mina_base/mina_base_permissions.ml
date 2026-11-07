@@ -31,3 +31,23 @@ end
 module V3 = struct
   type t = (Auth_required.V2.t, Mina_numbers.Txn_version.V1.t) Poly.V2.t
 end
+
+module Update = struct
+  module V1 = struct
+    type t =
+      { edit_state : Auth_required.V2.t
+      ; access : Auth_required.V2.t
+      ; send : Auth_required.V2.t
+      ; receive : Auth_required.V2.t
+      ; set_delegate : Auth_required.V2.t
+      ; set_permissions : Auth_required.V2.t
+      ; set_verification_key : Auth_required.V2.t * Mina_numbers.Txn_version.V1.t
+      ; set_zkapp_uri : Auth_required.V2.t
+      ; edit_action_state : Auth_required.V2.t
+      ; set_token_symbol : Auth_required.V2.t
+      ; increment_nonce : Auth_required.V2.t
+      ; set_voting_for : Auth_required.V2.t
+      ; set_timing : Auth_required.V2.t
+      }
+  end
+end
