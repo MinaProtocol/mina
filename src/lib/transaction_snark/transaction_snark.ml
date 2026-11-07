@@ -1732,7 +1732,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 account_update.data.update.voting_for
 
               let permissions ({ account_update; _ } : t) =
-                account_update.data.update.permissions
+                Set_or_keep.Checked.map account_update.data.update.permissions
+                  ~f:Permissions.Update.Checked.to_account
             end
 
             module Account_precondition = struct

@@ -679,7 +679,7 @@ module Update = struct
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
-        ; permissions : Permissions.Stable.V3.t Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Update.Stable.V1.t Set_or_keep.Stable.V1.t
         ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -722,7 +722,8 @@ module Update = struct
         { app_state
         ; delegate
         ; verification_key
-        ; permissions
+        ; permissions =
+            Set_or_keep.map permissions ~f:Permissions.Update.of_account
         ; zkapp_uri
         ; token_symbol
         ; timing
@@ -765,7 +766,7 @@ module Update = struct
       | None ->
           return Set_or_keep.Keep
       | Some auth_tag ->
-          let%map permissions = Permissions.gen ~auth_tag in
+          let%map permissions = Permissions.Update.gen ~auth_tag in
           Set_or_keep.Set permissions
     in
     let%bind zkapp_uri =
@@ -817,7 +818,7 @@ module Update = struct
             Data_as_hash.t )
           Zkapp_basic.Flagged_option.t
           Set_or_keep.Checked.t
-      ; permissions : Permissions.Checked.t Set_or_keep.Checked.t
+      ; permissions : Permissions.Update.Checked.t Set_or_keep.Checked.t
       ; zkapp_uri : string Data_as_hash.t Set_or_keep.Checked.t
       ; token_symbol : Account.Token_symbol.var Set_or_keep.Checked.t
       ; timing : Timing_info.Checked.t Set_or_keep.Checked.t
@@ -845,7 +846,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input verification_key ~f:(fun x ->
               field (Data_as_hash.hash x.data) )
         ; Set_or_keep.Checked.to_input permissions
-            ~f:Permissions.Checked.to_input
+            ~f:Permissions.Update.Checked.to_input
         ; Set_or_keep.Checked.to_input zkapp_uri ~f:Data_as_hash.to_input
         ; Set_or_keep.Checked.to_input token_symbol
             ~f:Account.Token_symbol.var_to_input
@@ -890,8 +891,8 @@ module Update = struct
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions
-          ~dummy:Permissions.dummy_value_for_set_or_keep_placeholder_only
-          ~f:Permissions.to_input
+          ~dummy:Permissions.Update.dummy_value_for_set_or_keep_placeholder_only
+          ~f:Permissions.Update.to_input
       ; Set_or_keep.to_input
           (Set_or_keep.map ~f:Zkapp_account.hash_zkapp_uri zkapp_uri)
           ~dummy:(Zkapp_account.hash_zkapp_uri_opt None)
@@ -932,8 +933,8 @@ module Update = struct
                    ; is_some = Set_or_keep.Checked.is_set x
                    } ) )
       ; Set_or_keep.typ
-          ~dummy:Permissions.dummy_value_for_set_or_keep_placeholder_only
-          Permissions.typ
+          ~dummy:Permissions.Update.dummy_value_for_set_or_keep_placeholder_only
+          Permissions.Update.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.lazy_optional_typ ~hash:Zkapp_account.hash_zkapp_uri
              ~non_preimage:(lazy (Zkapp_account.hash_zkapp_uri_opt None))
@@ -967,7 +968,10 @@ module Update = struct
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
-         ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
+         ~permissions:
+           !.(Set_or_keep.deriver
+                (iso_record ~of_record:Permissions.Update.of_account
+                   ~to_record:Permissions.Update.to_account Permissions.deriver ) )
          ~zkapp_uri:!.(Set_or_keep.deriver zkapp_uri)
          ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
