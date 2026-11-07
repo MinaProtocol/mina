@@ -1,12 +1,40 @@
-(tests
- (names test_chain_id)
+(executable
+ (name print_chain_id)
  (libraries
   ;; opam libraries
-  alcotest
+  core_kernel
   ;; local libraries
   chain_id
-  precomputed_values)
+  coda_genesis_ledger
+  coda_genesis_proof
+  consensus
+  genesis_constants
+  mina_node_config
+  mina_signature_kind)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps mina_ppx)))
+
+; Generate the chain ID for the current dune profile, which also sets MINA_PROFILE.
+; The output file name includes the profile to allow profile-specific regression testing.
+; After an intended change, update the expected value with `dune promote`.
+
+(rule
+ (target %{profile}_chain_id.txt.computed)
+ (deps print_chain_id.exe)
+ (action
+  (setenv
+   MINA_PROFILE
+   %{profile}
+   (with-stdout-to
+    %{target}
+    (run %{deps})))))
+
+(rule
+ (deps
+  (:orig %{profile}_chain_id.txt)
+  (:computed %{profile}_chain_id.txt.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
