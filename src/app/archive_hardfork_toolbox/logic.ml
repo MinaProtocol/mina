@@ -262,12 +262,25 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let check_result = { id = "8.F"; name = "Fork validation"; result } in
   [ check_result ]
 
-let fetch_last_filled_block ~postgres_uri () =
+(* The last filled block on the chain ending at [latest_state_hash], by
+   default the highest block of the archive (as in [is_in_best_chain]). *)
+let last_filled_block ~postgres_uri ?latest_state_hash () =
   let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
+  let%bind tip_hash =
+    match latest_state_hash with
+    | Some hash ->
+        return hash
+    | None ->
+        query_db ~f:Sql.latest_state_hash
+  in
+  query_db ~f:(fun db -> Sql.fetch_last_filled_block db ~tip_hash)
+
+let fetch_last_filled_block ~postgres_uri ?latest_state_hash () =
+  let open Deferred.Let_syntax in
   let%map hash, slot_since_genesis, height =
-    query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
+    last_filled_block ~postgres_uri ?latest_state_hash ()
   in
 
   let json =
