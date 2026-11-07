@@ -443,7 +443,9 @@ let%test_module "Test transaction logic." =
         let%bind perms = Permissions.gen ~auth_tag:Proof in
         let txn =
           Alter_account.make ~account
-            { Account_update.Update.noop with permissions = Set perms }
+            { Account_update.Update.noop with
+              permissions = Set (Permissions.Update.of_account perms)
+            }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
         (account.pk, fee, [ account ], [ (txn :> transaction) ], perms))
@@ -536,7 +538,9 @@ let%test_module "Test transaction logic." =
                  must *not* require authorisation or we will see more errors
                  than expected. *)
               permissions =
-                Set { perms with send = Proof; increment_nonce = None }
+                Set
+                  (Permissions.Update.of_account
+                     { perms with send = Proof; increment_nonce = None } )
             }
         in
         let mina_transfer = Simple_txn.make ~sender ~receiver amount in

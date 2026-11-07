@@ -13,9 +13,10 @@ struct
     { Account_update.Update.dummy with
       permissions =
         Zkapp_basic.Set_or_keep.Set
-          { Permissions.user_default with
-            set_verification_key = (Proof, Mina_numbers.Txn_version.current)
-          }
+          (Permissions.Update.of_account
+             { Permissions.user_default with
+               set_verification_key = (Proof, Mina_numbers.Txn_version.current)
+             } )
     }
 
   let is_non_zkapp_update = true
@@ -44,10 +45,11 @@ let suite () =
       { Account_update.Update.dummy with
         permissions =
           Zkapp_basic.Set_or_keep.Set
-            { Permissions.user_default with
-              set_verification_key =
-                (perm_after, Mina_numbers.Txn_version.current)
-            }
+            (Permissions.Update.of_account
+               { Permissions.user_default with
+                 set_verification_key =
+                   (perm_after, Mina_numbers.Txn_version.current)
+               } )
       }
 
     let older_version =
