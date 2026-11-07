@@ -111,7 +111,6 @@ module Accounts = struct
         | Some
             { app_state
             ; verification_key
-            ; zkapp_version
             ; action_state
             ; last_action_slot
             ; proved_state
@@ -159,7 +158,6 @@ module Accounts = struct
             Some
               { Zkapp_account.verification_key
               ; app_state
-              ; zkapp_version
               ; action_state
               ; last_action_slot
               ; proved_state
@@ -263,7 +261,6 @@ module Accounts = struct
           ~f:(fun
                { app_state
                ; verification_key
-               ; zkapp_version
                ; action_state
                ; last_action_slot
                ; proved_state
@@ -280,7 +277,6 @@ module Accounts = struct
             in
             { Runtime_config.Accounts.Single.Zkapp_account.app_state
             ; verification_key
-            ; zkapp_version
             ; action_state
             ; last_action_slot
             ; proved_state
