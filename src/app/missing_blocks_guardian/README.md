@@ -4,17 +4,15 @@ Missing Blocks Guardian
 `mina-missing-blocks-guardian` finds the blocks that an archive database
 lacks and restores them from a bucket of block files.
 
-It runs the audit of `mina-missing-blocks-auditor` in its own process, with
-the library `missing_blocks_auditor_lib`, to find the first block whose
-parent is missing. It downloads that parent as
-`<network>-<height>-<state hash>.json` from the bucket, writes it to the
-database with the library of `mina-archive-blocks`, and repeats until the
-audit reports no missing parent.
+It audits the database to find the first block whose parent is missing. It
+downloads that parent as `<network>-<height>-<state hash>.json` from the
+bucket, writes it to the database, and repeats until the audit reports no
+missing parent.
 
-The guardian needs a profile, as `mina-archive-blocks` does: `MINA_PROFILE`,
-or the file `/etc/coda/build_config/PROFILE` that packages and configured
-docker images have. Without one it stops at start, before it reads its
-settings, for each subcommand.
+The guardian needs a profile: `MINA_PROFILE`, or the file
+`/etc/coda/build_config/PROFILE` that packages and configured docker images
+have. Without one it stops at start, before it reads its settings, for each
+subcommand.
 
 Subcommands
 -----------
