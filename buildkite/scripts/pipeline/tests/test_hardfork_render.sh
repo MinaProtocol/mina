@@ -160,8 +160,9 @@ step_commands="$(commands <<< "$yaml")"
 expect "the corrupted config must fail on the hash mismatch, not on anything else" \
   grep -q -- "--checks config --expect-config-mismatch" <<< "$step_commands"
 expect_not "no step counts any failure as a pass" grep -q "&& ! (FORKING_FROM_CONFIG_JSON" <<< "$step_commands"
+prefork_version="$(dhall-to-yaml <<< '(./buildkite/src/Constants/Prefork.dhall).version')"
 expect "the config step compares the package with the fork block" \
-  grep -q -- "--checks config,block,constants,artifacts --prefork-version 4.0.3-73134bf" <<< "$step_commands"
+  grep -q -- "--checks config,block,constants,artifacts --prefork-version $prefork_version" <<< "$step_commands"
 expect "the ledgers step compares the accounts with the fork config" \
   grep -q -- "--checks ledgers,accounts" <<< "$step_commands"
 

@@ -56,6 +56,8 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Prefork = ../Constants/Prefork.dhall
+
 let Expr = ../Pipeline/Expr.dhall
 
 let PackagingSpec =
@@ -94,7 +96,7 @@ let PackagingSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "4.0.3-73134bf"
+          , deb_legacy_version = Prefork.version
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_repo = DockerRepo.Type.InternalEurope
