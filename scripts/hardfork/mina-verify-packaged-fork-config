@@ -272,7 +272,9 @@ function extract_ledgers() {
       --seed --genesis-ledger-dir "$ledger_dir" \
       --log-level "${MINA_LOG_LEVEL:-info}" &
 
-    while ! "$MINA_EXE" ledger export staged-ledger  | jq . 2>/dev/null >"$json_prefix-staged.json"; do
+    # The exports are kept as written, so they are compared byte for byte
+    # and not as text.
+    while ! "$MINA_EXE" ledger export staged-ledger >"$json_prefix-staged.json" 2>/dev/null; do
         sleep 1m
         if ! grep -qFx "$(cat ~/.mina-config/.mina-lock)" <(jobs -rp); then
             echo "daemon died before exporting ledgers" >&2
@@ -280,8 +282,8 @@ function extract_ledgers() {
         fi
     done
 
-    "$MINA_EXE" ledger export staking-epoch-ledger | jq . > "$json_prefix-staking.json"
-    "$MINA_EXE" ledger export next-epoch-ledger | jq . > "$json_prefix-next.json"
+    "$MINA_EXE" ledger export staking-epoch-ledger > "$json_prefix-staking.json"
+    "$MINA_EXE" ledger export next-epoch-ledger > "$json_prefix-next.json"
 
     if [ -n "$genesis_block_json" ]; then
         curl -sf -H 'Content-Type: application/json' \
