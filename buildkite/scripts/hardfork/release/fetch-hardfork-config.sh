@@ -104,12 +104,32 @@ for dir in "" fork_validation/legacy/; do
 done
 
 echo "--- Checking that the config and the state dump describe the same fork block"
+curl -sSfL "$CONFIG_JSON_GZ_URL" -o "$WORKDIR/dump.json.gz"
+dump_field() { gunzip -c "$WORKDIR/dump.json.gz" | jq -r "$1 // empty"; }
 CONFIG_STATE_HASH=$(jq -r '.proof.fork.state_hash // empty' "$CONFIG_DIR/daemon.json")
-DUMP_STATE_HASH=$(curl -sSfL "$CONFIG_JSON_GZ_URL" | gunzip | jq -r '.proof.fork.state_hash // empty')
+DUMP_STATE_HASH=$(dump_field '.proof.fork.state_hash')
 echo "config: $CONFIG_STATE_HASH"
 echo "dump:   $DUMP_STATE_HASH"
 if [[ -z "$CONFIG_STATE_HASH" || "$CONFIG_STATE_HASH" != "$DUMP_STATE_HASH" ]]; then
   echo "❌ The hardfork config and the state dump are not from the same fork block." >&2
+  exit 1
+fi
+
+# The legacy ledgers are the daemon's own, not rebuilt by a prefork release
+# from the dump as the reference step does. The dump's ledger hash, which the
+# preflight compares with the fork block, ties the legacy genesis ledger to the
+# chain. The dump holds no hash for the epoch ledgers.
+echo "--- Checking the legacy genesis ledger against the state dump"
+LEGACY_LEDGER_HASH=$(jq -r '.ledger.hash' "$CONFIG_DIR/fork_validation/legacy/daemon.json")
+DUMP_LEDGER_HASH=$(dump_field '.ledger.hash')
+echo "legacy: $LEGACY_LEDGER_HASH"
+echo "dump:   $DUMP_LEDGER_HASH"
+if [[ -z "$DUMP_LEDGER_HASH" ]]; then
+  echo "❌ The state dump holds no ledger hash." >&2
+  exit 1
+fi
+if [[ "$LEGACY_LEDGER_HASH" != "$DUMP_LEDGER_HASH" ]]; then
+  echo "❌ The legacy genesis ledger of the hardfork config is not the ledger of the state dump." >&2
   exit 1
 fi
 

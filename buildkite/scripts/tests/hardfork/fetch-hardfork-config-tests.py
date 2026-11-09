@@ -97,8 +97,13 @@ class FetchHardforkConfig(unittest.TestCase):
             stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
         self.secret = self.dir / "secret"
         self.secret.write_text("aws_secret_access_key=SUPERSECRET")
+        # The dump holds the chain's ledger, which the legacy side of the
+        # archive must be.
         self.dump = self.dir / "dump.json.gz"
-        self.dump.write_bytes(gzip.compress(json.dumps(config("x")).encode()))
+        self.write_dump(config("old"))
+
+    def write_dump(self, dump):
+        self.dump.write_bytes(gzip.compress(json.dumps(dump).encode()))
 
     def fetch(self, archive):
         path = self.dir / "config.tar.gz"
@@ -198,10 +203,22 @@ class FetchHardforkConfig(unittest.TestCase):
         self.assert_refused(self.fetch(archive), "does not hold the hash")
 
     def test_other_fork_block_is_refused(self):
-        other = config("x")
+        other = config("old")
         other["proof"]["fork"]["state_hash"] = "3Nother"
-        self.dump.write_bytes(gzip.compress(json.dumps(other).encode()))
+        self.write_dump(other)
         self.assert_refused(self.fetch(Archive()), "not from the same fork block")
+
+    def test_legacy_ledger_other_than_the_dump_is_refused(self):
+        self.write_dump(config("x"))
+        self.assert_refused(
+            self.fetch(Archive()), "legacy genesis ledger of the hardfork config is not the ledger"
+        )
+
+    def test_dump_without_ledger_hash_is_refused(self):
+        dump = config("old")
+        del dump["ledger"]["hash"]
+        self.write_dump(dump)
+        self.assert_refused(self.fetch(Archive()), "state dump holds no ledger hash")
 
     def test_shared_epoch_tarball_is_accepted(self):
         archive = Archive()
