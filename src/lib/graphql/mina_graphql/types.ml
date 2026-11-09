@@ -1723,6 +1723,24 @@ module AccountObj = struct
             ~resolve:(fun _ permission -> permission.Permissions.Poly.set_timing)
         ] )
 
+  (* A token symbol or zkApp URI is any bytes on chain. The string field of the
+     account shows it as text; this object carries the exact value. *)
+  let arbitrary_bytes : (Mina_lib.t, string option) typ =
+    obj "ArbitraryBytes"
+      ~doc:
+        "A value that is arbitrary bytes on chain, such as a token symbol or a \
+         zkApp URI" ~fields:(fun _ ->
+        [ field "hex" ~typ:(non_null string) ~doc:"The exact bytes, hex-encoded"
+            ~args:Arg.[]
+            ~resolve:(fun _ s -> Graphql_lib.Arbitrary_bytes.to_hex s)
+        ; field "utf8" ~typ:string
+            ~doc:
+              "The bytes as text when they are valid UTF-8, null when they are \
+               not"
+            ~args:Arg.[]
+            ~resolve:(fun _ s -> Graphql_lib.Arbitrary_bytes.utf8_opt s)
+        ] )
+
   let account_vk =
     obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
       ~fields:(fun _ ->
@@ -1947,11 +1965,18 @@ module AccountObj = struct
            ; field "zkappUri" ~typ:string
                ~doc:
                  "The URI associated with this account, usually pointing to \
-                  the zkApp source code"
+                  the zkApp source code. A byte that is not valid UTF-8 is \
+                  returned as the character U+00XX; zkappUriBytes has the \
+                  exact bytes"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
-                 Option.value_map account.zkapp ~default:None ~f:(fun zkapp ->
-                     Some zkapp.zkapp_uri ) )
+                 Option.map account.zkapp ~f:(fun zkapp ->
+                     Graphql_lib.Arbitrary_bytes.to_utf8 zkapp.zkapp_uri ) )
+           ; field "zkappUriBytes" ~typ:arbitrary_bytes
+               ~doc:"The exact bytes of the zkApp URI"
+               ~args:Arg.[]
+               ~resolve:(fun _ { account; _ } ->
+                 Option.map account.zkapp ~f:(fun zkapp -> zkapp.zkapp_uri) )
            ; field "zkappState"
                ~typ:
                  ( list @@ non_null
@@ -1981,7 +2006,14 @@ module AccountObj = struct
            ; field "tokenSymbol" ~typ:string
                ~doc:
                  "The symbol for the token owned by this account, if there is \
-                  one"
+                  one. A byte that is not valid UTF-8 is returned as the \
+                  character U+00XX; tokenSymbolBytes has the exact bytes"
+               ~args:Arg.[]
+               ~resolve:(fun _ { account; _ } ->
+                 Option.map account.Account.Poly.token_symbol
+                   ~f:Graphql_lib.Arbitrary_bytes.to_utf8 )
+           ; field "tokenSymbolBytes" ~typ:arbitrary_bytes
+               ~doc:"The exact bytes of the token symbol"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
                  account.Account.Poly.token_symbol )
