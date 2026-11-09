@@ -362,13 +362,13 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V5 = struct
+  module V6 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V4.t
+        (( Sync_ledger.Answer.Stable.V5.t
          , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )

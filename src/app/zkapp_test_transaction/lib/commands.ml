@@ -99,7 +99,11 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
               ; set_token_symbol = Proof
               }
           ; zkapp =
-              Some { Zkapp_account.default with verification_key = Some vk }
+              Some
+                { Zkapp_account.default with
+                  verification_key =
+                    Some (Zkapp_account.Vk_with_version.stamp_current vk)
+                }
           }
         |> Or_error.ok_exn |> ignore )
   in

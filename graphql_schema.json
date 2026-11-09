@@ -12450,6 +12450,23 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "txnVersion",
+              "description":
+                "Transaction version that was current when the verification key was set. While it is older than the current version, a signature satisfies the account's access permission when it is Proof, and its setVerificationKey permission when it is Proof or Impossible.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,

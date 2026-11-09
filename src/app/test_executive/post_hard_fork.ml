@@ -89,6 +89,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let older_version = Mina_numbers.Txn_version.of_int 1
 
+  (* A zkApp account whose verification key was set under an older transaction
+     version, so that its owner may replace it by signature after the fork. *)
+  let stale_vk_zkapp =
+    { Zkapp_account.default with
+      verification_key =
+        Some
+          { Zkapp_account.Vk_with_version.Poly.vk =
+              { With_hash.data = Pickles.Side_loaded.Verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+          ; txn_version = older_version
+          }
+    }
+
   let fork_config : Runtime_config.Fork_config.t =
     { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
     ; blockchain_length = 300000
@@ -183,13 +197,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 { Permissions.user_default with
                   set_verification_key = (Proof, older_version)
                 }
-              ~zkapp:Zkapp_account.default ()
+              ~zkapp:stale_vk_zkapp ()
           ; create ~account_name:"vk-impossible" ~balance:"1000"
               ~permissions:
                 { Permissions.user_default with
-                  set_verification_key = (Proof, older_version)
+                  set_verification_key = (Impossible, older_version)
                 }
-              ~zkapp:Zkapp_account.default ()
+              ~zkapp:stale_vk_zkapp ()
           ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }

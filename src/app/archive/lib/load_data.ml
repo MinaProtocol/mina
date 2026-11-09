@@ -800,6 +800,10 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           zkapp_version |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Zkapp_version.of_uint32
         in
+        let verification_key =
+          Zkapp_account.Vk_with_version.of_flat ~zkapp_version verification_key
+          |> Or_error.ok_exn
+        in
         let%bind elements =
           query_db ~f:(fun db ->
               Processor.Zkapp_action_states.load db action_state_id )
@@ -823,7 +827,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         Some
           ( { app_state
             ; verification_key
-            ; zkapp_version
             ; action_state
             ; last_action_slot
             ; proved_state

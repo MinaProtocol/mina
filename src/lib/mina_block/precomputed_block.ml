@@ -84,7 +84,7 @@ module Stable = struct
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
       ; protocol_version : Protocol_version.Stable.V2.t
       ; proposed_protocol_version : Protocol_version.Stable.V2.t option
-      ; accounts_accessed : (int * Account.Stable.V3.t) list
+      ; accounts_accessed : (int * Account.Stable.V4.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
@@ -108,7 +108,7 @@ module Stable = struct
       ; protocol_version : Protocol_version.Stable.V2.t
       ; proposed_protocol_version : Protocol_version.Stable.V2.t option
             [@default None]
-      ; accounts_accessed : (int * Account.Stable.V3.t) list
+      ; accounts_accessed : (int * Mesa_types.Account.Stable.V3.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
@@ -138,7 +138,9 @@ module Stable = struct
       ; delta_transition_chain_proof
       ; protocol_version
       ; proposed_protocol_version
-      ; accounts_accessed
+      ; accounts_accessed =
+          List.map accounts_accessed ~f:(fun (index, account) ->
+              (index, Mesa_types.Account.to_current account) )
       ; accounts_created
       ; tokens_used
       }

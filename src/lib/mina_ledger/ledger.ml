@@ -128,8 +128,8 @@ module Ledger_inner = struct
 
     [%%versioned
     module Stable = struct
-      module V3 = struct
-        type t = Account.Stable.V3.t [@@deriving equal, compare, sexp]
+      module V4 = struct
+        type t = Account.Stable.V4.t [@@deriving equal, compare, sexp]
 
         let to_latest = Fn.id
 
@@ -872,10 +872,11 @@ let%test_unit "tokens test" =
                   { Zkapp_account.default with
                     verification_key =
                       Some
-                        With_hash.
-                          { data = Side_loaded_verification_key.dummy
-                          ; hash = Zkapp_account.dummy_vk_hash ()
-                          }
+                        (Zkapp_account.Vk_with_version.stamp_current
+                           With_hash.
+                             { data = Side_loaded_verification_key.dummy
+                             ; hash = Zkapp_account.dummy_vk_hash ()
+                             } )
                   }
             }
           in

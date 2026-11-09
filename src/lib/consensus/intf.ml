@@ -452,7 +452,7 @@ module type S = sig
       module Stable : sig
         [@@@no_toplevel_latest_type]
 
-        module V3 : sig
+        module V4 : sig
           type t
 
           val to_latest : t -> t
@@ -666,7 +666,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V3 : sig
+        module V4 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -675,7 +675,7 @@ module type S = sig
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V3.t
+                Mina_base.Account.Stable.V4.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }

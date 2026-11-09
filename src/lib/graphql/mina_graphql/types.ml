@@ -1706,13 +1706,24 @@ module AccountObj = struct
               ( non_null
               @@ Pickles_graphql.Graphql_scalars.VerificationKey.typ () )
             ~args:Arg.[]
-            ~resolve:(fun _ (vk : _ With_hash.t) -> vk.data)
+            ~resolve:(fun _ (vk : Zkapp_account.Vk_with_version.t) -> vk.vk.data)
         ; field "hash" ~doc:"Hash of verification key"
             ~typ:
               ( non_null
               @@ Pickles_graphql.Graphql_scalars.VerificationKeyHash.typ () )
             ~args:Arg.[]
-            ~resolve:(fun _ (vk : _ With_hash.t) -> vk.hash)
+            ~resolve:(fun _ (vk : Zkapp_account.Vk_with_version.t) -> vk.vk.hash)
+        ; field "txnVersion"
+            ~doc:
+              "Transaction version that was current when the verification key \
+               was set. While it is older than the current version, a \
+               signature satisfies the account's access permission when it is \
+               Proof, and its setVerificationKey permission when it is Proof \
+               or Impossible."
+            ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ (vk : Zkapp_account.Vk_with_version.t) ->
+              Mina_numbers.Txn_version.to_string vk.txn_version )
         ] )
 
   let rec account =
@@ -1964,8 +1975,8 @@ module AccountObj = struct
                ~doc:"Verification key associated with this account"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
-                 Option.value_map account.Account.Poly.zkapp ~default:None
-                   ~f:(fun zkapp_account -> zkapp_account.verification_key) )
+                 Option.bind account.Account.Poly.zkapp ~f:(fun zkapp ->
+                     zkapp.verification_key ) )
            ; field "actionState"
                ~doc:"Action state associated with this account"
                ~typ:

@@ -1,0 +1,18 @@
+(library
+ (name mesa_types)
+ (public_name mesa_types)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  ppx_deriving_yojson.runtime
+  yojson
+  ;; local libraries
+  currency
+  mina_base
+  mina_numbers
+  pickles_types
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson)))

@@ -871,6 +871,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let if_ b ~(then_ : t) ~(else_ : t) : t =
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+
+          let is_some = Zkapp_basic.Flagged_option.is_some
         end
 
         module Verification_key_hash = struct
@@ -1018,10 +1020,24 @@ module Make_str (A : Wire_types.Concrete) = struct
             { data = { a with zkapp = { a.zkapp with app_state } }; hash }
 
           let verification_key (a : t) : Verification_key.t =
-            a.data.zkapp.verification_key
+            a.data.zkapp.verification_key.vk
 
-          let set_verification_key (verification_key : Verification_key.t)
+          let verification_key_txn_version (a : t) =
+            a.data.zkapp.verification_key.txn_version
+
+          let set_verification_key (vk : Verification_key.t)
+              (txn_version : Mina_numbers.Txn_version.Checked.t)
               ({ data = a; hash } : t) : t =
+            let txn_version =
+              run_checked
+              @@ Mina_numbers.Txn_version.Checked.if_
+                   (Zkapp_basic.Flagged_option.is_some vk)
+                   ~then_:txn_version
+                   ~else_:Mina_numbers.Txn_version.(Checked.constant zero)
+            in
+            let verification_key =
+              { Zkapp_account.Vk_with_version.Poly.vk; txn_version }
+            in
             { data = { a with zkapp = { a.zkapp with verification_key } }
             ; hash
             }
@@ -1075,23 +1091,11 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           type txn_version = Mina_numbers.Txn_version.Checked.t
 
-          let txn_version ({ data = a; _ } : t) =
-            snd a.permissions.set_verification_key
-
           let permissions (a : t) = a.data.permissions
 
           let set_permissions (permissions : Permissions.t)
               ({ data = a; hash } : t) : t =
             { data = { a with permissions }; hash }
-
-          let set_txn_version_to_current ({ data = a; hash } : t) : t =
-            let set_verification_key =
-              ( fst a.permissions.set_verification_key
-              , Mina_numbers.Txn_version.current_checked )
-            in
-            let permissions = { a.permissions with set_verification_key } in
-            let data = { a with permissions } in
-            { data; hash }
         end
 
         module Opt = struct
@@ -1461,7 +1465,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         match
                           (As_prover.read (Typ.prover_value ())
                              (Data_as_hash.prover_value
-                                a.zkapp.verification_key.data ) )
+                                a.zkapp.verification_key.vk.data ) )
                             .data
                         with
                         | Some vk ->
@@ -1470,7 +1474,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                             Side_loaded_verification_key.dummy )
                   in
                   let expected_hash =
-                    Data_as_hash.hash a.zkapp.verification_key.data
+                    Data_as_hash.hash a.zkapp.verification_key.vk.data
                   in
                   let actual_hash = Zkapp_account.Checked.digest_vk vk in
                   Field.Assert.equal expected_hash actual_hash ;
@@ -1509,6 +1513,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             let if_ cond ~then_ ~else_ =
               run_checked
               @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
+
+            let current = Mina_numbers.Txn_version.current_checked
 
             let equal_to_current t =
               run_checked @@ Mina_numbers.Txn_version.equal_to_current_checked t
@@ -4092,8 +4098,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               (find_index_exn witness.local_state_init.ledger account_id))
         in
         match
-          Option.value_map ~default:None account.zkapp ~f:(fun s ->
-              s.verification_key )
+          Option.value_map ~default:None account.zkapp
+            ~f:Zkapp_account.verification_key_wire
         with
         | None ->
             { With_hash.data =
@@ -5216,15 +5222,24 @@ module Make_str (A : Wire_types.Concrete) = struct
       signature_transfers ~constraint_constants
         (Multiple_transfers_spec.signature_transfers_spec_of_t spec)
 
-    let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
+    let trivial_zkapp_account ?(permissions = Permissions.user_default)
+        ?(vk_txn_version = Mina_numbers.Txn_version.current) ~vk pk =
       let id = Account_id.create pk Token_id.default in
       { (Account.create id Balance.(of_mina_int_exn 1_000_000)) with
         permissions
-      ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
+      ; zkapp =
+          Some
+            { Zkapp_account.default with
+              verification_key =
+                Some
+                  { Zkapp_account.Vk_with_version.Poly.vk
+                  ; txn_version = vk_txn_version
+                  }
+            }
       }
 
     let create_trivial_zkapp_account ?(permissions = Permissions.user_default)
-        ~vk ~ledger pk =
+        ?vk_txn_version ~vk ~ledger pk =
       let create ledger id account =
         match Ledger.location_of_account ledger id with
         | Some _loc ->
@@ -5236,7 +5251,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ()
       in
       let id = Account_id.create pk Token_id.default in
-      let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
+      let account : Account.t =
+        trivial_zkapp_account ~permissions ?vk_txn_version ~vk pk
+      in
       create ledger id account
 
     let create_trivial_predicate_snapp

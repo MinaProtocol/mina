@@ -392,8 +392,8 @@ let gen_snapp_ledger =
   in
   (test_spec, kp)
 
-let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
-    ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
+let test_snapp_update ?expected_failure ?state_body ?snapp_permissions
+    ?vk_txn_version ~vk ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -402,7 +402,8 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
           (*create a snapp account*)
           let%bind vk' = vk in
           Transaction_snark.For_tests.create_trivial_zkapp_account
-            ?permissions:snapp_permissions ~vk:vk' ~ledger snapp_pk ;
+            ?permissions:snapp_permissions ?vk_txn_version ~vk:vk' ~ledger
+            snapp_pk ;
           let%bind zkapp_command =
             let zkapp_prover_and_vk = (zkapp_prover, vk) in
             Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk

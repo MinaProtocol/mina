@@ -1782,7 +1782,11 @@ let%test_module _ =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
-            Some { Zkapp_account.default with verification_key = Some vk }
+            Some
+              { Zkapp_account.default with
+                verification_key =
+                  Some (Zkapp_account.Vk_with_version.stamp_current vk)
+              }
           in
           { account with
             zkapp

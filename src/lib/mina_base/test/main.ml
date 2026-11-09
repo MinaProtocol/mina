@@ -7,7 +7,7 @@ let () =
         ( "verification-key-permission"
         , [ test_case
               "Update verification key permission with a different version \
-               should be rejected."
+               should be accepted."
               `Quick update_vk_perm_with_different_version
           ; test_case
               "Update verification key permission with current version should \
@@ -20,6 +20,14 @@ let () =
               (checked_pop_reverses_push (module Zkapp_account.Events))
           ; test_case "Actions pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Actions))
+          ; test_case "Digest matches the flat verification key layout." `Quick
+              digest_matches_flat_layout
+          ; test_case "Checked digest matches unchecked digest." `Quick
+              checked_digest_matches_unchecked
+          ; test_case "Flat verification key encoding round-trips." `Quick
+              flat_round_trip
+          ; test_case "Flat version without a key is rejected." `Quick
+              flat_version_without_key_is_rejected
           ] )
     ; Account_test.
         ( "accounts"
