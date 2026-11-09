@@ -23,17 +23,8 @@ let archive =
          postgres://user:password@localhost:5432/archive (or DB_USERNAME, \
          PGPASSWORD, DB_HOST, DB_PORT and DB_NAME)"
       (optional string)
-  and auditor =
-    flag "--missing-blocks-auditor"
-      ~aliases:[ "missing-blocks-auditor" ]
-      ~doc:
-        (sprintf
-           "PATH mina-missing-blocks-auditor program (or \
-            MISSING_BLOCKS_AUDITOR; default: %s)"
-           Config.Default.auditor )
-      (optional string)
   in
-  fun ~env -> Config.archive ~env ~uri ~auditor
+  fun ~env -> Config.archive_uri ~env uri
 
 let blocks =
   let%map_open url =
@@ -81,12 +72,9 @@ let or_exit ~logger = function
           [%log fatal] "Cannot start: %s" problem ) ;
       Core.exit 1
 
-let log_archive ~logger (archive : Config.archive) =
-  [%log info] "Archive database $archive, audited with $auditor"
-    ~metadata:
-      [ ("archive", `String (Config.redact archive.uri))
-      ; ("auditor", `String archive.auditor)
-      ]
+let log_archive ~logger archive_uri =
+  [%log info] "Archive database $archive"
+    ~metadata:[ ("archive", `String (Config.redact archive_uri)) ]
 
 let log_blocks ~logger (blocks : Config.blocks) =
   [%log info]

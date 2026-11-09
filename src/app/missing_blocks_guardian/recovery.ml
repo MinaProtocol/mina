@@ -54,17 +54,15 @@ let populate ~logger ~add_block file =
       | Error not_removed ->
           Error (reason ^ " " ^ not_removed) )
 
-(* Imports [parent] from the bucket, then each next missing parent that the
-   auditor reports, until it reports none. Stops when an import changes
+(* Imports [parent] from the bucket with [add_block], then each next missing
+   parent that [check] reports, until it reports none. Stops when an import changes
    nothing, so that one bad block file cannot keep it busy forever. *)
-let rec restore ~logger ~add_block (archive : Config.archive)
-    (blocks : Config.blocks) (parent : Auditor.missing_parent) =
+let rec restore ~logger ~add_block ~check (blocks : Config.blocks)
+    (parent : Auditor.missing_parent) =
   let open Deferred.Result.Let_syntax in
   let%bind file = download ~logger blocks parent in
   let%bind () = populate ~logger ~add_block file in
-  match%bind
-    Auditor.check ~logger ~prog:archive.auditor ~archive_uri:archive.uri
-  with
+  match%bind check () with
   | None ->
       return ()
   | Some next when Auditor.equal_missing_parent next parent ->
@@ -75,4 +73,4 @@ let rec restore ~logger ~add_block (archive : Config.archive)
                The database remains unhealthy."
               file parent.hash parent.height ) )
   | Some next ->
-      restore ~logger ~add_block archive blocks next
+      restore ~logger ~add_block ~check blocks next
