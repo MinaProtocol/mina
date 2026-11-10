@@ -153,40 +153,57 @@ let%test_module "snarked_ledger_state" =
 
     let genesis_hash = Frozen_ledger_hash.empty_hash
 
+    let genesis_total_currency = Currency.Amount.zero
+
     let%test_unit "genesis creates valid state" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       [%test_eq: Frozen_ledger_hash.t] g.connecting_ledger_left genesis_hash ;
       [%test_eq: Frozen_ledger_hash.t] g.connecting_ledger_right genesis_hash ;
-      assert (Currency.Amount.Signed.is_zero g.supply_increase)
+      [%test_eq: Currency.Amount.t] g.source.total_currency
+        g.target.total_currency
 
     let%test_unit "genesis source equals target" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       [%test_eq: Registers.Value.t] g.source g.target
 
     let%test_unit "to_input does not raise on genesis" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       let (_ : _) = to_input g in
       ()
 
     let%test_unit "to_input is deterministic on genesis" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       let i1 = to_input g in
       let i2 = to_input g in
       [%test_eq: Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t] i1 i2
 
     let%test_unit "to_field_elements does not raise on genesis" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       let fields = to_field_elements g in
       assert (Int.( > ) (Array.length fields) 0)
 
     let%test_unit "to_field_elements is deterministic" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       let f1 = to_field_elements g in
       let f2 = to_field_elements g in
       [%test_eq: Snark_params.Tick.Field.t array] f1 f2
 
     let%test_unit "display does not raise on genesis" =
-      let g = genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        genesis ~genesis_ledger_hash:genesis_hash ~genesis_total_currency
+      in
       let (_ : _) = display g in
       ()
 
@@ -196,12 +213,16 @@ let%test_module "snarked_ledger_state" =
            Frozen_ledger_hash.gen ) ~trials:20 ~f:(fun (h1, h2) ->
           if Frozen_ledger_hash.equal h1 h2 then ()
           else
-            let g1 = genesis ~genesis_ledger_hash:h1 in
-            let g2 = genesis ~genesis_ledger_hash:h2 in
+            let g1 = genesis ~genesis_ledger_hash:h1 ~genesis_total_currency in
+            let g2 = genesis ~genesis_ledger_hash:h2 ~genesis_total_currency in
             assert (not ([%equal: t] g1 g2)) )
 
     let%test_unit "With_sok.genesis creates valid state" =
-      let g = With_sok.genesis ~genesis_ledger_hash:genesis_hash in
+      let g =
+        With_sok.genesis ~genesis_ledger_hash:genesis_hash
+          ~genesis_total_currency
+      in
       [%test_eq: Frozen_ledger_hash.t] g.connecting_ledger_left genesis_hash ;
-      assert (Currency.Amount.Signed.is_zero g.supply_increase)
+      [%test_eq: Currency.Amount.t] g.source.total_currency
+        g.target.total_currency
   end )
