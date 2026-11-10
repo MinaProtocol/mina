@@ -262,12 +262,36 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let check_result = { id = "8.F"; name = "Fork validation"; result } in
   [ check_result ]
 
-let fetch_last_filled_block ~postgres_uri () =
+(* The last filled block on the chain ending at [latest_state_hash], by
+   default the highest block of the archive (as in [is_in_best_chain]).
+   The connection is closed before returning, so that the caller can drop the
+   database right after. *)
+let last_filled_block ~postgres_uri ?latest_state_hash () =
   let open Deferred.Let_syntax in
-  let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let%bind (module Conn : Mina_caqti.CONNECTION) =
+    match%map Mina_caqti.connect postgres_uri with
+    | Ok conn ->
+        conn
+    | Error e ->
+        failwith (Caqti_error.show e)
+  in
+  Monitor.protect ~finally:Conn.disconnect
+  @@ fun () ->
+  let%bind tip_hash =
+    match latest_state_hash with
+    | Some hash ->
+        return hash
+    | None ->
+        Sql.latest_state_hash (module Conn)
+        >>| Mina_caqti.ok_exn ~ctx:"latest state hash"
+  in
+  Sql.fetch_last_filled_block (module Conn) ~tip_hash
+  >>| Mina_caqti.ok_exn ~ctx:"last filled block"
+
+let fetch_last_filled_block ~postgres_uri ?latest_state_hash () =
+  let open Deferred.Let_syntax in
   let%map hash, slot_since_genesis, height =
-    query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
+    last_filled_block ~postgres_uri ?latest_state_hash ()
   in
 
   let json =
