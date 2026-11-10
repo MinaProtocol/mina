@@ -15,29 +15,6 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
-    ~hardfork_slot
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    (accounts : Runtime_config.Accounts.t) =
-  let transform_account account =
-    let account_padded =
-      Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
-        ~pad_app_state account
-    in
-    Runtime_genesis_ledger_lib.convert_account ~identity_conversion
-      ~hardfork_slot account_padded
-  in
-
-  let accounts =
-    List.map accounts ~f:(fun account -> (None, transform_account account))
-  in
-  let packed =
-    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
-      ~depth:constraint_constants.ledger_depth ~genesis_backing_type:Stable_db
-      (lazy accounts)
-  in
-  Lazy.force (Genesis_ledger.Packed.t packed)
-
 let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   let%bind tar_path =
     Deferred.Or_error.ok_exn
@@ -111,12 +88,12 @@ let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; num_accounts = None
     ; balances = []
-    ; hash = _
+    ; hash
     ; name = None
     ; add_genesis_winner = Some false
     ; s3_data_hash = _
     } ->
-      accounts
+      (accounts, hash)
   | _ ->
       failwith "Wrong ledger supplied"
 
@@ -217,22 +194,21 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
-  let ledger =
-    load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
-      ~constraint_constants ~hardfork_slot accounts
+  let load_ledger ~name (accounts, expected_hash) =
+    Runtime_genesis_ledger_lib.load_ledger ~ignore_missing_fields ~pad_app_state
+      ~identity_conversion ~hardfork_slot
+      ~depth:constraint_constants.ledger_depth ~name ?expected_hash accounts
+    |> Or_error.ok_exn
   in
+  let ledger = load_ledger ~name:"ledger" accounts in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
-      ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
-           ~constraint_constants ~hardfork_slot )
+      ~f:(load_ledger ~name:"epoch_data.staking.ledger")
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
-      ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
-           ~constraint_constants ~hardfork_slot )
+      ~f:(load_ledger ~name:"epoch_data.next.ledger")
       next_accounts_opt
   in
   let%bind hash_json =
