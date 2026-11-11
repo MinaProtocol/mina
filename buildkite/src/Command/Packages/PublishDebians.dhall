@@ -7,9 +7,10 @@
 -- with.
 --
 -- Nothing is rewritten on the way. The version comes from the git tag the
--- build was made from and the `Suite:` field was written at packaging time
--- from the same MINA_RELEASE_CHANNEL this step publishes into, so the package
--- that reaches the repository is the package that was tested. That is the
+-- build was made from, and the package does not name its channel (there is no
+-- `Suite:` field in the control file), so it needs no change to be published
+-- into MINA_RELEASE_CHANNEL. The package that reaches the repository is the
+-- package that was tested. That is the
 -- whole point of dropping the promotion step: `release-manager
 -- publish-from-cache` still exists for the flows that genuinely need a
 -- rewrite.

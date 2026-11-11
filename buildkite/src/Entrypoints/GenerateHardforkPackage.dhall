@@ -65,9 +65,9 @@ let dockerRepo =
 let buildCacheDir = MinaArtifact.ownBuildCacheDir
 
 let debianChannel =
-    -- The channel the packages are built for, so their Suite matches the
-    -- channel the publish pipeline is pointed at (MINA_RELEASE_CHANNEL, the
-    -- same variable). Unstable unless the pipeline says otherwise.
+    -- The channel the packages are built for: the apt component the publish
+    -- pipeline is pointed at (MINA_RELEASE_CHANNEL, the same variable).
+    -- Unstable unless the pipeline says otherwise.
       DebianChannel.effective DebianChannel.Type.Unstable
 
 let hardforkDockerSpec =
