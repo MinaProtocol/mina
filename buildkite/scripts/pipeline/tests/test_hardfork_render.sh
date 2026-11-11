@@ -214,6 +214,14 @@ expect "the verification takes the reference ledgers from the fetch" \
   grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-artifacts-config-noble")"
 expect "so does the image check of the other codenames" \
   grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-image-jammy")"
+expect "the verification still waits for the preflight" \
+  grep -qx "_GenerateHardforkPackage-preflight-state-dump" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-artifacts-config-noble")"
+expect "so does the image check" \
+  grep -qx "_GenerateHardforkPackage-preflight-state-dump" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-image-jammy")"
+expect_not "the fetch does not wait for the preflight" \
+  grep -qx "_GenerateHardforkPackage-preflight-state-dump" <<< "$(deps_of "_GenerateHardforkPackage-generate-hardfork-tarballs-noble")"
+expect_not "nor does the packaging" \
+  grep -qx "_GenerateHardforkPackage-preflight-state-dump" <<< "$(deps_of "_GenerateHardforkPackage-build-hf-debian")"
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"

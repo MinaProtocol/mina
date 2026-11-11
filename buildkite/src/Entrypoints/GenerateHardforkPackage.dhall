@@ -618,6 +618,23 @@ let preflightCommand =
             , target = Size.Small
             }
 
+let referenceLedgersDeps =
+    -- What a verification step waits for besides its image: the step that
+    -- writes the reference ledgers, and with a ready config also the
+    -- preflight. Without one, the reference step already waits for the
+    -- preflight. The fetch does not, so that no deb or image waits for it; the
+    -- verification does, so a bad dump still stops it within seconds.
+          \(spec : Spec.Type)
+      ->  \(pipelineName : Text)
+      ->  \(codename : DebianArchPair)
+      ->    [ { name = pipelineName, key = referenceLedgersKey spec codename } ]
+          # merge
+              { Some =
+                  \(_ : Text) -> [ { name = pipelineName, key = preflightKey } ]
+              , None = [] : List Command.TaggedKey.Type
+              }
+              spec.hardfork_config_url
+
 let verifyImageCommand =
     -- The full verification runs for the first codename. Every other codename
     -- has its own image, with its own binary and packages, so it gets the
@@ -662,13 +679,11 @@ let verifyImageCommand =
                       , key = "verify-packaged-image-${lowerNameCodename}"
                       , target = Size.Small
                       , depends_on =
-                        [ { name = pipelineName
-                          , key = DockerImage.stepKey dockerDaemonSpec
-                          }
-                        , { name = pipelineName
-                          , key = referenceLedgersKey spec firstCodename
-                          }
-                        ]
+                            [ { name = pipelineName
+                              , key = DockerImage.stepKey dockerDaemonSpec
+                              }
+                            ]
+                          # referenceLedgersDeps spec pipelineName firstCodename
                       }
                   ]
                 , Arm64 = [] : List Command.Type
@@ -726,11 +741,8 @@ let generateHfRelatedStepsForCodename =
               -- The verification reads the reference ledgers from the cache,
               -- which the reference step writes and the image build does not
               -- wait for.
-                [ { name = pipelineName, key = dockerDaemonStep }
-                , { name = pipelineName
-                  , key = referenceLedgersKey spec codename
-                  }
-                ]
+                  [ { name = pipelineName, key = dockerDaemonStep } ]
+                # referenceLedgersDeps spec pipelineName codename
 
           let precomputed_block_prefix_arg =
                 merge
