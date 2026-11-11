@@ -414,8 +414,7 @@ let build_artifacts
 let commonBuildEnvs =
     -- MINA_DEB_RELEASE is the channel: the apt component the packages are
     -- published into. builder-helpers.sh checks it against the known channels
-    -- and defaults it to "unstable". It is not written into the control file,
-    -- so the same package can move between channels without a rewrite.
+    -- and defaults it to "unstable".
           \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 

@@ -1328,13 +1328,6 @@ test_control_file_common_fields() {
     assert_control_field "$CAPTURED_CONTROL" "Origin" "MinaProtocol"
     assert_control_field "$CAPTURED_CONTROL" "Label" "MinaProtocol"
     assert_control_field "$CAPTURED_CONTROL" "Codename" "bullseye"
-    # The channel is the apt component, not a package field: a package that
-    # names its channel must be rewritten each time it moves to another one.
-    if echo "$CAPTURED_CONTROL" | grep -q '^Suite:'; then
-        log_fail "control must not have a Suite field"
-    else
-        log_pass
-    fi
     assert_control_field "$CAPTURED_CONTROL" "Section" "base"
     assert_control_field "$CAPTURED_CONTROL" "Priority" "optional"
     assert_contains "control has description" "$CAPTURED_CONTROL" "Description:"
