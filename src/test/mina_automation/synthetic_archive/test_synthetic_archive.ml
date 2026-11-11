@@ -41,7 +41,7 @@ let db_tests server_uri =
   ; Alcotest.test_case "account states as the archive writes them" `Quick
       (run Account_states.test)
   ; Alcotest.test_case
-      "schema scripts on a built database keep every row and index" `Quick
+      "schema scripts on a built database give the archive back" `Quick
       (run Account_states.test_run_script)
   ]
 

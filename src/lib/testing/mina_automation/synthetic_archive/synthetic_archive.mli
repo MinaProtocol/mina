@@ -23,9 +23,12 @@ module Db : sig
       [server_uri] points at (its path, if any, is ignored) and loads
       [create_schema.sql] and, with [~upgrade:true], [upgrade.sql]. A database
       of the same name left by an earlier run is dropped first, so [name] must
-      start with [test_]; any other name is refused. *)
+      start with [test_]; any other name is refused. [encoding], e.g.
+      ["SQL_ASCII"], gives the database that encoding and the C locale; without
+      it the database takes the server's defaults. *)
   val create :
        ?upgrade:bool
+    -> ?encoding:string
     -> server_uri:Uri.t
     -> name:string
     -> unit
@@ -60,6 +63,7 @@ module Db : sig
       {!create} and drops it again unless [~keep:true]. *)
   val with_fresh :
        ?upgrade:bool
+    -> ?encoding:string
     -> ?keep:bool
     -> server_uri:Uri.t
     -> name:string
