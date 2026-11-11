@@ -30,6 +30,8 @@ let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Prefork = ../Constants/Prefork.dhall
+
 let DebianInstallMode
     : Type
     = < NoInstall | DownloadOnly >
@@ -82,7 +84,7 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bookworm
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_legacy_version = "4.0.3-73134bf"
+          , deb_legacy_version = Prefork.version
           , docker_target = None Text
           , base_image = None Text
           , deb_profile = Profiles.Type.Devnet
