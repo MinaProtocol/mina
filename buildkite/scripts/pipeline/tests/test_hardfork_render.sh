@@ -18,7 +18,9 @@
 #   - each verification step runs the checks it has the inputs for, and the
 #     corrupted config must fail on the hash mismatch alone;
 #   - the state dump is checked at once, no build waits for that step, and every
-#     amd64 codename has its image checked.
+#     amd64 codename has its image checked;
+#   - with a ready config (HARDFORK_CONFIG_URL) nothing rebuilds the ledgers, and
+#     the images still wait for the packages.
 #
 # Needs dhall-to-yaml, as the render does.
 
@@ -46,7 +48,8 @@ expect_not() {
 
 CLEAN=(env -u MINA_RELEASE_CHANNEL -u MINA_RELEASE_DOCKER_REPO -u MINA_RELEASE_DOCKER_MIRROR
        -u MINA_RELEASE_DEBIAN_REPO -u MINA_RELEASE_DEBIAN_MIRROR
-       -u USE_GENERIC_DOCKERS_FROM_VERSION -u USE_ARTIFACTS_FROM_BUILDKITE_BUILD)
+       -u USE_GENERIC_DOCKERS_FROM_VERSION -u USE_ARTIFACTS_FROM_BUILDKITE_BUILD
+       -u HARDFORK_CONFIG_URL)
 
 # render <VAR=value>...: the pipeline YAML for a mainnet noble run. dhall-to-yaml
 # 1.6 quotes the keys and step names with ', 1.7 with ". The checks read ', so
@@ -191,6 +194,26 @@ expect "the jammy check waits for the jammy image" grep -qx "_GenerateHardforkPa
 expect "the jammy check waits for the reference ledgers" grep -qx "_GenerateHardforkPackage-generate-reference-tarballs-noble" <<< "$deps"
 expect_not "the first codename is not checked twice" grep -q "verify-packaged-image-noble" <<< "$yaml"
 expect_not "arm64 is left out: the verification runs on amd64 agents" grep -q "verify-packaged-image-bookworm" <<< "$yaml"
+
+echo "TEST: a ready config replaces the generation, and the images still wait for the packages"
+yaml="$(render HARDFORK_CONFIG_URL=https://example.invalid/mainnet-hardfork-config-3Nabc.tar.gz CODENAMES_CONFIG=Noble_Amd64,Jammy_Amd64)"
+undefined="$(comm -23 \
+  <(grep -oE "_GenerateHardforkPackage-[A-Za-z0-9_-]+" <<< "$yaml" | sort -u) \
+  <(keys <<< "$yaml"))"
+expect "no undefined depends_on target (got: ${undefined:-none})" test -z "$undefined"
+step_commands="$(commands <<< "$yaml")"
+expect "the fetch step runs" \
+  grep -q "fetch-hardfork-config.sh --network mainnet --url https://example.invalid/mainnet-hardfork-config-3Nabc.tar.gz --config-json-gz-url https://example.invalid/config.json.gz" <<< "$step_commands"
+expect_not "no step rebuilds the ledgers" grep -q "generate-fork-config-and-ledger-tarballs" <<< "$step_commands"
+expect "the fetch step waits for nothing" test -z "$(deps_of "_GenerateHardforkPackage-generate-hardfork-tarballs-noble")"
+deps="$(deps_of "_GenerateHardforkPackage-build-hf-debian")"
+expect "the packaging waits for the fetch" grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$deps"
+expect "the packaging waits for the artifacts, or the images start without them" \
+  grep -qx "_GenerateHardforkPackage-build-deb-pkg-noble" <<< "$deps"
+expect "the verification takes the reference ledgers from the fetch" \
+  grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-artifacts-config-noble")"
+expect "so does the image check of the other codenames" \
+  grep -qx "_GenerateHardforkPackage-generate-hardfork-tarballs-noble" <<< "$(deps_of "_GenerateHardforkPackage-verify-packaged-image-jammy")"
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ test_hardfork_render: failures"
