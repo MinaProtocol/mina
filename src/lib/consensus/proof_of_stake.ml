@@ -837,7 +837,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   )
       end
 
-      let check ~context:(module Context : CONTEXT)
+      let check ~context:(module Context : CONTEXT) ~should_stop
           ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
           ~producer_private_key ~producer_public_key ~total_stake
           ~(get_delegators :
@@ -852,6 +852,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let rec go acc = function
           | [] ->
+              Interruptible.return acc
+          | _ :: _ when should_stop () ->
               Interruptible.return acc
           | (delegator, (account : Mina_base.Account.t)) :: delegators ->
               let%bind () = Interruptible.return () in
@@ -3783,6 +3785,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Interruptible.force
               (Vrf.check
                  ~context:(module Context)
+                 ~should_stop:(fun () -> false)
                  ~global_slot ~seed ~producer_private_key:private_key
                  ~producer_public_key:public_key_compressed ~total_stake
                  ~get_delegators:

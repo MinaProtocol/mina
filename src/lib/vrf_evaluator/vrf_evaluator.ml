@@ -74,6 +74,10 @@ end
 module Worker_state = struct
   let max_slots_won_queue_length = 100
 
+  (* How many slots before a slot starts its search must finish, leaving time
+     for the win to reach the block producer. *)
+  let deadline_lead_slots = 2
+
   type init_arg =
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.Stable.Latest.t
@@ -176,7 +180,7 @@ module Worker_state = struct
 
   let evaluate_vrf ~context:(module Context : CONTEXT)
       ~(epoch_data : Consensus.Data.Epoch_data_for_vrf.t) ~keypairs
-      ~consensus_time =
+      ~consensus_time ~should_stop =
     let open Context in
     let epoch = epoch_data.epoch in
     let start_global_slot = epoch_data.global_slot in
@@ -223,7 +227,7 @@ module Worker_state = struct
             Interruptible.force
               (Consensus.Data.Vrf.check
                  ~context:(module Context)
-                 ~global_slot ~seed:epoch_data.epoch_seed
+                 ~should_stop ~global_slot ~seed:epoch_data.epoch_seed
                  ~get_delegators:
                    (Public_key.Compressed.Table.find delegatee_table)
                  ~producer_private_key:keypair.private_key
@@ -261,6 +265,57 @@ module Worker_state = struct
         =
       Consensus.Data.Consensus_time.(
         of_global_slot ~constants:consensus_constants epoch_data.global_slot)
+    in
+    let time_controller = Block_time.Controller.basic ~logger in
+    let slot_duration_ms =
+      Block_time.Span.to_ms consensus_constants.slot_duration_ms
+    in
+    (* A win is only useful if it reaches the block producer before its slot
+       starts, so the search for a slot stops [deadline_lead_slots] slots
+       before the slot starts, keeping the best win found by then. A slot too
+       close for that, such as the first slots after new epoch data arrives,
+       is instead searched until its midpoint. A slot past its midpoint is
+       skipped. *)
+    let search_deadline consensus_time =
+      let current_time = Block_time.now time_controller in
+      let slot_start =
+        Consensus_time.start_time ~constants:consensus_constants consensus_time
+      in
+      let lead_deadline =
+        Block_time.sub slot_start
+          (Block_time.Span.of_ms
+             Int64.(of_int deadline_lead_slots * slot_duration_ms) )
+      in
+      let midpoint =
+        Block_time.add slot_start
+          (Block_time.Span.of_ms Int64.(slot_duration_ms / of_int 2))
+      in
+      if Block_time.(current_time < lead_deadline) then Some lead_deadline
+      else if Block_time.(current_time < midpoint) then Some midpoint
+      else None
+    in
+    let rec next_searchable_slot consensus_time =
+      match search_deadline consensus_time with
+      | Some deadline ->
+          (consensus_time, deadline)
+      | None ->
+          next_searchable_slot (Consensus_time.succ consensus_time)
+    in
+    let skip_unsearchable_slots consensus_time =
+      let ((next_slot, _) as next) = next_searchable_slot consensus_time in
+      if Consensus_time.compare next_slot consensus_time <> 0 then
+        [%log warn]
+          "Skipping VRF evaluation from slot $skipped_from to slot $next_slot, \
+           as the skipped slots are past their search deadline"
+          ~metadata:
+            [ ( "skipped_from"
+              , Global_slot_since_hard_fork.to_yojson
+                  (Consensus_time.to_global_slot consensus_time) )
+            ; ( "next_slot"
+              , Global_slot_since_hard_fork.to_yojson
+                  (Consensus_time.to_global_slot next_slot) )
+            ] ;
+      next
     in
     let wait_for_state_change () = Ivar.read t.state_changed in
     let scanning generation state_version consensus_time =
@@ -305,6 +360,9 @@ module Worker_state = struct
                       ~metadata:[ ("epoch", Epoch.to_yojson epoch_data.epoch) ] ;
                     start_consensus_time epoch_data
               in
+              let consensus_time, deadline =
+                skip_unsearchable_slots consensus_time
+              in
               let slot = Slot.of_uint32 @@ Consensus_time.slot consensus_time in
               let global_slot =
                 Consensus_time.to_uint32 consensus_time
@@ -336,7 +394,14 @@ module Worker_state = struct
                   evaluate_vrf
                     ~context:(module Context)
                     ~epoch_data ~keypairs ~consensus_time
+                    ~should_stop:(fun () ->
+                      Block_time.(now time_controller >= deadline) )
                 in
+                if Block_time.(now time_controller >= deadline) then
+                  [%log warn]
+                    "VRF evaluation for slot $slot reached its deadline, and \
+                     may not have checked every delegator"
+                    ~metadata:[ ("slot", Slot.to_yojson slot) ] ;
                 if
                   t.epoch_generation <> generation
                   || t.state_version <> state_version
