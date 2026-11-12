@@ -16,6 +16,8 @@ let Size = ../../Command/Size.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -44,7 +46,7 @@ in  Pipeline.build
             , label = "Debian builder-helpers tests"
             , key = "builder-helpers-tests"
             , target = Size.Small
-            , docker = None Docker.Type
+            , docker = Some Docker::{ image = ContainerImages.minaToolchain }
             }
         , Command.build
             Command.Config::{

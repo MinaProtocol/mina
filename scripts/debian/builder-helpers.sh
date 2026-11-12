@@ -107,7 +107,23 @@ BUILDDIR="${BUILDDIR:-deb_build}"
 # Ledger tarballs of the genesis configs, as <s3_data_hash>/<file name in S3>.
 LEDGER_TARBALLS_DIR="${LEDGER_TARBALLS_DIR:-/var/storagebox/ledger-tarballs}"
 
+# deb-toolkit (MinaProtocol/deb-toolkit) writes the control file and builds
+# the package. It comes from PATH (the toolchain image has it), or from
+# $DEB_TOOLKIT.
+DEB_TOOLKIT="${DEB_TOOLKIT:-deb-toolkit}"
+
+# Control fields of the next package, as `deb-toolkit build` arguments.
+# create_control_file sets them and build_deb uses them.
+DEB_CONTROL_ARGS=()
+
 # Function to ease creation of Debian package control files
+#   $1 - package name
+#   $2 - Depends
+#   $3 - description
+#   $4 - Suggests (optional)
+#   $5 - Replaces and Breaks (optional)
+#   $6 - Provides (optional)
+#   $7 - Conflicts (optional)
 create_control_file() {
 
   echo "create_control_file inputs:"
@@ -127,56 +143,43 @@ create_control_file() {
     echo "Conflicts: ${7}"
   fi
   # Make sure the directory exists
-  mkdir -p "${BUILDDIR}/DEBIAN"
+  mkdir -p "${BUILDDIR}"
 
   # Also clean the binary directory that all packages need
   rm -rf "${BUILDDIR}/usr/local/bin"
 
-  CONTROL="${BUILDDIR}/DEBIAN/control"
-
-  # Create the control file itself
-  cat << EOF > ${CONTROL}
-Package: ${1}
-Version: ${MINA_DEB_VERSION}
-License: Apache-2.0
-Origin: MinaProtocol
-Label: MinaProtocol
-Vendor: O(1)Labs
-Codename: ${MINA_DEB_CODENAME}
-Architecture: ${ARCHITECTURE}
-Maintainer: O(1)Labs <build@o1labs.org>
-Installed-Size:
-EOF
-
+  DEB_CONTROL_ARGS=(
+    --package-name "${1}"
+    --version "${MINA_DEB_VERSION}"
+    --codename "${MINA_DEB_CODENAME}"
+    --architecture "${ARCHITECTURE}"
+    --license "Apache-2.0"
+    --origin "MinaProtocol"
+    --label "MinaProtocol"
+    --vendor "O(1)Labs"
+    --maintainer "O(1)Labs <build@o1labs.org>"
+    --section "base"
+    --priority "optional"
+    --homepage "https://minaprotocol.com/"
+    --description "${3}"
+    --githash "${GITHASH}"
+    --buildurl "${BUILD_URL}"
+  )
   if [ -n "${2:-}" ]; then
-    echo "Depends: ${2}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--depends "${2}")
   fi
   if [ -n "${4:-}" ]; then
-    echo "Suggests: ${4}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--suggested-depends "${4}")
   fi
   if [ -n "${5:-}" ]; then
-    echo "Replaces: ${5}" >> ${CONTROL}
-    echo "Breaks: ${5}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--replaces "${5}" --breaks "${5}")
   fi
   if [ -n "${6:-}" ]; then
-    echo "Provides: ${6}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--provides "${6}")
   fi
   if [ -n "${7:-}" ]; then
-    echo "Conflicts: ${7}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--conflicts "${7}")
   fi
-
-  cat <<EOF >> ${CONTROL}
-Section: base
-Priority: optional
-Homepage: https://minaprotocol.com/
-Description:
- ${3}
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-  echo "Control File:"
-  cat "${BUILDDIR}/DEBIAN/control"
-
 }
 
 # Function to ease package build
@@ -206,8 +209,27 @@ build_deb() {
   echo "Deb Contents:"
   find "${BUILDDIR}"
 
-  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), capture the staging
-  # directory state to that directory instead of invoking fakeroot/dpkg-deb.
+  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), the package is built into
+  # that directory, and the staging directory (with the control file that
+  # deb-toolkit wrote into it) is kept there for the test to read.
+  local output_dir="."
+  if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
+    output_dir="${BUILD_DEB_CAPTURE_DIR}/debs"
+    rm -rf "${output_dir}"
+  fi
+
+  # deb-toolkit runs `fakeroot dpkg-deb -Zgzip --build`. The packages are
+  # gzip, not the zstd default of newer distributions (e.g. Noble), because
+  # the Docker image builds examine them on buildkite agents where zstd might
+  # not be available.
+  "${DEB_TOOLKIT}" build \
+    --build-dir "${BUILDDIR}" \
+    --output-dir "${output_dir}" \
+    "${DEB_CONTROL_ARGS[@]}"
+
+  echo "Control File:"
+  cat "${BUILDDIR}/DEBIAN/control"
+
   if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
     echo "${package_name}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
     cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
@@ -219,13 +241,6 @@ build_deb() {
     return 0
   fi
 
-  # Build the package
-  # NOTE: the reason for `-Zgzip` is we might be building on newer Ubuntu, e.g.
-  # Noble. The default packaging format is `zstd`, but then when we're building
-  # Docker image, we're examining those packages in buildkite's agent, where
-  # `zstd` might not be available.
-  fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" \
-    "${package_name}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
   echo "build_deb outputs:"
   ls -lh "${package_name}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
