@@ -203,7 +203,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V3.t
+                Mina_base.Account.Stable.V4.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }
