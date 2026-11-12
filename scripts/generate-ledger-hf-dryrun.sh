@@ -32,6 +32,7 @@ check_basic_dependencies() {
         echo "Error: Missing required dependencies: ${missing_deps[*]}" >&2
         echo "Please install the missing dependencies and try again." >&2
         echo "  - jq: JSON processor (required for configuration generation)" >&2
+        echo "  - mina-json-bytes: keeps non-UTF-8 ledger bytes exact through jq. The toolchain image has it; elsewhere install the mina-release-toolkit package (https://github.com/MinaProtocol/mina-release-toolkit/releases)." >&2
         exit 1
     fi
 }

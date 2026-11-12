@@ -15,6 +15,9 @@ require_external_commands() {
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         echo "Error: Missing required dependencies: ${missing_deps[*]}" >&2
         echo "Please install the missing dependencies and try again." >&2
+        if [[ " ${missing_deps[*]} " == *" mina-json-bytes "* ]]; then
+            echo "  - mina-json-bytes: keeps non-UTF-8 ledger bytes exact through jq. The toolchain image has it; elsewhere install the mina-release-toolkit package (https://github.com/MinaProtocol/mina-release-toolkit/releases)." >&2
+        fi
         exit 1
     fi
 }
