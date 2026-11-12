@@ -1066,7 +1066,7 @@ module Make (L : Ledger_intf.S) :
     end
 
     module Verification_key = struct
-      type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
+      type t = Verification_key_wire.t option
 
       let if_ = value_if
     end
@@ -1221,7 +1221,7 @@ module Make (L : Ledger_intf.S) :
         | None ->
             None
         | Some zkapp ->
-            Option.map zkapp.verification_key ~f:With_hash.hash
+            Option.map zkapp.verification_key ~f:Verification_key_wire.hash
 
       let last_action_slot (a : t) = (get_zkapp a).last_action_slot
 
@@ -2312,9 +2312,10 @@ module For_tests = struct
                 { Zkapp_account.default with
                   verification_key =
                     Some
-                      { With_hash.hash = Zkapp_basic.F.zero
-                      ; data = Side_loaded_verification_key.dummy
-                      }
+                      (Verification_key_wire.of_hashed
+                         { With_hash.hash = Zkapp_basic.F.zero
+                         ; data = Side_loaded_verification_key.dummy
+                         } )
                 }
             else None
           in

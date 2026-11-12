@@ -95,10 +95,10 @@ let%test_module "Archive node unit tests" =
       let zkappify_account (account : Account.t) : Account.t =
         let verification_key =
           Some
-            With_hash.
-              { data = Side_loaded_verification_key.dummy
-              ; hash = Zkapp_account.dummy_vk_hash ()
-              }
+            (Verification_key_wire.of_hashed
+               { With_hash.data = Side_loaded_verification_key.dummy
+               ; hash = Zkapp_account.dummy_vk_hash ()
+               } )
         in
         let zkapp = Some { Zkapp_account.default with verification_key } in
         { account with zkapp }

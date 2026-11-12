@@ -48,11 +48,9 @@ let check_signed_command ~signature_kind c =
   | _, false ->
       Error (`Invalid_signature (Signed_command.public_keys c))
 
-let collect_vk_assumption
+let collect_vk_assumption ~hash_of_vk
     ( (p : (Account_update.Body.t, _ Control.Poly.t, _) Account_update.Poly.t)
-    , ( (vk_opt :
-          (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
-          option )
+    , ( (vk_opt : (Side_loaded_verification_key.t, _) With_hash.t option)
       , (stmt : Zkapp_statement.t) ) ) =
   match (p.authorization, p.body.authorization_kind, vk_opt) with
   | Proof _, Proof _, None ->
@@ -62,7 +60,7 @@ let collect_vk_assumption
   | Proof pi, Proof vk_hash, Some (vk : _ With_hash.t) ->
       if
         (* check that vk expected for proof is the one being used *)
-        Snark_params.Tick.Field.equal vk_hash (With_hash.hash vk)
+        Snark_params.Tick.Field.equal vk_hash (hash_of_vk vk)
       then Ok (Some (vk.data, stmt, pi))
       else
         Error
@@ -71,9 +69,9 @@ let collect_vk_assumption
   | _ ->
       Ok None
 
-let collect_vk_assumptions zkapp_command =
+let collect_vk_assumptions ~hash_of_vk zkapp_command =
   let collect_vk_assumption' collected (element, _) =
-    let%map.Result res_opt = collect_vk_assumption element in
+    let%map.Result res_opt = collect_vk_assumption ~hash_of_vk element in
     Option.value_map ~f:(Fn.flip List.cons collected) ~default:collected res_opt
   in
   zkapp_command.Zkapp_command.Poly.account_updates
@@ -133,7 +131,7 @@ let check_signatures_of_zkapp_command ~signature_kind
                (`Mismatched_authorization_kind
                  [ Account_id.public_key @@ Account_update.account_id p ] ) )
 
-let check ~signature_kind (cmd : _ With_status.t) :
+let check ~signature_kind ~hash_of_vk (cmd : _ With_status.t) :
     ([ `Assuming of _ list ], invalid) Result.t =
   match cmd with
   | { With_status.data = User_command.Signed_command c; status = _ } ->
@@ -149,7 +147,7 @@ let check ~signature_kind (cmd : _ With_status.t) :
       let%bind.Result () =
         check_signatures_of_zkapp_command ~signature_kind command
       in
-      let%map.Result assuming = collect_vk_assumptions verifiable in
+      let%map.Result assuming = collect_vk_assumptions ~hash_of_vk verifiable in
       `Assuming assuming
 
 (** Verifies a command that is being held in mempool.
@@ -176,7 +174,9 @@ let verify_command_from_mempool
   | { data = Signed_command _ as verifiable_cmd; status = Applied } ->
       `Valid (coerce_cmd_as_valid verifiable_cmd)
   | { data = Zkapp_command zkapp_cmd as verifiable_cmd; status = Applied } -> (
-      match collect_vk_assumptions zkapp_cmd with
+      match
+        collect_vk_assumptions ~hash_of_vk:Verification_key_wire.hash zkapp_cmd
+      with
       | Error e ->
           e
       | _ ->
