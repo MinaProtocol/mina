@@ -1,0 +1,30 @@
+(library
+ (name gossip_net_tests)
+ (libraries
+  ;; opam libraries
+  core
+  async
+  async_kernel
+  async_unix
+  async_rpc_kernel
+  core_kernel
+  ppx_inline_test.config
+  sexplib0
+  bin_prot.shape
+  base.caml
+  ;; local libraries
+  block_time
+  child_processes
+  gossip_net
+  logger
+  mina_metrics
+  mina_net2
+  network_peer
+  node_addrs_and_ports
+  trust_system)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx))
+ (inline_tests
+  (flags -verbose -show-counts)))

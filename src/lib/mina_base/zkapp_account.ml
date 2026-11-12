@@ -197,6 +197,13 @@ module Zkapp_uri = struct
   [%%define_locally
   Stable.Latest.
     (sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson, max_length, check)]
+
+  (* any bytes, as on chain: the protocol does no encoding check *)
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind len = Int.gen_incl 0 max_length in
+    String.gen_with_length len
+      (Char.gen_uniform_inclusive Char.min_value Char.max_value)
 end
 
 module Poly = struct

@@ -1383,7 +1383,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ~f:(fun pk -> `Other pk)
           in
           let proposed_protocol_version_opt =
-            Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+            Mina_run.get_proposed_protocol_version_opt ~logger
               proposed_protocol_version
           in
           ( match

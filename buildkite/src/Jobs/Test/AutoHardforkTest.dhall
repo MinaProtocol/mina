@@ -25,6 +25,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
+let Toolchain = ../../Constants/Toolchain.dhall
+
 let Size = ../../Command/Size.dhall
 
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
@@ -60,6 +62,7 @@ let dirtyWhen =
       , S.exactly_noext "dockerfiles/stages/1-base-deps"
       , S.exactly "scripts/hardfork/dispatcher" "sh"
       , S.exactly "scripts/hardfork/create_runtime_config" "sh"
+      , S.exactly "scripts/hardfork/release/check-fork-dump" "py"
       , S.strictlyStart (S.contains "buildkite/scripts/tests/hardfork")
       , S.exactly "scripts/docker/build" "sh"
       , S.exactly "scripts/debian/builder-helpers" "sh"
@@ -140,6 +143,17 @@ in  Pipeline.build
               ]
             , label = "Auto Hardfork: create_runtime_config Tests"
             , key = "auto-hardfork-create-runtime-config-tests"
+            , target = Size.Small
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+                Toolchain.select
+                  Toolchain.Spec::{ debVersion = debVersion, arch = arch }
+                  ([] : List Text)
+                  "python3 buildkite/scripts/tests/hardfork/check-fork-dump-tests.py"
+            , label = "Auto Hardfork: check-fork-dump Tests"
+            , key = "auto-hardfork-check-fork-dump-tests"
             , target = Size.Small
             }
         ]
