@@ -66,6 +66,18 @@ struct
 
   let () = assert (N.length_in_bits * 2 < Field.size_in_bits + 1)
 
+  let assert_div_mod ~(x : var) ~(y : var) ~(q : var) ~(r : var) =
+    (* q * y + r = x
+
+       q * y = x - r
+    *)
+    let%bind () = assert_r1cs q y (Field.Var.sub x r) in
+    (* r < y, i.e. y - r - 1 does not underflow. Since r >= 0, this also
+       forces y <> 0; together these make (q, r) the unique Euclidean
+       quotient and remainder.
+    *)
+    range_check Field.Var.(sub (sub y r) (constant Field.one))
+
   let div_mod (x : var) (y : var) =
     let%bind q, r =
       exists (Typ.tuple2 typ typ)
@@ -74,12 +86,7 @@ struct
             let%map x = read typ x and y = read typ y in
             (N.div x y, N.rem x y))
     in
-
-    (* q * y + r = x
-
-       q * y = x - r
-    *)
-    let%map () = assert_r1cs q y (Field.Var.sub x r) in
+    let%map () = assert_div_mod ~x ~y ~q ~r in
     (q, r)
 
   type t = var
@@ -305,3 +312,52 @@ module Make64 () : UInt64 = struct
 
   let of_uint64 = Unsigned_extended.UInt64.of_uint64
 end
+
+let%test_module "div_mod" =
+  ( module struct
+    module N = Unsigned_extended.UInt32
+    module C = Make_checked (N) (Bits.UInt32)
+
+    let accepts ~x ~y ~q ~r =
+      let witness n = exists C.typ ~compute:(As_prover.return (N.of_int n)) in
+      Or_error.is_ok
+        (check
+           (let%bind x = witness x
+            and y = witness y
+            and q = witness q
+            and r = witness r in
+            C.assert_div_mod ~x ~y ~q ~r ) )
+
+    let%test_unit "div_mod computes the quotient and remainder" =
+      Quickcheck.test
+        Quickcheck.Generator.(
+          both (Int.gen_incl 0 1_000_000) (Int.gen_incl 1 1_000_000))
+        ~f:(fun (x, y) ->
+          let q, r =
+            Or_error.ok_exn
+              (run_and_check
+                 (let%bind x =
+                    exists C.typ ~compute:(As_prover.return (N.of_int x))
+                  and y =
+                    exists C.typ ~compute:(As_prover.return (N.of_int y))
+                  in
+                  let%map q, r = C.div_mod x y in
+                  As_prover.(
+                    let%map q = read C.typ q and r = read C.typ r in
+                    (N.to_int q, N.to_int r)) ) )
+          in
+          [%test_eq: int * int] (q, r) (x / y, x % y) )
+
+    let%test "accepts the canonical witness" = accepts ~x:17 ~y:5 ~q:3 ~r:2
+
+    let%test "rejects a remainder equal to the divisor" =
+      not (accepts ~x:15 ~y:5 ~q:2 ~r:5)
+
+    let%test "rejects a remainder larger than the divisor" =
+      not (accepts ~x:17 ~y:5 ~q:1 ~r:12)
+
+    let%test "rejects the trivial witness q = 0, r = x" =
+      not (accepts ~x:17 ~y:5 ~q:0 ~r:17)
+
+    let%test "rejects a zero divisor" = not (accepts ~x:17 ~y:0 ~q:42 ~r:17)
+  end )
