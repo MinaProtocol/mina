@@ -326,6 +326,12 @@ module Mina_state = struct
   include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
   include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
   include
+    Assert_equal2V1 (O.Protocol_versions.Poly.Stable) (W.Protocol_versions.Poly)
+  include
+    Assert_equal0V1
+      (O.Protocol_versions.Value.Stable)
+      (W.Protocol_versions.Value)
+  include
     Assert_equal0V3 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
   include Assert_equal0 (O.Blockchain_state.Value) (W.Blockchain_state.Value.V3)
   include

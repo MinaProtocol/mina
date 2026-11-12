@@ -161,6 +161,44 @@ let test_variant_rejected () =
     Alcotest.fail "Hashes unexpectedly equal — test setup error"
   else ()
 
+(* Check the genesis step with the protocol versions in the new state's
+   blockchain state replaced, consistently in the transition and the public
+   input, so that only the versions differ from the baseline. *)
+let check_with_protocol_versions protocol_versions =
+  let blockchain_state = { baseline_blockchain_state with protocol_versions } in
+  let witness : Blockchain_snark.Witness.t =
+    { prev_state = negative_one_state
+    ; prev_state_proof = Lazy.force Mina_base.Proof.transaction_dummy
+    ; transition = { baseline_transition with blockchain_state }
+    ; txn_snark = matching_txn_snark
+    ; txn_snark_proof = Lazy.force Mina_base.Proof.transaction_dummy
+    }
+  in
+  Blockchain_snark.check witness ~handler:consensus_handler
+    ~proof_level:Genesis_constants.Proof_level.No_check ~constraint_constants
+    (Mina_state.Protocol_state.with_protocol_versions genesis_protocol_state
+       protocol_versions )
+
+let bump ?(transaction = 0) ?(network = 0) ?(patch = 0) v =
+  Protocol_version.create
+    ~transaction:(Protocol_version.transaction v + transaction)
+    ~network:(Protocol_version.network v + network)
+    ~patch:(Protocol_version.patch v + patch)
+
+let current = Protocol_version.current
+
+let expect_accepted protocol_versions () =
+  match check_with_protocol_versions protocol_versions with
+  | Ok () ->
+      ()
+  | Error e ->
+      Alcotest.fail
+        (Printf.sprintf "Witness rejected: %s" (Error.to_string_hum e))
+
+let expect_rejected protocol_versions () =
+  if Result.is_ok (check_with_protocol_versions protocol_versions) then
+    Alcotest.fail "Circuit accepted a witness with another protocol's version"
+
 let tests =
   [ ( "baseline"
     , [ Alcotest.test_case "baseline witness accepted" `Quick
@@ -169,6 +207,25 @@ let tests =
   ; ( "variant"
     , [ Alcotest.test_case "variant witness rejected" `Quick
           test_variant_rejected
+      ] )
+  ; ( "protocol versions"
+    , [ Alcotest.test_case "proposed version accepted" `Quick
+          (expect_accepted
+             (Mina_state.Protocol_versions.create ~current
+                ~proposed:(Some (bump ~patch:1 current)) ) )
+      ; Alcotest.test_case "other patch version accepted" `Quick
+          (expect_accepted
+             (Mina_state.Protocol_versions.create
+                ~current:(bump ~patch:1 current) ~proposed:None ) )
+      ; Alcotest.test_case "other transaction version rejected" `Quick
+          (expect_rejected
+             (Mina_state.Protocol_versions.create
+                ~current:(bump ~transaction:1 current)
+                ~proposed:None ) )
+      ; Alcotest.test_case "other network version rejected" `Quick
+          (expect_rejected
+             (Mina_state.Protocol_versions.create
+                ~current:(bump ~network:1 current) ~proposed:None ) )
       ] )
   ]
 

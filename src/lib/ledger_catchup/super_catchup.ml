@@ -269,8 +269,10 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                       |> Protocol_version.to_string ) )
                 ; ( "proposed_protocol_version"
                   , `String
-                      ( Mina_block.Header.proposed_protocol_version_opt
-                          (Mina_block.header transition)
+                      ( (Mina_state.Protocol_state.protocol_versions
+                           (Mina_block.Header.protocol_state
+                              (Mina_block.header transition) ) )
+                          .proposed
                       |> Option.value_map ~default:"<None>"
                            ~f:Protocol_version.to_string ) )
                 ] ) )

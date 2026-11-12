@@ -4,7 +4,7 @@ module type Full = sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving compare, equal, sexp, yojson]
+      type t [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
 

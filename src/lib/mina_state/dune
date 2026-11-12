@@ -49,4 +49,5 @@
   sgn_type
   blake2
   ppx_version.runtime
-  mina_wire_types))
+  mina_wire_types
+  protocol_version))

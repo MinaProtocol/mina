@@ -97,8 +97,9 @@ let to_logging_yojson header : Yojson.Safe.t =
     ; ( "proposed_protocol_version"
       , `String
           (Option.value_map
-             (Header.proposed_protocol_version_opt header)
-             ~default:"<None>" ~f:Protocol_version.to_string ) )
+             (Mina_state.Protocol_state.protocol_versions
+                (Header.protocol_state header) )
+               .proposed ~default:"<None>" ~f:Protocol_version.to_string ) )
     ]
 
 let create ~header ~body = { header; body }
