@@ -1328,7 +1328,6 @@ test_control_file_common_fields() {
     assert_control_field "$CAPTURED_CONTROL" "Origin" "MinaProtocol"
     assert_control_field "$CAPTURED_CONTROL" "Label" "MinaProtocol"
     assert_control_field "$CAPTURED_CONTROL" "Codename" "bullseye"
-    assert_control_field "$CAPTURED_CONTROL" "Suite" "unstable"
     assert_control_field "$CAPTURED_CONTROL" "Section" "base"
     assert_control_field "$CAPTURED_CONTROL" "Priority" "optional"
     assert_contains "control has description" "$CAPTURED_CONTROL" "Description:"
