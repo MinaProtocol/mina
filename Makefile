@@ -241,6 +241,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/archive_blocks/archive_blocks.exe \
 		src/app/extract_blocks/extract_blocks.exe \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
 		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
 		src/app/dump_slot_ledger/dump_slot_ledger.exe \
 		src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
@@ -366,6 +367,15 @@ build-missing-blocks-auditor: ocaml_checks ## Build missing blocks auditor tool
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		--profile=$(DUNE_PROFILE) \
+		&& echo "✅ Build complete"
+
+.PHONY: build-missing-blocks-guardian
+build-missing-blocks-guardian: ocaml_checks ## Build missing blocks guardian tool
+	$(info 🏗️  Building missing blocks guardian tool with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -725,16 +735,7 @@ debian-download-create-legacy-hardfork: ## Download and create legacy hardfork D
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
 	$(call check_env_var,NETWORK_NAME)
 
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-$(NETWORK_NAME)-prefork-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
-
-.PHONY: debian-reversion
-debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
-	$(call check_env_var,DEB)
-	$(call check_env_var,NEW_VERSION)
-	@./scripts/debian/reversion.sh "$(DEB)" "$(NEW_VERSION)" \
-		$(if $(NEW_SUITE),--suite "$(NEW_SUITE)") \
-		$(if $(NEW_NAME),--name "$(NEW_NAME)") \
-		$(if $(OUTPUT),--output "$(OUTPUT)")
+	@buildkite-cache-manager read --root legacy/debians/$(CODENAME) "mina-create-$(NETWORK_NAME)-prefork-genesis_*_amd64.deb" _build
 
 ########################################
 # Release management
@@ -745,20 +746,20 @@ cache-get-prefork-debians: ## Download debian packages for prefork genesis creat
 
 	$(call check_env_var,NETWORK_NAME)
 
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-prefork  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+	@buildkite-cache-manager read --root berkeley/debians/$(CODENAME) "mina-$(NETWORK_NAME)-prefork_*_amd64.deb" _build
 
 .PHONY: cache-get-create-prefork-genesis-debians
 cache-get-create-prefork-genesis-debians: ## Download debian packages for prefork genesis creation
 	$(info 📦 Downloading prefork genesis creation Debian packages for debian $(CODENAME))
 	$(call check_env_var,NETWORK_NAME)
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-create-genesis-ledger  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+	@buildkite-cache-manager read --root berkeley/debians/$(CODENAME) "mina-$(NETWORK_NAME)-create-genesis-ledger_*_amd64.deb" _build
 
 .PHONY: cache-put-debian
 cache-put-debian: ## Upload debian packages for prefork genesis creation
 	$(info 📦 Uploading Debian packages for debian $(CODENAME) to CI cache)
 	$(call check_env_var,TARGET)
 	$(call check_env_var,DEB_PATH)
-	@./buildkite/scripts/release/manager.sh persist --codename $(CODENAME)  --target $(TARGET)  --backend hetzner --local-debian-path $(DEB_PATH)
+	@buildkite-cache-manager write --root $(TARGET) $(DEB_PATH) debians/$(CODENAME)/
 
 ########################################
 # Docker images

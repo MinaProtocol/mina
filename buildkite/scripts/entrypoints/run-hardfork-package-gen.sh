@@ -21,6 +21,24 @@ set -euox pipefail
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
 #
+# READ BY THE RENDER, SHARED WITH THE RELEASE PIPELINES:
+#   MINA_RELEASE_CHANNEL               - (Optional) The channel the packages are built for (their Suite), which is
+#                                        the channel the fork-day publish must be pointed at. Default: unstable
+#
+# What this pipeline publishes: the docker images, to the internal euro
+# registry only, so that a hardfork candidate can be run before the fork
+# without reaching a user. The packages are published by nothing here. Every
+# image is also written to this build's cache
+# (/var/storagebox/<build id>/docker-images) and every package to
+# debians/<codename>/ of the same cache, which is the layout the publish
+# pipelines read. On fork day, run mina-<network>-publish with
+# MINA_READ_CACHE_ROOT set to this build's id and the MINA_RELEASE_* targets
+# of that pipeline (see buildkite/src/Jobs/Release/PublishDockers.dhall and
+# PublishDebians.dhall): it retags the cached images for docker.io and
+# publishes the packages to the channel they were built for. A build that is
+# never published that way is a candidate, and nothing in the build needs to
+# know which.
+#
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
 #   export NETWORK="Devnet"
@@ -45,6 +63,11 @@ DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
 ARCH_DHALL_DEF="(./buildkite/src/Constants/Arch.dhall)"
 NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
 GENERATE_HARDFORK_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/GenerateHardforkPackage.dhall)"
+
+# A release variable spelled so that Dhall would quietly ignore it is an error
+# here, as it is in Prepare.dhall. The YAML goes to stdout, so the gate's
+# report goes to stderr.
+./buildkite/scripts/pipeline/validate-release-env.sh >&2
 
 function usage() {
   if [[ -n "$1" ]]; then
