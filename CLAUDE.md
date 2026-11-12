@@ -127,7 +127,7 @@ Profiles are defined as `.mlh` files in `src/config/` and selected via `--profil
 - Supports multiarch builds (amd64, arm64) via `docker buildx`
 
 ### Release Management
-- `buildkite/scripts/release/manager.sh` - Main tool for publishing, promoting, and verifying releases
+- `release-manager` (MinaProtocol/mina-release-toolkit, installed in the toolchain image) - Main tool for publishing, promoting, and verifying releases
 - Workflow: Build -> Unstable -> Alpha -> Beta -> Stable
 - Supports Debian repos, GCR, and docker.io
 - Uses `deb-s3` for Debian repository operations
