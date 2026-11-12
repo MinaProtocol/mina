@@ -92,6 +92,9 @@ module T = struct
     ; tree : ('hash, 'account) Tree.t
     }
   [@@deriving sexp, yojson]
+
+  let map_accounts ~f { indexes; depth; tree } =
+    { indexes; depth; tree = Tree.Stable.V1.to_latest f tree }
 end
 
 module type S = sig
