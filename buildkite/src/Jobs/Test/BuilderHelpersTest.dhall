@@ -42,7 +42,9 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./scripts/tests/debian/test_builder_helpers.sh" ]
+              [ Cmd.run
+                  "git config --global --add safe.directory /workdir && ./scripts/tests/debian/test_builder_helpers.sh"
+              ]
             , label = "Debian builder-helpers tests"
             , key = "builder-helpers-tests"
             , target = Size.Small
