@@ -329,6 +329,67 @@ let sync_status_command =
            Yojson.Safe.pretty_to_channel Out_channel.stdout
              (`Assoc [ ("error", Error_json.error_to_yojson e) ]) )
 
+let bootstrap_status_to_yojson (s : Bootstrap_status.Snapshot.t) =
+  (* Name enum values as the GraphQL schema does: [SYNCING_ROOT_LEDGER] *)
+  let enum_name sexp = `String (String.uppercase (Sexp.to_string sexp)) in
+  let time t = `String (Time.to_string_iso8601_basic ~zone:Time.Zone.utc t) in
+  let option f = function Some x -> f x | None -> `Null in
+  let progress (p : Syncable_ledger.Progress.t) =
+    `Assoc
+      [ ("targets", `Int p.targets)
+      ; ("target_set_at", option time p.target_set_at)
+      ; ("pending_child_hashes", `Int p.pending_child_hashes)
+      ; ("pending_contents", `Int p.pending_contents)
+      ; ("synced", `Bool p.synced)
+      ; ("answers_accepted", `Int p.answers_accepted)
+      ; ("answers_ignored", `Int p.answers_ignored)
+      ; ("answers_rejected", `Int p.answers_rejected)
+      ; ("last_accepted_answer_at", option time p.last_accepted_answer_at)
+      ; ("num_accounts", option (fun n -> `Int n) p.num_accounts)
+      ; ("accounts_settled", `Int p.accounts_settled)
+      ; ("accounts_received", `Int p.accounts_received)
+      ]
+  in
+  let ledger_sync (l : Bootstrap_status.Snapshot.ledger_sync) =
+    `Assoc
+      [ ("ledger", enum_name (Bootstrap_status.Ledger.sexp_of_t l.ledger))
+      ; ( "target"
+        , option
+            (fun h -> `String (Mina_base.Ledger_hash.to_base58_check h))
+            l.target )
+      ; ("active", `Bool l.active)
+      ; ("progress", progress l.progress)
+      ]
+  in
+  `Assoc
+    [ ("phase", enum_name (Bootstrap_status.Phase.sexp_of_t s.phase))
+    ; ("phase_started_at", time s.phase_started_at)
+    ; ("bootstrap_started_at", option time s.bootstrap_started_at)
+    ; ("bootstrap_attempts", `Int s.bootstrap_attempts)
+    ; ( "last_attempt_failure"
+      , option (fun r -> `String r) s.last_attempt_failure )
+    ; ("ledger_syncs", `List (List.map s.ledger_syncs ~f:ledger_sync))
+    ]
+
+let bootstrap_status_command =
+  Command.async
+    ~summary:
+      "Query what the daemon is doing to reach the network's chain: its step \
+       of initialisation or bootstrap, and its ledger syncs"
+    (let%map_open.Command uri_str = graphql_uri_flag in
+     fun () ->
+       let logger = Logger.create () in
+       let node_uri = Uri.of_string uri_str in
+       let%map result =
+         Mina_graphql_client.Client.get_bootstrap_status ~logger node_uri
+       in
+       Yojson.Safe.pretty_to_channel Out_channel.stdout
+         ( match result with
+         | Ok status ->
+             bootstrap_status_to_yojson status
+         | Error e ->
+             `Assoc [ ("error", Error_json.error_to_yojson e) ] ) )
+
 let network_id_command =
   Command.async ~summary:"Query daemon network ID"
     (let%map_open.Command uri_str = graphql_uri_flag
@@ -428,6 +489,7 @@ let () =
        ; ("set-snark-worker", set_snark_worker_command)
        ; ("set-snark-fee", set_snark_fee_command)
        ; ("sync-status", sync_status_command)
+       ; ("bootstrap-status", bootstrap_status_command)
        ; ("network-id", network_id_command)
        ; ("fork-config", fork_config_command)
        ; ("send-raw", send_raw_command)

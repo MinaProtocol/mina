@@ -621,8 +621,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       overwritten leaf. An account overwritten by one with the same identifier
       keeps its location and token entries, which are already right, if its
       location entry points at the overwritten leaf; otherwise the leaf held a
-      stale copy, and the entries are written again. *)
-  let set_all_accounts_rooted_at_exn mdb address accounts =
+      stale copy, and the entries are written again.
+
+      [subtree_hashes] are stored as the hashes of their nodes rather than
+      computed; each must be in the subtree. *)
+  let set_all_accounts_rooted_at_exn ?subtree_hashes mdb address accounts =
     let ledger_depth = mdb.depth in
     let first, last = Addr.Range.subtree_range ~ledger_depth address in
     let first = Addr.to_int first in
@@ -633,6 +636,16 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         "set_all_accounts_rooted_at_exn: %d accounts do not fit in a subtree \
          of %d leaves"
         num_accounts capacity () ;
+    let hash_cache =
+      Option.map subtree_hashes ~f:(fun subtree_hashes ->
+          List.iter subtree_hashes ~f:(fun (addr, _) ->
+              if not (Addr.is_parent_of address ~maybe_child:addr) then
+                failwithf
+                  !"set_all_accounts_rooted_at_exn: given the hash of %{sexp: \
+                    Addr.t}, outside the subtree at %{sexp: Addr.t}"
+                  addr address () ) ;
+          Addr.Map.of_alist_exn subtree_hashes )
+    in
     let addresses_and_accounts =
       List.mapi accounts ~f:(fun i account ->
           (Addr.of_int_exn ~ledger_depth (first + i), account) )
@@ -669,7 +682,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           else set )
     in
     remove_accounts_at_locations mdb displaced ;
-    set_batch_reindexing
+    set_batch_reindexing ?hash_cache
       ~reindex:(fun (location, _) -> not (Set.mem already_indexed location))
       mdb
       (List.map addresses_and_accounts ~f:(fun (addr, account) ->

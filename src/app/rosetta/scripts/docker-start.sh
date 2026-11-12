@@ -116,7 +116,14 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-TIMEOUT=3600 mina-missing-blocks-guardian daemon &
+# The guardian exits with 1 when it cannot restore a block. It must not stop
+# this script, which ends when any background job ends. The "||" also keeps
+# "set -e" from ending the loop.
+while true; do
+  TIMEOUT=3600 mina-missing-blocks-guardian daemon --log-json --log-level "${LOG_LEVEL}" \
+    || echo "[WARN] mina-missing-blocks-guardian exited with $?, starting it again in 60 seconds"
+  sleep 60
+done &
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
   echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"

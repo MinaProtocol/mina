@@ -28,6 +28,9 @@
 //   profile=       devnet, mainnet, lightnet
 //   instrumented=  true, false (the default), both
 //   from=          take the binaries and the packages from that earlier build
+//   skip_branch=   1 leaves the branch out of the version: 4.0.4-c00c297, and
+//                  not 4.0.4-my-branch-c00c297. Use it for a build that a
+//                  release publishes.
 //
 // A list is separated by commas: codename=bullseye,jammy.
 //
@@ -49,6 +52,7 @@ const KEYS = {
   profile: "BUILDKITE_PIPELINE_PROFILE",
   instrumented: "BUILDKITE_PIPELINE_INSTRUMENTED",
   from: "BUILDKITE_PIPELINE_FROM_BUILD",
+  skip_branch: "SKIP_GITBRANCH",
 };
 
 // Values that are a closed list. Checking them here names the word that is
@@ -56,6 +60,7 @@ const KEYS = {
 const ENUMS = {
   arch: ["amd64", "arm64"],
   instrumented: ["true", "false", "both"],
+  skip_branch: ["0", "1"],
 };
 
 const listIsIn = (value, allowed) =>

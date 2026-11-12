@@ -361,12 +361,12 @@ module T = struct
     | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.get_inner_hash_at_addr_exn db
 
-  let set_all_accounts_rooted_at_exn t =
+  let set_all_accounts_rooted_at_exn ?subtree_hashes t =
     match t with
     | Stable_db db ->
-        Ledger.Db.set_all_accounts_rooted_at_exn db
+        Ledger.Db.set_all_accounts_rooted_at_exn ?subtree_hashes db
     | Converting_db ((module Converting_ledger), db, _) ->
-        Converting_ledger.set_all_accounts_rooted_at_exn db
+        Converting_ledger.set_all_accounts_rooted_at_exn ?subtree_hashes db
 
   let set_batch_accounts t =
     match t with

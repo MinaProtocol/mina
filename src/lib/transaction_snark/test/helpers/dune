@@ -1,0 +1,20 @@
+(library
+ (name transaction_snark_test_helpers)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  ;; local libraries
+  genesis_constants
+  mina_base
+  mina_generators
+  mina_ledger
+  mina_numbers
+  mina_state
+  mina_transaction_logic
+  mina_transaction
+  precomputed_values)
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))

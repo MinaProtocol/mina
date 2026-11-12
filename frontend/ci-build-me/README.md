@@ -32,6 +32,10 @@ Builds what it is told and triages nothing. The first word is the layer
 the whole layer. See `src/artifacts.js` for the keys and
 `buildkite/src/Constants/Artifact/Sets.dhall` for the sets.
 
+Add `skip_branch=1` to leave the branch out of the version, for a build that a
+release publishes: `4.0.4-c00c297`, and not `4.0.4-my-branch-c00c297`. It sets
+`SKIP_GITBRANCH`, which `scripts/export-git-env-vars.sh` reads.
+
 Pipeline: **`mina-artifacts`**, which uploads
 `buildkite/src/Entrypoints/RunSelection.dhall`.
 

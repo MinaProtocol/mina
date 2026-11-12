@@ -49,6 +49,7 @@ val prev : t -> t Option.t
 
 val is_leaf : ledger_depth:int -> t -> bool
 
+(** Whether [maybe_child] is [parent] or an address under it. *)
 val is_parent_of : t -> maybe_child:t -> bool
 
 val serialize : ledger_depth:int -> t -> Bigstring.t
