@@ -486,8 +486,8 @@ let%test_module "Archive node unit tests" =
        WITHOUT its ledger accounts (e.g. the archive was never (re)started with
        the fork [--config-file]), [accounts_accessed] is empty for it, so Rosetta
        reports zero balances at the fork block. [add_genesis_accounts] -- the
-       routine the [populate-genesis-accounts] toolbox command invokes -- must
-       backfill the full fork genesis ledger onto that existing block. *)
+       legacy writer, run with --legacy-genesis-accounts -- must backfill the
+       full fork genesis ledger onto that existing block. *)
     let%test_unit "Accounts_accessed: add_genesis_accounts backfills the fork \
                    genesis ledger onto an existing fork genesis block" =
       let pool = Lazy.force conn_pool_lazy in
@@ -581,19 +581,19 @@ let%test_module "Archive node unit tests" =
       (* The bug: the fork genesis block has no accounts_accessed rows. *)
       [%test_result: int] ~expect:0 before ;
       let%bind () =
-        Processor.add_genesis_accounts ~logger
-          ~runtime_config_opt:(Some runtime_config) ~genesis_constants
-          ~chunks_length:100 ~constraint_constants pool
+        Processor.add_genesis_accounts ~logger ~precomputed_values
+          ~chunks_length:100 pool
       in
       let%map after = count_accounts_accessed genesis_block_id in
       (* The fix: every fork genesis ledger account is now attached to the
          fork genesis block. *)
       [%test_result: int] ~expect:num_accounts after
 
-    (* --hardfork-handover: [add_genesis_ledger] writes the fork genesis ledger
-       to genesis_accounts at the genesis height and leaves accounts_accessed
-       alone. The shared database is not reset between tests, so the fork
-       height is random: rows from an earlier run cannot be counted. *)
+    (* --config-file: [add_genesis_block] stores the fork genesis block, as
+       canonical, and [add_genesis_ledger] writes the fork genesis ledger to
+       genesis_accounts at the genesis height, leaving accounts_accessed alone.
+       The shared database is not reset between tests, so the fork height is
+       random: rows from an earlier run cannot be counted. *)
     let%test_unit "Genesis_accounts: add_genesis_ledger writes the fork \
                    genesis ledger at its height and not to accounts_accessed" =
       let pool = Lazy.force conn_pool_lazy in
@@ -658,20 +658,36 @@ let%test_module "Archive node unit tests" =
              "SELECT COUNT(*) FROM genesis_accounts WHERE genesis_height = ?" )
           genesis_height
       in
-      let%bind accessed_before = count_accounts_accessed () in
-      let%bind () =
-        Processor.add_genesis_ledger ~logger ~runtime_config ~genesis_constants
-          ~chunks_length:2 ~constraint_constants pool
+      let%bind precomputed_values =
+        Processor.precomputed_values_of_config ~logger ~runtime_config
+          ~genesis_constants ~constraint_constants
       in
+      let start () =
+        let%bind genesis_id =
+          Processor.add_genesis_block ~logger ~precomputed_values pool
+        in
+        let%map () =
+          Processor.add_genesis_ledger ~logger ~precomputed_values
+            ~chunks_length:2 pool
+        in
+        genesis_id
+      in
+      let%bind accessed_before = count_accounts_accessed () in
+      let%bind genesis_id = start () in
+      let%bind status =
+        count
+          (Mina_caqti.find_req Caqti_type.int Caqti_type.string
+             "SELECT chain_status::text FROM blocks WHERE id = ?" )
+          genesis_id
+      in
+      [%test_result: string] ~expect:"canonical" status ;
       let%bind written = count_genesis_rows () in
       [%test_result: int] ~expect:num_accounts written ;
       let%bind accessed_after = count_accounts_accessed () in
       [%test_result: int] ~expect:accessed_before accessed_after ;
-      (* A second start writes nothing more. *)
-      let%bind () =
-        Processor.add_genesis_ledger ~logger ~runtime_config ~genesis_constants
-          ~chunks_length:2 ~constraint_constants pool
-      in
+      (* A second start finds the same block and writes nothing more. *)
+      let%bind genesis_id_again = start () in
+      [%test_result: int] ~expect:genesis_id genesis_id_again ;
       let%map again = count_genesis_rows () in
       [%test_result: int] ~expect:num_accounts again
 
