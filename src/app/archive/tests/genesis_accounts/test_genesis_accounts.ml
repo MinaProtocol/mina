@@ -481,9 +481,51 @@ let startup_resumes_partial_ledger server_uri () =
       Alcotest.(check int) "genesis_accounts rows" 3 rows ;
       check_chain db built blocks unsettled_fork_chain )
 
+(* The fork genesis was stored, then its ledger hash changed (a hand edit, an
+   import): the archive stops, with or without --legacy-genesis-accounts,
+   and writes nothing more. *)
+let startup_refuses_another_ledger_hash server_uri () =
+  let s = B.create () in
+  let tag = "startup_refuses_another_ledger_hash" in
+  let fork_hash = real_state_hash "startup-another-ledger-hash" in
+  let blocks = fork_chain ~fork_hash s in
+  let runtime_config = config ~tag ~fork:(fork_hash, 3) s in
+  let other_ledger_hash =
+    Mina_base.Ledger_hash.to_base58_check
+      (Quickcheck.random_value
+         ~seed:(`Deterministic "startup-another-ledger-hash")
+         Mina_base.Ledger_hash.gen )
+  in
+  B.Db.with_fresh ~server_uri ~name:"test_startup_another_ledger_hash"
+    (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let%bind config = load runtime_config in
+      let%bind first = startup db config in
+      expect_ok "first startup" first ;
+      let%bind () =
+        exec db
+          (sprintf
+             "UPDATE blocks SET ledger_hash = '%s' WHERE height = 4 AND \
+              global_slot_since_hard_fork = 0"
+             other_ledger_hash )
+      in
+      let%bind accessed_before = accounts_accessed db in
+      let%bind second = startup db config in
+      expect_failure "another ledger hash" ~mentioning:"ledger hash" second ;
+      let%bind legacy = startup ~legacy:true db config in
+      expect_failure "another ledger hash, legacy" ~mentioning:"ledger hash"
+        legacy ;
+      let%bind rows = genesis_rows db ~height:4 in
+      Alcotest.(check int) "genesis_accounts rows of the first startup" 3 rows ;
+      let%bind accessed_after = accounts_accessed db in
+      Alcotest.(check int)
+        "accounts_accessed unchanged" accessed_before accessed_after ;
+      check_chain db built blocks unsettled_fork_chain )
+
 (* A database that never ran upgrade.sql has no genesis_accounts table: the
    archive stops and says so; with --legacy-genesis-accounts it writes the
-   ledger to accounts_accessed instead. *)
+   ledger to accounts_accessed instead, and a restart writes nothing more. *)
 let startup_without_table server_uri () =
   let s = B.create () in
   let tag = "startup_without_table" in
@@ -501,15 +543,23 @@ let startup_without_table server_uri () =
       let%bind result = startup db config in
       expect_failure "no table" ~mentioning:"no genesis_accounts table" result ;
       let%bind () = check_chain db built blocks unsettled_fork_chain in
-      let%bind legacy = startup ~legacy:true db config in
-      expect_ok "legacy startup" legacy ;
-      let%bind on_genesis =
+      let on_genesis () =
         query_int db
           "SELECT count(*)::int FROM accounts_accessed aa JOIN blocks b ON \
            b.id = aa.block_id WHERE b.height = 4 AND \
            b.global_slot_since_hard_fork = 0"
       in
-      Alcotest.(check int) "accounts_accessed of the fork genesis" 3 on_genesis ;
+      let%bind legacy = startup ~legacy:true db config in
+      expect_ok "legacy startup" legacy ;
+      let%bind rows = on_genesis () in
+      Alcotest.(check int) "accounts_accessed of the fork genesis" 3 rows ;
+      let%bind again = startup ~legacy:true db config in
+      expect_ok "second legacy startup" again ;
+      let%bind genesis = genesis_statuses db ~height:4 in
+      Alcotest.(check (list string)) "one fork genesis" [ "canonical" ] genesis ;
+      let%bind rows = on_genesis () in
+      Alcotest.(check int)
+        "accounts_accessed of the fork genesis after a restart" 3 rows ;
       check_chain db built blocks unsettled_fork_chain )
 
 (* A config that starts a new chain, not a hard fork: its genesis block and
@@ -691,6 +741,8 @@ let () =
             (run startup_refuses_another_genesis)
         ; Alcotest.test_case "refuses another genesis ledger" `Quick
             (run startup_refuses_another_ledger)
+        ; Alcotest.test_case "refuses another genesis ledger hash" `Quick
+            (run startup_refuses_another_ledger_hash)
         ; Alcotest.test_case "resumes a partial genesis ledger" `Quick
             (run startup_resumes_partial_ledger)
         ; Alcotest.test_case "without the genesis_accounts table" `Quick
