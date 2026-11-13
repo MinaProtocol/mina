@@ -89,7 +89,7 @@ func TestMakeHelperForgetsPersistedBannedPeers(t *testing.T) {
 		&CodaGatingConfig{BannedPeers: map[peer.ID]struct{}{bannedPid: {}}},
 		1, 10, 0.2, time.Second, nil)
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, h.Host.Close()) })
+	t.Cleanup(func() { require.NoError(t, h.Close()) })
 
 	require.Empty(t, h.Host.Peerstore().Addrs(bannedPid))
 	require.Equal(t, []ma.Multiaddr{otherMa}, h.Host.Peerstore().Addrs(otherPid))
