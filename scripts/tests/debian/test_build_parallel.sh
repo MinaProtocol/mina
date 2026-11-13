@@ -56,8 +56,15 @@ run_test_in_subshell() {
 
   echo -n "TEST: ${test_name} ... "
 
-  local rc=0
-  ( set -e; "$test_name" ) || rc=$?
+  # The subshell must not be in a list ("( ... ) || rc=$?"): there bash
+  # ignores "set -e" in all of it, and a failed command in the test or in the
+  # build it calls does not stop it. "set +e" here keeps a failed test from
+  # stopping the suite.
+  local rc
+  set +e
+  ( set -e; "$test_name" )
+  rc=$?
+  set -e
 
   if [[ $rc -eq 0 ]]; then
     echo "OK"
@@ -302,13 +309,9 @@ EXE
   export BUILD_DEB_CAPTURE_DIR="$capture_dir"
   export MINA_DEB_JOBS=1
 
-  # main eventually calls build_deb which may exit; run in a subshell-caught block
-  if main logproc; then
-    :
-  else
-    echo "FAIL: main logproc failed" >&2
-    exit 1
-  fi
+  # A plain command, not "if main ...": in an "if" bash ignores "set -e" in
+  # the build. Here a failed command stops the test subshell.
+  main logproc
 
   if [[ -f "${capture_dir}/deb_name" ]]; then
     local captured_name

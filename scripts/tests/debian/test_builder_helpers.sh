@@ -73,7 +73,7 @@ assert_not_contains() {
 
 assert_file_captured() {
     local captured_files="$1" path="$2"
-    if grep -qF "./${path}" <<< "$captured_files"; then
+    if grep -qxF "./${path}" <<< "$captured_files"; then
         log_pass
     else
         log_fail "Expected file '${path}' in package"
@@ -82,7 +82,7 @@ assert_file_captured() {
 
 assert_file_not_captured() {
     local captured_files="$1" path="$2"
-    if ! grep -qF "./${path}" <<< "$captured_files"; then
+    if ! grep -qxF "./${path}" <<< "$captured_files"; then
         log_pass
     else
         log_fail "Unexpected file '${path}' in package"
@@ -216,34 +216,50 @@ load_captured_state() {
     rm -rf "$extracted"
     dpkg-deb -R "${debs[0]}" "$extracted"
     CAPTURED_CONTROL=$(cat "${extracted}/DEBIAN/control")
-    CAPTURED_FILES=$(cd "$extracted" && find . -type f | sort)
+    # Files and symlinks: some binaries are symlinks (for example
+    # usr/local/bin/mina -> mina-dispatch).
+    CAPTURED_FILES=$(cd "$extracted" && find . \( -type f -o -type l \) | sort)
     CAPTURED_LAST_BUILD_DIR="$extracted"
 }
 
-# Run a build function safely in a subshell (protects against exit 1).
-# Returns the exit code of the build function.
+# Run a build function in a subshell with "set -e", as build.sh does, so a
+# failed command (for example a cp of a missing file) stops the build.
+# Sets SAFE_BUILD_RC and returns the exit code of the build function.
+#
+# "set -e" works only if no caller runs the build in a list or an "if"
+# ("safe_build ... || ...", "if test_x", "test_x || true"): there, bash ignores
+# "set -e" in all of it, also in subshells. Thus:
+#   - the test shell runs with "set +e" (setup_test_environment), so a
+#     non-zero status does not stop the suite,
+#   - run_test and run_test_expect_fail call the tests as plain commands,
+#   - a test calls "safe_build ..." as a plain command, then
+#     "build_succeeded || return".
+SAFE_BUILD_RC=0
 safe_build() {
     rm -rf "${CAPTURE_DIR}"/{deb_name,debs,extracted} "${BUILDDIR}"
 
-    # NOTE: The subshell must NOT be followed by || true (or any || / &&),
-    # because bash disables set -e inside subshells that are part of a
-    # conditional list, making it impossible to detect build failures.
-    # Callers (run_test, run_test_expect_fail) use || true / || build_rc=$?
-    # so a non-zero exit here won't kill the script.
-    local rc
     (
         set -e
         "$@"
     )
-    rc=$?
-    if [[ $rc -ne 0 ]]; then
-        echo "  [safe_build] '$*' exited with code ${rc}" >&2
+    SAFE_BUILD_RC=$?
+    if [[ $SAFE_BUILD_RC -ne 0 ]]; then
+        echo "  [safe_build] '$*' exited with code ${SAFE_BUILD_RC}" >&2
     fi
-    return $rc
+    return $SAFE_BUILD_RC
 }
 
-# Run a test function directly (NOT in a subshell).
-# Test functions use safe_build() for build calls, then run assertions.
+# Records a failure if the last safe_build failed.
+build_succeeded() {
+    if [[ $SAFE_BUILD_RC -ne 0 ]]; then
+        log_fail "build exited non-zero (${SAFE_BUILD_RC})"
+        return 1
+    fi
+}
+
+# Run a test function directly (NOT in a subshell, and not in a list: see
+# safe_build). Test functions use safe_build() for build calls, then run
+# assertions.
 run_test() {
     local test_name="$1"
     CURRENT_TEST="$test_name"
@@ -252,7 +268,7 @@ run_test() {
 
     echo -n "TEST: ${test_name} ... "
 
-    "$test_name" || true
+    "$test_name"
 
     if [[ ${TESTS_FAILED} -eq ${failures_before} ]]; then
         echo "OK"
@@ -270,8 +286,9 @@ run_test_expect_fail() {
 
     echo -n "TEST: ${test_name} (expect fail) ... "
 
-    local build_rc=0
-    "$test_name" || build_rc=$?
+    local build_rc
+    "$test_name"
+    build_rc=$?
 
     if [[ $build_rc -ne 0 ]]; then
         log_pass  # Expected failure
@@ -406,6 +423,11 @@ MOCKEXE
     create_mock_exe "default/src/app/mina_healthcheck/mina_healthcheck.exe"
     create_mock_exe "default/src/app/cli/src/mina_mainnet_signatures.exe"
     create_mock_exe "default/src/app/cli/src/mina_testnet_signatures.exe"
+    # Unified (profile-dispatched-at-runtime) mina binary, used by
+    # copy_common_daemon_apps.
+    create_mock_exe "default/src/app/cli/src/mina.exe"
+    create_mock_exe "default/src/test/node_status_mock_server/node_status_mock_server.exe"
+    create_mock_exe "default/src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe"
     create_mock_exe "default/src/app/archive/archive.exe"
     create_mock_exe "default/src/app/archive_blocks/archive_blocks.exe"
     create_mock_exe "default/src/app/extract_blocks/extract_blocks.exe"
@@ -507,6 +529,10 @@ SVCEOF
     export SCRIPTPATH="${REAL_SCRIPTS_DIR}"
     source "${REAL_SCRIPTS_DIR}/builder-helpers.sh"
 
+    # builder-helpers.sh sets "set -e". The test shell runs without it, so
+    # that a failed build or test does not stop the suite (see safe_build).
+    set +e
+
     # Store expected values set by export-git-env-vars.sh via our mock git
     export EXPECTED_VERSION="${MINA_DEB_VERSION}"       # 1.0.0-test-branch-abcd123
     export EXPECTED_GITHASH_CONFIG="${GITHASH_CONFIG}"   # abcd1234
@@ -524,7 +550,8 @@ teardown_test_environment() {
 ################################################################################
 
 test_build_logproc_deb() {
-    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_logproc_deb
+    build_succeeded || return
     load_captured_state
     assert_eq "deb name" "mina-logproc" "$CAPTURED_DEB_NAME"
 
@@ -544,7 +571,8 @@ test_build_logproc_deb() {
 }
 
 test_build_daemon_storage_toolbox_deb() {
-    safe_build build_daemon_storage_toolbox_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_storage_toolbox_deb
+    build_succeeded || return
     load_captured_state
     assert_eq "deb name" "mina-daemon-storage-toolbox" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-daemon-storage-toolbox"
@@ -566,7 +594,8 @@ test_build_daemon_storage_toolbox_deb() {
 }
 
 test_build_test_executive_deb() {
-    safe_build build_test_executive_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_test_executive_deb
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-test-executive" "$CAPTURED_DEB_NAME"
@@ -585,7 +614,8 @@ test_build_test_executive_deb() {
 
 test_build_tx_tools_deb() {
     # Real package containing both tx-tooling binaries.
-    safe_build build_tx_tools_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_tx_tools_deb
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-tx-tools" "$CAPTURED_DEB_NAME"
@@ -608,7 +638,8 @@ test_build_tx_tools_deb() {
 ################################################################################
 
 test_build_functional_test_suite_deb() {
-    safe_build build_functional_test_suite_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_functional_test_suite_deb
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-test-suite" "$CAPTURED_DEB_NAME"
@@ -634,7 +665,8 @@ test_build_functional_test_suite_deb() {
 ################################################################################
 
 test_build_rosetta_mainnet_deb() {
-    safe_build build_rosetta_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_rosetta_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-mainnet" "$CAPTURED_DEB_NAME"
@@ -644,7 +676,8 @@ test_build_rosetta_mainnet_deb() {
 }
 
 test_build_rosetta_devnet_deb() {
-    safe_build build_rosetta_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_rosetta_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-devnet" "$CAPTURED_DEB_NAME"
@@ -658,7 +691,8 @@ test_build_rosetta_devnet_deb() {
 ################################################################################
 
 test_build_daemon_mainnet_config_deb() {
-    safe_build build_daemon_config_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_config_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
@@ -695,7 +729,8 @@ test_build_daemon_mainnet_config_deb() {
 }
 
 test_build_daemon_devnet_config_deb() {
-    safe_build build_daemon_config_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_config_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
@@ -740,7 +775,8 @@ test_config_deb_rejects_missing_ledger_tarball() {
 }
 
 test_build_daemon_mainnet_prefork_deb() {
-    safe_build build_daemon_prefork_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_prefork_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-prefork-mesa" "$CAPTURED_DEB_NAME"
@@ -760,7 +796,8 @@ test_build_daemon_mainnet_prefork_deb() {
 }
 
 test_build_daemon_devnet_prefork_deb() {
-    safe_build build_daemon_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_prefork_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
@@ -779,7 +816,9 @@ test_build_daemon_devnet_prefork_deb() {
 test_build_daemon_devnet_postfork_deb() {
     export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
 
-    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_postfork_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
@@ -816,7 +855,9 @@ test_build_daemon_devnet_postfork_deb() {
 test_build_daemon_mainnet_postfork_deb() {
     export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
 
-    safe_build build_daemon_postfork_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_postfork_deb mainnet
+
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-postfork-mesa" "$CAPTURED_DEB_NAME"
@@ -840,7 +881,9 @@ test_build_daemon_postfork_deb_without_prefork_version() {
     # (config comes from the mina-<network>-config package)
     unset PREFORK_LEGACY_VERSION 2>/dev/null || true
 
-    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_postfork_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
 
@@ -862,7 +905,9 @@ test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
     export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
     unset PREFORK_GITHASH_CONFIG 2>/dev/null || true
 
-    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_postfork_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
 
@@ -887,7 +932,9 @@ test_build_daemon_postfork_deb_prefork_githash_override() {
     export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
     export PREFORK_GITHASH_CONFIG="abadcafe"
 
-    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_postfork_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
 
@@ -921,7 +968,8 @@ test_build_daemon_postfork_deb_prefork_githash_override() {
 ################################################################################
 
 test_build_daemon_devnet_automode_deb() {
-    safe_build build_daemon_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_automode_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
@@ -942,7 +990,8 @@ test_build_daemon_devnet_automode_deb() {
 }
 
 test_build_daemon_mainnet_automode_deb() {
-    safe_build build_daemon_automode_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_automode_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
@@ -966,7 +1015,8 @@ test_build_daemon_mainnet_automode_deb() {
 ################################################################################
 
 test_build_daemon_devnet_generic_deb() {
-    safe_build build_daemon_generic_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_generic_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-generic" "$CAPTURED_DEB_NAME"
@@ -995,7 +1045,8 @@ test_build_daemon_devnet_generic_deb() {
 }
 
 test_build_daemon_mainnet_generic_deb() {
-    safe_build build_daemon_generic_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_generic_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-generic" "$CAPTURED_DEB_NAME"
@@ -1029,7 +1080,8 @@ test_build_daemon_mainnet_generic_deb() {
 # daemon binaries that dispatch the profile at runtime).
 
 test_build_profile_lightnet_deb() {
-    safe_build build_profile_deb lightnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_profile_deb lightnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-lightnet" "$CAPTURED_DEB_NAME"
@@ -1047,7 +1099,8 @@ test_build_profile_lightnet_deb() {
 }
 
 test_build_profile_devnet_deb() {
-    safe_build build_profile_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_profile_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-profile" "$CAPTURED_DEB_NAME"
@@ -1066,7 +1119,8 @@ test_build_profile_devnet_deb() {
 ################################################################################
 
 test_build_archive_devnet_deb() {
-    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-archive-devnet" "$CAPTURED_DEB_NAME"
@@ -1076,7 +1130,8 @@ test_build_archive_devnet_deb() {
 }
 
 test_build_archive_mainnet_deb() {
-    safe_build build_archive_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-archive-mainnet" "$CAPTURED_DEB_NAME"
@@ -1094,7 +1149,9 @@ test_build_daemon_devnet_hardfork_config_deb() {
     export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
     export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
 
-    safe_build build_daemon_hardfork_config_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_hardfork_config_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
@@ -1134,7 +1191,9 @@ test_build_daemon_mainnet_hardfork_config_deb() {
     export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
     export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
 
-    safe_build build_daemon_hardfork_config_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_hardfork_config_deb mainnet
+
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
@@ -1173,13 +1232,15 @@ test_build_daemon_mainnet_hardfork_config_deb() {
 # non-config deb preserves the original architecture for the second package.
 test_config_deb_restores_architecture() {
     # Build config package (sets ARCHITECTURE=all internally)
-    safe_build build_daemon_config_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_config_deb devnet
+    build_succeeded || return
 
     # ARCHITECTURE should be restored to "amd64" after build_daemon_config_deb
     assert_eq "ARCHITECTURE restored after config deb" "amd64" "$ARCHITECTURE"
 
     # Build a non-config package and verify it uses the original architecture
-    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_logproc_deb
+    build_succeeded || return
 
     load_captured_state
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
@@ -1190,13 +1251,15 @@ test_hardfork_config_deb_restores_architecture() {
     export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
 
     # Build hardfork config package (sets ARCHITECTURE=all internally)
-    safe_build build_daemon_hardfork_config_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_hardfork_config_deb devnet
+    build_succeeded || return
 
     # ARCHITECTURE should be restored to "amd64" after build_daemon_hardfork_config_deb
     assert_eq "ARCHITECTURE restored after hardfork config deb" "amd64" "$ARCHITECTURE"
 
     # Build a non-config package and verify it uses the original architecture
-    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_logproc_deb
+    build_succeeded || return
 
     load_captured_state
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
@@ -1209,7 +1272,8 @@ test_hardfork_config_deb_restores_architecture() {
 ################################################################################
 
 test_build_delegation_verify_deb() {
-    safe_build build_delegation_verify_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_delegation_verify_deb
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-delegation-verify" "$CAPTURED_DEB_NAME"
@@ -1221,7 +1285,8 @@ test_build_delegation_verify_deb() {
 }
 
 test_build_prefork_devnet_genesis_ledger_deb() {
-    safe_build build_prefork_genesis_ledger_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb devnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-create-devnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -1232,7 +1297,8 @@ test_build_prefork_devnet_genesis_ledger_deb() {
 }
 
 test_build_prefork_mainnet_genesis_ledger_deb() {
-    safe_build build_prefork_genesis_ledger_deb mainnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb mainnet
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-create-mainnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -1243,7 +1309,8 @@ test_build_prefork_mainnet_genesis_ledger_deb() {
 }
 
 test_build_prefork_testnet_generic_genesis_ledger_deb() {
-    safe_build build_prefork_testnet_generic_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_testnet_generic_genesis_ledger_deb
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-create-testnet-generic-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -1261,7 +1328,9 @@ test_build_daemon_devnet_generic_lightnet_naming() {
     local saved_suffix="${DEB_SUFFIX}"
     DEB_SUFFIX="lightnet"
 
-    safe_build build_daemon_generic_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_generic_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-generic-lightnet" "$CAPTURED_DEB_NAME"
@@ -1277,7 +1346,9 @@ test_build_archive_devnet_suffix_naming() {
     local saved_name="${MINA_ARCHIVE_DEB_NAME}"
     MINA_ARCHIVE_DEB_NAME="mina-archive-devnet-lightnet"
 
-    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb devnet
+
+    build_succeeded || return
 
     load_captured_state
     assert_eq "deb name" "mina-archive-devnet-lightnet" "$CAPTURED_DEB_NAME"
@@ -1306,7 +1377,9 @@ test_codename_noble_deps() {
     DAEMON_DEPS="${NOBLE_DAEMON_DEPS}"
     ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
-    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_logproc_deb
+
+    build_succeeded || return
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
@@ -1322,7 +1395,9 @@ test_codename_noble_archive_deps() {
     local saved_archive="${ARCHIVE_DEPS}"
     ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
-    safe_build build_archive_generic_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_generic_deb
+
+    build_succeeded || return
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
