@@ -2496,6 +2496,8 @@ module Queries = struct
                        available.
                     *)
                     Lazy.force Proof.blockchain_dummy )
+            ; current_protocol_version = Protocol_version.current
+            ; proposed_protocol_version_opt = None
             }
         ; hash
         } )

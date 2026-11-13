@@ -57,6 +57,7 @@
   transaction_snark_work
   unsigned_extended
   precomputed_values
+  protocol_version
   transaction_inclusion_status
   graphql_lib
   block_time
