@@ -9,7 +9,10 @@ set -euo pipefail
 #
 # This test suite:
 # - Creates a temporary directory with mock source files (executables, configs)
-# - Mocks external tools (git, fakeroot, dpkg-deb)
+# - Mocks external tools (git, and deb-toolkit with mock-deb-toolkit.sh)
+#   The tests check the files and control fields that builder-helpers.sh
+#   gives to deb-toolkit, not the package that deb-toolkit builds. Thus they
+#   need no deb-toolkit, fakeroot or dpkg-deb.
 # - Sources builder-helpers.sh in the mocked environment
 # - Runs each test in a subshell (to survive exit 1 from build functions)
 # - Verifies each build_*_deb function produces correct package layout
@@ -488,6 +491,7 @@ SVCEOF
     # SCRIPTPATH is exported so builder-helpers.sh uses our real scripts dir.
     #---------------------------------------------------------------------------
     export SCRIPTPATH="${REAL_SCRIPTS_DIR}"
+    export DEB_TOOLKIT="${TEST_SCRIPT_DIR}/mock-deb-toolkit.sh"
     source "${REAL_SCRIPTS_DIR}/builder-helpers.sh"
 
     # Store expected values set by export-git-env-vars.sh via our mock git
@@ -1335,6 +1339,51 @@ test_control_file_common_fields() {
 }
 
 ################################################################################
+# Tests: build_deb stops when the package build fails
+################################################################################
+
+# build.sh calls the build functions as "_build_one ... || exit 1". In such a
+# list bash ignores "set -e", so build_deb must stop by itself. The build runs
+# here in the same type of list, without "set -e".
+build_without_errexit() {
+    local rc=0
+    ( set +e; "$@"; echo "build continued after the failure" >&2; exit 0 ) || rc=$?
+    return $rc
+}
+
+test_build_deb_fails_when_deb_toolkit_fails() {
+    rm -rf "${BUILDDIR}"
+    MOCK_DEB_TOOLKIT_FAIL=1 build_without_errexit build_logproc_deb
+}
+
+test_build_deb_fails_when_deb_toolkit_is_missing() {
+    rm -rf "${BUILDDIR}"
+    DEB_TOOLKIT="${TEST_TMPDIR}/no-such-deb-toolkit" build_without_errexit build_logproc_deb
+}
+
+# A build function, like build_daemon_config_deb, that runs more commands after
+# build_deb must also stop.
+test_build_deb_failure_is_not_lost_by_caller() {
+    rm -rf "${BUILDDIR}"
+    MOCK_DEB_TOOLKIT_FAIL=1 build_without_errexit build_daemon_config_deb devnet
+}
+
+test_build_deb_fails_without_control_fields() {
+    rm -rf "${BUILDDIR}"
+    mkdir -p "${BUILDDIR}"
+    # shellcheck disable=SC2034 # build_deb (builder-helpers.sh) reads it
+    DEB_CONTROL_ARGS=()
+    build_without_errexit build_deb mina-logproc
+}
+
+# deb-toolkit names the file after the package name of create_control_file.
+test_build_deb_fails_on_package_name_mismatch() {
+    rm -rf "${BUILDDIR}"
+    build_without_errexit eval \
+        'create_control_file mina-logproc "" "test"; build_deb mina-other'
+}
+
+################################################################################
 # Main
 ################################################################################
 
@@ -1417,6 +1466,13 @@ main() {
 
     # Control file structure
     run_test test_control_file_common_fields
+
+    # Failures of the package build
+    run_test_expect_fail test_build_deb_fails_when_deb_toolkit_fails
+    run_test_expect_fail test_build_deb_fails_when_deb_toolkit_is_missing
+    run_test_expect_fail test_build_deb_failure_is_not_lost_by_caller
+    run_test_expect_fail test_build_deb_fails_without_control_fields
+    run_test_expect_fail test_build_deb_fails_on_package_name_mismatch
 
     # Cleanup
     teardown_test_environment
