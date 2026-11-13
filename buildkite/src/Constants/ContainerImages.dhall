@@ -38,7 +38,7 @@
 , minaToolchainBookworm =
     { amd64 = "docker.io/minaprotocol/mina-toolchain:5778e28-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:5778e28-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:8d99a24-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
     "docker.io/minaprotocol/mina-toolchain:5778e28-bullseye-devnet"
