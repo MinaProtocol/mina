@@ -4976,6 +4976,171 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 (** See genesis_accounts.ml. *)
 module Genesis_accounts = Genesis_accounts
 
+(* [precomputed_values_of_config] builds the precomputed values of the
+   runtime config. Both genesis writers use it. *)
+let precomputed_values_of_config ~logger ~(runtime_config : Runtime_config.t)
+    ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+  let (module G) = Genesis_constants.profiled () in
+  match%map
+    Genesis_ledger_helper.init_from_config_file ~logger
+      ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+      runtime_config ~cli_proof_level:None
+  with
+  | Ok precomputed_values ->
+      precomputed_values
+  | Error err ->
+      failwithf "Could not get precomputed values, error: %s"
+        (Error.to_string_hum err) ()
+
+(* [genesis_height_of] is the blockchain length of the genesis block, the
+   height that genesis_accounts rows are keyed by. *)
+let genesis_height_of ~precomputed_values =
+  let With_hash.{ data = block; _ }, _ =
+    Mina_block.genesis ~precomputed_values
+  in
+  Mina_block.blockchain_length block
+  |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int64
+
+(* The genesis block of [precomputed_values]. *)
+let genesis_block_of ~precomputed_values =
+  fst (Mina_block.genesis ~precomputed_values)
+
+(* [check_genesis_ledger_hash] stops the archive when the archived genesis
+   block [block] does not carry the ledger hash of the config's genesis
+   ledger. *)
+let check_genesis_ledger_hash ~config_file_values (block : Block.t) =
+  let expected =
+    Precomputed_values.genesis_ledger config_file_values
+    |> Lazy.force |> Mina_ledger.Ledger.merkle_root
+  in
+  if
+    not
+      (Ledger_hash.equal expected
+         (Ledger_hash.of_base58_check_exn block.ledger_hash) )
+  then
+    failwithf
+      "The archived genesis block %s has ledger hash %s, the genesis ledger of \
+       --config-file has %s"
+      block.state_hash block.ledger_hash
+      (Ledger_hash.to_base58_check expected)
+      ()
+
+(* [check_genesis_canonical] stops the archive when the archived genesis
+   block [block] is not canonical, which the archive never stores. *)
+let check_genesis_canonical (block : Block.t) =
+  match Chain_status.of_string block.chain_status with
+  | Canonical ->
+      ()
+  | (Orphaned | Pending) as status ->
+      failwithf
+        "The archived genesis block %s is %s, not canonical: the archive \
+         stores a genesis block as canonical, so the database was changed by \
+         hand or by an import; fix it before starting"
+        block.state_hash
+        (Chain_status.to_string status)
+        ()
+
+(* [add_genesis_block] makes sure the genesis block of --config-file
+   ([config_file_values]) is in the archive, as the daemon would store it:
+   canonical, with the config's genesis ledger hash. It inserts the block
+   when it is missing, and stops the archive when the database holds
+   something else: another genesis block at that height, a different ledger
+   hash, this one not canonical. Returns the block's id. *)
+let add_genesis_block ~logger ~config_file_values pool =
+  let genesis_block = genesis_block_of ~precomputed_values:config_file_values in
+  let state_hash =
+    State_hash.With_state_hashes.state_hash genesis_block
+    |> State_hash.to_base58_check
+  in
+  let genesis_height =
+    genesis_height_of ~precomputed_values:config_file_values
+  in
+  let metadata =
+    [ ("state_hash", `String state_hash)
+    ; ("height", `String (Int64.to_string genesis_height))
+    ]
+  in
+  let store (module Conn : CONNECTION) =
+    let open Deferred.Result.Let_syntax in
+    match%bind
+      Genesis_block_sql.other_geneses (module Conn) ~genesis_height ~state_hash
+    with
+    | _ :: _ as others ->
+        return (`Other_geneses others)
+    | [] ->
+        let%bind id =
+          Block.add_if_doesn't_exist
+            (module Conn)
+            ~logger
+            ~constraint_constants:config_file_values.constraint_constants
+            genesis_block ~accounts_accessed:[] ~accounts_created:[]
+        in
+        let%map block = Block.load (module Conn) ~id in
+        `Stored (id, block)
+  in
+  match%map Pool.use store pool with
+  | Error e ->
+      failwithf "Could not store the genesis block %s: %s" state_hash
+        (Caqti_error.show e) ()
+  | Ok (`Other_geneses others) ->
+      failwithf
+        "The archive has another genesis block at height %Ld (%s), not %s: \
+         --config-file is not the config of this archive's chain"
+        genesis_height
+        (String.concat ~sep:", " others)
+        state_hash ()
+  | Ok (`Stored (id, block)) ->
+      check_genesis_ledger_hash ~config_file_values block ;
+      check_genesis_canonical block ;
+      [%log info] "The genesis block is in the archive" ~metadata ;
+      id
+
+(* [add_genesis_ledger] is called when starting the archive process with
+   --config-file. It writes the genesis ledger to genesis_accounts, at the
+   height of the genesis block, instead of to accounts_accessed; a write that
+   was interrupted is resumed. The genesis block must be stored first
+   ({!add_genesis_block}). *)
+let add_genesis_ledger ~logger ~config_file_values ~chunks_length pool =
+  let genesis_height =
+    genesis_height_of ~precomputed_values:config_file_values
+  in
+  let%bind accounts =
+    Precomputed_values.genesis_ledger config_file_values
+    |> Lazy.force |> Mina_ledger.Ledger.to_list
+  in
+  let metadata = [ ("height", `String (Int64.to_string genesis_height)) ] in
+  match%bind
+    Pool.use
+      (fun (module Conn : CONNECTION) ->
+        Genesis_accounts.add ~chunk_size:chunks_length
+          (module Conn)
+          ~genesis_height accounts )
+      pool
+  with
+  | Error e ->
+      failwithf "Could not write genesis accounts: %s" (Caqti_error.show e) ()
+  | Ok `No_table ->
+      failwith
+        "The archive database has no genesis_accounts table; run upgrade.sql, \
+         or pass --legacy-genesis-accounts to write accounts_accessed"
+  | Ok `Already_loaded ->
+      [%log info] "The genesis ledger at height $height is already written"
+        ~metadata ;
+      Deferred.unit
+  | Ok (`Mismatch mismatch) ->
+      let msg = Genesis_accounts.mismatch_message ~genesis_height mismatch in
+      [%log fatal] "$error" ~metadata:(("error", `String msg) :: metadata) ;
+      failwith msg
+  | Ok (`Added (count, resumed_after)) ->
+      [%log info]
+        "Wrote $count genesis ledger accounts at height $height, after \
+         $resumed_after written before"
+        ~metadata:
+          ( metadata
+          @ [ ("count", `Int count); ("resumed_after", `Int resumed_after) ] ) ;
+      Deferred.unit
+
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
@@ -4984,18 +5149,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
-        match%map
-          Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
-            runtime_config ~cli_proof_level:None
-        with
-        | Ok precomputed_values ->
-            precomputed_values
-        | Error err ->
-            failwithf "Could not get precomputed values, error: %s"
-              (Error.to_string_hum err) ()
+        precomputed_values_of_config ~logger ~runtime_config ~genesis_constants
+          ~constraint_constants
       in
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
@@ -5110,6 +5266,35 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       | Ok () ->
           () )
 
+(* [add_genesis_ledger_accounts] writes the accounts of the genesis ledger of
+   --config-file: to genesis_accounts, or with [legacy_genesis_accounts] to
+   accounts_accessed, as archives before 5.0.0 did. *)
+let add_genesis_ledger_accounts ~logger ~genesis_constants ~constraint_constants
+    ~chunks_length ~runtime_config ~config_file_values ~legacy_genesis_accounts
+    pool =
+  if legacy_genesis_accounts then
+    add_genesis_accounts ~logger ~runtime_config_opt:(Some runtime_config)
+      ~genesis_constants ~chunks_length ~constraint_constants pool
+  else add_genesis_ledger ~logger ~config_file_values ~chunks_length pool
+
+(* [genesis_at_startup] is what the archive does with --config-file before it
+   takes blocks: store the config's genesis block, then write its genesis
+   ledger's accounts. [config_file] is the runtime config and its precomputed
+   values. *)
+let genesis_at_startup ~logger ~genesis_constants ~constraint_constants
+    ~chunks_length ~config_file ~legacy_genesis_accounts pool =
+  match config_file with
+  | None ->
+      if legacy_genesis_accounts then
+        [%log warn]
+          "--legacy-genesis-accounts has no effect without --config-file" ;
+      Deferred.unit
+  | Some (runtime_config, config_file_values) ->
+      let%bind (_ : int) = add_genesis_block ~logger ~config_file_values pool in
+      add_genesis_ledger_accounts ~logger ~genesis_constants
+        ~constraint_constants ~chunks_length ~runtime_config ~config_file_values
+        ~legacy_genesis_accounts pool
+
 (* The metrics server is created before the RPC handlers are installed, rather
    than alongside the polling loop that fills the gauges, because the handlers
    record into the same registry. A consequence is that the metrics endpoint
@@ -5152,7 +5337,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~legacy_genesis_accounts =
   let%bind metric_server = create_metrics_server ~logger ~metrics_server_port in
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
@@ -5215,9 +5400,20 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      let%bind config_file =
+        match runtime_config_opt with
+        | None ->
+            return None
+        | Some runtime_config ->
+            let%map config_file_values =
+              precomputed_values_of_config ~logger ~runtime_config
+                ~genesis_constants ~constraint_constants
+            in
+            Some (runtime_config, config_file_values)
+      in
       let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt ~chunks_length
+        genesis_at_startup ~logger ~genesis_constants ~constraint_constants
+          ~chunks_length ~config_file ~legacy_genesis_accounts pool
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than

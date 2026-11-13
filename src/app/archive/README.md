@@ -119,17 +119,41 @@ $ archive run \
     --server-port <PORT> \
     [--metrics-port <PORT>] \
     [--missing-blocks-width <INT>] \
-    [--delete-older-than <INT>]
+    [--delete-older-than <INT>] \
+    [--legacy-genesis-accounts]
 ```
 
 Parameters:
-- `--config-file`: Path to the configuration file containing the genesis ledger
+- `--config-file`: Path to the configuration file containing the genesis ledger.
+  See "Genesis at startup" below.
 - `--postgres-uri`: PostgreSQL connection URI
 - `--server-port`: Port for the archive server (default: 3086)
 - `--metrics-port`: Optional port for Prometheus metrics server
 - `--missing-blocks-width`: Optional width of block heights to report missing blocks
 - `--delete-older-than`: Optional parameter to delete blocks older than N blocks
   from the maximum height
+- `--legacy-genesis-accounts`: Write the genesis ledger to `accounts_accessed`,
+  as archives before 5.0.0 did, instead of to `genesis_accounts`
+
+#### Genesis at startup
+
+With `--config-file`, before it takes any block the archive:
+
+1. Stores the config's genesis block, as the daemon would: canonical, with the
+   config's genesis ledger hash. A block already there is checked instead. The
+   archive stops when the database holds something else: another genesis
+   block at that height, a different ledger hash, or the genesis block not
+   canonical.
+2. Writes the genesis ledger to `genesis_accounts`, keyed by the genesis
+   height. A write that was interrupted is resumed. When the rows already at
+   that height are another ledger (an older config, another network), the
+   archive stops and overwrites nothing; the message says how to remove them.
+   A database without the table stops the archive too. The table is in
+   `create_schema.sql` and `upgrade.sql` from 4.0.4 on (compatible and master
+   included), so only an archive created before 4.0.4 that never ran
+   `upgrade.sql` lacks it.
+   With `--legacy-genesis-accounts` the ledger goes to `accounts_accessed` of
+   the genesis block instead, which needs no upgrade.
 
 ### Prune
 
