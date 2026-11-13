@@ -148,7 +148,10 @@ With `--config-file`, before it takes any block the archive:
    height. A write that was interrupted is resumed. When the rows already at
    that height are another ledger (an older config, another network), the
    archive stops and overwrites nothing; the message says how to remove them.
-   A database without the table (`upgrade.sql` not run) stops the archive too.
+   A database without the table stops the archive too. The table is in
+   `create_schema.sql` and `upgrade.sql` from 4.0.4 on (compatible and master
+   included), so only an archive created before 4.0.4 that never ran
+   `upgrade.sql` lacks it.
    With `--legacy-genesis-accounts` the ledger goes to `accounts_accessed` of
    the genesis block instead, which needs no upgrade.
 

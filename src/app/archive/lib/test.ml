@@ -631,8 +631,9 @@ let%test_module "Archive node unit tests" =
       (* The bug: the fork genesis block has no accounts_accessed rows. *)
       [%test_result: int] ~expect:0 before ;
       let%bind () =
-        Processor.add_genesis_accounts ~logger ~precomputed_values
-          ~chunks_length:100 pool
+        Processor.add_genesis_accounts ~logger
+          ~runtime_config_opt:(Some runtime_config) ~genesis_constants
+          ~chunks_length:100 ~constraint_constants pool
       in
       let%map after = count_accounts_accessed genesis_block_id in
       (* The fix: every fork genesis ledger account is now attached to the
@@ -714,11 +715,12 @@ let%test_module "Archive node unit tests" =
       in
       let start () =
         let%bind genesis_id =
-          Processor.add_genesis_block ~logger ~precomputed_values pool
+          Processor.add_genesis_block ~logger
+            ~config_file_values:precomputed_values pool
         in
         let%map () =
-          Processor.add_genesis_ledger ~logger ~precomputed_values
-            ~chunks_length:2 pool
+          Processor.add_genesis_ledger ~logger
+            ~config_file_values:precomputed_values ~chunks_length:2 pool
         in
         genesis_id
       in
