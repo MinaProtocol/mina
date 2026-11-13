@@ -127,8 +127,14 @@ archive_hardfork_toolbox validate-fork \
 Settles the hard fork boundary of the newest fork genesis in the archive. The chain
 leading to the fork block becomes `canonical`, and the rest of the ended chain is
 `orphaned`. It runs the same core as the archive node: `Archive_lib.Settle_pending_blocks`.
-This is the post-fork repair step for the pre-fork tail, which would otherwise stay
-`pending`.
+This is the on-demand repair of the pre-fork tail, which would otherwise stay
+`pending`: when the archive did not settle it at startup
+(`--settle-prefork-pending-blocks`, see the archive README), or after pre-fork blocks
+were backfilled. Running it again is safe: a settled boundary is left as it is.
+
+It refuses, and changes nothing, when the fork genesis is not `canonical` (the
+archive always stores it so). It also fails when the fork block or a canonical block
+below it is not in the archive: backfill them and run it again.
 
 **Usage:**
 ```bash

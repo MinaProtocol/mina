@@ -9,7 +9,8 @@
 
     A fork genesis is the first block of the new chain: global slot since hard
     fork 0, above the first genesis (global slot since genesis above 0). It is
-    inserted as canonical. Its parent is the fork block. The chain is read
+    inserted as canonical; one that is not is refused, nothing is changed
+    ({!Fork_genesis_not_canonical}). Its parent is the fork block. The chain is read
     through parent links only, so a fork that keeps the protocol version is
     handled like any other. *)
 
@@ -26,22 +27,36 @@ type boundary =
   | No_canonical_ancestor
       (** The fork block's ancestry reaches no canonical block, so the
           boundary is left as it is. *)
+  | Fork_genesis_not_canonical
+      (** The fork genesis is not canonical, which the archive never stores:
+          the database is not what a settle builds on, so nothing changes. *)
 [@@deriving yojson, sexp, equal]
 
 (** Settle the boundary of the fork that [genesis_id] starts. One statement;
     the caller decides the transaction. *)
 let settle_fork (module Conn : Mina_caqti.CONNECTION) ~genesis_id =
   let open Deferred.Result.Let_syntax in
-  match%bind Conn.find_opt Settle_pending_blocks_sql.fork_block genesis_id with
-  | None ->
+  match%bind
+    Conn.find_opt Settle_pending_blocks_sql.fork_genesis genesis_id
+  with
+  | None | Some (true, None) ->
       return No_fork_block
-  | Some fork_block_id ->
+  | Some (false, _) ->
+      return Fork_genesis_not_canonical
+  | Some (true, Some fork_block_id) ->
       let%map canonicalized, orphaned, anchored =
         Conn.find Settle_pending_blocks_sql.settle_fork
           (genesis_id, fork_block_id)
       in
       if anchored then Settled { canonicalized; orphaned }
       else No_canonical_ancestor
+
+(** The fork geneses whose fork block has [fork_state_hash]: the genesis of
+    the config that names that fork block. *)
+let fork_geneses_of_fork_block (module Conn : Mina_caqti.CONNECTION)
+    ~fork_state_hash =
+  Conn.collect_list Settle_pending_blocks_sql.fork_geneses_of_fork_block
+    fork_state_hash
 
 (** The outcome of {!run}. *)
 type t =
@@ -80,14 +95,3 @@ let run ?(dry_run = false) ?genesis_id (module Conn : Mina_caqti.CONNECTION) =
   | Ok t ->
       let%map () = if dry_run then Conn.rollback () else Conn.commit () in
       t
-
-(** For the daemon stream, after it stored a fork genesis: settle the newest
-    fork genesis, in its own transaction. The caller calls this only for a
-    block that starts a hard fork. *)
-let settle_stored_fork_genesis ~logger pool =
-  Mina_caqti.Pool.use
-    (fun (module Conn : Mina_caqti.CONNECTION) -> run (module Conn))
-    pool
-  |> Deferred.Result.map ~f:(fun result ->
-         [%log info] "Settled the hard fork boundary"
-           ~metadata:[ ("result", to_yojson result) ] )

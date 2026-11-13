@@ -305,20 +305,37 @@ let fetch_last_filled_block ~postgres_uri ?latest_state_hash () =
   Out_channel.newline Out_channel.stdout
 
 (* Settle the hard fork boundary of the newest fork genesis, with the same core
-   the archive node runs at startup: Archive_lib.Settle_pending_blocks. [dry_run]
-   rolls the change back and prints what it would change. *)
-let convert_chain_to_canonical ~postgres_uri ~dry_run () =
-  let pool = connect postgres_uri in
-  match%map
-    Mina_caqti.Pool.use
-      (fun (module Conn : Mina_caqti.CONNECTION) ->
-        Archive_lib.Settle_pending_blocks.run ~dry_run (module Conn) )
-      pool
-  with
-  | Ok result ->
-      Yojson.Safe.to_channel Out_channel.stdout
-        (Archive_lib.Settle_pending_blocks.to_yojson result) ;
-      Out_channel.newline Out_channel.stdout ;
-      Ok ()
+   the archive node runs: Archive_lib.Settle_pending_blocks. [dry_run] rolls the
+   change back; the result is what a run changes. *)
+let settle_boundary ~postgres_uri ~dry_run =
+  match%bind Mina_caqti.connect postgres_uri with
   | Error e ->
-      Or_error.error_string (Caqti_error.show e)
+      Deferred.Or_error.error_string (Caqti_error.show e)
+  | Ok (module Conn : Mina_caqti.CONNECTION) ->
+      Monitor.protect ~finally:Conn.disconnect (fun () ->
+          Archive_lib.Settle_pending_blocks.run ~dry_run (module Conn)
+          >>| Result.map_error ~f:(fun e ->
+                  Error.of_string (Caqti_error.show e) ) )
+
+(* [settle_boundary], printing its result as JSON. A boundary that could not
+   be settled is an error, so a script sees it. *)
+let convert_chain_to_canonical ~postgres_uri ~dry_run () =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind result = settle_boundary ~postgres_uri ~dry_run in
+  Yojson.Safe.to_channel Out_channel.stdout
+    (Archive_lib.Settle_pending_blocks.to_yojson result) ;
+  Out_channel.newline Out_channel.stdout ;
+  match result.boundary with
+  | None | Some (Settled _) ->
+      return ()
+  | Some No_fork_block ->
+      Deferred.Or_error.error_string
+        "The fork block is not in the archive: backfill it, then run again"
+  | Some No_canonical_ancestor ->
+      Deferred.Or_error.error_string
+        "No canonical block below the fork block: backfill the missing blocks, \
+         then run again"
+  | Some Fork_genesis_not_canonical ->
+      Deferred.Or_error.error_string
+        "The fork genesis is not canonical, which the archive never stores: \
+         nothing was changed"

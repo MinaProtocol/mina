@@ -11,15 +11,25 @@ let newest_fork_genesis =
           LIMIT 1
     |sql}
 
-(* $1: a fork genesis. The parent link, or, when it is not set yet, the block
-   whose state hash is the genesis's parent hash. *)
-let fork_block =
-  (Caqti_type.int ->? Caqti_type.int)
-    {sql| SELECT COALESCE(g.parent_id, p.id)
+(* $1: a fork block's state hash. The fork geneses whose parent it is: one
+   unless the archive holds the geneses of several configs. *)
+let fork_geneses_of_fork_block =
+  (Caqti_type.string ->* Caqti_type.int)
+    {sql| SELECT id FROM blocks
+          WHERE parent_hash = $1
+            AND global_slot_since_hard_fork = 0
+          ORDER BY id
+    |sql}
+
+(* $1: a fork genesis. Whether it is canonical, and its fork block: the parent
+   link, or, when it is not set yet, the block whose state hash is the
+   genesis's parent hash. No row when $1 is not a block. *)
+let fork_genesis =
+  (Caqti_type.int ->? Caqti_type.(t2 bool (option int)))
+    {sql| SELECT g.chain_status = 'canonical', COALESCE(g.parent_id, p.id)
           FROM blocks g
           LEFT JOIN blocks p ON p.state_hash = g.parent_hash
           WHERE g.id = $1
-            AND COALESCE(g.parent_id, p.id) IS NOT NULL
     |sql}
 
 (* $1: the fork genesis, $2: the fork block. [walk] climbs from the fork block
