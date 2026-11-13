@@ -126,6 +126,8 @@ MOCKGIT
 
   # ---------- Env vars required by builder-helpers.sh / build.sh ----------
   export SCRIPTPATH="${REAL_SCRIPTS_DIR}"
+  # The tests check build.sh, not the package build (see mock-deb-toolkit.sh).
+  export DEB_TOOLKIT="${TEST_SCRIPT_DIR}/mock-deb-toolkit.sh"
   export MINA_DEB_CODENAME="bullseye"
   export DUNE_PROFILE="devnet"
   export BRANCH_NAME="test-branch"
@@ -488,7 +490,8 @@ EXE
   mkdir -p "$worker_dir"
   export BUILDDIR="$worker_dir"
 
-  if build_logproc_deb; then
+  # build_deb stops with "exit 1", so it runs in a subshell here.
+  if (build_logproc_deb); then
     echo "FAIL: build_logproc_deb should have failed (pre-existing .deb)" >&2
     rm -f "$fake_deb" 2>/dev/null || true
     exit 1

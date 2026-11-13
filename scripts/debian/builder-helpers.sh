@@ -182,6 +182,22 @@ create_control_file() {
   fi
 }
 
+# Stops the package build with an error.
+#
+# It uses "exit", not "return". build.sh calls the build functions as
+# "_build_one ... || exit 1", and bash ignores "set -e" in a command of such a
+# list. Some build functions also run more commands after build_deb (for
+# example, they restore ARCHITECTURE), so a "return 1" from build_deb can be
+# lost. "exit" stops build.sh (serial build) or the worker subshell (parallel
+# build) in all cases.
+#   $1 - error message
+fail_build_deb() {
+  echo "ERROR: $1" >&2
+  rm -rf "${BUILDDIR}"
+  DEB_CONTROL_ARGS=()
+  exit 1
+}
+
 # Function to ease package build
 build_deb() {
   local package_name="$1"
@@ -192,14 +208,17 @@ build_deb() {
   # in normal use.  If it does, it is a bug in the upstream duplicate-
   # detection logic or this invocation has stale output from a previous run.
   if [[ -z "${BUILD_DEB_CAPTURE_DIR:-}" ]] && [[ -f "$deb_file" ]]; then
-    echo "ERROR: ${deb_file} already exists." >&2
-    echo "       build.sh validates that every requested token produces a unique" >&2
-    echo "       .deb output.  If you see this error:" >&2
-    echo "        - two tokens mapped to the same .deb (duplicate-output bug), or" >&2
-    echo "        - stale .deb files from a previous run are present." >&2
-    echo "       Clean _build/*.deb and retry." >&2
-    rm -rf "${BUILDDIR}"
-    return 1
+    echo "build.sh validates that every requested token produces a unique" >&2
+    echo ".deb output.  If you see the error below:" >&2
+    echo " - two tokens mapped to the same .deb (duplicate-output bug), or" >&2
+    echo " - stale .deb files from a previous run are present." >&2
+    fail_build_deb "${deb_file} already exists. Clean _build/*.deb and retry."
+  fi
+
+  # create_control_file sets the control fields. Without them, the package
+  # would get no fields, or the fields of the package built before it.
+  if [[ ${#DEB_CONTROL_ARGS[@]} -eq 0 ]]; then
+    fail_build_deb "build_deb ${package_name}: no control fields. Call create_control_file first."
   fi
 
   echo "Building ${deb_file}"
@@ -222,10 +241,19 @@ build_deb() {
   # gzip, not the zstd default of newer distributions (e.g. Noble), because
   # the Docker image builds examine them on buildkite agents where zstd might
   # not be available.
-  "${DEB_TOOLKIT}" build \
+  if ! "${DEB_TOOLKIT}" build \
     --build-dir "${BUILDDIR}" \
     --output-dir "${output_dir}" \
-    "${DEB_CONTROL_ARGS[@]}"
+    "${DEB_CONTROL_ARGS[@]}"; then
+    fail_build_deb "'${DEB_TOOLKIT} build' failed for ${deb_file}. deb-toolkit comes from PATH (the toolchain image has it) or from \$DEB_TOOLKIT."
+  fi
+  DEB_CONTROL_ARGS=()
+
+  # deb-toolkit names the file after the --package-name of create_control_file.
+  # If that name is not the name given to build_deb, the file is not here.
+  if [[ ! -f "${output_dir}/${deb_file}" ]]; then
+    fail_build_deb "deb-toolkit did not write ${output_dir}/${deb_file}. The package name in create_control_file and build_deb must be the same."
+  fi
 
   echo "Control File:"
   cat "${BUILDDIR}/DEBIAN/control"
@@ -242,7 +270,7 @@ build_deb() {
   fi
 
   echo "build_deb outputs:"
-  ls -lh "${package_name}"_*.deb
+  ls -lh "${deb_file}"
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 }
