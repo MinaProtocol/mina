@@ -130,6 +130,13 @@ let insert_chunk (module Conn : Mina_caqti.CONNECTION) ~genesis_height rows =
 
 let default_chunk_size = 5_000
 
+(** A row's account: its public key and token. *)
+module Account_key = struct
+  type t = string * string [@@deriving compare, hash, sexp]
+end
+
+let key row = (row.public_key, row.token)
+
 (** Rows at a height that are not [accounts]: [differing] rows hold another
     state for an account of the ledger, [not_in_ledger] rows are accounts the
     ledger does not have. Such a height was written from another ledger (an
@@ -155,15 +162,17 @@ let add ?(chunk_size = default_chunk_size) (module Conn : Mina_caqti.CONNECTION)
   | false ->
       return `No_table
   | true -> (
-      let key row = row.public_key ^ "\000" ^ row.token in
       let rows =
         List.map accounts ~f:row_of_account
-        |> List.sort ~compare:(fun a b ->
-               [%compare: string * string] (a.public_key, a.token)
-                 (b.public_key, b.token) )
+        |> List.sort ~compare:(fun a b -> Account_key.compare (key a) (key b))
       in
+      (* one lookup per written row, in a table of the ledger's rows: the
+         ledger is in memory already, so this costs little next to loading
+         it *)
       let ledger =
-        String.Map.of_alist_exn (List.map rows ~f:(fun r -> (key r, r)))
+        Hashtbl.of_alist_exn
+          (module Account_key)
+          (List.map rows ~f:(fun row -> (key row, row)))
       in
       let%bind written =
         Sql.rows_at (module Conn) ~genesis_height >>| List.map ~f:row_of_tuple
@@ -171,7 +180,7 @@ let add ?(chunk_size = default_chunk_size) (module Conn : Mina_caqti.CONNECTION)
       let mismatch =
         List.fold written ~init:{ differing = 0; not_in_ledger = 0 }
           ~f:(fun acc row ->
-            match Map.find ledger (key row) with
+            match Hashtbl.find ledger (key row) with
             | None ->
                 { acc with not_in_ledger = acc.not_in_ledger + 1 }
             | Some expected when equal_row expected row ->
@@ -182,9 +191,11 @@ let add ?(chunk_size = default_chunk_size) (module Conn : Mina_caqti.CONNECTION)
       if mismatch.differing > 0 || mismatch.not_in_ledger > 0 then
         return (`Mismatch mismatch)
       else
-        let present = String.Set.of_list (List.map written ~f:key) in
+        let present =
+          Hash_set.of_list (module Account_key) (List.map written ~f:key)
+        in
         let missing =
-          List.filter rows ~f:(fun row -> not (Set.mem present (key row)))
+          List.filter rows ~f:(fun row -> not (Hash_set.mem present (key row)))
         in
         match missing with
         | [] ->

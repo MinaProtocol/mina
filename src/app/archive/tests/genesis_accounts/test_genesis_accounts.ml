@@ -278,18 +278,21 @@ let config_of ?fork accounts =
 
 let config ~tag ?fork s = config_of ?fork (ledger ~tag s)
 
-(* The precomputed values of [runtime_config], loaded once per config: the
-   ledger cache they open can be opened once per process. *)
+(* --config-file as the archive loads it: the runtime config and its
+   precomputed values, loaded once per config: the ledger cache they open can
+   be opened once per process. *)
 let load runtime_config =
   let precomputed = Lazy.force Precomputed_values.for_unit_tests in
   Archive_lib.Processor.precomputed_values_of_config ~logger:(Logger.null ())
     ~runtime_config ~genesis_constants:precomputed.genesis_constants
     ~constraint_constants:precomputed.constraint_constants
+  >>| (fun values -> (runtime_config, values))
   |> Deferred.ok
 
-(* The archive's startup on [db] with a config's [precomputed_values]:
-   [Error] carries the message it stopped with. *)
-let startup ?(legacy = false) (db : B.Db.t) precomputed_values =
+(* The archive's startup on [db] with [config_file] (see [load]): [Error]
+   carries the message it stopped with. *)
+let startup ?(legacy = false) (db : B.Db.t) config_file =
+  let precomputed = Lazy.force Precomputed_values.for_unit_tests in
   match Mina_caqti.connect_pool db.uri with
   | Error e ->
       Deferred.Or_error.error_string (Caqti_error.show e)
@@ -300,8 +303,9 @@ let startup ?(legacy = false) (db : B.Db.t) precomputed_values =
         (fun () ->
           Monitor.try_with ~extract_exn:true (fun () ->
               Archive_lib.Processor.genesis_at_startup ~logger:(Logger.null ())
-                ~chunks_length:2
-                ~precomputed_values_opt:(Some precomputed_values)
+                ~genesis_constants:precomputed.genesis_constants
+                ~constraint_constants:precomputed.constraint_constants
+                ~chunks_length:2 ~config_file:(Some config_file)
                 ~legacy_genesis_accounts:legacy pool )
           >>| Result.map_error ~f:Exn.to_string
           |> Deferred.ok )
@@ -436,7 +440,7 @@ let startup_refuses_another_genesis server_uri () =
       let%bind built = B.materialize s db in
       let%bind config = load runtime_config in
       let%bind result = startup db config in
-      expect_failure "another genesis block" ~mentioning:"different genesis"
+      expect_failure "another genesis block" ~mentioning:"another genesis block"
         result ;
       let%bind rows = genesis_rows db ~height:4 in
       Alcotest.(check int) "no genesis_accounts rows" 0 rows ;
@@ -573,7 +577,7 @@ let startup_two_forks server_uri () =
       let%bind pa = load config_a in
       let%bind pb = load config_b in
       let genesis_a_hash =
-        Archive_lib.Processor.genesis_block_of ~precomputed_values:pa
+        Archive_lib.Processor.genesis_block_of ~precomputed_values:(snd pa)
         |> Mina_base.State_hash.With_state_hashes.state_hash
         |> Mina_base.State_hash.to_base58_check
       in
