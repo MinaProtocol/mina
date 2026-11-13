@@ -168,8 +168,7 @@ let generateStep =
               -- Only Daemon/Rosetta ("*-config" images) need an arch marker
               -- baked into the custom suffix build-arg on top of --platform;
               -- --platform alone already derives -arm64 for everyone else
-              -- (scripts/docker/helper.sh get_platform_suffix), which is the
-              -- only arch suffix manager.sh verify's tag ever expects.
+              -- (scripts/docker/helper.sh get_platform_suffix).
                 merge
                   { Base = ""
                   , DaemonGeneric = ""
