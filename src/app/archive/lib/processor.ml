@@ -4905,159 +4905,112 @@ let add_genesis_ledger ~logger ~config_file_values ~chunks_length pool =
           @ [ ("count", `Int count); ("resumed_after", `Int resumed_after) ] ) ;
       Deferred.unit
 
-(* [add_genesis_accounts] is called when starting the archive process *)
-let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t) ~chunks_length
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
-  match runtime_config_opt with
-  | None ->
-      Deferred.unit
-  | Some runtime_config -> (
-      let%bind precomputed_values =
-        precomputed_values_of_config ~logger ~runtime_config ~genesis_constants
-          ~constraint_constants
-      in
-      let ledger =
-        Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
-      in
-      let%bind account_ids =
-        let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
-        Account_id.Set.to_list account_id_set
-      in
-      let genesis_block =
-        let With_hash.{ data = block; hash = the_hash }, _ =
-          Mina_block.genesis ~precomputed_values
-        in
-        With_hash.{ data = block; hash = the_hash }
-      in
-      (* NOTE: it's fine for accounts_accessed to be added non-atomically.
-         Since we're bootstrapping, I guess? *)
-      (* TODO: figure out whether we need to add genesis accounts to accounts_created *)
-      let add_accounts () =
-        let%bind.Deferred.Result ledger_hash, genesis_block_id =
-          Mina_caqti.Pool.use
-            (fun (module Conn : Mina_caqti.CONNECTION) ->
-              let%bind.Deferred.Result genesis_block_id =
-                Block.add_if_doesn't_exist
-                  (module Conn)
-                  ~logger
-                  ~constraint_constants:precomputed_values.constraint_constants
-                  genesis_block ~accounts_accessed:[] ~accounts_created:[]
-              in
-              let%bind.Deferred.Result { ledger_hash; _ } =
-                Block.load (module Conn) ~id:genesis_block_id
-              in
-              return (Ok (ledger_hash, genesis_block_id)) )
-            pool
-        in
-        let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
-        let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
-        if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
-          [%log info]
-            "Archived genesis block ledger hash equals actual genesis ledger \
-             hash"
-            ~metadata:
-              [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash) ]
-        else (
-          [%log error]
-            "Archived genesis block ledger hash different than actual genesis \
-             ledger hash"
-            ~metadata:
-              [ ("archived_ledger_hash", Ledger_hash.to_yojson db_ledger_hash)
-              ; ("actual_ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
-              ] ;
-          exit 1 ) ;
-        let open Deferred.Let_syntax in
-        let genesis_accounts_count = List.length account_ids in
-        [%log info] "Archiving genesis accounts"
-          ~metadata:[ ("count", `Int genesis_accounts_count) ] ;
+(* [add_genesis_accounts] writes the genesis ledger of [precomputed_values]
+   to accounts_accessed, on the genesis block [genesis_block_id], as archives
+   before 5.0.0 did (--legacy-genesis-accounts). The genesis block must be
+   stored first ({!add_genesis_block}). *)
+let add_genesis_accounts ~logger ~(precomputed_values : Precomputed_values.t)
+    ~genesis_block_id ~chunks_length pool =
+  let ledger =
+    Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+  in
+  let%bind account_ids =
+    let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+    Account_id.Set.to_list account_id_set
+  in
+  (* NOTE: it's fine for accounts_accessed to be added non-atomically.
+     Since we're bootstrapping, I guess? *)
+  (* TODO: figure out whether we need to add genesis accounts to accounts_created *)
+  let add_accounts () =
+    let genesis_accounts_count = List.length account_ids in
+    [%log info] "Archiving genesis accounts"
+      ~metadata:[ ("count", `Int genesis_accounts_count) ] ;
 
-        let acccount_with_index_of_id ~ledger acct_id =
-          match Mina_ledger.Ledger.location_of_account ledger acct_id with
+    let acccount_with_index_of_id ~ledger acct_id =
+      match Mina_ledger.Ledger.location_of_account ledger acct_id with
+      | None ->
+          [%log error] "Could not get location for account"
+            ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
+          failwith "Could not get location for genesis account"
+      | Some loc -> (
+          let index = Mina_ledger.Ledger.index_of_account_exn ledger acct_id in
+          match Mina_ledger.Ledger.get ledger loc with
           | None ->
-              [%log error] "Could not get location for account"
+              [%log error] "Could not get account, given a location"
                 ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
-              failwith "Could not get location for genesis account"
-          | Some loc -> (
-              let index =
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id
-              in
-              match Mina_ledger.Ledger.get ledger loc with
-              | None ->
-                  [%log error] "Could not get account, given a location"
-                    ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
-                  failwith "Could not get genesis account, given a location"
-              | Some acct ->
-                  (index, acct) )
-        in
-        let%bind list_of_results =
-          List.map account_ids ~f:(fun acct_id ->
-              acccount_with_index_of_id ~ledger acct_id )
-          |> List.chunks_of ~length:chunks_length
-          |> Deferred.List.mapi ~f:(fun i batch ->
-                 match%bind
-                   Pool.use
-                     (fun (module Conn : CONNECTION) ->
-                       Accounts_accessed.add_accounts_if_don't_exist
-                         (module Conn)
-                         genesis_block_id batch )
-                     pool
-                 with
-                 | Ok _ ->
-                     [%log trace] "Archived batch of account %d of %d"
-                       (i * chunks_length) genesis_accounts_count ;
-                     return (Result.Ok ())
-                 | Error err ->
-                     [%log error] "Could not add batch of genesis account"
-                       ~metadata:
-                         [ ("batch number", `Int i)
-                         ; ("error", `String (Caqti_error.show err))
-                         ] ;
-                     return (Result.Error err) )
-        in
+              failwith "Could not get genesis account, given a location"
+          | Some acct ->
+              (index, acct) )
+    in
+    let%bind list_of_results =
+      List.map account_ids ~f:(fun acct_id ->
+          acccount_with_index_of_id ~ledger acct_id )
+      |> List.chunks_of ~length:chunks_length
+      |> Deferred.List.mapi ~f:(fun i batch ->
+             match%bind
+               Pool.use
+                 (fun (module Conn : CONNECTION) ->
+                   Accounts_accessed.add_accounts_if_don't_exist
+                     (module Conn)
+                     genesis_block_id batch )
+                 pool
+             with
+             | Ok _ ->
+                 [%log trace] "Archived batch of account %d of %d"
+                   (i * chunks_length) genesis_accounts_count ;
+                 return (Result.Ok ())
+             | Error err ->
+                 [%log error] "Could not add batch of genesis account"
+                   ~metadata:
+                     [ ("batch number", `Int i)
+                     ; ("error", `String (Caqti_error.show err))
+                     ] ;
+                 return (Result.Error err) )
+    in
 
-        return
-          ( List.find list_of_results ~f:(fun result -> Result.is_error result)
-          |> Option.value ~default:(Result.Ok ()) )
-      in
-      match%map
-        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
-      with
-      | Error e ->
-          [%log warn] "genesis accounts could not be added"
-            ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
-          failwith "Failed to add genesis accounts"
-      | Ok () ->
-          () )
+    return
+      ( List.find list_of_results ~f:(fun result -> Result.is_error result)
+      |> Option.value ~default:(Result.Ok ()) )
+  in
+  match%map
+    retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+  with
+  | Error e ->
+      [%log warn] "genesis accounts could not be added"
+        ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+      failwith "Failed to add genesis accounts"
+  | Ok () ->
+      ()
 
 (* [add_genesis_ledger_accounts] writes the accounts of the genesis ledger of
    --config-file: to genesis_accounts, or with [legacy_genesis_accounts] to
-   accounts_accessed, as archives before 5.0.0 did. *)
-let add_genesis_ledger_accounts ~logger ~genesis_constants ~constraint_constants
-    ~chunks_length ~runtime_config ~config_file_values ~legacy_genesis_accounts
-    pool =
+   accounts_accessed of the genesis block [genesis_block_id], as archives
+   before 5.0.0 did. *)
+let add_genesis_ledger_accounts ~logger ~chunks_length ~config_file_values
+    ~genesis_block_id ~legacy_genesis_accounts pool =
   if legacy_genesis_accounts then
-    add_genesis_accounts ~logger ~runtime_config_opt:(Some runtime_config)
-      ~genesis_constants ~chunks_length ~constraint_constants pool
+    add_genesis_accounts ~logger ~precomputed_values:config_file_values
+      ~genesis_block_id ~chunks_length pool
   else add_genesis_ledger ~logger ~config_file_values ~chunks_length pool
 
 (* [genesis_at_startup] is what the archive does with --config-file before it
    takes blocks: store the config's genesis block, then write its genesis
-   ledger's accounts. [config_file] is the runtime config and its precomputed
-   values. *)
-let genesis_at_startup ~logger ~genesis_constants ~constraint_constants
-    ~chunks_length ~config_file ~legacy_genesis_accounts pool =
+   ledger's accounts. [config_file] is the precomputed values of the runtime
+   config. *)
+let genesis_at_startup ~logger ~chunks_length ~config_file
+    ~legacy_genesis_accounts pool =
   match config_file with
   | None ->
       if legacy_genesis_accounts then
         [%log warn]
           "--legacy-genesis-accounts has no effect without --config-file" ;
       Deferred.unit
-  | Some (runtime_config, config_file_values) ->
-      let%bind (_ : int) = add_genesis_block ~logger ~config_file_values pool in
-      add_genesis_ledger_accounts ~logger ~genesis_constants
-        ~constraint_constants ~chunks_length ~runtime_config ~config_file_values
-        ~legacy_genesis_accounts pool
+  | Some config_file_values ->
+      let%bind genesis_block_id =
+        add_genesis_block ~logger ~config_file_values pool
+      in
+      add_genesis_ledger_accounts ~logger ~chunks_length ~config_file_values
+        ~genesis_block_id ~legacy_genesis_accounts pool
 
 (* The metrics server is created before the RPC handlers are installed, rather
    than alongside the polling loop that fills the gauges, because the handlers
@@ -5153,11 +5106,11 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
               precomputed_values_of_config ~logger ~runtime_config
                 ~genesis_constants ~constraint_constants
             in
-            Some (runtime_config, config_file_values)
+            Some config_file_values
       in
       let%bind () =
-        genesis_at_startup ~logger ~genesis_constants ~constraint_constants
-          ~chunks_length ~config_file ~legacy_genesis_accounts pool
+        genesis_at_startup ~logger ~chunks_length ~config_file
+          ~legacy_genesis_accounts pool
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than

@@ -523,20 +523,12 @@ let%test_module "Archive node unit tests" =
         ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
         }
       in
-      (* Derive the precomputed values (and hence the exact fork genesis block)
-         the same way [add_genesis_accounts] does internally, so the block we
-         insert below is the very block it will later look up and backfill. *)
-      let (module G) = Genesis_constants.profiled () in
+      (* The precomputed values of the config, as the archive loads
+         --config-file: the block we insert below is the fork genesis block
+         [add_genesis_accounts] backfills. *)
       let%bind precomputed_values =
-        match%map
-          Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
-            ~cli_proof_level:None runtime_config
-        with
-        | Ok precomputed_values ->
-            precomputed_values
-        | Error err ->
-            failwithf "init_from_config_file: %s" (Error.to_string_hum err) ()
+        Processor.precomputed_values_of_config ~logger ~runtime_config
+          ~genesis_constants ~constraint_constants
       in
       let genesis_block =
         let With_hash.{ data = block; hash = the_hash }, _ =
@@ -581,9 +573,8 @@ let%test_module "Archive node unit tests" =
       (* The bug: the fork genesis block has no accounts_accessed rows. *)
       [%test_result: int] ~expect:0 before ;
       let%bind () =
-        Processor.add_genesis_accounts ~logger
-          ~runtime_config_opt:(Some runtime_config) ~genesis_constants
-          ~chunks_length:100 ~constraint_constants pool
+        Processor.add_genesis_accounts ~logger ~precomputed_values
+          ~genesis_block_id ~chunks_length:100 pool
       in
       let%map after = count_accounts_accessed genesis_block_id in
       (* The fix: every fork genesis ledger account is now attached to the
