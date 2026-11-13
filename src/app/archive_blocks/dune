@@ -1,7 +1,36 @@
+(library
+ (name archive_blocks_lib)
+ (modules block_file)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  caqti
+  core_kernel
+  yojson
+  ;; local libraries
+  archive_lib
+  genesis_constants
+  logger
+  mina_block
+  mina_caqti
+  mina_signature_kind
+  proof_cache_tag)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   mina_ppx
+   -allow-unannotated-ignores
+   -allow-toplevel-expression
+   -dont-check-underscored-literal)))
+
 (executable
  (package archive_blocks)
  (name archive_blocks)
  (public_name archive_blocks)
+ (modules archive_blocks prepared_statements_probe)
  (libraries
   ;; opam libraries
   async
@@ -19,6 +48,7 @@
   stdio
   uri
   ;; local libraries
+  archive_blocks_lib
   archive_lib
   mina_stdlib
   genesis_constants
