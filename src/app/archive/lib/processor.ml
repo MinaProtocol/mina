@@ -5006,16 +5006,10 @@ let genesis_height_of ~precomputed_values =
 let genesis_block_of ~precomputed_values =
   fst (Mina_block.genesis ~precomputed_values)
 
-(* [genesis_block_error] logs [msg] and stops the archive. *)
-let genesis_block_error ~logger ~metadata msg =
-  [%log fatal] "$error" ~metadata:(("error", `String msg) :: metadata) ;
-  failwith msg
-
 (* [check_genesis_ledger_hash] stops the archive when the archived genesis
    block [block] does not carry the ledger hash of the config's genesis
    ledger. *)
-let check_genesis_ledger_hash ~logger ~metadata ~config_file_values
-    (block : Block.t) =
+let check_genesis_ledger_hash ~config_file_values (block : Block.t) =
   let expected =
     Precomputed_values.genesis_ledger config_file_values
     |> Lazy.force |> Mina_ledger.Ledger.merkle_root
@@ -5025,24 +5019,27 @@ let check_genesis_ledger_hash ~logger ~metadata ~config_file_values
       (Ledger_hash.equal expected
          (Ledger_hash.of_base58_check_exn block.ledger_hash) )
   then
-    genesis_block_error ~logger ~metadata
-      (sprintf
-         "The archived genesis block has ledger hash %s, the genesis ledger of \
-          --config-file has %s"
-         block.ledger_hash
-         (Ledger_hash.to_base58_check expected) )
+    failwithf
+      "The archived genesis block %s has ledger hash %s, the genesis ledger of \
+       --config-file has %s"
+      block.state_hash block.ledger_hash
+      (Ledger_hash.to_base58_check expected)
+      ()
 
 (* [check_genesis_canonical] stops the archive when the archived genesis
    block [block] is not canonical, which the archive never stores. *)
-let check_genesis_canonical ~logger ~metadata (block : Block.t) =
-  if not (String.equal block.chain_status Chain_status.(to_string Canonical))
-  then
-    genesis_block_error ~logger ~metadata
-      (sprintf
-         "The archived genesis block is %s, not canonical: the archive stores \
-          a genesis block as canonical, so the database was changed by hand or \
-          by an import; fix it before starting"
-         block.chain_status )
+let check_genesis_canonical (block : Block.t) =
+  match Chain_status.of_string block.chain_status with
+  | Canonical ->
+      ()
+  | (Orphaned | Pending) as status ->
+      failwithf
+        "The archived genesis block %s is %s, not canonical: the archive \
+         stores a genesis block as canonical, so the database was changed by \
+         hand or by an import; fix it before starting"
+        block.state_hash
+        (Chain_status.to_string status)
+        ()
 
 (* [add_genesis_block] makes sure the genesis block of --config-file
    ([config_file_values]) is in the archive, as the daemon would store it:
@@ -5084,18 +5081,18 @@ let add_genesis_block ~logger ~config_file_values pool =
   in
   match%map Pool.use store pool with
   | Error e ->
-      genesis_block_error ~logger ~metadata
-        ("Could not store the genesis block: " ^ Caqti_error.show e)
+      failwithf "Could not store the genesis block %s: %s" state_hash
+        (Caqti_error.show e) ()
   | Ok (`Other_geneses others) ->
-      genesis_block_error ~logger ~metadata
-        (sprintf
-           "The archive has another genesis block at height %Ld (%s): \
-            --config-file is not the config of this archive's chain"
-           genesis_height
-           (String.concat ~sep:", " others) )
+      failwithf
+        "The archive has another genesis block at height %Ld (%s), not %s: \
+         --config-file is not the config of this archive's chain"
+        genesis_height
+        (String.concat ~sep:", " others)
+        state_hash ()
   | Ok (`Stored (id, block)) ->
-      check_genesis_ledger_hash ~logger ~metadata ~config_file_values block ;
-      check_genesis_canonical ~logger ~metadata block ;
+      check_genesis_ledger_hash ~config_file_values block ;
+      check_genesis_canonical block ;
       [%log info] "The genesis block is in the archive" ~metadata ;
       id
 

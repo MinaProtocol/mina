@@ -292,9 +292,9 @@ let load runtime_config =
   >>| (fun values -> (runtime_config, values))
   |> Deferred.ok
 
-(* The archive's startup on [db] with [config_file] (see [load]): [Error]
-   carries the message it stopped with. *)
-let startup ?(legacy = false) (db : B.Db.t) config_file =
+(* The archive's startup on [db] with [config_file], [None] without
+   --config-file (see [load]): [Error] carries the message it stopped with. *)
+let startup_with ?(legacy = false) (db : B.Db.t) config_file =
   let precomputed = Lazy.force Precomputed_values.for_unit_tests in
   match Mina_caqti.connect_pool db.uri with
   | Error e ->
@@ -308,10 +308,12 @@ let startup ?(legacy = false) (db : B.Db.t) config_file =
               Archive_lib.Processor.genesis_at_startup ~logger:(Logger.null ())
                 ~genesis_constants:precomputed.genesis_constants
                 ~constraint_constants:precomputed.constraint_constants
-                ~chunks_length:2 ~config_file:(Some config_file)
-                ~legacy_genesis_accounts:legacy pool )
+                ~chunks_length:2 ~config_file ~legacy_genesis_accounts:legacy
+                pool )
           >>| Result.map_error ~f:Exn.to_string
           |> Deferred.ok )
+
+let startup ?legacy db config_file = startup_with ?legacy db (Some config_file)
 
 let expect_ok what = function
   | Ok () ->
@@ -517,6 +519,53 @@ let startup_without_table server_uri () =
       Alcotest.(check int) "accounts_accessed of the fork genesis" 3 on_genesis ;
       check_chain db built blocks unsettled_fork_chain )
 
+(* The archived genesis block carries another ledger hash than the config's
+   genesis ledger (changed by hand): the archive stops. *)
+let startup_refuses_another_ledger_hash server_uri () =
+  let s = B.create () in
+  let tag = "startup_refuses_another_ledger_hash" in
+  let fork_hash = real_state_hash tag in
+  let blocks = fork_chain ~fork_hash s in
+  let runtime_config = config ~tag ~fork:(fork_hash, 3) s in
+  let other_ledger_hash =
+    Mina_base.Ledger_hash.to_base58_check
+      (Quickcheck.random_value ~seed:(`Deterministic tag)
+         Mina_base.Ledger_hash.gen )
+  in
+  B.Db.with_fresh ~server_uri ~name:"test_startup_another_ledger_hash"
+    (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let%bind config = load runtime_config in
+      let%bind first = startup db config in
+      expect_ok "first startup" first ;
+      let%bind () =
+        exec db
+          (sprintf
+             "UPDATE blocks SET ledger_hash = '%s' WHERE height = 4 AND \
+              global_slot_since_hard_fork = 0"
+             other_ledger_hash )
+      in
+      let%bind second = startup db config in
+      expect_failure "another ledger hash" ~mentioning:"ledger hash" second ;
+      check_chain db built blocks unsettled_fork_chain )
+
+(* Without --config-file nothing is stored at startup, with or without
+   --legacy-genesis-accounts. *)
+let startup_without_config server_uri () =
+  B.Db.with_fresh ~server_uri ~name:"test_startup_without_config" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind result = startup_with db None in
+      expect_ok "startup" result ;
+      let%bind legacy = startup_with ~legacy:true db None in
+      expect_ok "legacy startup" legacy ;
+      let%bind blocks = query_int db "SELECT count(*)::int FROM blocks" in
+      Alcotest.(check int) "no block" 0 blocks ;
+      let%map rows =
+        query_int db "SELECT count(*)::int FROM genesis_accounts"
+      in
+      Alcotest.(check int) "no genesis_accounts row" 0 rows )
+
 (* A config that starts a new chain, not a hard fork: its genesis block and
    ledger are stored at height 1; there is nothing to settle. *)
 let startup_new_chain server_uri () =
@@ -700,6 +749,10 @@ let () =
             (run startup_resumes_partial_ledger)
         ; Alcotest.test_case "without the genesis_accounts table" `Quick
             (run startup_without_table)
+        ; Alcotest.test_case "refuses another ledger hash" `Quick
+            (run startup_refuses_another_ledger_hash)
+        ; Alcotest.test_case "without --config-file" `Quick
+            (run startup_without_config)
         ; Alcotest.test_case "a new chain's config" `Quick
             (run startup_new_chain)
         ; Alcotest.test_case "two forks in turn" `Quick (run startup_two_forks)
