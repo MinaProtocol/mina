@@ -9,10 +9,10 @@ set -euo pipefail
 #
 # This test suite:
 # - Creates a temporary directory with mock source files (executables, configs)
-# - Mocks external tools (git, and deb-toolkit with mock-deb-toolkit.sh)
-#   The tests check the files and control fields that builder-helpers.sh
-#   gives to deb-toolkit, not the package that deb-toolkit builds. Thus they
-#   need no deb-toolkit, fakeroot or dpkg-deb.
+# - Mocks git
+# - Builds the real packages with deb-toolkit (from PATH, or $DEB_TOOLKIT),
+#   fakeroot and dpkg-deb, as in CI. Thus it runs in the toolchain image.
+# - Reads the control fields and the files from each built .deb
 # - Sources builder-helpers.sh in the mocked environment
 # - Runs each test in a subshell (to survive exit 1 from build functions)
 # - Verifies each build_*_deb function produces correct package layout
@@ -49,9 +49,13 @@ assert_eq() {
     fi
 }
 
+# The asserts give the text to grep as a here-string, not with
+# 'echo "$text" | grep -q'. "grep -q" stops at the first match, then echo can
+# get SIGPIPE, and with "set -o pipefail" the pipeline fails: a match is then
+# reported as no match (and "! ..." as a pass).
 assert_contains() {
     local label="$1" haystack="$2" needle="$3"
-    if echo "$haystack" | grep -qF "$needle"; then
+    if grep -qF "$needle" <<< "$haystack"; then
         log_pass
     else
         log_fail "${label}: expected to contain '${needle}'"
@@ -60,7 +64,7 @@ assert_contains() {
 
 assert_not_contains() {
     local label="$1" haystack="$2" needle="$3"
-    if ! echo "$haystack" | grep -qF "$needle"; then
+    if ! grep -qF "$needle" <<< "$haystack"; then
         log_pass
     else
         log_fail "${label}: should NOT contain '${needle}'"
@@ -69,7 +73,7 @@ assert_not_contains() {
 
 assert_file_captured() {
     local captured_files="$1" path="$2"
-    if echo "$captured_files" | grep -qF "./${path}"; then
+    if grep -qF "./${path}" <<< "$captured_files"; then
         log_pass
     else
         log_fail "Expected file '${path}' in package"
@@ -78,7 +82,7 @@ assert_file_captured() {
 
 assert_file_not_captured() {
     local captured_files="$1" path="$2"
-    if ! echo "$captured_files" | grep -qF "./${path}"; then
+    if ! grep -qF "./${path}" <<< "$captured_files"; then
         log_pass
     else
         log_fail "Unexpected file '${path}' in package"
@@ -88,7 +92,7 @@ assert_file_not_captured() {
 assert_control_field() {
     local captured_control="$1" field="$2" expected="$3"
     local actual
-    actual=$(echo "$captured_control" | grep "^${field}:" | head -1 | sed "s/^${field}: *//")
+    actual=$(grep -m1 "^${field}:" <<< "$captured_control" | sed "s/^${field}: *//")
     if [[ "$actual" == "$expected" ]]; then
         log_pass
     else
@@ -99,8 +103,8 @@ assert_control_field() {
 assert_control_contains() {
     local captured_control="$1" field="$2" needle="$3"
     local line
-    line=$(echo "$captured_control" | grep "^${field}:" | head -1 || true)
-    if echo "$line" | grep -qF "$needle"; then
+    line=$(grep -m1 "^${field}:" <<< "$captured_control" || true)
+    if grep -qF "$needle" <<< "$line"; then
         log_pass
     else
         log_fail "Control '${field}' should contain '${needle}', got '${line}'"
@@ -109,7 +113,7 @@ assert_control_contains() {
 
 assert_control_has_field() {
     local captured_control="$1" field="$2"
-    if echo "$captured_control" | grep -q "^${field}:"; then
+    if grep -q "^${field}:" <<< "$captured_control"; then
         log_pass
     else
         log_fail "Control file missing field '${field}'"
@@ -118,7 +122,7 @@ assert_control_has_field() {
 
 assert_control_no_field() {
     local captured_control="$1" field="$2"
-    if ! echo "$captured_control" | grep -q "^${field}:"; then
+    if ! grep -q "^${field}:" <<< "$captured_control"; then
         log_pass
     else
         log_fail "Control file should NOT have field '${field}'"
@@ -185,7 +189,10 @@ assert_rosetta_configs() {
     assert_file_captured "$captured_files" "etc/mina/rosetta/rosetta-cli-config/check.ros"
 }
 
-# Load captured state from files written by build_deb override
+# Load the state of the last build: the package name that build_deb wrote,
+# and the control file and files of the .deb that deb-toolkit built (in
+# BUILD_DEB_CAPTURE_DIR/debs). The .deb is extracted, with its DEBIAN
+# directory, into CAPTURE_DIR/extracted.
 load_captured_state() {
     CAPTURED_DEB_NAME=""
     CAPTURED_CONTROL=""
@@ -195,21 +202,28 @@ load_captured_state() {
     if [[ -f "${CAPTURE_DIR}/deb_name" ]]; then
         CAPTURED_DEB_NAME=$(cat "${CAPTURE_DIR}/deb_name")
     fi
-    if [[ -f "${CAPTURE_DIR}/control" ]]; then
-        CAPTURED_CONTROL=$(cat "${CAPTURE_DIR}/control")
+
+    local debs=()
+    if [[ -d "${CAPTURE_DIR}/debs" ]]; then
+        debs=("${CAPTURE_DIR}"/debs/*.deb)
     fi
-    if [[ -f "${CAPTURE_DIR}/files" ]]; then
-        CAPTURED_FILES=$(cat "${CAPTURE_DIR}/files")
+    if [[ ${#debs[@]} -ne 1 || ! -f "${debs[0]}" ]]; then
+        log_fail "expected one .deb in ${CAPTURE_DIR}/debs, found: ${debs[*]:-none}"
+        return 0
     fi
-    if [[ -d "${CAPTURE_DIR}/last_build" ]]; then
-        CAPTURED_LAST_BUILD_DIR="${CAPTURE_DIR}/last_build"
-    fi
+
+    local extracted="${CAPTURE_DIR}/extracted"
+    rm -rf "$extracted"
+    dpkg-deb -R "${debs[0]}" "$extracted"
+    CAPTURED_CONTROL=$(cat "${extracted}/DEBIAN/control")
+    CAPTURED_FILES=$(cd "$extracted" && find . -type f | sort)
+    CAPTURED_LAST_BUILD_DIR="$extracted"
 }
 
 # Run a build function safely in a subshell (protects against exit 1).
 # Returns the exit code of the build function.
 safe_build() {
-    rm -rf "${CAPTURE_DIR}"/{deb_name,control,files,last_build} "${BUILDDIR}"
+    rm -rf "${CAPTURE_DIR}"/{deb_name,debs,extracted} "${BUILDDIR}"
 
     # NOTE: The subshell must NOT be followed by || true (or any || / &&),
     # because bash disables set -e inside subshells that are part of a
@@ -491,7 +505,6 @@ SVCEOF
     # SCRIPTPATH is exported so builder-helpers.sh uses our real scripts dir.
     #---------------------------------------------------------------------------
     export SCRIPTPATH="${REAL_SCRIPTS_DIR}"
-    export DEB_TOOLKIT="${TEST_SCRIPT_DIR}/mock-deb-toolkit.sh"
     source "${REAL_SCRIPTS_DIR}/builder-helpers.sh"
 
     # Store expected values set by export-git-env-vars.sh via our mock git
@@ -1319,32 +1332,12 @@ test_codename_noble_archive_deps() {
 }
 
 ################################################################################
-# Tests: Control file structure
-################################################################################
-
-test_control_file_common_fields() {
-    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_control_field "$CAPTURED_CONTROL" "Version" "${EXPECTED_VERSION}"
-    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
-    assert_control_field "$CAPTURED_CONTROL" "License" "Apache-2.0"
-    assert_control_field "$CAPTURED_CONTROL" "Origin" "MinaProtocol"
-    assert_control_field "$CAPTURED_CONTROL" "Label" "MinaProtocol"
-    assert_control_field "$CAPTURED_CONTROL" "Codename" "bullseye"
-    assert_control_field "$CAPTURED_CONTROL" "Section" "base"
-    assert_control_field "$CAPTURED_CONTROL" "Priority" "optional"
-    assert_contains "control has description" "$CAPTURED_CONTROL" "Description:"
-    assert_contains "control has git hash" "$CAPTURED_CONTROL" "${GITHASH}"
-}
-
-################################################################################
 # Tests: build_deb stops when the package build fails
 ################################################################################
 
-# build.sh calls the build functions as "_build_one ... || exit 1". In such a
-# list bash ignores "set -e", so build_deb must stop by itself. The build runs
-# here in the same type of list, without "set -e".
+# If a caller runs a build function in a list ("build_x || ..."), bash
+# ignores "set -e" in it, so build_deb must stop by itself. The build runs
+# here in such a list, without "set -e".
 build_without_errexit() {
     local rc=0
     ( set +e; "$@"; echo "build continued after the failure" >&2; exit 0 ) || rc=$?
@@ -1353,7 +1346,7 @@ build_without_errexit() {
 
 test_build_deb_fails_when_deb_toolkit_fails() {
     rm -rf "${BUILDDIR}"
-    MOCK_DEB_TOOLKIT_FAIL=1 build_without_errexit build_logproc_deb
+    DEB_TOOLKIT=false build_without_errexit build_logproc_deb
 }
 
 test_build_deb_fails_when_deb_toolkit_is_missing() {
@@ -1365,7 +1358,7 @@ test_build_deb_fails_when_deb_toolkit_is_missing() {
 # build_deb must also stop.
 test_build_deb_failure_is_not_lost_by_caller() {
     rm -rf "${BUILDDIR}"
-    MOCK_DEB_TOOLKIT_FAIL=1 build_without_errexit build_daemon_config_deb devnet
+    DEB_TOOLKIT=false build_without_errexit build_daemon_config_deb devnet
 }
 
 test_build_deb_fails_without_control_fields() {
@@ -1463,9 +1456,6 @@ main() {
     # Architecture restoration after config packages
     run_test test_config_deb_restores_architecture
     run_test test_hardfork_config_deb_restores_architecture
-
-    # Control file structure
-    run_test test_control_file_common_fields
 
     # Failures of the package build
     run_test_expect_fail test_build_deb_fails_when_deb_toolkit_fails

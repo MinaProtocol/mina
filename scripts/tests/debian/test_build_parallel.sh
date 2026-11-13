@@ -126,8 +126,6 @@ MOCKGIT
 
   # ---------- Env vars required by builder-helpers.sh / build.sh ----------
   export SCRIPTPATH="${REAL_SCRIPTS_DIR}"
-  # The tests check build.sh, not the package build (see mock-deb-toolkit.sh).
-  export DEB_TOOLKIT="${TEST_SCRIPT_DIR}/mock-deb-toolkit.sh"
   export MINA_DEB_CODENAME="bullseye"
   export DUNE_PROFILE="devnet"
   export BRANCH_NAME="test-branch"

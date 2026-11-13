@@ -16,6 +16,16 @@ let Size = ../../Command/Size.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
+let toolchain =
+    -- These tests build real packages with deb-toolkit, fakeroot and
+    -- dpkg-deb, which the toolchain image has. The repository is mounted at
+    -- /workdir with a different owner, so git must trust it.
+      { docker = Some Docker::{ image = ContainerImages.minaToolchain }
+      , safeDirectory = "git config --global --add safe.directory /workdir && "
+      }
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -40,20 +50,24 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./scripts/tests/debian/test_builder_helpers.sh" ]
+              [ Cmd.run
+                  "${toolchain.safeDirectory}./scripts/tests/debian/test_builder_helpers.sh"
+              ]
             , label = "Debian builder-helpers tests"
             , key = "builder-helpers-tests"
             , target = Size.Small
-            , docker = None Docker.Type
+            , docker = toolchain.docker
             }
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./scripts/tests/debian/test_build_parallel.sh" ]
+              [ Cmd.run
+                  "${toolchain.safeDirectory}./scripts/tests/debian/test_build_parallel.sh"
+              ]
             , label = "Debian parallel-build tests"
             , key = "build-parallel-tests"
             , target = Size.Small
-            , docker = None Docker.Type
+            , docker = toolchain.docker
             }
         , Command.build
             Command.Config::{

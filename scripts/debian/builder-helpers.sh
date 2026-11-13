@@ -184,12 +184,12 @@ create_control_file() {
 
 # Stops the package build with an error.
 #
-# It uses "exit", not "return". build.sh calls the build functions as
-# "_build_one ... || exit 1", and bash ignores "set -e" in a command of such a
-# list. Some build functions also run more commands after build_deb (for
-# example, they restore ARCHITECTURE), so a "return 1" from build_deb can be
-# lost. "exit" stops build.sh (serial build) or the worker subshell (parallel
-# build) in all cases.
+# It uses "exit", not "return". If a caller runs a build function in a
+# list ("build_x || ..."), or in an "if", bash ignores "set -e" in it. Some
+# build functions also run more commands after build_deb (for example, they
+# restore ARCHITECTURE), so a "return 1" from build_deb can be lost. "exit"
+# stops build.sh (serial build) or the worker subshell (parallel build) in
+# all cases.
 #   $1 - error message
 fail_build_deb() {
   echo "ERROR: $1" >&2
@@ -229,8 +229,8 @@ build_deb() {
   find "${BUILDDIR}"
 
   # If BUILD_DEB_CAPTURE_DIR is set (used by tests), the package is built into
-  # that directory, and the staging directory (with the control file that
-  # deb-toolkit wrote into it) is kept there for the test to read.
+  # <BUILD_DEB_CAPTURE_DIR>/debs, and its name goes into
+  # <BUILD_DEB_CAPTURE_DIR>/deb_name. The tests read the built package.
   local output_dir="."
   if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
     output_dir="${BUILD_DEB_CAPTURE_DIR}/debs"
@@ -260,12 +260,8 @@ build_deb() {
 
   if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
     echo "${package_name}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
-    cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
-    (cd "${BUILDDIR}" && find . -type f | sort) > "${BUILD_DEB_CAPTURE_DIR}/files"
-    rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
-    cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
     rm -rf "${BUILDDIR}"
-    echo "Captured ${package_name} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    echo "Captured ${deb_file} in ${output_dir}"
     return 0
   fi
 
