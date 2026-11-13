@@ -10,6 +10,11 @@ packaging changes or when you want to feed a local `.deb` into a
   [setup-linux.md](./setup-linux.md), [setup-macos.md](./setup-macos.md),
   or [setup-docker.md](./setup-docker.md).
 - The native build dependencies installed (`make build` should succeed).
+- `deb-toolkit`, `fakeroot` and `dpkg-deb`. `deb-toolkit` writes the control
+  file and builds the package. It is in the `mina-release-toolkit` package
+  ([releases](https://github.com/MinaProtocol/mina-release-toolkit/releases)),
+  and the toolchain image has it. The build finds it on `PATH`, or you can set
+  `DEB_TOOLKIT` to its path.
 
 ## Steps
 
