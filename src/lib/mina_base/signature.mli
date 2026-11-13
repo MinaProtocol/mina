@@ -17,7 +17,7 @@ val gen : t Quickcheck.Generator.t
 
 include Codable.S with type t := t
 
-type var = Field.Var.t * Inner_curve.Scalar.var
+type var = Signature_lib.Schnorr.Chunked.Signature.var
 
 include Codable.Base58_check_intf with type t := t
 
