@@ -13,6 +13,11 @@
 # published package whose dependency is not published cannot be installed.
 # Files that are not reached (test tools, legacy packages nothing depends on,
 # other architectures) are moved to <excluded-folder> and listed.
+#
+# One name and version built for two architectures fails: the files are keyed
+# by name and version, so the second would replace the first in the selection
+# and one architecture would be published without being selected. Keep each
+# architecture in its own folder.
 
 set -euo pipefail
 
@@ -29,22 +34,32 @@ excluded="${2:-${folder%/}.excluded}"
 declare -A file_of=()      # "name=version" -> file
 declare -A versions_of=()  # name -> space separated versions
 declare -A depends_of=()   # "name=version" -> Depends field
+declare -A arch_of=()      # "name=version" -> Architecture field
 
 shopt -s nullglob
 for f in "${folder}"/*.deb; do
-  name="" version="" depends=""
+  name="" version="" depends="" arch=""
   while IFS= read -r line; do
     case "$line" in
       Package:*) name="${line#Package: }" ;;
       Version:*) version="${line#Version: }" ;;
       Depends:*) depends="${line#Depends: }" ;;
+      Architecture:*) arch="${line#Architecture: }" ;;
     esac
-  done < <(dpkg-deb -f "$f" Package Version Depends)
+  done < <(dpkg-deb -f "$f" Package Version Depends Architecture)
   if [[ -z "$name" || -z "$version" ]]; then
     echo "❌ ${f}: no Package or Version in the control file" >&2
     exit 1
   fi
-  file_of["${name}=${version}"]="$f"
+  key="${name}=${version}"
+  if [[ -n "${file_of[$key]:-}" && "${arch_of[$key]}" != "$arch" ]]; then
+    echo "❌ ${name} (= ${version}) is in ${folder} for two architectures:" \
+      "${arch_of[$key]} ($(basename "${file_of[$key]}")) and ${arch} ($(basename "$f"))." \
+      "Select each architecture from its own folder." >&2
+    exit 1
+  fi
+  file_of["$key"]="$f"
+  arch_of["$key"]="$arch"
   versions_of["$name"]="${versions_of[$name]:-} ${version}"
   depends_of["${name}=${version}"]="$depends"
 done

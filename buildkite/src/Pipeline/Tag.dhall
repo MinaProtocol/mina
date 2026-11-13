@@ -36,6 +36,7 @@ let Tag
       | Mesa
       | Packaging
       | Publish
+      | PublishArm64
       | Generic
       >
 
@@ -70,6 +71,7 @@ let capitalName =
             , Mesa = "Mesa"
             , Packaging = "Packaging"
             , Publish = "Publish"
+            , PublishArm64 = "PublishArm64"
             , Generic = "Generic"
             }
             tag
@@ -105,6 +107,7 @@ let lowerName =
             , Mesa = "mesa"
             , Packaging = "packaging"
             , Publish = "publish"
+            , PublishArm64 = "publishArm64"
             , Generic = "generic"
             }
             tag

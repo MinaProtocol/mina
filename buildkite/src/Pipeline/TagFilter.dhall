@@ -21,6 +21,8 @@ let Filter
       | PackagingAmd64Devnet
       | PackagingAmd64Mainnet
       | PackagingAmd64Generic
+      | PackagingArm64Lightnet
+      | PublishArm64Lightnet
       | Rosetta
       | Hardfork
       | AllDockersAndDebians
@@ -53,7 +55,19 @@ let Filter
 
 let tags
     : Filter -> List Tag.Type
-    =     \(filter : Filter)
+    =
+      -- PackagingArm64Lightnet: the Bookworm arm64 packages that the
+      -- mina-lightnet-docker images install, the lightnet (no proofs) and the
+      -- devnet (full proofs) image alike: mina-devnet-generic,
+      -- mina-archive-devnet, mina-logproc and their mina dependencies. With
+      -- FILTER_MODE=All it selects the generic and devnet Bookworm arm64
+      -- packaging jobs: the arm64 apps job has no Packaging tag, and the
+      -- mainnet one no Devnet tag.
+      --
+      -- PublishArm64Lightnet: its own tag, not Publish. The amd64 publish
+      -- pipelines select Publish in Any mode and would run an arm64 publish
+      -- too. See Jobs/Release/PublishDebiansArm64Lightnet.dhall.
+          \(filter : Filter)
       ->  merge
             { FastOnly = [ Tag.Type.Fast ]
             , LongAndVeryLong = [ Tag.Type.Long, Tag.Type.VeryLong ]
@@ -71,6 +85,13 @@ let tags
               [ Tag.Type.Packaging, Tag.Type.Mainnet, Tag.Type.Amd64 ]
             , PackagingAmd64Generic =
               [ Tag.Type.Packaging, Tag.Type.Generic, Tag.Type.Amd64 ]
+            , PackagingArm64Lightnet =
+              [ Tag.Type.Packaging
+              , Tag.Type.Devnet
+              , Tag.Type.Arm64
+              , Tag.Type.Bookworm
+              ]
+            , PublishArm64Lightnet = [ Tag.Type.PublishArm64 ]
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Rosetta = [ Tag.Type.Rosetta ]
@@ -228,6 +249,8 @@ let show
             , PackagingAmd64Devnet = "PackagingAmd64Devnet"
             , PackagingAmd64Mainnet = "PackagingAmd64Mainnet"
             , PackagingAmd64Generic = "PackagingAmd64Generic"
+            , PackagingArm64Lightnet = "PackagingArm64Lightnet"
+            , PublishArm64Lightnet = "PublishArm64Lightnet"
             , Rosetta = "Rosetta"
             , Hardfork = "Hardfork"
             , AllDockersAndDebians = "AllDockersAndDebians"
