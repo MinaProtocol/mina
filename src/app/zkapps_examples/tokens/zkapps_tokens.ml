@@ -637,6 +637,8 @@ module Transfer_recursive = struct
 
   let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
 
+  let vk = Lazy.map ~f:Pickles.Side_loaded.Verification_key.of_compiled tag
+
   let prover =
     Lazy.map lazy_compiled ~f:(fun (_, _, _, Pickles.Provers.[ prover ]) ->
         prover )
