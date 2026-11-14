@@ -5110,6 +5110,99 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       | Ok () ->
           () )
 
+(* [settle_prefork_pending_blocks_at_startup] is called with
+   --settle-prefork-pending-blocks, after the genesis of [runtime_config] is
+   stored. When the config is a hard fork's ([proof.fork]), it settles the
+   boundary of its fork genesis once (Settle_pending_blocks): the genesis
+   whose parent is the config's fork block. A boundary that cannot be
+   settled yet (the fork block or its ancestry is missing) is reported, and
+   left to archive_hardfork_toolbox convert-chain-to-canonical once the
+   blocks are backfilled. *)
+let settle_prefork_pending_blocks_at_startup ~logger
+    ~(runtime_config : Runtime_config.t) pool =
+  match
+    Option.bind runtime_config.proof
+      ~f:(fun (proof : Runtime_config.Proof_keys.t) -> proof.fork)
+  with
+  | None ->
+      [%log info]
+        "--config-file starts a new chain, not a hard fork: no prefork blocks \
+         to settle" ;
+      Deferred.unit
+  | Some fork -> (
+      let metadata = [ ("fork_block", `String fork.state_hash) ] in
+      match%map
+        Pool.use
+          (fun (module Conn : CONNECTION) ->
+            let open Deferred.Result.Let_syntax in
+            match%bind
+              Settle_pending_blocks.fork_geneses_of_fork_block
+                (module Conn)
+                ~fork_state_hash:fork.state_hash
+            with
+            | [ genesis_id ] ->
+                let%map result =
+                  Settle_pending_blocks.run ~genesis_id (module Conn)
+                in
+                `Result result
+            | geneses ->
+                return (`Geneses (List.length geneses)) )
+          pool
+      with
+      | Error e ->
+          failwithf "Could not settle the prefork pending blocks: %s"
+            (Caqti_error.show e) ()
+      | Ok (`Geneses 0) ->
+          [%log warn]
+            "The fork genesis of --config-file is not in the archive: nothing \
+             is settled. Once it is, run archive_hardfork_toolbox \
+             convert-chain-to-canonical"
+            ~metadata
+      | Ok (`Geneses n) ->
+          failwithf
+            "The archive has %d fork geneses on the fork block %s of \
+             --config-file: the prefork pending blocks are not settled"
+            n fork.state_hash ()
+      | Ok (`Result result) -> (
+          let metadata =
+            metadata @ [ ("result", Settle_pending_blocks.to_yojson result) ]
+          in
+          match result.boundary with
+          | Some (Settled _) ->
+              [%log info] "Settled the prefork pending blocks" ~metadata
+          | Some (No_fork_block | No_canonical_ancestor) | None ->
+              [%log warn]
+                "Could not settle the prefork pending blocks: the fork block \
+                 or its ancestry is not in the archive. Backfill the missing \
+                 blocks, then run archive_hardfork_toolbox \
+                 convert-chain-to-canonical"
+                ~metadata
+          | Some Fork_genesis_not_canonical ->
+              failwith
+                "The fork genesis is not canonical, which the archive never \
+                 stores: the prefork pending blocks are not settled" ) )
+
+(* [startup_with_config] is what the archive does before it takes blocks:
+   write the genesis of --config-file, then with
+   [settle_prefork_pending_blocks] settle the prefork pending blocks once. *)
+let startup_with_config ~logger ~genesis_constants ~constraint_constants
+    ~chunks_length ~runtime_config_opt ~settle_prefork_pending_blocks pool =
+  let%bind () =
+    add_genesis_accounts pool ~logger ~genesis_constants ~constraint_constants
+      ~runtime_config_opt ~chunks_length
+  in
+  match (runtime_config_opt, settle_prefork_pending_blocks) with
+  | _, false ->
+      Deferred.unit
+  | None, true ->
+      [%log warn]
+        "--settle-prefork-pending-blocks needs --config-file, which names the \
+         hard fork; nothing is settled. Settle with archive_hardfork_toolbox \
+         convert-chain-to-canonical" ;
+      Deferred.unit
+  | Some runtime_config, true ->
+      settle_prefork_pending_blocks_at_startup ~logger ~runtime_config pool
+
 (* The metrics server is created before the RPC handlers are installed, rather
    than alongside the polling loop that fills the gauges, because the handlers
    record into the same registry. A consequence is that the metrics endpoint
@@ -5152,7 +5245,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~settle_prefork_pending_blocks =
   let%bind metric_server = create_metrics_server ~logger ~metrics_server_port in
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
@@ -5216,8 +5309,8 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Deferred.unit
   | Ok pool ->
       let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt ~chunks_length
+        startup_with_config ~logger ~genesis_constants ~constraint_constants
+          ~chunks_length ~runtime_config_opt ~settle_prefork_pending_blocks pool
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than

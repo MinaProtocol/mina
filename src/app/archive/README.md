@@ -119,7 +119,8 @@ $ archive run \
     --server-port <PORT> \
     [--metrics-port <PORT>] \
     [--missing-blocks-width <INT>] \
-    [--delete-older-than <INT>]
+    [--delete-older-than <INT>] \
+    [--settle-prefork-pending-blocks]
 ```
 
 Parameters:
@@ -130,6 +131,36 @@ Parameters:
 - `--missing-blocks-width`: Optional width of block heights to report missing blocks
 - `--delete-older-than`: Optional parameter to delete blocks older than N blocks
   from the maximum height
+- `--settle-prefork-pending-blocks`: Once at startup, settle the blocks of the
+  chain that the config's hard fork ended (needs `--config-file`). Also enabled
+  by the `MINA_ARCHIVE_SETTLE_PREFORK_PENDING_BLOCKS` environment variable.
+
+#### Hard fork handover
+
+The archive marks blocks canonical only k blocks behind the tip, so at a hard
+fork the last blocks of the ended chain stay pending. Start the postfork
+archive with the fork config and `--settle-prefork-pending-blocks`:
+
+```shell
+$ archive run --config-file fork_config.json \
+    --settle-prefork-pending-blocks ...
+```
+
+Once at startup, after the config's genesis is stored, the archive settles the
+boundary of that fork genesis (the block whose parent is the config's fork
+block): the chain to the fork block becomes canonical, the other blocks of the
+ended chain are orphaned. It does not wait for blocks. The archive stops when
+the fork genesis is not canonical, which it never stores so. When the fork
+block or its ancestry is not in the archive yet, this is logged and the
+archive starts anyway.
+
+Whatever was not settled at startup is settled on demand with
+`archive_hardfork_toolbox convert-chain-to-canonical`: the archive ran without
+the flag or without `--config-file`, the fork block was missing at startup, or
+prefork blocks were backfilled after the fork (with `mina-archive-blocks` /
+`missing-blocks-guardian`, which store them as pending). Backfilled postfork
+blocks need nothing: the archive's canonical marking covers them as the chain
+grows.
 
 ### Prune
 

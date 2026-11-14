@@ -49,9 +49,9 @@
  (modules
   main
   test_env
-  convert_canonical_tests
   last_filled_block_tests
-  populate_genesis_accounts_tests)
+  populate_genesis_accounts_tests
+  convert_chain_to_canonical_tests)
  (preprocess
   (pps
    mina_ppx.no_pipebang
