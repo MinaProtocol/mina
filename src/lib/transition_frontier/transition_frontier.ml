@@ -175,6 +175,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   ; catchup_state =
       Catchup_state.create catchup_mode ~logger
         ~root:(Full_frontier.root full_frontier)
+        ~breadcrumbs:(Full_frontier.all_breadcrumbs full_frontier)
   ; verifier
   ; consensus_local_state
   ; full_frontier
