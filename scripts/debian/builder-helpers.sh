@@ -107,7 +107,23 @@ BUILDDIR="${BUILDDIR:-deb_build}"
 # Ledger tarballs of the genesis configs, as <s3_data_hash>/<file name in S3>.
 LEDGER_TARBALLS_DIR="${LEDGER_TARBALLS_DIR:-/var/storagebox/ledger-tarballs}"
 
+# deb-toolkit (MinaProtocol/deb-toolkit) writes the control file and builds
+# the package. It comes from PATH (the toolchain image has it), or from
+# $DEB_TOOLKIT.
+DEB_TOOLKIT="${DEB_TOOLKIT:-deb-toolkit}"
+
+# Control fields of the next package, as `deb-toolkit build` arguments.
+# create_control_file sets them and build_deb uses them.
+DEB_CONTROL_ARGS=()
+
 # Function to ease creation of Debian package control files
+#   $1 - package name
+#   $2 - Depends
+#   $3 - description
+#   $4 - Suggests (optional)
+#   $5 - Replaces and Breaks (optional)
+#   $6 - Provides (optional)
+#   $7 - Conflicts (optional)
 create_control_file() {
 
   echo "create_control_file inputs:"
@@ -127,56 +143,59 @@ create_control_file() {
     echo "Conflicts: ${7}"
   fi
   # Make sure the directory exists
-  mkdir -p "${BUILDDIR}/DEBIAN"
+  mkdir -p "${BUILDDIR}"
 
   # Also clean the binary directory that all packages need
   rm -rf "${BUILDDIR}/usr/local/bin"
 
-  CONTROL="${BUILDDIR}/DEBIAN/control"
-
-  # Create the control file itself
-  cat << EOF > ${CONTROL}
-Package: ${1}
-Version: ${MINA_DEB_VERSION}
-License: Apache-2.0
-Origin: MinaProtocol
-Label: MinaProtocol
-Vendor: O(1)Labs
-Codename: ${MINA_DEB_CODENAME}
-Architecture: ${ARCHITECTURE}
-Maintainer: O(1)Labs <build@o1labs.org>
-Installed-Size:
-EOF
-
+  DEB_CONTROL_ARGS=(
+    --package-name "${1}"
+    --version "${MINA_DEB_VERSION}"
+    --codename "${MINA_DEB_CODENAME}"
+    --architecture "${ARCHITECTURE}"
+    --license "Apache-2.0"
+    --origin "MinaProtocol"
+    --label "MinaProtocol"
+    --vendor "O(1)Labs"
+    --maintainer "O(1)Labs <build@o1labs.org>"
+    --section "base"
+    --priority "optional"
+    --homepage "https://minaprotocol.com/"
+    --description "${3}"
+    --githash "${GITHASH}"
+    --buildurl "${BUILD_URL}"
+  )
   if [ -n "${2:-}" ]; then
-    echo "Depends: ${2}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--depends "${2}")
   fi
   if [ -n "${4:-}" ]; then
-    echo "Suggests: ${4}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--suggested-depends "${4}")
   fi
   if [ -n "${5:-}" ]; then
-    echo "Replaces: ${5}" >> ${CONTROL}
-    echo "Breaks: ${5}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--replaces "${5}" --breaks "${5}")
   fi
   if [ -n "${6:-}" ]; then
-    echo "Provides: ${6}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--provides "${6}")
   fi
   if [ -n "${7:-}" ]; then
-    echo "Conflicts: ${7}" >> ${CONTROL}
+    DEB_CONTROL_ARGS+=(--conflicts "${7}")
   fi
+}
 
-  cat <<EOF >> ${CONTROL}
-Section: base
-Priority: optional
-Homepage: https://minaprotocol.com/
-Description:
- ${3}
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-  echo "Control File:"
-  cat "${BUILDDIR}/DEBIAN/control"
-
+# Stops the package build with an error.
+#
+# It uses "exit", not "return". If a caller runs a build function in a
+# list ("build_x || ..."), or in an "if", bash ignores "set -e" in it. Some
+# build functions also run more commands after build_deb (for example, they
+# restore ARCHITECTURE), so a "return 1" from build_deb can be lost. "exit"
+# stops build.sh (serial build) or the worker subshell (parallel build) in
+# all cases.
+#   $1 - error message
+fail_build_deb() {
+  echo "ERROR: $1" >&2
+  rm -rf "${BUILDDIR}"
+  DEB_CONTROL_ARGS=()
+  exit 1
 }
 
 # Function to ease package build
@@ -189,14 +208,17 @@ build_deb() {
   # in normal use.  If it does, it is a bug in the upstream duplicate-
   # detection logic or this invocation has stale output from a previous run.
   if [[ -z "${BUILD_DEB_CAPTURE_DIR:-}" ]] && [[ -f "$deb_file" ]]; then
-    echo "ERROR: ${deb_file} already exists." >&2
-    echo "       build.sh validates that every requested token produces a unique" >&2
-    echo "       .deb output.  If you see this error:" >&2
-    echo "        - two tokens mapped to the same .deb (duplicate-output bug), or" >&2
-    echo "        - stale .deb files from a previous run are present." >&2
-    echo "       Clean _build/*.deb and retry." >&2
-    rm -rf "${BUILDDIR}"
-    return 1
+    echo "build.sh validates that every requested token produces a unique" >&2
+    echo ".deb output.  If you see the error below:" >&2
+    echo " - two tokens mapped to the same .deb (duplicate-output bug), or" >&2
+    echo " - stale .deb files from a previous run are present." >&2
+    fail_build_deb "${deb_file} already exists. Clean _build/*.deb and retry."
+  fi
+
+  # create_control_file sets the control fields. Without them, the package
+  # would get no fields, or the fields of the package built before it.
+  if [[ ${#DEB_CONTROL_ARGS[@]} -eq 0 ]]; then
+    fail_build_deb "build_deb ${package_name}: no control fields. Call create_control_file first."
   fi
 
   echo "Building ${deb_file}"
@@ -206,28 +228,45 @@ build_deb() {
   echo "Deb Contents:"
   find "${BUILDDIR}"
 
-  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), capture the staging
-  # directory state to that directory instead of invoking fakeroot/dpkg-deb.
+  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), the package is built into
+  # <BUILD_DEB_CAPTURE_DIR>/debs, and its name goes into
+  # <BUILD_DEB_CAPTURE_DIR>/deb_name. The tests read the built package.
+  local output_dir="."
+  if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
+    output_dir="${BUILD_DEB_CAPTURE_DIR}/debs"
+    rm -rf "${output_dir}"
+  fi
+
+  # deb-toolkit runs `fakeroot dpkg-deb -Zgzip --build`. The packages are
+  # gzip, not the zstd default of newer distributions (e.g. Noble), because
+  # the Docker image builds examine them on buildkite agents where zstd might
+  # not be available.
+  if ! "${DEB_TOOLKIT}" build \
+    --build-dir "${BUILDDIR}" \
+    --output-dir "${output_dir}" \
+    "${DEB_CONTROL_ARGS[@]}"; then
+    fail_build_deb "'${DEB_TOOLKIT} build' failed for ${deb_file}. deb-toolkit comes from PATH (the toolchain image has it) or from \$DEB_TOOLKIT."
+  fi
+  DEB_CONTROL_ARGS=()
+
+  # deb-toolkit names the file after the --package-name of create_control_file.
+  # If that name is not the name given to build_deb, the file is not here.
+  if [[ ! -f "${output_dir}/${deb_file}" ]]; then
+    fail_build_deb "deb-toolkit did not write ${output_dir}/${deb_file}. The package name in create_control_file and build_deb must be the same."
+  fi
+
+  echo "Control File:"
+  cat "${BUILDDIR}/DEBIAN/control"
+
   if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
     echo "${package_name}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
-    cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
-    (cd "${BUILDDIR}" && find . -type f | sort) > "${BUILD_DEB_CAPTURE_DIR}/files"
-    rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
-    cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
     rm -rf "${BUILDDIR}"
-    echo "Captured ${package_name} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    echo "Captured ${deb_file} in ${output_dir}"
     return 0
   fi
 
-  # Build the package
-  # NOTE: the reason for `-Zgzip` is we might be building on newer Ubuntu, e.g.
-  # Noble. The default packaging format is `zstd`, but then when we're building
-  # Docker image, we're examining those packages in buildkite's agent, where
-  # `zstd` might not be available.
-  fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" \
-    "${package_name}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
   echo "build_deb outputs:"
-  ls -lh "${package_name}"_*.deb
+  ls -lh "${deb_file}"
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 }
