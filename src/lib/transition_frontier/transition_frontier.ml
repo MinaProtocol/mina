@@ -13,7 +13,6 @@ module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
-module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 
 module type CONTEXT = sig
@@ -43,7 +42,7 @@ type t =
   { logger : Logger.t
   ; verifier : Verifier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
-  ; catchup_state : Catchup_state.t
+  ; catchup_tree : Full_catchup_tree.t
   ; full_frontier : Full_frontier.t
   ; persistent_root : Persistent_root.t
   ; persistent_root_instance : Persistent_root.Instance.t
@@ -55,7 +54,7 @@ type t =
   ; closed : unit Ivar.t
   }
 
-let catchup_state t = t.catchup_state
+let catchup_tree t = t.catchup_tree
 
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
@@ -100,8 +99,7 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ?max_frontier_depth ?(set_best_tip = true)
-    ignore_consensus_local_state =
+    ?max_frontier_depth ?(set_best_tip = true) ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -172,9 +170,8 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
                  (Persistent_frontier.Database.Error.not_found_message err) ) )
   in
   { logger
-  ; catchup_state =
-      Catchup_state.create catchup_mode ~logger
-        ~root:(Full_frontier.root full_frontier)
+  ; catchup_tree =
+      Full_catchup_tree.create ~logger ~root:(Full_frontier.root full_frontier)
   ; verifier
   ; consensus_local_state
   ; full_frontier
@@ -206,7 +203,6 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Super ]
     -> ?set_best_tip:bool
     -> unit
     -> ( t
@@ -217,8 +213,8 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
      ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
-     ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
-     ?set_best_tip () ->
+     ~consensus_local_state ~persistent_root ~persistent_frontier ?set_best_tip
+     () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -248,7 +244,7 @@ let rec load_with_max_length :
           load_from_persistence_and_start
             ~context:(module Context)
             ~verifier ~consensus_local_state ~max_length ~persistent_root
-            ~persistent_root_instance ~catchup_mode ~persistent_frontier
+            ~persistent_root_instance ~persistent_frontier
             ~persistent_frontier_instance ?max_frontier_depth ?set_best_tip
             ignore_consensus_local_state
         with
@@ -355,7 +351,7 @@ let rec load_with_max_length :
         load_with_max_length
           ~context:(module Context)
           ~max_length ~verifier ~consensus_local_state ~persistent_root
-          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
+          ~persistent_frontier ~retry_with_fresh_db:false ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -384,7 +380,7 @@ let rec load_with_max_length :
 
 let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
     ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
-    ~persistent_root ~persistent_frontier ~catchup_mode () =
+    ~persistent_root ~persistent_frontier () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -395,7 +391,7 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
         ~context:(module Context)
         ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode ?set_best_tip () )
+        ?set_best_tip () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -403,7 +399,7 @@ let close ~loc
     ( { logger
       ; verifier = _
       ; consensus_local_state = _
-      ; catchup_state = _
+      ; catchup_tree = _
       ; full_frontier
       ; persistent_root = _safe_to_ignore_1
       ; persistent_root_instance
@@ -460,7 +456,7 @@ let add_breadcrumb_exn t breadcrumb =
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
   [%log internal] "Apply_catchup_state_diffs" ;
-  Catchup_state.apply_diffs t.catchup_state diffs ;
+  Full_catchup_tree.apply_diffs t.catchup_tree diffs ;
   [%log internal] "Apply_full_frontier_diffs"
     ~metadata:[ ("count", `Int (List.length diffs)) ] ;
   let (`New_root_and_diffs_with_mutants
@@ -468,7 +464,7 @@ let add_breadcrumb_exn t breadcrumb =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~has_long_catchup_job:
-        (Catchup_state.max_catchup_chain_length t.catchup_state > 5)
+        (Full_catchup_tree.max_catchup_chain_length t.catchup_tree > 5)
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   [%log internal] "Apply_full_frontier_diffs_done" ;
@@ -771,7 +767,7 @@ module For_tests = struct
           load_with_max_length ~max_length ~retry_with_fresh_db:false
             ~context:(module Context)
             ~verifier ~consensus_local_state ~persistent_root
-            ~catchup_mode:`Super ~persistent_frontier () )
+            ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in
