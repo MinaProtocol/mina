@@ -1788,12 +1788,16 @@ let protocol_version_signals =
     include Comparator.Make (T)
   end in
   let open Command.Param in
+  let positive_int =
+    Command.Arg_type.map int ~f:(fun n ->
+        if n < 1 then failwith "--max-length must be at least 1" else n )
+  in
   let max_length =
     flag "--max-length" ~aliases:[ "max-length" ]
       ~doc:
         "N Only count the N blocks closest to the best tip (default: every \
          block in the transition frontier)"
-      (optional int)
+      (optional positive_int)
   in
   Command.async
     ~summary:
