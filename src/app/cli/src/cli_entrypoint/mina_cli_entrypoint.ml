@@ -296,7 +296,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     flag "--libp2p-metrics-port" ~aliases:[ "libp2p-metrics-port" ]
       ~doc:
         "PORT libp2p metrics server for scraping via Prometheus (default no \
-         libp2p-metrics-server)"
+         libp2p-metrics-server). Set LIBP2P_ENABLE_PPROF=true to also serve \
+         /debug/pprof/ on this port"
       (optional int16)
   and external_ip_opt =
     flag "--external-ip" ~aliases:[ "external-ip" ]

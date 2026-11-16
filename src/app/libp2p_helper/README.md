@@ -66,6 +66,16 @@ Controls whether mDNS (Multicast DNS) local network peer discovery is enabled.
 - **Use case**: mDNS is only needed for local development/testing where multiple nodes run on the same network. **Production deployments should keep this disabled** as nodes discover each other via seed peers and DHT.
 - **Security**: Disabling mDNS prevents the node from broadcasting on cloud provider internal networks and discovering other VMs, which can trigger abuse reports.
 
+#### LIBP2P_ENABLE_PPROF
+
+Controls whether the metrics server also serves the Go pprof profiles on `/debug/pprof/`.
+
+- **Default**: `false` (only `/metrics` is served)
+- **Values**: `"true"` to enable, any other value or unset to disable
+- **Requires**: the daemon flag `--libp2p-metrics-port`. Without a metrics port, the helper starts no HTTP server, and this variable has no effect.
+- **Use case**: diagnosing memory or goroutine growth in the helper (`/debug/pprof/heap`, `/debug/pprof/goroutine?debug=1`).
+- **Security and cost**: pprof has no authentication. Do not expose the metrics port outside a trusted network when this is enabled. Serving the endpoints costs nothing while idle, but collecting a goroutine dump pauses the helper, and a CPU profile or trace slows it down while it runs.
+
 #### MINA_LIBP2P_DISCOVERY_MIN_INTERVAL / MINA_LIBP2P_DISCOVERY_MAX_INTERVAL
 
 Bound the interval at which the node re-queries the DHT for peers while it is below its low-water peer mark. The wait starts at the minimum and doubles up to the maximum until enough peers are found.
