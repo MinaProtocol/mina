@@ -372,7 +372,7 @@ test_manager_publish_signed() {
     if "${MANAGER_SCRIPT}" publish \
         --buildkite-build-id "test_data" \
         --source-version "3.3.0-8c0c2e6" \
-        --target-version "3.3.0-8c0c2e6-${RANDOM_SUFFIX}" \
+        --target-version "3.3.0-8c0c2e6" \
         --channel "${SIGNED_TEST_COMPONENT}" \
         --artifacts "mina-archive" \
         --networks "devnet" \
@@ -382,7 +382,6 @@ test_manager_publish_signed() {
         --debian-sign-key "${DEBIAN_SIGN_KEY}" \
         --backend "${BACKEND}" \
         --only-debians \
-        --strip-network-from-archive \
         --skip-cache-invalidation \
         --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/publish_signed_dry_run.log"; then
         assert_success "Manager publish command (signed, dry-run)" 0
@@ -423,7 +422,7 @@ test_manager_publish_mina_config() {
     if "${MANAGER_SCRIPT}" publish \
         --buildkite-build-id "test_data" \
         --source-version "3.3.0-test-config" \
-        --target-version "3.3.0-test-config-${RANDOM_SUFFIX}" \
+        --target-version "3.3.0-test-config" \
         --channel "${TEST_COMPONENT_TEST}" \
         --artifacts "mina-config" \
         --networks "devnet" \
@@ -457,7 +456,7 @@ test_manager_publish_mina_generic() {
     if "${MANAGER_SCRIPT}" publish \
         --buildkite-build-id "test_data" \
         --source-version "3.3.0-test-generic" \
-        --target-version "3.3.0-test-generic-${RANDOM_SUFFIX}" \
+        --target-version "3.3.0-test-generic" \
         --channel "${TEST_COMPONENT_TEST}" \
         --artifacts "mina-generic" \
         --networks "devnet" \
@@ -483,7 +482,7 @@ test_manager_publish_rosetta_generic() {
     if "${MANAGER_SCRIPT}" publish \
         --buildkite-build-id "test_data" \
         --source-version "3.3.0-test-rosetta-generic" \
-        --target-version "3.3.0-test-rosetta-generic-${RANDOM_SUFFIX}" \
+        --target-version "3.3.0-test-rosetta-generic" \
         --channel "${TEST_COMPONENT_TEST}" \
         --artifacts "rosetta-generic" \
         --networks "devnet" \
@@ -550,7 +549,7 @@ test_manager_publish_mixed_with_config() {
     if "${MANAGER_SCRIPT}" publish \
         --buildkite-build-id "test_data" \
         --source-version "3.3.0-test-mixed" \
-        --target-version "3.3.0-test-mixed-${RANDOM_SUFFIX}" \
+        --target-version "3.3.0-test-mixed" \
         --channel "${TEST_COMPONENT_TEST}" \
         --artifacts "mina-config,mina-generic,rosetta-generic" \
         --networks "devnet" \
@@ -564,6 +563,33 @@ test_manager_publish_mixed_with_config() {
         assert_success "Manager publish mixed artifacts with mina-config (dry-run)" 0
     else
         assert_success "Manager publish mixed artifacts with mina-config (dry-run)" 1
+    fi
+}
+
+# Test: publish refuses to change the version of a debian package
+test_manager_publish_rejects_debian_reversion() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh publish rejects different debian versions"
+    log_info "========================================="
+
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test" \
+        --target-version "3.3.0-test-${RANDOM_SUFFIX}" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-logproc" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/debian_reversion.log"; then
+        # Should have failed
+        assert_success "Manager rejects different debian versions" 1
+    else
+        assert_success "Manager rejects different debian versions" 0
     fi
 }
 
@@ -606,5 +632,6 @@ run_dry_run_tests() {
     test_manager_publish_rosetta_generic
     test_manager_publish_mina_automode
     test_manager_publish_mixed_with_config
+    test_manager_publish_rejects_debian_reversion
     test_manager_unknown_artifact_rejected
 }

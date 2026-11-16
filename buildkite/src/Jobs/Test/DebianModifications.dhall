@@ -14,8 +14,8 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.strictlyStart (S.contains "scripts/debian/session")
-          , S.strictlyStart (S.contains "scripts/tests/deb-session")
+          [ S.strictlyStart (S.contains "scripts/tests/deb-session")
+          , S.exactly "dockerfiles/toolchain/3-toolchain" ""
           , S.exactly "buildkite/src/Jobs/Test/DebianModifications" "dhall"
           , S.exactly "buildkite/src/Command/DebianModifications" "dhall"
           ]
@@ -29,5 +29,5 @@ in  Pipeline.build
           , PipelineTag.Type.Debian
           ]
         }
-      , steps = [ DebianModifications.step, DebianModifications.debToolkitStep ]
+      , steps = [ DebianModifications.step ]
       }
