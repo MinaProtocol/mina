@@ -413,7 +413,7 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
 (** Run one bootstrap cycle *)
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
-    ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
+    ~persistent_root ~persistent_frontier ~initial_root_transition
     ~bootstrap_status previous_cycles =
   let open Context in
   Bootstrap_status.start_bootstrap_attempt bootstrap_status ;
@@ -613,7 +613,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
             Transition_frontier.load
               ~context:(module Context)
               ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-              ~persistent_root ~persistent_frontier ~catchup_mode ()
+              ~persistent_root ~persistent_frontier ()
             >>| function
             | Ok frontier ->
                 frontier
@@ -698,7 +698,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
  *)
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
-    ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
+    ~persistent_root ~persistent_frontier ~initial_root_transition
     ~bootstrap_status =
   let open Context in
   let run_cycle =
@@ -706,8 +706,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~context:(module Context : CONTEXT)
       ~trust_system ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
-      ~persistent_frontier ~initial_root_transition ~catchup_mode
-      ~bootstrap_status
+      ~persistent_frontier ~initial_root_transition ~bootstrap_status
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
@@ -929,7 +928,7 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition ~bootstrap_status )
+           ~initial_root_transition ~bootstrap_status )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
