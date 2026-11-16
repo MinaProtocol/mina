@@ -119,7 +119,7 @@ Publishes build artifacts from cache storage to Debian repositories and Docker r
 #### Required Parameters
 - `--buildkite-build-id <ID>`: BuildKite build ID containing the artifacts to publish
 - `--source-version <VERSION>`: Source version of the build artifacts
-- `--target-version <VERSION>`: Target version for published artifacts
+- `--target-version <VERSION>`: Target version for published artifacts. Debian packages are uploaded as built, so it must equal `--source-version` unless `--only-dockers` is set (docker images can be retagged)
 - `--channel <CHANNEL>`: Target Debian channel (unstable, alpha, beta, stable)
 
 #### Optional Parameters
@@ -136,7 +136,6 @@ Publishes build artifacts from cache storage to Debian repositories and Docker r
 - `--verify`: Verify packages after publishing
 - `--dry-run`: Show what would be published without executing
 - `--force-upload-debians`: Force upload even if packages exist
-- `--strip-network-from-archive`: Remove network suffix from archive names
 
 #### Backend Parameter Details
 
@@ -163,7 +162,7 @@ The `--backend` parameter is **crucial** and determines where artifacts are sour
 ```bash
 ./manager.sh publish \
   --buildkite-build-id 12345 \
-  --source-version 2.0.0-rc1 \
+  --source-version 2.0.0 \
   --target-version 2.0.0 \
   --channel stable \
   --verify
@@ -175,7 +174,7 @@ The `--backend` parameter is **crucial** and determines where artifacts are sour
   --artifacts mina-daemon,mina-archive \
   --networks mainnet \
   --buildkite-build-id 12345 \
-  --source-version 2.0.0-rc1 \
+  --source-version 2.0.0 \
   --target-version 2.0.0 \
   --channel stable \
   --backend hetzner \
@@ -199,7 +198,7 @@ The `--backend` parameter is **crucial** and determines where artifacts are sour
 ```bash
 ./manager.sh publish \
   --buildkite-build-id 12345 \
-  --source-version 2.0.0-rc1 \
+  --source-version 2.0.0 \
   --target-version 2.0.0 \
   --channel stable \
   --dry-run
@@ -339,8 +338,6 @@ Archives artifacts from cache to long-term storage with optional version modific
 
 #### Optional Parameters
 - `--backend <BACKEND>`: Storage backend (default: hetzner)
-- `--new-version <VERSION>`: New version for repackaged artifacts
-- `--suite <SUITE>`: Debian suite (default: unstable)
 - `--arch <ARCH>`: Architecture (default: amd64)
 
 #### Examples
@@ -353,17 +350,6 @@ Archives artifacts from cache to long-term storage with optional version modific
   --target /archive/2024/releases \
   --codename bullseye \
   --artifacts mina-daemon,mina-archive
-```
-
-**Archive with version change:**
-```bash
-./manager.sh persist \
-  --buildkite-build-id 12345 \
-  --target /archive/legacy \
-  --codename bullseye \
-  --artifacts mina-daemon \
-  --new-version 1.9.9-legacy \
-  --suite stable
 ```
 
 ### 6. PULL Command
@@ -442,7 +428,7 @@ sudo chown $USER:$USER /var/storagebox
    ```bash
    ./manager.sh publish \
      --buildkite-build-id 12345 \
-     --source-version 2.0.0-rc1-abc123 \
+     --source-version 2.0.0-rc1 \
      --target-version 2.0.0-rc1 \
      --channel unstable \
      --verify
@@ -544,79 +530,3 @@ This documentation applies to CLI version 1.0.0 of the release manager script. C
 ```bash
 ./manager.sh version
 ```
-
-#### Real life scenario for uploading last release 3.3.0 alpha1
-
-In such case we want to upload devnet packages to :
-
-A) Debians to packages.o1test.net and unstable.apt.packages.minaprotocol.com (signed)
-B) Dockers for gcr.io
-
-I. debians and dockers for bullseye,focal,noble,bookworm,jammy for amd64
-II. debians and dockers for noble,bookworm for arm64 (we are only support new dockers for arm64 architectures)
-III. debians for archive with stripped network for arm64,amd64
-
-In current state of tool we need to perform 6 uploads:
-
-1. Upload debians to packages.o1test.net and dockers to gcr.io for:
-   - bullseye,focal,noble,bookworm,jammy
-   - amd64 arch
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-logproc,mina-daemon,mina-archive,mina-rosetta  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames focal,bullseye,jammy,noble,bookworm --archs amd64
-```
-
-2. Upload debians to packages.o1test.net for:
-   - noble,bookworm
-   - arm64 arch
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-logproc,mina-daemon,mina-archive,mina-rosetta  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames noble,bookworm --archs arm64  --only-debians
-
-```
-
-3. Upload debians to unstable.apt.packages.minaprotocol.com
-   - bullseye,focal,noble,bookworm,jammy
-   - amd64 arch
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-logproc,mina-daemon,mina-archive,mina-rosetta  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames focal,bullseye,jammy,noble,bookworm --arch amd64 --debian-repo nightly.apt.packages.minaprotocol.com --only-debians --debian-sign-key 386E9DAC378726A48ED5CE56ADB30D9ACE02F414
-```
-
-4. Upload debians to unstable.apt.packages.minaprotocol.com for:
-   - noble,bookworm
-   - arm64 arch
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-logproc,mina-daemon,mina-archive,mina-rosetta  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames noble,bookworm --archs arm64 --debian-repo nightly.apt.packages.minaprotocol.com --only-debians --debian-sign-key 386E9DAC378726A48ED5CE56ADB30D9ACE02F414
-```
-
-
-5. strip network archive suffix from debians in packages.o1.test.net
-
-
-a) amd64
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-archive  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames focal,bullseye,jammy,noble,bookworm --archs amd64 --only-debians --strip-network-from-archive
-```
-
-b) arm64
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-archive  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames noble,bookworm --archs arm64 --only-debians --strip-network-from-archive
-```
-
-6. strip network archive suffix from debians in unstable.apt.packages.o1test.net
-
-a) amd64
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-archive  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames focal,bullseye,jammy,noble,bookworm --archs amd64 --debian-repo nightly.apt.packages.minaprotocol.com --only-debians --debian-sign-key 386E9DAC378726A48ED5CE56ADB30D9ACE02F414
-```
-b) arm64
-
-```
-./buildkite/scripts/release/manager.sh publish --artifacts mina-archive  --networks devnet --buildkite-build-id 019933f3-00ad-4d7a-8520-ac539e9d9521 --backend hetzner --channel alpha --source-version 3.3.0-alpha1-release-3.3.0-6929a7e --target-version 3.3.0-alpha1-6929a7e --codenames noble,bookworm --archs arm64--debian-repo nightly.apt.packages.minaprotocol.com --only-debians --debian-sign-key 386E9DAC378726A48ED5CE56ADB30D9ACE02F414
-```
-

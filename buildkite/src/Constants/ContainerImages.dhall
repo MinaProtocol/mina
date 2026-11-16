@@ -36,30 +36,30 @@
 --       mirror one and repoint the constant if Docker Hub pull limits start to bite
 { toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:d7ffaee-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:9e7c4e5-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:d7ffaee-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:9e7c4e5-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:d7ffaee-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:9e7c4e5-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:d7ffaee-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:9e7c4e5-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:d7ffaee-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:9e7c4e5-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:d7ffaee-bookworm-devnet"
+    "docker.io/minaprotocol/mina-toolchain:9e7c4e5-bookworm-devnet"
 , minaBaseBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
-    , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
+    { amd64 = "docker.io/minaprotocol/mina-base:c4b61c7-bookworm-devnet"
+    , arm64 = "docker.io/minaprotocol/mina-base:c4b61c7-bookworm-devnet-arm64"
     }
 , minaBaseBullseye.amd64 =
-    "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
-, minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-focal-devnet"
-, minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
-, minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
-, minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
+    "docker.io/minaprotocol/mina-base:c4b61c7-bullseye-devnet"
+, minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:c4b61c7-focal-devnet"
+, minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:c4b61c7-jammy-devnet"
+, minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:c4b61c7-noble-devnet"
+, minaBase = "docker.io/minaprotocol/mina-base:c4b61c7-bookworm-devnet"
 , postgres = "docker.io/library/postgres:17-alpine"
 , xrefcheck = "docker.io/dkhamsing/awesome_bot:latest"
 , nixos = "docker.io/minaprotocol/nixos:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.8"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.10"
 }

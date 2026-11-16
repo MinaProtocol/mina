@@ -12,8 +12,8 @@ module Zkapp_command_segment_witness = struct
 
     module V3 = struct
       type t =
-        { global_first_pass_ledger : Sparse_ledger.Stable.V3.t
-        ; global_second_pass_ledger : Sparse_ledger.Stable.V3.t
+        { global_first_pass_ledger : Sparse_ledger.Stable.V4.t
+        ; global_second_pass_ledger : Sparse_ledger.Stable.V4.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
               , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
@@ -27,7 +27,7 @@ module Zkapp_command_segment_witness = struct
               With_stack_hash.Stable.V1.t
               list
             , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-            , Sparse_ledger.Stable.V3.t
+            , Sparse_ledger.Stable.V4.t
             , bool
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , Mina_numbers.Index.Stable.V1.t
@@ -93,9 +93,13 @@ module Zkapp_command_segment_witness = struct
            ; block_global_slot
            } :
             t ) : Latest.t =
-        { global_first_pass_ledger
-        ; global_second_pass_ledger
-        ; local_state_init
+        let to_latest_ledger = Sparse_ledger.Stable.V3.to_latest in
+        { global_first_pass_ledger = to_latest_ledger global_first_pass_ledger
+        ; global_second_pass_ledger = to_latest_ledger global_second_pass_ledger
+        ; local_state_init =
+            { local_state_init with
+              ledger = to_latest_ledger local_state_init.ledger
+            }
         ; start_zkapp_command
         ; state_body =
             Mina_state.Protocol_state.Body.Value.Stable.V3.to_latest state_body
@@ -204,8 +208,8 @@ module Stable = struct
   module V4 = struct
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V3.t
-      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
-      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
+      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V4.t
+      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V4.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V4.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
       ; status : Mina_base.Transaction_status.Stable.V2.t
@@ -239,8 +243,10 @@ module Stable = struct
          } :
           t ) : Latest.t =
       { transaction
-      ; first_pass_ledger
-      ; second_pass_ledger
+      ; first_pass_ledger =
+          Mina_ledger.Sparse_ledger.Stable.V3.to_latest first_pass_ledger
+      ; second_pass_ledger =
+          Mina_ledger.Sparse_ledger.Stable.V3.to_latest second_pass_ledger
       ; protocol_state_body =
           Mina_state.Protocol_state.Body.Value.Stable.V3.to_latest
             protocol_state_body
