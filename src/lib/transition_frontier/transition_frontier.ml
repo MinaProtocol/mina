@@ -13,7 +13,6 @@ module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
-module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
 
@@ -44,7 +43,7 @@ type t =
   { logger : Logger.t
   ; verifier : Verifier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
-  ; catchup_state : Catchup_state.t
+  ; catchup_tree : Full_catchup_tree.t
   ; full_frontier : Full_frontier.t
   ; persistent_root : Persistent_root.t
   ; persistent_root_instance : Persistent_root.Instance.t
@@ -55,7 +54,7 @@ type t =
   ; closed : unit Ivar.t
   }
 
-let catchup_state t = t.catchup_state
+let catchup_tree t = t.catchup_tree
 
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
@@ -172,9 +171,11 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
                  (Persistent_frontier.Database.Error.not_found_message err) ) )
   in
   { logger
-  ; catchup_state =
-      Catchup_state.create catchup_mode ~logger
-        ~root:(Full_frontier.root full_frontier)
+  ; catchup_tree =
+      ( match catchup_mode with
+      | `Super ->
+          Full_catchup_tree.create ~logger
+            ~root:(Full_frontier.root full_frontier) )
   ; verifier
   ; consensus_local_state
   ; full_frontier
@@ -402,7 +403,7 @@ let close ~loc
     { logger
     ; verifier = _
     ; consensus_local_state = _
-    ; catchup_state = _
+    ; catchup_tree = _
     ; full_frontier
     ; persistent_root = _safe_to_ignore_1
     ; persistent_root_instance
@@ -455,7 +456,7 @@ let add_breadcrumb_exn t breadcrumb =
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
   [%log internal] "Apply_catchup_state_diffs" ;
-  Catchup_state.apply_diffs t.catchup_state diffs ;
+  Full_catchup_tree.apply_diffs t.catchup_tree diffs ;
   [%log internal] "Apply_full_frontier_diffs"
     ~metadata:[ ("count", `Int (List.length diffs)) ] ;
   let (`New_root_and_diffs_with_mutants
@@ -463,7 +464,7 @@ let add_breadcrumb_exn t breadcrumb =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~has_long_catchup_job:
-        (Catchup_state.max_catchup_chain_length t.catchup_state > 5)
+        (Full_catchup_tree.max_catchup_chain_length t.catchup_tree > 5)
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   [%log internal] "Apply_full_frontier_diffs_done" ;
