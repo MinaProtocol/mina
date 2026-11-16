@@ -15,7 +15,7 @@
       "opam": 51
     },
     "exe:app/archive_blocks:archive_blocks": {
-      "libs": 187,
+      "libs": 188,
       "opam": 51
     },
     "exe:app/archive_hardfork_toolbox:archive_hardfork_toolbox": {
@@ -107,8 +107,8 @@
       "opam": 36
     },
     "exe:app/missing_blocks_guardian:missing_blocks_guardian": {
-      "libs": 104,
-      "opam": 38
+      "libs": 181,
+      "opam": 54
     },
     "exe:app/protocol_state_replay:protocol_state_replay": {
       "libs": 161,
