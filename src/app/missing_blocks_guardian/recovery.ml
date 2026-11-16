@@ -39,12 +39,10 @@ let remove file =
   | Error err ->
       Error (sprintf "Could not remove %s: %s" file (Error.to_string_hum err))
 
-(* Writes [file] to the archive and removes it, also after a failure. *)
-let populate ~logger (archive : Config.archive) (blocks : Config.blocks) file =
-  match%bind
-    Archive_blocks.add ~logger ~prog:blocks.archive_blocks ~format:blocks.format
-      ~archive_uri:archive.uri file
-  with
+(* Writes [file] to the archive with [add_block] and removes it, also after a
+   failure. *)
+let populate ~logger ~add_block file =
+  match%bind add_block file with
   | Ok () ->
       [%log info] "Populated the database with $file"
         ~metadata:[ ("file", `String file) ] ;
@@ -59,11 +57,11 @@ let populate ~logger (archive : Config.archive) (blocks : Config.blocks) file =
 (* Imports [parent] from the bucket, then each next missing parent that the
    auditor reports, until it reports none. Stops when an import changes
    nothing, so that one bad block file cannot keep it busy forever. *)
-let rec restore ~logger (archive : Config.archive) (blocks : Config.blocks)
-    (parent : Auditor.missing_parent) =
+let rec restore ~logger ~add_block (archive : Config.archive)
+    (blocks : Config.blocks) (parent : Auditor.missing_parent) =
   let open Deferred.Result.Let_syntax in
   let%bind file = download ~logger blocks parent in
-  let%bind () = populate ~logger archive blocks file in
+  let%bind () = populate ~logger ~add_block file in
   match%bind
     Auditor.check ~logger ~prog:archive.auditor ~archive_uri:archive.uri
   with
@@ -77,4 +75,4 @@ let rec restore ~logger (archive : Config.archive) (blocks : Config.blocks)
                The database remains unhealthy."
               file parent.hash parent.height ) )
   | Some next ->
-      restore ~logger archive blocks next
+      restore ~logger ~add_block archive blocks next

@@ -137,12 +137,12 @@ let test_gs_url_hint () =
   expect_problems
     ~mentioning:[ "https://storage.googleapis.com/<bucket>" ]
     (Config.blocks ~env:no_env ~url:(Some "gs://mina_network_block_data")
-       ~network:(Some "mainnet") ~format:None ~archive_blocks:None )
+       ~network:(Some "mainnet") ~format:None )
 
 let test_blocks_url () =
   let blocks ~url =
     Config.blocks ~env:no_env ~url:(Some url) ~network:(Some "mainnet")
-      ~format:None ~archive_blocks:None
+      ~format:None
   in
   Alcotest.(check string)
     "trailing slash removed" "https://bucket.example/blocks"
@@ -168,7 +168,7 @@ let test_blocks_problems_reported_together () =
        ~env:
          (env
             [ ("PRECOMPUTED_BLOCKS_URL", "ftp://x"); ("BLOCKS_FORMAT", "json") ] )
-       ~url:None ~network:(Some "a/b") ~format:None ~archive_blocks:None )
+       ~url:None ~network:(Some "a/b") ~format:None )
 
 let test_both_collects_problems () =
   expect_problems
@@ -176,7 +176,7 @@ let test_both_collects_problems () =
     (Config.both
        (Config.archive ~env:no_env ~uri:None ~auditor:None)
        (Config.blocks ~env:no_env ~url:None ~network:(Some "mainnet")
-          ~format:None ~archive_blocks:None ) )
+          ~format:None ) )
 
 let test_app_log () =
   let output =
@@ -399,12 +399,8 @@ let check_auditor ~prog =
 
 let archive ~auditor : Config.archive = { uri = archive_uri; auditor }
 
-let blocks ~dir ~archive_blocks : Config.blocks =
-  { url = "file://" ^ dir
-  ; network = "mainnet"
-  ; format = Config.Default.format
-  ; archive_blocks
-  }
+let blocks ~dir : Config.blocks =
+  { url = "file://" ^ dir; network = "mainnet"; format = Config.Default.format }
 
 let test_auditor_missing_blocks () =
   Fake_app.with_dir (fun ~dir ->
@@ -478,98 +474,85 @@ let block_name = "mainnet-5-3NKfive.json"
 
 let block_at_five : Auditor.missing_parent = { hash = "3NKfive"; height = 5 }
 
-(* Runs [populate] on a block file in the working directory. The file must
-   be removed in every case. *)
-let populate ~dir ~archive_blocks =
-  let%bind () = Writer.save block_name ~contents:Mock_bucket.block_body in
+(* Runs [populate] on a block file with [contents] in the working directory.
+   The file must be removed in every case. *)
+let populate ~add_block ~contents =
+  let%bind () = Writer.save block_name ~contents in
   let%bind result =
-    Recovery.populate ~logger:(Logger.null ())
-      (archive ~auditor:"unused")
-      (blocks ~dir ~archive_blocks)
-      block_name
+    Recovery.populate ~logger:(Logger.null ()) ~add_block block_name
   in
   let%map exists = Sys.file_exists_exn block_name in
   Alcotest.(check bool) "file removed" false exists ;
   result
 
-(* The flags of the format and of the database, then the file. *)
-let test_archive_blocks_arguments () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind prog =
-        Fake_app.printing ~dir ~name:"archive-blocks"
-          ~lines:[ Fake_app.info_line ]
-          ~ending:(sprintf "echo \"$*\" > %s/arguments" dir)
-      in
-      let%bind result =
-        Archive_blocks.add ~logger:(Logger.null ()) ~prog
-          ~format:Config.Block_format.Extensional ~archive_uri "block.json"
-      in
-      check_ok "added" result ;
-      let%map arguments = Reader.file_lines (dir ^/ "arguments") in
-      Alcotest.(check (list string))
-        "arguments"
-        [ "--extensional --archive-uri " ^ Uri.to_string archive_uri
-          ^ " block.json"
-        ]
-        arguments )
-
 let test_populate_ok () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind archive_blocks =
-        Fake_app.printing ~dir ~name:"archive-blocks"
-          ~lines:[ Fake_app.info_line ] ~ending:"exit 0"
+  Thread_safe.block_on_async_exn (fun () ->
+      let added = ref [] in
+      let add_block file =
+        added := file :: !added ;
+        return (Ok ())
       in
-      let%map result = populate ~dir ~archive_blocks in
-      check_ok "added" result )
+      let%map result = populate ~add_block ~contents:Mock_bucket.block_body in
+      check_ok "added" result ;
+      Alcotest.(check (list string)) "the file" [ block_name ] !added )
 
-let test_populate_error_line () =
-  Fake_app.with_dir (fun ~dir ->
-      (* mina-archive-blocks exits with 0 when it cannot add a block. *)
-      let%bind archive_blocks =
-        Fake_app.printing ~dir ~name:"archive-blocks"
-          ~lines:[ Fake_app.error_line ] ~ending:"exit 0"
+let test_populate_failure () =
+  Thread_safe.block_on_async_exn (fun () ->
+      let add_block _file = return (Error "not added") in
+      let%map result = populate ~add_block ~contents:Mock_bucket.block_body in
+      expect_error_with ~substring:"not added" result )
+
+(* The real import, on files that fail before the first query. *)
+let add_block ~format =
+  let pool =
+    Result.ok (Mina_caqti.connect_pool archive_uri) |> Option.value_exn
+  in
+  Archive_blocks.add_block ~logger:(Logger.null ()) ~pool ~format
+
+let test_import_not_json () =
+  Thread_safe.block_on_async_exn (fun () ->
+      let%map result =
+        populate
+          ~add_block:(add_block ~format:Config.Block_format.Precomputed)
+          ~contents:"not json"
       in
-      let%map result = populate ~dir ~archive_blocks in
-      expect_error_with ~substring:"Failed to connect" result ;
+      expect_error_with ~substring:"Could not parse JSON from file" result ;
       expect_error_with ~substring:"The database remains unhealthy" result )
 
-let test_populate_exit_code () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind archive_blocks =
-        Fake_app.printing ~dir ~name:"archive-blocks"
-          ~lines:[ Fake_app.info_line ] ~ending:"echo bad flag >&2\nexit 2"
+(* The two formats give different errors for the same file. *)
+let test_import_format () =
+  Thread_safe.block_on_async_exn (fun () ->
+      let contents = {|{"a":1}|} in
+      let%bind result =
+        populate
+          ~add_block:(add_block ~format:Config.Block_format.Precomputed)
+          ~contents
       in
-      let%map result = populate ~dir ~archive_blocks in
-      expect_error_with ~substring:"it exited with 2 and wrote: bad flag" result )
-
-let test_populate_signal () =
-  Fake_app.with_dir (fun ~dir ->
-      let%bind archive_blocks =
-        Fake_app.printing ~dir ~name:"archive-blocks" ~lines:[]
-          ~ending:"kill -KILL $$"
+      expect_error_with ~substring:"missing version tag" result ;
+      let%map result =
+        populate
+          ~add_block:(add_block ~format:Config.Block_format.Extensional)
+          ~contents
       in
-      let%map result = populate ~dir ~archive_blocks in
-      expect_error_with ~substring:"it was killed by signal" result )
+      expect_error_with ~substring:"Expected versioned JSON" result )
 
 let save_block ~dir ~height ~hash =
   Writer.save
     (dir ^/ sprintf "mainnet-%d-%s.json" height hash)
     ~contents:Mock_bucket.block_body
 
-(* A fake mina-archive-blocks that records the names of its files in
-   [dir]/imported, so that a test can see the order of the imports. *)
-let recording_archive_blocks ~dir =
-  let%bind () =
-    Writer.save (dir ^/ "line") ~contents:(Fake_app.info_line ^ "\n")
-  in
-  Fake_app.write_program ~dir ~name:"archive-blocks"
-    (sprintf "for last; do :; done\necho \"$last\" >> %s/imported\ncat %s/line"
-       dir dir )
+(* An [add_block] that records its files, and the list of them, oldest
+   first. *)
+let recording_add_block () =
+  let added = ref [] in
+  ( (fun file ->
+      added := file :: !added ;
+      return (Ok ()) )
+  , fun () -> List.rev !added )
 
-let restore ~dir ~auditor ~archive_blocks =
-  Recovery.restore ~logger:(Logger.null ()) (archive ~auditor)
-    (blocks ~dir ~archive_blocks)
-    block_at_five
+let restore ~dir ~auditor ~add_block =
+  Recovery.restore ~logger:(Logger.null ()) ~add_block (archive ~auditor)
+    (blocks ~dir) block_at_five
 
 let test_restore_follows_parents () =
   Fake_app.with_dir (fun ~dir ->
@@ -582,14 +565,13 @@ let test_restore_follows_parents () =
             ; [ Fake_app.info_line ]
             ]
       in
-      let%bind archive_blocks = recording_archive_blocks ~dir in
-      let%bind result = restore ~dir ~auditor ~archive_blocks in
+      let add_block, added = recording_add_block () in
+      let%map result = restore ~dir ~auditor ~add_block in
       check_ok "restored" result ;
-      let%map imported = Reader.file_lines (dir ^/ "imported") in
       Alcotest.(check (list string))
         "imports in order"
         [ block_name; "mainnet-4-3NKfour.json" ]
-        imported )
+        (added ()) )
 
 let test_restore_no_progress () =
   Fake_app.with_dir (fun ~dir ->
@@ -599,12 +581,11 @@ let test_restore_no_progress () =
           ~lines:[ Fake_app.parent_lacking ~height:5 ~hash:"3NKfive" ]
           ~ending:"exit 1"
       in
-      let%bind archive_blocks = recording_archive_blocks ~dir in
-      let%bind result = restore ~dir ~auditor ~archive_blocks in
+      let add_block, added = recording_add_block () in
+      let%map result = restore ~dir ~auditor ~add_block in
       expect_error_with ~substring:"still lacks block 3NKfive at height 5"
         result ;
-      let%map imported = Reader.file_lines (dir ^/ "imported") in
-      Alcotest.(check (list string)) "one import" [ block_name ] imported )
+      Alcotest.(check (list string)) "one import" [ block_name ] (added ()) )
 
 let test_restore_block_not_in_bucket () =
   Fake_app.with_dir (fun ~dir ->
@@ -612,10 +593,11 @@ let test_restore_block_not_in_bucket () =
         Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.info_line ]
           ~ending:"exit 0"
       in
-      let%bind archive_blocks = recording_archive_blocks ~dir in
-      let%map result = restore ~dir ~auditor ~archive_blocks in
+      let add_block, added = recording_add_block () in
+      let%map result = restore ~dir ~auditor ~add_block in
       expect_error_with ~substring:"Could not download the block at height 5"
-        result )
+        result ;
+      Alcotest.(check (list string)) "no import" [] (added ()) )
 
 let test_restore_auditor_fails () =
   Fake_app.with_dir (fun ~dir ->
@@ -624,8 +606,8 @@ let test_restore_auditor_fails () =
         Fake_app.printing ~dir ~name:"auditor" ~lines:[ Fake_app.error_line ]
           ~ending:"exit 1"
       in
-      let%bind archive_blocks = recording_archive_blocks ~dir in
-      let%map result = restore ~dir ~auditor ~archive_blocks in
+      let add_block, _added = recording_add_block () in
+      let%map result = restore ~dir ~auditor ~add_block in
       expect_error_with ~substring:"Failed to connect" result )
 
 let () =
@@ -678,16 +660,13 @@ let () =
         ; Alcotest.test_case "program not found is a failure" `Quick
             test_auditor_not_found
         ] )
-    ; ( "archive_blocks"
-      , [ Alcotest.test_case "arguments" `Quick test_archive_blocks_arguments ]
-      )
     ; ( "populate"
       , [ Alcotest.test_case "success" `Quick test_populate_ok
-        ; Alcotest.test_case "error line with exit 0 is a failure" `Quick
-            test_populate_error_line
-        ; Alcotest.test_case "non-zero exit is a failure" `Quick
-            test_populate_exit_code
-        ; Alcotest.test_case "signal is a failure" `Quick test_populate_signal
+        ; Alcotest.test_case "failure" `Quick test_populate_failure
+        ; Alcotest.test_case "real import of a file that is not JSON" `Quick
+            test_import_not_json
+        ; Alcotest.test_case "real import uses the format" `Quick
+            test_import_format
         ] )
     ; ( "restore"
       , [ Alcotest.test_case "follows the missing parents" `Quick
