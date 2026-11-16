@@ -37,3 +37,34 @@ prepare_nix_workdir() {
   git checkout -b "$BUILDKITE_BRANCH"
   git reset --hard "$BUILDKITE_COMMIT"
 }
+
+# Nix binary cache on the Hetzner storage box.
+#
+# The nixos job container starts with an empty /nix/store every time (it is
+# `docker run --rm`), so every job re-downloads the whole dependency closure.
+# The only readers of the GCS cache (gs://mina-nix-cache) were these very jobs,
+# paying internet egress for a few GiB of NARs per job. The storage box is
+# already mounted into every job container (Cmds.dhall mounts /var/storagebox),
+# so the cache lives there now, as a plain file:// binary cache, next to the
+# docker-cache and the other CI caches.
+#
+# Reads: added as a substituter below. NARs are signed with the same key as
+# before (test.sh passes NIX_CACHE_NAR_SECRET as --secret-key-files), and its
+# public key is in flake.nix nixConfig, which --accept-flake-config trusts, so
+# nothing else has to change for signature checks.
+#
+# Writes: test.sh copies the job's whole store there after the build with
+# `nix copy --all`. The store only holds what the job used, and `nix copy`
+# skips paths the cache already has, so this seeds the cache from whatever the
+# first run substituted and after that only uploads new outputs. zstd rather
+# than nix's default xz: the uploads are a few GiB per commit and xz is an
+# order of magnitude slower to compress for no gain a CI cache would notice.
+#
+# Guarded on the mount so the scripts still work where there is no storage box
+# (buildkite/local/run_job.sh without the sync, a developer's machine).
+NIX_STORAGEBOX_CACHE="${NIX_STORAGEBOX_CACHE:-/var/storagebox/nix-cache}"
+# shellcheck disable=SC2034 # consumed by test.sh
+NIX_STORAGEBOX_CACHE_PUSH_URL="file://${NIX_STORAGEBOX_CACHE}?compression=zstd"
+if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" ]]; then
+  NIX_OPTS+=(--extra-substituters "file://${NIX_STORAGEBOX_CACHE}")
+fi

@@ -19,24 +19,6 @@ if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
   NIX_SECRET_KEY=/tmp/nix-cache-secret
 fi
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
-  echo "GCP uploading configured (for nix binaries)"
-  cat <<'EOF'> /tmp/nix-post-build
-#!/bin/sh
-
-set -eu
-set -f # disable globbing
-export IFS=' '
-
-echo $OUT_PATHS | tr ' ' '\n' >> /tmp/nix-paths
-EOF
-  chmod +x /tmp/nix-post-build
-  NIX_POST_BUILD_HOOK=/tmp/nix-post-build
-fi
-
-if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
-  NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
-fi
 if [[ "$NIX_SECRET_KEY" != "" ]]; then
   NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
 fi
@@ -53,13 +35,10 @@ nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "dun
   nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --no-link
 wait
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
-  mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
-[default]
-aws_access_key_id=$NIX_CACHE_GCP_ID
-aws_secret_access_key=$NIX_CACHE_GCP_SECRET
-EOF
-
-  nix --experimental-features nix-command copy --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" --stdin </tmp/nix-paths
+# Push everything this job used to the storage-box cache (see lib.sh). The
+# store started empty, so "everything" is exactly the closure of the build and
+# the dev shell: the paths built here plus the ones substituted, which is what
+# seeds the cache on the first run and keeps it complete afterwards.
+if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" ]]; then
+  nix "${NIX_OPTS[@]}" copy --all --to "$NIX_STORAGEBOX_CACHE_PUSH_URL"
 fi
