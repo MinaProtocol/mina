@@ -132,6 +132,7 @@ let best_tip t = find_exn ~message:"best_tip" t t.best_tip
 
 let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+  Mina_metrics.Transition_frontier.update_proposed_protocol_versions [] ;
   ignore
     ( Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
         (Breadcrumb.mask (root t))
