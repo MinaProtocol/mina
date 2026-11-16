@@ -107,7 +107,7 @@
       "opam": 36
     },
     "exe:app/missing_blocks_guardian:missing_blocks_guardian": {
-      "libs": 181,
+      "libs": 189,
       "opam": 54
     },
     "exe:app/protocol_state_replay:protocol_state_replay": {
