@@ -19,16 +19,14 @@ let segment
             }
             buildFlags
 
-let test_standard =
-      assert : "" === segment BuildFlags.Type.None Arch.Type.Amd64
+let test_standard = assert : "" === segment BuildFlags.Type.None Arch.Type.Amd64
 
 let test_arm64 =
       assert : "arm64" === segment BuildFlags.Type.None Arch.Type.Arm64
 
 let test_instrumented =
         assert
-      :     "instrumented"
-        ===  segment BuildFlags.Type.Instrumented Arch.Type.Amd64
+      : "instrumented" === segment BuildFlags.Type.Instrumented Arch.Type.Amd64
 
 let test_instrumented_arm64 =
         assert
