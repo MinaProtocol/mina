@@ -4,7 +4,8 @@
 # Usage:
 #   mkdeb.sh --output <file.deb> --package <name> --version <version>
 #            --architecture <arch> --description <text>
-#            [--depends <extra Depends>] [--replaces <pkgs>] [--breaks <pkgs>]
+#            [--depends <extra Depends>] [--suggests <pkgs>] [--provides <pkgs>]
+#            [--replaces <pkgs>] [--breaks <pkgs>]
 #            [--githash <hash>] [--buildurl <url>]
 #            <source>:<destination> ... [--into <directory> <source> ...]
 #
@@ -34,7 +35,8 @@
 set -euo pipefail
 
 output="" package="" version="" architecture="" description=""
-depends="" replaces="" breaks="" githash="" buildurl="" into=""
+depends="" suggests="" provides="" replaces="" breaks=""
+githash="" buildurl="" into=""
 installs=()
 
 while [[ $# -gt 0 ]]; do
@@ -45,6 +47,8 @@ while [[ $# -gt 0 ]]; do
     --architecture) architecture="$2"; shift 2 ;;
     --description) description="$2"; shift 2 ;;
     --depends) depends="$2"; shift 2 ;;
+    --suggests) suggests="$2"; shift 2 ;;
+    --provides) provides="$2"; shift 2 ;;
     --replaces) replaces="$2"; shift 2 ;;
     --breaks) breaks="$2"; shift 2 ;;
     --githash) githash="$2"; shift 2 ;;
@@ -135,6 +139,12 @@ installed_size=$(du -sk --exclude=DEBIAN "$root" | cut -f1)
   echo "Installed-Size: ${installed_size}"
   if [[ -n "$all_depends" ]]; then
     echo "Depends: ${all_depends}"
+  fi
+  if [[ -n "$suggests" ]]; then
+    echo "Suggests: ${suggests}"
+  fi
+  if [[ -n "$provides" ]]; then
+    echo "Provides: ${provides}"
   fi
   if [[ -n "$replaces" ]]; then
     echo "Replaces: ${replaces}"
