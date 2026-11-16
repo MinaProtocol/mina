@@ -24,7 +24,11 @@
 # The shared libraries the binaries need are found by dpkg-shlibdeps, from the
 # libraries installed where the build runs. So a package built on bookworm
 # depends on bookworm's library packages, and one built on jammy on jammy's.
-# --depends adds dependencies that are not shared libraries.
+# --depends adds dependencies that are not shared libraries. Each library
+# dependency must be met by what is installed where the build runs, and every
+# versioned symbol a binary uses must be known there. So a binary built on a
+# newer system than this one fails the build: the package could not be
+# installed on the system it was built for.
 #
 # --base-name is the package's name without a variant suffix. A package whose
 # name has a suffix (mina-generic-instrumented) provides its base name
@@ -129,7 +133,29 @@ shlib_depends=""
 if [[ ${#elfs[@]} -gt 0 ]]; then
   : > "${work}/debian/control"
   shlib_depends=$(cd "$work" && dpkg-shlibdeps -O "${elfs[@]/#${work}\//}" \
-    | sed -n 's/^shlibs:Depends=//p')
+    2> "${work}/shlibdeps.err" | sed -n 's/^shlibs:Depends=//p')
+  cat "${work}/shlibdeps.err" >&2
+  if grep -q 'unresolvable reference to symbol' "${work}/shlibdeps.err"; then
+    echo "mkdeb: a binary uses library symbols that ${codename} does not have" >&2
+    echo "mkdeb: the binaries were built for a newer system than ${codename}" >&2
+    exit 1
+  fi
+fi
+unmet=0
+IFS=',' read -ra shlib_entries <<< "$shlib_depends"
+for entry in "${shlib_entries[@]}"; do
+  if [[ "$entry" =~ ^[[:space:]]*([^[:space:]]+)[[:space:]]*\(\>=[[:space:]]*([^\)]+)\) ]]; then
+    dep="${BASH_REMATCH[1]}" min="${BASH_REMATCH[2]}"
+    installed=$(dpkg-query -W -f='${Version}' "$dep" 2>/dev/null || true)
+    if [[ -z "$installed" ]] || ! dpkg --compare-versions "$installed" ge "$min"; then
+      echo "mkdeb: needs ${dep} (>= ${min}), but this system has ${installed:-none}" >&2
+      unmet=1
+    fi
+  fi
+done
+if [[ "$unmet" -ne 0 ]]; then
+  echo "mkdeb: the binaries were built for a newer system than ${codename}" >&2
+  exit 1
 fi
 all_depends="${shlib_depends}${depends:+${shlib_depends:+, }${depends}}"
 
