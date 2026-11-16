@@ -5,7 +5,12 @@
 #   mkdeb.sh --output <file.deb> --package <name> --version <version>
 #            --architecture <arch> --description <text>
 #            [--depends <extra Depends>] [--githash <hash>] [--buildurl <url>]
-#            <source>:<destination> ...
+#            <source>:<destination> ... [--into <directory> <source> ...]
+#
+# <source>:<destination> installs <source> at <destination>. After
+# --into <directory>, a <source> on its own is installed in <directory> under
+# its own name. A file is installed with mode 0755 if <source> is executable,
+# and 0644 otherwise.
 #
 # --architecture is what the package must be built for, normally dune's
 # %{architecture}: the target of the compiler that built the binaries. Every
@@ -26,7 +31,7 @@
 set -euo pipefail
 
 output="" package="" version="" architecture="" description=""
-depends="" githash="" buildurl=""
+depends="" githash="" buildurl="" into=""
 installs=()
 
 while [[ $# -gt 0 ]]; do
@@ -39,8 +44,15 @@ while [[ $# -gt 0 ]]; do
     --depends) depends="$2"; shift 2 ;;
     --githash) githash="$2"; shift 2 ;;
     --buildurl) buildurl="$2"; shift 2 ;;
+    --into) into="$2"; shift 2 ;;
     --*) echo "mkdeb: unknown option $1" >&2; exit 2 ;;
-    *) installs+=("$1"); shift ;;
+    *:*) installs+=("$1"); shift ;;
+    *)
+      if [[ -z "$into" ]]; then
+        echo "mkdeb: $1 has no destination; give <source>:<destination> or --into" >&2
+        exit 2
+      fi
+      installs+=("$1:${into%/}/$(basename "$1")"); shift ;;
   esac
 done
 
@@ -71,7 +83,11 @@ elfs=()
 for entry in "${installs[@]}"; do
   src="${entry%%:*}"
   dest="${entry#*:}"
-  install -D -m 0755 "$src" "${root}${dest}"
+  mode=0644
+  if [[ -x "$src" ]]; then
+    mode=0755
+  fi
+  install -D -m "$mode" "$src" "${root}${dest}"
   if [[ "$(head -c 4 "$src")" == $'\x7fELF' ]]; then
     machine=$(readelf -h "$src" | sed -n 's/^ *Machine: *//p')
     if [[ "$machine" != "$elf_machine" ]]; then
