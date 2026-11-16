@@ -1,633 +1,520 @@
 (* Archive_lib.Settle_pending_blocks against hand-built archives: what it
-   makes canonical, what it orphans, and what it must leave alone. Needs a
-   PostgreSQL server: MINA_TEST_POSTGRES (any database path is ignored). *)
+   makes canonical, what it orphans, and what it must leave alone; next to the
+   archive's own canonical marking; and at the archive's startup. Each test
+   case is a scenario (Settle_scenario): its blocks, then steps with what each
+   expects. Needs a PostgreSQL server: MINA_TEST_POSTGRES (any database path is
+   ignored). *)
 
 open Core
-open Mina_base
 open Async
-module B = Synthetic_archive
-module Settle = Archive_lib.Settle_pending_blocks
+open Settle_scenario
 
-let v4 = (4, 0, 0)
+(* --- settle_pending_blocks ------------------------------------------------ *)
 
-let v5 = (5, 0, 0)
+(* The archive canonicalized the old chain past the fork block C before the
+   new chain arrived: D and E go on past C, and the fork genesis shares D's
+   height. *)
+let fork_mid_canonical ?(protocol_version = v5) () =
+  [ block "A" ~height:1 Canonical
+  ; block "B" ~parent:"A" ~height:2 Canonical
+  ; block "C" ~parent:"B" ~height:3 Canonical
+  ; block "D" ~parent:"C" ~height:4 Canonical
+  ; block "E" ~parent:"D" ~height:5 Pending
+  ; fork_genesis ~fork_block:"C" ~protocol_version ~height:4 ()
+  ; block "N" ~parent:"genesis" ~protocol_version ~height:5 Pending
+  ]
 
-let to_error e = Error.of_string (Caqti_error.show e)
+let fork_mid_canonical_settled =
+  [ ("A", Canonical)
+  ; ("B", Canonical)
+  ; ("C", Canonical)
+  ; ("D", Orphaned)
+  ; ("E", Orphaned)
+  ; ("genesis", Canonical)
+  ; ("N", Pending)
+  ]
 
-let with_conn (db : B.Db.t) f =
-  match%bind Mina_caqti.connect db.uri with
-  | Error e ->
-      return (Error (to_error e))
-  | Ok (module Conn : Mina_caqti.CONNECTION) ->
-      (* disconnect even when [f] raises, or the database cannot be dropped *)
-      Monitor.protect ~finally:Conn.disconnect (fun () ->
-          f (module Conn : Mina_caqti.CONNECTION)
-          >>| Result.map_error ~f:to_error )
-
-let run ?dry_run db = with_conn db (Settle.run ?dry_run)
-
-(* The chain status of each named block, as the archive holds it. *)
-let statuses db built blocks =
-  with_conn db (fun (module Conn) ->
-      let%map results =
-        Deferred.List.map blocks ~f:(fun (name, block) ->
-            let%map.Deferred.Result b =
-              Archive_lib.Processor.Block.load
-                (module Conn)
-                ~id:(B.block_id built block)
-            in
-            (name, b.chain_status) )
-      in
-      Result.all results )
-
-let check_statuses db built expected =
-  let open Deferred.Or_error.Let_syntax in
-  let%map got = statuses db built (List.map expected ~f:fst) in
-  Alcotest.(check (list (pair string string)))
-    "chain statuses"
-    (List.map expected ~f:(fun ((name, _), status) -> (name, status)))
-    got
-
-(* The outcome a scenario expects: the fork genesis it settles at (by name)
-   and what became of its boundary. *)
-type expected = { genesis : B.block option; boundary : Settle.boundary option }
-
-let check_result built expected (got : Settle.t) =
-  let want =
-    { Settle.genesis_id = Option.map expected.genesis ~f:(B.block_id built)
-    ; boundary = expected.boundary
-    }
-  in
-  Alcotest.(check string)
-    "settled"
-    (Sexp.to_string (Settle.sexp_of_t want))
-    (Sexp.to_string (Settle.sexp_of_t got))
-
-(* Build [scenario] into a fresh database, settle once, and compare. *)
-let run_scenario ~server_uri ~name scenario =
-  let s = B.create () in
-  let expected, statuses = scenario s in
-  B.Db.with_fresh ~server_uri ~name (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind got = run db in
-      check_result built expected got ;
-      check_statuses db built statuses )
-
-let settled canonicalized orphaned =
-  Some (Settle.Settled { canonicalized; orphaned })
-
-(* A fork genesis: the first block of the new chain, child of [fork_block]. *)
-let fork_genesis ?(protocol_version = v5) s ~fork_block ~height status =
-  B.block ~parent:fork_block ~protocol_version ~global_slot_since_hard_fork:0 s
-    ~name:"genesis" ~height status
-
-(* The archive canonicalized the old chain past the fork block (D) before the
-   new chain arrived; the new chain's genesis shares D's height. *)
-let fork_mid_canonical ?(new_version = v5) () s =
-  let a = B.block ~protocol_version:v4 s ~name:"A" ~height:1 Canonical in
-  let b =
-    B.block ~parent:a ~protocol_version:v4 s ~name:"B" ~height:2 Canonical
-  in
-  let c =
-    B.block ~parent:b ~protocol_version:v4 s ~name:"C" ~height:3 Canonical
-  in
-  let d =
-    B.block ~parent:c ~protocol_version:v4 s ~name:"D" ~height:4 Canonical
-  in
-  let e =
-    B.block ~parent:d ~protocol_version:v4 s ~name:"E" ~height:5 Pending
-  in
-  let g =
-    fork_genesis ~protocol_version:new_version s ~fork_block:c ~height:4
-      Canonical
-  in
-  let n =
-    B.block ~parent:g ~protocol_version:new_version s ~name:"N" ~height:5
-      Pending
-  in
-  ( { genesis = Some g; boundary = settled 0 2 }
-  , [ (("A", a), "canonical")
-    ; (("B", b), "canonical")
-    ; (("C", c), "canonical")
-    ; (("D", d), "orphaned")
-    ; (("E", e), "orphaned")
-    ; (("genesis", g), "canonical")
-    ; (("N", n), "pending")
-    ] )
-
-let fork_in_canonical_chain server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_mid_canonical"
-    (fork_mid_canonical ())
+let fork_in_canonical_chain =
+  { name = "fork in the canonical chain"
+  ; blocks = fork_mid_canonical ()
+  ; steps = [ Settle (settled 0 2); Expect fork_mid_canonical_settled ]
+  }
 
 (* An emergency fork that keeps the protocol version: parent links only. *)
-let fork_same_version server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_same_version"
-    (fork_mid_canonical ~new_version:v4 ())
+let fork_same_version =
+  { name = "fork without a protocol version bump"
+  ; blocks = fork_mid_canonical ~protocol_version:v4 ()
+  ; steps = [ Settle (settled 0 2); Expect fork_mid_canonical_settled ]
+  }
 
-(* The watermark is behind the fork block: its pending ancestry becomes
-   canonical, the competitors are orphaned. *)
-let fork_on_pending server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_on_pending" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-      let c = B.block ~parent:b s ~name:"C" ~height:3 Pending in
-      let d = B.block ~parent:b s ~name:"D" ~height:3 Pending in
-      let e = B.block ~parent:d s ~name:"E" ~height:4 Pending in
-      let g = fork_genesis s ~fork_block:c ~height:4 Canonical in
-      ( { genesis = Some g; boundary = settled 2 2 }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("C", c), "canonical")
-        ; (("D", d), "orphaned")
-        ; (("E", e), "orphaned")
-        ; (("genesis", g), "canonical")
-        ] ) )
+(* The watermark is behind the fork block C: its pending ancestry becomes
+   canonical, the competitors D and E are orphaned. *)
+let fork_on_pending =
+  { name = "fork on a pending block"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; block "C" ~parent:"B" ~height:3 Pending
+      ; block "D" ~parent:"B" ~height:3 Pending
+      ; block "E" ~parent:"D" ~height:4 Pending
+      ; fork_genesis ~fork_block:"C" ~height:4 ()
+      ]
+  ; steps =
+      [ Settle (settled 2 2)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("C", Canonical)
+          ; ("D", Orphaned)
+          ; ("E", Orphaned)
+          ; ("genesis", Canonical)
+          ]
+      ]
+  }
 
-(* The archive orphaned the fork block and made its sibling canonical: the
-   fork genesis says otherwise. *)
-let fork_on_orphaned server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_on_orphaned" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Orphaned in
-      let b' = B.block ~parent:a s ~name:"B'" ~height:2 Canonical in
-      let g = fork_genesis s ~fork_block:b ~height:3 Canonical in
-      ( { genesis = Some g; boundary = settled 1 1 }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("B'", b'), "orphaned")
-        ; (("genesis", g), "canonical")
-        ] ) )
+(* The archive orphaned the fork block B and made its sibling B' canonical:
+   the fork genesis says otherwise. *)
+let fork_on_orphaned =
+  { name = "fork on an orphaned block"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Orphaned
+      ; block "B'" ~parent:"A" ~height:2 Canonical
+      ; fork_genesis ~fork_block:"B" ~height:3 ()
+      ]
+  ; steps =
+      [ Settle (settled 1 1)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("B'", Orphaned)
+          ; ("genesis", Canonical)
+          ]
+      ]
+  }
 
-(* The fork genesis has no parent link yet, but its fork block is in the
+(* The fork genesis has no parent link yet, but its fork block B is in the
    archive: found by the genesis's parent hash. *)
-let fork_genesis_without_parent_link server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_no_parent_link" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-      let b' = B.block ~parent:a s ~name:"B'" ~height:2 Pending in
-      let g =
-        B.block ~parent_hash:(B.state_hash b) ~protocol_version:v5
-          ~global_slot_since_hard_fork:0 s ~name:"genesis" ~height:3 Canonical
-      in
-      ( { genesis = Some g; boundary = settled 1 1 }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("B'", b'), "orphaned")
-        ; (("genesis", g), "canonical")
-        ] ) )
+let fork_genesis_without_parent_link =
+  { name = "fork genesis without a parent link"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; block "B'" ~parent:"A" ~height:2 Pending
+      ; fork_genesis ~fork_block:"B" ~unlinked:true ~height:3 ()
+      ]
+  ; steps =
+      [ Settle (settled 1 1)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("B'", Orphaned)
+          ; ("genesis", Canonical)
+          ]
+      ]
+  }
 
-(* The fork block is not in the archive at all: nothing to anchor to, and
-   the result says so. *)
-let fork_block_missing server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_fork_block_missing" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-      let g =
-        B.block ~protocol_version:v5 ~global_slot_since_hard_fork:0 s
-          ~name:"genesis" ~height:4 Canonical
-      in
-      ( { genesis = Some g; boundary = Some No_fork_block }
-      , [ (("B", b), "pending"); (("genesis", g), "canonical") ] ) )
+(* The fork block is not in the archive at all: nothing to anchor to. *)
+let fork_block_missing =
+  { name = "fork block missing"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; fork_genesis ~height:4 ()
+      ]
+  ; steps =
+      [ Settle (unsettled No_fork_block)
+      ; Expect [ ("B", Pending); ("genesis", Canonical) ]
+      ]
+  }
 
 (* No canonical block on the fork block's ancestry. *)
-let fork_unanchored server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_unanchored" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Pending in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-      let g = fork_genesis s ~fork_block:b ~height:3 Canonical in
-      ( { genesis = Some g; boundary = Some No_canonical_ancestor }
-      , [ (("A", a), "pending")
-        ; (("B", b), "pending")
-        ; (("genesis", g), "canonical")
-        ] ) )
+let fork_unanchored =
+  { name = "fork without a canonical anchor"
+  ; blocks =
+      [ block "A" ~height:1 Pending
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; fork_genesis ~fork_block:"B" ~height:3 ()
+      ]
+  ; steps =
+      [ Settle (unsettled No_canonical_ancestor)
+      ; Expect [ ("A", Pending); ("B", Pending); ("genesis", Canonical) ]
+      ]
+  }
 
-(* The fork block is the highest canonical block; the old chain went on past
-   it as pending blocks, which are orphaned. *)
-let fork_on_last_canonical server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_on_last_canonical" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Canonical in
-      let c = B.block ~parent:b s ~name:"C" ~height:3 Canonical in
-      let d = B.block ~parent:c s ~name:"D" ~height:4 Pending in
-      let e = B.block ~parent:d s ~name:"E" ~height:5 Pending in
-      let g = fork_genesis s ~fork_block:c ~height:4 Canonical in
-      ( { genesis = Some g; boundary = settled 0 2 }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("C", c), "canonical")
-        ; (("D", d), "orphaned")
-        ; (("E", e), "orphaned")
-        ; (("genesis", g), "canonical")
-        ] ) )
+(* The fork block C is the highest canonical block; the old chain went on
+   past it as pending blocks, which are orphaned. *)
+let fork_on_last_canonical =
+  { name = "fork on the last canonical block"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Canonical
+      ; block "C" ~parent:"B" ~height:3 Canonical
+      ; block "D" ~parent:"C" ~height:4 Pending
+      ; block "E" ~parent:"D" ~height:5 Pending
+      ; fork_genesis ~fork_block:"C" ~height:4 ()
+      ]
+  ; steps =
+      [ Settle (settled 0 2)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("C", Canonical)
+          ; ("D", Orphaned)
+          ; ("E", Orphaned)
+          ; ("genesis", Canonical)
+          ]
+      ]
+  }
 
 (* A fork right after the first genesis: the old chain's canonical block B is
    a sibling of the fork genesis and is orphaned. The new chain's own pending
    blocks are left to the archive's canonical marking. *)
-let fork_on_new_network server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_new_network" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Canonical in
-      let g = fork_genesis s ~fork_block:a ~height:2 Canonical in
-      let d =
-        B.block ~parent:g ~protocol_version:v5 s ~name:"D" ~height:3 Pending
-      in
-      let e =
-        B.block ~parent:d ~protocol_version:v5 s ~name:"E" ~height:4 Pending
-      in
-      ( { genesis = Some g; boundary = settled 0 1 }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "orphaned")
-        ; (("genesis", g), "canonical")
-        ; (("D", d), "pending")
-        ; (("E", e), "pending")
-        ] ) )
+let fork_on_new_network =
+  { name = "fork on a new network"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Canonical
+      ; fork_genesis ~fork_block:"A" ~height:2 ()
+      ; postfork "D" ~parent:"genesis" ~height:3 Pending
+      ; postfork "E" ~parent:"D" ~height:4 Pending
+      ]
+  ; steps =
+      [ Settle (settled 0 1)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Orphaned)
+          ; ("genesis", Canonical)
+          ; ("D", Pending)
+          ; ("E", Pending)
+          ]
+      ]
+  }
 
 (* No fork genesis: nothing to settle, and pending blocks stay pending. *)
-let no_fork_genesis server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_no_fork_genesis" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-      let b' = B.block ~parent:a s ~name:"B'" ~height:2 Pending in
-      ( { genesis = None; boundary = None }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "pending")
-        ; (("B'", b'), "pending")
-        ] ) )
+let no_fork_genesis =
+  { name = "no fork genesis"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; block "B'" ~parent:"A" ~height:2 Pending
+      ]
+  ; steps =
+      [ Settle no_fork
+      ; Expect [ ("A", Canonical); ("B", Pending); ("B'", Pending) ]
+      ]
+  }
 
 (* A fork genesis that is not canonical, which the archive never stores
    (only an import of a block exported as pending, or a hand edit): refused,
    nothing changes. *)
-let pending_fork_genesis server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_pending_genesis" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-      let b' = B.block ~parent:a s ~name:"B'" ~height:2 Pending in
-      let g = fork_genesis s ~fork_block:b ~height:3 Pending in
-      ( { genesis = Some g; boundary = Some Fork_genesis_not_canonical }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "pending")
-        ; (("B'", b'), "pending")
-        ; (("genesis", g), "pending")
-        ] ) )
+let pending_fork_genesis =
+  { name = "pending fork genesis is refused"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; block "B'" ~parent:"A" ~height:2 Pending
+      ; fork_genesis ~fork_block:"B" ~status:Pending ~height:3 ()
+      ]
+  ; steps =
+      [ Settle (unsettled Fork_genesis_not_canonical)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Pending)
+          ; ("B'", Pending)
+          ; ("genesis", Pending)
+          ]
+      ]
+  }
 
 (* Two forks in one archive (devnet and mainnet keep the Berkeley genesis): the
-   newer fork genesis, by height, is settled; the older boundary is not
+   newer fork genesis, by height, is settled; the older boundary (A') is not
    touched. *)
-let newest_of_two_forks server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_two_forks" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let old_fork_sibling = B.block ~parent:a s ~name:"A'" ~height:2 Pending in
-      let g1 =
-        B.block ~parent:a ~protocol_version:v4 ~global_slot_since_hard_fork:0 s
-          ~name:"genesis1" ~height:2 Canonical
-      in
-      let c =
-        B.block ~parent:g1 ~global_slot_since_hard_fork:1 s ~name:"C" ~height:3
+let newest_of_two_forks =
+  { name = "newest of two forks"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "A'" ~parent:"A" ~height:2 Pending
+      ; fork_genesis ~name:"genesis1" ~fork_block:"A" ~protocol_version:v4
+          ~height:2 ()
+      ; block "C" ~parent:"genesis1" ~global_slot_since_hard_fork:1 ~height:3
           Canonical
-      in
-      let d =
-        B.block ~parent:c ~global_slot_since_hard_fork:2 s ~name:"D" ~height:4
-          Pending
-      in
-      let d' =
-        B.block ~parent:c ~global_slot_since_hard_fork:2 s ~name:"D'" ~height:4
-          Pending
-      in
-      let g2 =
-        B.block ~parent:d ~protocol_version:v5 ~global_slot_since_hard_fork:0 s
-          ~name:"genesis2" ~height:5 Canonical
-      in
-      ( { genesis = Some g2; boundary = settled 1 1 }
-      , [ (("A'", old_fork_sibling), "pending")
-        ; (("genesis1", g1), "canonical")
-        ; (("C", c), "canonical")
-        ; (("D", d), "canonical")
-        ; (("D'", d'), "orphaned")
-        ; (("genesis2", g2), "canonical")
-        ] ) )
+      ; block "D" ~parent:"C" ~global_slot_since_hard_fork:2 ~height:4 Pending
+      ; block "D'" ~parent:"C" ~global_slot_since_hard_fork:2 ~height:4 Pending
+      ; fork_genesis ~name:"genesis2" ~fork_block:"D" ~height:5 ()
+      ]
+  ; steps =
+      [ Settle (settled ~genesis:"genesis2" 1 1)
+      ; Expect
+          [ ("A'", Pending)
+          ; ("genesis1", Canonical)
+          ; ("C", Canonical)
+          ; ("D", Canonical)
+          ; ("D'", Orphaned)
+          ; ("genesis2", Canonical)
+          ]
+      ]
+  }
+
+(* A dry run reports what a run changes and changes nothing; a second run
+   finds nothing left to change. *)
+let dry_run_and_idempotence =
+  { name = "dry run, then idempotent"
+  ; blocks = fork_mid_canonical ()
+  ; steps =
+      [ Dry_run (settled 0 2)
+      ; Expect [ ("D", Canonical); ("E", Pending) ]
+      ; Settle (settled 0 2)
+      ; Settle (settled 0 0)
+      ; Expect fork_mid_canonical_settled
+      ]
+  }
 
 (* A block of the ended chain stored after the boundary was settled, e.g. by
    a backfill, is pending (here: E set back to pending, as the archive stores
    it). Settling again, as convert-chain-to-canonical does on demand, orphans
    it and changes nothing else. *)
-let late_block_of_ended_chain server_uri () =
-  let s = B.create () in
-  let expected, statuses = fork_mid_canonical () s in
-  B.Db.with_fresh ~server_uri ~name:"test_settle_late_block" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind first = run db in
-      check_result built expected first ;
-      let e =
-        List.find_map_exn statuses ~f:(fun ((name, b), _) ->
-            Option.some_if (String.equal name "E") b )
-      in
-      let%bind () =
-        with_conn db (fun (module Conn) ->
-            Conn.exec
-              (Mina_caqti.exec_req Caqti_type.int
-                 "UPDATE blocks SET chain_status = 'pending' WHERE id = ?" )
-              (B.block_id built e) )
-      in
-      let%bind again = run db in
-      check_result built { expected with boundary = settled 0 1 } again ;
-      check_statuses db built statuses )
+let late_block_of_ended_chain =
+  { name = "late block of the ended chain"
+  ; blocks = fork_mid_canonical ()
+  ; steps =
+      [ Settle (settled 0 2)
+      ; Set_status ("E", Pending)
+      ; Settle (settled 0 1)
+      ; Expect fork_mid_canonical_settled
+      ]
+  }
 
-(* The state hash of a block that is not in the archive: a parent hash that
-   no parent link can follow. *)
-let missing_hash name =
-  B.state_hash (B.block (B.create ()) ~name ~height:1 Pending)
+(* The ended chain has a gap: E's parent D is not in the archive, so E has no
+   parent link and settling, which follows parent links, cannot reach it. E
+   stays pending; "block after a gap in the ended chain" in the canonical
+   marking group shows what orphans it. *)
+let gap_in_ended_chain =
+  { name = "gap in the ended chain"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Canonical
+      ; block "C" ~parent:"B" ~height:3 Pending
+      ; block "E" ~height:5 Pending
+      ; fork_genesis ~fork_block:"B" ~height:3 ()
+      ]
+  ; steps =
+      [ Settle (settled 0 1)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("C", Orphaned)
+          ; ("E", Pending)
+          ; ("genesis", Canonical)
+          ]
+      ]
+  }
 
-(* The ended chain has a gap: E's parent is not in the archive, so its
-   parent link is not set and settling, which follows parent links, cannot
-   reach it. E stays pending; see "a block after a gap in the ended chain" in
-   the canonical marking group for what orphans it. *)
-let gap_in_ended_chain server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_gap_in_ended_chain" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let b = B.block ~parent:a s ~name:"B" ~height:2 Canonical in
-      let c = B.block ~parent:b s ~name:"C" ~height:3 Pending in
-      let e =
-        B.block ~parent_hash:(missing_hash "D") s ~name:"E" ~height:5 Pending
-      in
-      let g = fork_genesis s ~fork_block:b ~height:3 Canonical in
-      ( { genesis = Some g; boundary = settled 0 1 }
-      , [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("C", c), "orphaned")
-        ; (("E", e), "pending")
-        ; (("genesis", g), "canonical")
-        ] ) )
-
-(* The fork block's parent is not in the archive: its ancestry stops at the
+(* The fork block C's parent is not in the archive: its ancestry stops at the
    gap before any canonical block, so nothing changes. *)
-let fork_block_behind_gap server_uri () =
-  run_scenario ~server_uri ~name:"test_settle_fork_block_behind_gap" (fun s ->
-      let a = B.block s ~name:"A" ~height:1 Canonical in
-      let c =
-        B.block ~parent_hash:(missing_hash "B") s ~name:"C" ~height:3 Pending
-      in
-      let c' =
-        B.block ~parent_hash:(missing_hash "B") s ~name:"C'" ~height:3 Pending
-      in
-      let g = fork_genesis s ~fork_block:c ~height:4 Canonical in
-      ( { genesis = Some g; boundary = Some No_canonical_ancestor }
-      , [ (("A", a), "canonical")
-        ; (("C", c), "pending")
-        ; (("C'", c'), "pending")
-        ; (("genesis", g), "canonical")
-        ] ) )
+let fork_block_behind_gap =
+  { name = "fork block behind a gap"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "C" ~height:3 Pending
+      ; block "C'" ~height:3 Pending
+      ; fork_genesis ~fork_block:"C" ~height:4 ()
+      ]
+  ; steps =
+      [ Settle (unsettled No_canonical_ancestor)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("C", Pending)
+          ; ("C'", Pending)
+          ; ("genesis", Canonical)
+          ]
+      ]
+  }
 
-(* A dry run reports what a run changes and changes nothing; a second run
-   finds nothing left to change. *)
-let dry_run_and_idempotence server_uri () =
-  let s = B.create () in
-  let expected, statuses = fork_mid_canonical () s in
-  B.Db.with_fresh ~server_uri ~name:"test_settle_dry_run" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let before =
-        List.filter_map statuses ~f:(fun ((name, block), _) ->
-            match name with
-            | "D" ->
-                Some ((name, block), "canonical")
-            | "E" ->
-                Some ((name, block), "pending")
-            | _ ->
-                None )
-      in
-      let%bind dry = run ~dry_run:true db in
-      check_result built expected dry ;
-      let%bind () = check_statuses db built before in
-      let%bind real = run db in
-      check_result built expected real ;
-      let%bind again = run db in
-      check_result built { expected with boundary = settled 0 0 } again ;
-      check_statuses db built statuses )
+(* --- canonical marking ------------------------------------------------------
 
-(* --- the archive's canonical marking around a settled boundary --------------
-
-   As each block arrives the archive runs Processor.Block.update_chain_status:
-   once a block is k above the highest canonical block, the chain k below it
-   becomes canonical and every other block at those heights is orphaned; a
-   block below the highest canonical block (a backfill) makes the chain
-   between the canonical blocks around it canonical, the same way. These
-   tests run it with k = 2 next to a settle. *)
-
-let mark_chain_status db built block =
-  let precomputed = Lazy.force Precomputed_values.for_unit_tests in
-  let genesis_constants =
-    { precomputed.genesis_constants with
-      protocol = { precomputed.genesis_constants.protocol with k = 2 }
-    }
-  in
-  with_conn db (fun (module Conn) ->
-      Archive_lib.Processor.Block.update_chain_status
-        (module Conn)
-        ~logger:(Logger.null ()) ~genesis_constants
-        ~block_id:(B.block_id built block) )
-
-let check_settle built ?genesis boundary got =
-  check_result built { genesis; boundary } got
+   As each block arrives the archive runs Processor.Block.update_chain_status
+   (the Mark step, with k = 2): once a block is k above the highest canonical
+   block, the chain k below it becomes canonical and every other block at
+   those heights is orphaned; a block below the highest canonical block (a
+   backfill) makes the chain between the canonical blocks around it canonical,
+   the same way. *)
 
 (* After settling, the new chain's blocks are marked from the fork genesis
    on; the settled boundary is left as it is. *)
-let marking_after_settle server_uri () =
-  let s = B.create () in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let b = B.block ~parent:a s ~name:"B" ~height:2 Canonical in
-  let c = B.block ~parent:b s ~name:"C" ~height:3 Canonical in
-  let d = B.block ~parent:c s ~name:"D" ~height:4 Pending in
-  let e = B.block ~parent:d s ~name:"E" ~height:5 Pending in
-  let g = fork_genesis s ~fork_block:c ~height:4 Canonical in
-  let n1 =
-    B.block ~parent:g ~protocol_version:v5 s ~name:"N1" ~height:5 Pending
-  in
-  let n2 =
-    B.block ~parent:n1 ~protocol_version:v5 s ~name:"N2" ~height:6 Pending
-  in
-  let n3 =
-    B.block ~parent:n2 ~protocol_version:v5 s ~name:"N3" ~height:7 Pending
-  in
-  B.Db.with_fresh ~server_uri ~name:"test_marking_after_settle" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind got = run db in
-      check_settle built ~genesis:g (settled 0 2) got ;
-      let%bind () = mark_chain_status db built n3 in
-      check_statuses db built
-        [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("C", c), "canonical")
-        ; (("D", d), "orphaned")
-        ; (("E", e), "orphaned")
-        ; (("genesis", g), "canonical")
-        ; (("N1", n1), "canonical")
-        ; (("N2", n2), "pending")
-        ; (("N3", n3), "pending")
-        ] )
-
-(* Without settling, the archive's marking of the new chain orphans the old
-   chain's blocks at the new chain's heights (D, beside the fork genesis), but
-   never reaches the blocks below the fork genesis: B, C and C' stay pending
-   however long the new chain grows. Settling finishes them. *)
-let marking_without_settle server_uri () =
-  let s = B.create () in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-  let c = B.block ~parent:b s ~name:"C" ~height:3 Pending in
-  let c' = B.block ~parent:b s ~name:"C'" ~height:3 Pending in
-  let d = B.block ~parent:c s ~name:"D" ~height:4 Pending in
-  let g = fork_genesis s ~fork_block:c ~height:4 Canonical in
-  let n1 =
-    B.block ~parent:g ~protocol_version:v5 s ~name:"N1" ~height:5 Pending
-  in
-  let n2 =
-    B.block ~parent:n1 ~protocol_version:v5 s ~name:"N2" ~height:6 Pending
-  in
-  let n3 =
-    B.block ~parent:n2 ~protocol_version:v5 s ~name:"N3" ~height:7 Pending
-  in
-  B.Db.with_fresh ~server_uri ~name:"test_marking_without_settle" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind () = mark_chain_status db built n3 in
-      let%bind () =
-        check_statuses db built
-          [ (("A", a), "canonical")
-          ; (("B", b), "pending")
-          ; (("C", c), "pending")
-          ; (("C'", c'), "pending")
-          ; (("D", d), "orphaned")
-          ; (("genesis", g), "canonical")
-          ; (("N1", n1), "canonical")
+let marking_after_settle =
+  { name = "new chain marked after settling"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Canonical
+      ; block "C" ~parent:"B" ~height:3 Canonical
+      ; block "D" ~parent:"C" ~height:4 Pending
+      ; block "E" ~parent:"D" ~height:5 Pending
+      ; fork_genesis ~fork_block:"C" ~height:4 ()
+      ; postfork "N1" ~parent:"genesis" ~height:5 Pending
+      ; postfork "N2" ~parent:"N1" ~height:6 Pending
+      ; postfork "N3" ~parent:"N2" ~height:7 Pending
+      ]
+  ; steps =
+      [ Settle (settled 0 2)
+      ; Mark "N3"
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("C", Canonical)
+          ; ("D", Orphaned)
+          ; ("E", Orphaned)
+          ; ("genesis", Canonical)
+          ; ("N1", Canonical)
+          ; ("N2", Pending)
+          ; ("N3", Pending)
           ]
-      in
-      let%bind got = run db in
-      check_settle built ~genesis:g (settled 2 1) got ;
-      check_statuses db built
-        [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("C", c), "canonical")
-        ; (("C'", c'), "orphaned")
-        ; (("D", d), "orphaned")
-        ; (("genesis", g), "canonical")
-        ; (("N1", n1), "canonical")
-        ] )
+      ]
+  }
 
-(* A prefork block backfilled below the fork genesis, without settling: the
+(* Without settling, the marking of the new chain orphans the old chain's
+   blocks at the new chain's heights (D, beside the fork genesis), but never
+   reaches the blocks below the fork genesis: B, C and C' stay pending however
+   long the new chain grows. Settling finishes them. *)
+let marking_without_settle =
+  { name = "new chain marked without settling"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; block "C" ~parent:"B" ~height:3 Pending
+      ; block "C'" ~parent:"B" ~height:3 Pending
+      ; block "D" ~parent:"C" ~height:4 Pending
+      ; fork_genesis ~fork_block:"C" ~height:4 ()
+      ; postfork "N1" ~parent:"genesis" ~height:5 Pending
+      ; postfork "N2" ~parent:"N1" ~height:6 Pending
+      ; postfork "N3" ~parent:"N2" ~height:7 Pending
+      ]
+  ; steps =
+      [ Mark "N3"
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Pending)
+          ; ("C", Pending)
+          ; ("C'", Pending)
+          ; ("D", Orphaned)
+          ; ("genesis", Canonical)
+          ; ("N1", Canonical)
+          ]
+      ; Settle (settled 2 1)
+      ; Expect
+          [ ("A", Canonical)
+          ; ("B", Canonical)
+          ; ("C", Canonical)
+          ; ("C'", Orphaned)
+          ; ("D", Orphaned)
+          ; ("genesis", Canonical)
+          ; ("N1", Canonical)
+          ]
+      ]
+  }
+
+(* A prefork block X backfilled below the fork genesis, without settling: the
    archive makes the chain between the canonical blocks around it (A below,
    the fork genesis above) canonical and orphans the rest at those heights,
    which settles the boundary below the fork genesis. A later settle finds
    nothing left. *)
-let backfill_without_settle server_uri () =
-  let s = B.create () in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-  let c = B.block ~parent:b s ~name:"C" ~height:3 Pending in
-  let c' = B.block ~parent:b s ~name:"C'" ~height:3 Pending in
-  let g = fork_genesis s ~fork_block:c ~height:4 Canonical in
-  let x = B.block ~parent:a s ~name:"X" ~height:2 Pending in
-  B.Db.with_fresh ~server_uri ~name:"test_backfill_without_settle" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind () = mark_chain_status db built x in
-      let expected =
-        [ (("A", a), "canonical")
-        ; (("B", b), "canonical")
-        ; (("C", c), "canonical")
-        ; (("C'", c'), "orphaned")
-        ; (("genesis", g), "canonical")
-        ; (("X", x), "orphaned")
-        ]
-      in
-      let%bind () = check_statuses db built expected in
-      let%bind got = run db in
-      check_settle built ~genesis:g (settled 0 0) got ;
-      check_statuses db built expected )
+let backfill_without_settle =
+  let settled_by_backfill =
+    [ ("A", Canonical)
+    ; ("B", Canonical)
+    ; ("C", Canonical)
+    ; ("C'", Orphaned)
+    ; ("genesis", Canonical)
+    ; ("X", Orphaned)
+    ]
+  in
+  { name = "backfill below the fork genesis, not settled"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Pending
+      ; block "C" ~parent:"B" ~height:3 Pending
+      ; block "C'" ~parent:"B" ~height:3 Pending
+      ; fork_genesis ~fork_block:"C" ~height:4 ()
+      ; block "X" ~parent:"A" ~height:2 Pending
+      ]
+  ; steps =
+      [ Mark "X"
+      ; Expect settled_by_backfill
+      ; Settle (settled 0 0)
+      ; Expect settled_by_backfill
+      ]
+  }
 
-(* A pending block that competes with the chain below the settle's anchor
-   (X, beside the canonical fork block C) is not part of the ended chain, so
-   settling leaves it; the archive's marking orphans it when it arrives, as
-   for any backfilled block. *)
-let backfill_after_settle server_uri () =
-  let s = B.create () in
-  let expected, statuses = fork_mid_canonical () s in
-  let b =
-    List.find_map_exn statuses ~f:(fun ((name, b), _) ->
-        Option.some_if (String.equal name "B") b )
-  in
-  let x = B.block ~parent:b s ~name:"X" ~height:3 Pending in
-  B.Db.with_fresh ~server_uri ~name:"test_backfill_after_settle" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind got = run db in
-      check_result built expected got ;
-      let%bind () = check_statuses db built [ (("X", x), "pending") ] in
-      let%bind () = mark_chain_status db built x in
-      check_statuses db built (statuses @ [ (("X", x), "orphaned") ]) )
+(* A pending block X that competes with the chain below the settle's anchor
+   (beside the canonical fork block C) is not part of the ended chain, so
+   settling leaves it; the marking orphans it when it arrives, as for any
+   backfilled block. *)
+let backfill_after_settle =
+  { name = "backfill after settling"
+  ; blocks = fork_mid_canonical () @ [ block "X" ~parent:"B" ~height:3 Pending ]
+  ; steps =
+      [ Settle (settled 0 2)
+      ; Expect [ ("X", Pending) ]
+      ; Mark "X"
+      ; Expect (fork_mid_canonical_settled @ [ ("X", Orphaned) ])
+      ]
+  }
 
-(* The block after a gap in the ended chain (E), which settling cannot reach,
-   is orphaned once the new chain is k above its height. *)
-let gap_in_ended_chain_marked server_uri () =
-  let s = B.create () in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let b = B.block ~parent:a s ~name:"B" ~height:2 Canonical in
-  let c = B.block ~parent:b s ~name:"C" ~height:3 Pending in
-  let e =
-    B.block ~parent_hash:(missing_hash "D") s ~name:"E" ~height:5 Pending
-  in
-  let g = fork_genesis s ~fork_block:b ~height:3 Canonical in
-  let n1 =
-    B.block ~parent:g ~protocol_version:v5 s ~name:"N1" ~height:4 Pending
-  in
-  let n2 =
-    B.block ~parent:n1 ~protocol_version:v5 s ~name:"N2" ~height:5 Pending
-  in
-  let n3 =
-    B.block ~parent:n2 ~protocol_version:v5 s ~name:"N3" ~height:6 Pending
-  in
-  let n4 =
-    B.block ~parent:n3 ~protocol_version:v5 s ~name:"N4" ~height:7 Pending
-  in
-  B.Db.with_fresh ~server_uri ~name:"test_gap_in_ended_chain_marked" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind got = run db in
-      check_settle built ~genesis:g (settled 0 1) got ;
-      let%bind () = check_statuses db built [ (("E", e), "pending") ] in
-      let%bind () = mark_chain_status db built n4 in
-      check_statuses db built
-        [ (("C", c), "orphaned")
-        ; (("E", e), "orphaned")
-        ; (("genesis", g), "canonical")
-        ; (("N1", n1), "canonical")
-        ; (("N2", n2), "canonical")
-        ; (("N3", n3), "pending")
-        ] )
+(* E, after a gap in the ended chain, which settling cannot reach, is
+   orphaned once the new chain is k above its height. *)
+let gap_in_ended_chain_marked =
+  { name = "block after a gap in the ended chain"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "B" ~parent:"A" ~height:2 Canonical
+      ; block "C" ~parent:"B" ~height:3 Pending
+      ; block "E" ~height:5 Pending
+      ; fork_genesis ~fork_block:"B" ~height:3 ()
+      ; postfork "N1" ~parent:"genesis" ~height:4 Pending
+      ; postfork "N2" ~parent:"N1" ~height:5 Pending
+      ; postfork "N3" ~parent:"N2" ~height:6 Pending
+      ; postfork "N4" ~parent:"N3" ~height:7 Pending
+      ]
+  ; steps =
+      [ Settle (settled 0 1)
+      ; Expect [ ("E", Pending) ]
+      ; Mark "N4"
+      ; Expect
+          [ ("C", Orphaned)
+          ; ("E", Orphaned)
+          ; ("genesis", Canonical)
+          ; ("N1", Canonical)
+          ; ("N2", Canonical)
+          ; ("N3", Pending)
+          ]
+      ]
+  }
 
-(* --- startup with --config-file -------------------------------------------
+(* --- startup with --config-file ---------------------------------------------
 
    Processor.startup_with_config, as the archive runs it before it takes
-   blocks: write the config's genesis, then with
+   blocks: write the genesis of --config-file, then with
    --settle-prefork-pending-blocks settle the boundary of its fork genesis
    once. *)
 
-(* A real state hash: the config names the fork block by it, and the genesis
-   block built from the config has it as its parent hash. *)
-let real_state_hash seed =
-  State_hash.to_base58_check
-    (Quickcheck.random_value ~seed:(`Deterministic seed) State_hash.gen)
+(* The --config-file of a startup. *)
+type config =
+  | Fork_at of string  (** A hard fork at this block of the scenario. *)
+  | Fork_not_in_archive of int
+      (** A hard fork at a block of this height that is not in the archive. *)
+  | New_chain  (** A config that starts a new chain, not a hard fork. *)
+  | No_config_file
 
-(* Each test has its own genesis ledger: the daemon code that loads a config's
-   ledger keeps it in an on-disk cache named by its content, which one process
-   can open once. *)
-let config ~tag ?fork s =
+type startup_result = Starts | Stops_mentioning of string
+
+(* Each config has its own genesis ledger, named by the test case and [tag]:
+   the daemon code that loads a config's ledger keeps it in an on-disk cache
+   named by its content, which one process can open once. *)
+let runtime_config ctx ~tag ~fork =
   let accounts =
     List.map [ "alice"; "bob"; "carol" ] ~f:(fun name ->
         { Runtime_config.Accounts.Single.default with
-          pk = B.public_key (B.account s (tag ^ "-" ^ name))
+          pk = ctx.public_key (sprintf "%s %s %s" ctx.test tag name)
         ; balance = Currency.Balance.of_mina_int_exn 2000
         } )
   in
@@ -644,9 +531,8 @@ let config ~tag ?fork s =
   ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
   }
 
-(* The archive's startup on [db], with [runtime_config_opt] as its
-   --config-file: [Error] carries the message it stopped with. *)
-let startup_opt ?(settle = true) (db : B.Db.t) runtime_config_opt =
+(* The archive's startup: [Ok (Error msg)] when it stopped with [msg]. *)
+let run_startup (db : Synthetic_archive.Db.t) ~settle runtime_config_opt =
   let precomputed = Lazy.force Precomputed_values.for_unit_tests in
   match Mina_caqti.connect_pool db.uri with
   | Error e ->
@@ -665,342 +551,276 @@ let startup_opt ?(settle = true) (db : B.Db.t) runtime_config_opt =
           >>| Result.map_error ~f:Exn.to_string
           |> Deferred.ok )
 
-let startup ?settle db runtime_config =
-  startup_opt ?settle db (Some runtime_config)
+let describe_config = function
+  | Fork_at name ->
+      "the fork at " ^ name
+  | Fork_not_in_archive height ->
+      sprintf "a fork at height %d, not in the archive" height
+  | New_chain ->
+      "a new chain's config"
+  | No_config_file ->
+      "no --config-file"
 
-let expect_ok what = function
-  | Ok () ->
-      ()
-  | Error msg ->
-      Alcotest.failf "%s failed: %s" what msg
-
-let expect_failure what ~mentioning = function
-  | Ok () ->
-      Alcotest.failf "%s: expected the archive to stop" what
-  | Error msg ->
-      if not (String.is_substring msg ~substring:mentioning) then
-        Alcotest.failf "%s: stopped with an unexpected message: %s" what msg
-
-let exec db sql =
-  with_conn db (fun (module Conn) ->
-      Conn.exec (Mina_caqti.exec_req Caqti_type.unit sql) () )
-
-(* The chain status of each genesis block (global slot since hard fork 0) at
-   [height]. *)
-let genesis_statuses db ~height =
-  with_conn db (fun (module Conn) ->
-      Conn.collect_list
-        (Mina_caqti.collect_req Caqti_type.int Caqti_type.string
-           "SELECT chain_status::text FROM blocks WHERE height = ? AND \
-            global_slot_since_hard_fork = 0 ORDER BY id" )
-        height )
+(* A startup step: the archive starts with [config] (and
+   --settle-prefork-pending-blocks unless [~settle:false]) and [expect]s to
+   start or to stop. *)
+let startup ?(settle = true) ?(expect = Starts) config =
+  let check = function
+    | Starts, Ok () ->
+        Ok ()
+    | Starts, Error msg ->
+        Or_error.errorf "the archive stopped: %s" msg
+    | Stops_mentioning expected, Ok () ->
+        Or_error.errorf "expected the archive to stop (%s)" expected
+    | Stops_mentioning expected, Error msg ->
+        if String.is_substring msg ~substring:expected then Ok ()
+        else
+          Or_error.errorf "the archive stopped with an unexpected message: %s"
+            msg
+  in
+  Do
+    ( sprintf "startup with %s%s" (describe_config config)
+        (if settle then ", settling" else "")
+    , fun ctx ->
+        let runtime_config_opt =
+          match config with
+          | No_config_file ->
+              None
+          | New_chain ->
+              Some (runtime_config ctx ~tag:"new chain" ~fork:None)
+          | Fork_at name ->
+              Some
+                (runtime_config ctx ~tag:name
+                   ~fork:(Some (ctx.state_hash name, ctx.height name)) )
+          | Fork_not_in_archive height ->
+              Some
+                (runtime_config ctx ~tag:"missing fork block"
+                   ~fork:
+                     (Some
+                        ( state_hash_not_in_archive ~test:ctx.test "fork block"
+                        , height ) ) )
+        in
+        let%map.Deferred result =
+          run_startup ctx.db ~settle runtime_config_opt
+        in
+        Or_error.bind result ~f:(fun result -> check (expect, result)) )
 
 (* The old chain went on past its fork block C (height 3): D is canonical, E
    pending. The fork genesis, at height 4, is stored at startup. *)
-let fork_chain ~fork_hash s =
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let b = B.block ~parent:a s ~name:"B" ~height:2 Canonical in
-  let c =
-    B.block ~state_hash:fork_hash ~parent:b s ~name:"C" ~height:3 Canonical
-  in
-  let d = B.block ~parent:c s ~name:"D" ~height:4 Canonical in
-  let e = B.block ~parent:d s ~name:"E" ~height:5 Pending in
-  [ ("A", a); ("B", b); ("C", c); ("D", d); ("E", e) ]
+let fork_chain =
+  [ block "A" ~height:1 Canonical
+  ; block "B" ~parent:"A" ~height:2 Canonical
+  ; block "C" ~parent:"B" ~height:3 Canonical
+  ; block "D" ~parent:"C" ~height:4 Canonical
+  ; block "E" ~parent:"D" ~height:5 Pending
+  ]
 
-let settled_fork_chain =
-  [ "canonical"; "canonical"; "canonical"; "orphaned"; "orphaned" ]
+let fork_chain_settled =
+  [ ("A", Canonical)
+  ; ("B", Canonical)
+  ; ("C", Canonical)
+  ; ("D", Orphaned)
+  ; ("E", Orphaned)
+  ]
 
-let unsettled_fork_chain =
-  [ "canonical"; "canonical"; "canonical"; "canonical"; "pending" ]
-
-let check_chain db built blocks want =
-  check_statuses db built
-    (List.map2_exn blocks want ~f:(fun (name, block) status ->
-         ((name, block), status) ) )
+let fork_chain_unsettled =
+  [ ("A", Canonical)
+  ; ("B", Canonical)
+  ; ("C", Canonical)
+  ; ("D", Canonical)
+  ; ("E", Pending)
+  ]
 
 (* The fork genesis is stored at startup and its boundary settled; a second
    start changes nothing. *)
-let startup_settles_once server_uri () =
-  let s = B.create () in
-  let tag = "startup_settles_once" in
-  let fork_hash = real_state_hash tag in
-  let blocks = fork_chain ~fork_hash s in
-  let runtime_config = config ~tag ~fork:(fork_hash, 3) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_settles_once" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind first = startup db runtime_config in
-      expect_ok "startup" first ;
-      let%bind genesis = genesis_statuses db ~height:4 in
-      Alcotest.(check (list string)) "fork genesis" [ "canonical" ] genesis ;
-      let%bind () = check_chain db built blocks settled_fork_chain in
-      let%bind again = startup db runtime_config in
-      expect_ok "second startup" again ;
-      check_chain db built blocks settled_fork_chain )
+let startup_settles_once =
+  { name = "settles once"
+  ; blocks = fork_chain
+  ; steps =
+      [ startup (Fork_at "C")
+      ; Expect_geneses (4, [ Canonical ])
+      ; Expect fork_chain_settled
+      ; startup (Fork_at "C")
+      ; Expect fork_chain_settled
+      ]
+  }
 
 (* Without --settle-prefork-pending-blocks the prefork blocks are left as
    they are. *)
-let startup_without_settle server_uri () =
-  let s = B.create () in
-  let tag = "startup_without_settle" in
-  let fork_hash = real_state_hash tag in
-  let blocks = fork_chain ~fork_hash s in
-  let runtime_config = config ~tag ~fork:(fork_hash, 3) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_without_settle" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind result = startup ~settle:false db runtime_config in
-      expect_ok "startup" result ;
-      check_chain db built blocks unsettled_fork_chain )
+let startup_without_settle =
+  { name = "without --settle-prefork-pending-blocks"
+  ; blocks = fork_chain
+  ; steps = [ startup ~settle:false (Fork_at "C"); Expect fork_chain_unsettled ]
+  }
 
 (* The fork genesis was stored, then made pending (an import, a hand edit):
    the archive stops rather than settle on it, and changes nothing. *)
-let startup_refuses_pending_genesis server_uri () =
-  let s = B.create () in
-  let tag = "startup_refuses_pending_genesis" in
-  let fork_hash = real_state_hash tag in
-  let blocks = fork_chain ~fork_hash s in
-  let runtime_config = config ~tag ~fork:(fork_hash, 3) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_pending_genesis" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind first = startup ~settle:false db runtime_config in
-      expect_ok "first startup" first ;
-      let%bind () =
-        exec db
+let startup_refuses_pending_genesis =
+  { name = "refuses a pending fork genesis"
+  ; blocks = fork_chain
+  ; steps =
+      [ startup ~settle:false (Fork_at "C")
+      ; Sql
           "UPDATE blocks SET chain_status = 'pending' WHERE height = 4 AND \
            global_slot_since_hard_fork = 0"
-      in
-      let%bind second = startup db runtime_config in
-      expect_failure "a pending fork genesis" ~mentioning:"not canonical" second ;
-      check_chain db built blocks unsettled_fork_chain )
+      ; startup ~expect:(Stops_mentioning "not canonical") (Fork_at "C")
+      ; Expect fork_chain_unsettled
+      ]
+  }
 
 (* Devnet and mainnet keep an older fork genesis (Berkeley's), with its own
-   unsettled leftovers: startup settles the boundary of its config's fork,
-   not the older one. *)
-let startup_with_older_fork server_uri () =
-  let s = B.create () in
-  let tag = "startup_with_older_fork" in
-  let fork_hash = real_state_hash tag in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let a' = B.block ~parent:a s ~name:"A'" ~height:2 Pending in
-  let g1 =
-    B.block ~parent:a ~global_slot_since_hard_fork:0 s ~name:"genesis1"
-      ~height:2 Canonical
-  in
-  let c = B.block ~parent:g1 s ~name:"C" ~height:3 Canonical in
-  let d =
-    B.block ~state_hash:fork_hash ~parent:c s ~name:"D" ~height:4 Pending
-  in
-  let d' = B.block ~parent:c s ~name:"D'" ~height:4 Pending in
-  let runtime_config = config ~tag ~fork:(fork_hash, 4) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_older_fork" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind result = startup db runtime_config in
-      expect_ok "startup" result ;
-      check_statuses db built
-        [ (("A'", a'), "pending")
-        ; (("genesis1", g1), "canonical")
-        ; (("C", c), "canonical")
-        ; (("D", d), "canonical")
-        ; (("D'", d'), "orphaned")
-        ] )
+   unsettled leftovers (A'): startup settles the boundary of its config's
+   fork, not the older one. *)
+let startup_with_older_fork =
+  { name = "with an older fork in the archive"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "A'" ~parent:"A" ~height:2 Pending
+      ; fork_genesis ~name:"genesis1" ~fork_block:"A" ~protocol_version:v4
+          ~height:2 ()
+      ; block "C" ~parent:"genesis1" ~height:3 Canonical
+      ; block "D" ~parent:"C" ~height:4 Pending
+      ; block "D'" ~parent:"C" ~height:4 Pending
+      ]
+  ; steps =
+      [ startup (Fork_at "D")
+      ; Expect
+          [ ("A'", Pending)
+          ; ("genesis1", Canonical)
+          ; ("C", Canonical)
+          ; ("D", Canonical)
+          ; ("D'", Orphaned)
+          ]
+      ]
+  }
 
 (* The fork block is not in the archive yet: nothing is settled, the archive
    starts, and convert-chain-to-canonical settles it after a backfill. *)
-let startup_fork_block_missing server_uri () =
-  let s = B.create () in
-  let tag = "startup_fork_block_missing" in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
-  let runtime_config = config ~tag ~fork:(real_state_hash tag, 2) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_fork_block_missing" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind result = startup db runtime_config in
-      expect_ok "startup" result ;
-      check_statuses db built [ (("A", a), "canonical"); (("B", b), "pending") ] )
+let startup_fork_block_missing =
+  { name = "fork block missing"
+  ; blocks =
+      [ block "A" ~height:1 Canonical; block "B" ~parent:"A" ~height:2 Pending ]
+  ; steps =
+      [ startup (Fork_not_in_archive 2)
+      ; Expect [ ("A", Canonical); ("B", Pending) ]
+      ]
+  }
 
 (* A config that starts a new chain, not a hard fork: nothing to settle. *)
-let startup_new_chain server_uri () =
-  let s = B.create () in
-  let runtime_config = config ~tag:"startup_new_chain" s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_new_chain" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind result = startup db runtime_config in
-      expect_ok "startup" result ;
-      let%map genesis = genesis_statuses db ~height:1 in
-      Alcotest.(check (list string)) "genesis" [ "canonical" ] genesis )
+let startup_new_chain =
+  { name = "a new chain's config"
+  ; blocks = []
+  ; steps = [ startup New_chain; Expect_geneses (1, [ Canonical ]) ]
+  }
 
 (* Two hard forks in turn, each settled at its archive's startup. Fork A at
    FA, pending: FA becomes canonical, FA', which competes with it, is
-   orphaned. The chain fork A starts goes on
-   to fork B's block FB, which FB' competes with: fork B's startup makes FB
-   canonical and orphans FB'. *)
-let startup_two_forks server_uri () =
-  let s = B.create () in
-  let tag = "startup_two_forks" in
-  let fork_a_hash = real_state_hash (tag ^ "-a") in
-  let fork_b_hash = real_state_hash (tag ^ "-b") in
-  let a = B.block s ~name:"A" ~height:1 Canonical in
-  let fa =
-    B.block ~state_hash:fork_a_hash ~parent:a s ~name:"FA" ~height:2 Pending
-  in
-  let fa' = B.block ~parent:a s ~name:"FA'" ~height:2 Pending in
-  (* P1 follows fork A's genesis, which is not in the archive until fork A's
-     startup: it is linked to it then *)
-  let p1 =
-    B.block ~global_slot_since_genesis:3 ~global_slot_since_hard_fork:1
-      ~protocol_version:v5 s ~name:"P1" ~height:4 Canonical
-  in
-  let fb =
-    B.block ~state_hash:fork_b_hash ~parent:p1 ~global_slot_since_genesis:4
-      ~global_slot_since_hard_fork:2 ~protocol_version:v5 s ~name:"FB" ~height:5
-      Pending
-  in
-  let fb' =
-    B.block ~parent:p1 ~global_slot_since_genesis:4
-      ~global_slot_since_hard_fork:2 ~protocol_version:v5 s ~name:"FB'"
-      ~height:5 Pending
-  in
-  let config_a = config ~tag:(tag ^ "-a") ~fork:(fork_a_hash, 2) s in
-  let config_b = config ~tag:(tag ^ "-b") ~fork:(fork_b_hash, 5) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_two_forks" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind first = startup db config_a in
-      expect_ok "startup with fork A's config" first ;
-      let%bind () =
-        check_statuses db built
-          [ (("FA", fa), "canonical"); (("FA'", fa'), "orphaned") ]
-      in
-      (* link P1 to fork A's genesis, as the archive does for a block stored
-         after its parent *)
-      let%bind () =
-        exec db
-          (sprintf
-             "UPDATE blocks p1 SET parent_id = g.id, parent_hash = \
-              g.state_hash FROM blocks g WHERE p1.id = %d AND g.height = 3 AND \
-              g.global_slot_since_hard_fork = 0"
-             (B.block_id built p1) )
-      in
-      let%bind second = startup db config_b in
-      expect_ok "startup with fork B's config" second ;
-      let%bind ga = genesis_statuses db ~height:3 in
-      Alcotest.(check (list string)) "fork A's genesis" [ "canonical" ] ga ;
-      let%bind gb = genesis_statuses db ~height:6 in
-      Alcotest.(check (list string)) "fork B's genesis" [ "canonical" ] gb ;
-      check_statuses db built
-        [ (("A", a), "canonical")
-        ; (("FA", fa), "canonical")
-        ; (("FA'", fa'), "orphaned")
-        ; (("P1", p1), "canonical")
-        ; (("FB", fb), "canonical")
-        ; (("FB'", fb'), "orphaned")
-        ] )
+   orphaned. The chain fork A starts goes on to fork B's block FB, which FB'
+   competes with: fork B's startup makes FB canonical and orphans FB'. P1
+   follows fork A's genesis, which is not in the archive until fork A's
+   startup: it is linked to it then, as the archive links a block stored
+   before its parent. *)
+let startup_two_forks =
+  { name = "two forks in turn"
+  ; blocks =
+      [ block "A" ~height:1 Canonical
+      ; block "FA" ~parent:"A" ~height:2 Pending
+      ; block "FA'" ~parent:"A" ~height:2 Pending
+      ; postfork "P1" ~global_slot_since_genesis:3
+          ~global_slot_since_hard_fork:1 ~height:4 Canonical
+      ; postfork "FB" ~parent:"P1" ~global_slot_since_genesis:4
+          ~global_slot_since_hard_fork:2 ~height:5 Pending
+      ; postfork "FB'" ~parent:"P1" ~global_slot_since_genesis:4
+          ~global_slot_since_hard_fork:2 ~height:5 Pending
+      ]
+  ; steps =
+      [ startup (Fork_at "FA")
+      ; Expect [ ("FA", Canonical); ("FA'", Orphaned) ]
+      ; Do
+          ( "link P1 to fork A's genesis"
+          , fun ctx ->
+              exec ctx
+                (sprintf
+                   "UPDATE blocks p1 SET parent_id = g.id, parent_hash = \
+                    g.state_hash FROM blocks g WHERE p1.id = %d AND g.height = \
+                    3 AND g.global_slot_since_hard_fork = 0"
+                   (ctx.id "P1") ) )
+      ; startup (Fork_at "FB")
+      ; Expect_geneses (3, [ Canonical ])
+      ; Expect_geneses (6, [ Canonical ])
+      ; Expect
+          [ ("A", Canonical)
+          ; ("FA", Canonical)
+          ; ("FA'", Orphaned)
+          ; ("P1", Canonical)
+          ; ("FB", Canonical)
+          ; ("FB'", Orphaned)
+          ]
+      ]
+  }
 
 (* The archive holds another config's genesis on the same fork block: which
    boundary to settle is ambiguous, so the archive stops and changes
    nothing. *)
-let startup_two_geneses_on_fork_block server_uri () =
-  let s = B.create () in
-  let tag = "startup_two_geneses_on_fork_block" in
-  let fork_hash = real_state_hash tag in
-  let blocks = fork_chain ~fork_hash s in
-  let c = List.Assoc.find_exn blocks ~equal:String.equal "C" in
-  let (_ : B.block) =
-    B.block ~parent:c ~protocol_version:v5 ~global_slot_since_hard_fork:0 s
-      ~name:"other genesis" ~height:4 Canonical
-  in
-  let runtime_config = config ~tag ~fork:(fork_hash, 3) s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_two_geneses" (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind result = startup db runtime_config in
-      expect_failure "two fork geneses" ~mentioning:"2 fork geneses" result ;
-      check_chain db built blocks unsettled_fork_chain )
+let startup_two_geneses_on_fork_block =
+  { name = "two fork geneses on the fork block"
+  ; blocks =
+      fork_chain
+      @ [ fork_genesis ~name:"other genesis" ~fork_block:"C" ~height:4 () ]
+  ; steps =
+      [ startup ~expect:(Stops_mentioning "2 fork geneses") (Fork_at "C")
+      ; Expect fork_chain_unsettled
+      ]
+  }
 
 (* --settle-prefork-pending-blocks without --config-file: the archive does
    not know the fork, warns, starts, and changes nothing. *)
-let startup_settle_without_config server_uri () =
-  let s = B.create () in
-  let fork_hash = real_state_hash "startup_settle_without_config" in
-  let blocks = fork_chain ~fork_hash s in
-  B.Db.with_fresh ~server_uri ~name:"test_startup_settle_without_config"
-    (fun db ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind built = B.materialize s db in
-      let%bind result = startup_opt db None in
-      expect_ok "startup" result ;
-      check_chain db built blocks unsettled_fork_chain )
+let startup_settle_without_config =
+  { name = "flag without --config-file"
+  ; blocks = fork_chain
+  ; steps = [ startup No_config_file; Expect fork_chain_unsettled ]
+  }
 
 let () =
-  let uri = B.Db.test_server_uri () in
-  let run f () = Thread_safe.block_on_async_exn (f uri) |> Or_error.ok_exn in
+  let server_uri = Synthetic_archive.Db.test_server_uri () in
+  let group name cases =
+    (name, List.map cases ~f:(test_case ~server_uri ~group:name))
+  in
   Alcotest.run "settle_pending_blocks"
-    [ ( "settle_pending_blocks"
-      , [ Alcotest.test_case "fork in the canonical chain" `Quick
-            (run fork_in_canonical_chain)
-        ; Alcotest.test_case "fork without a protocol version bump" `Quick
-            (run fork_same_version)
-        ; Alcotest.test_case "fork on a pending block" `Quick
-            (run fork_on_pending)
-        ; Alcotest.test_case "fork on an orphaned block" `Quick
-            (run fork_on_orphaned)
-        ; Alcotest.test_case "fork genesis without a parent link" `Quick
-            (run fork_genesis_without_parent_link)
-        ; Alcotest.test_case "fork block missing" `Quick
-            (run fork_block_missing)
-        ; Alcotest.test_case "fork without a canonical anchor" `Quick
-            (run fork_unanchored)
-        ; Alcotest.test_case "fork on the last canonical block" `Quick
-            (run fork_on_last_canonical)
-        ; Alcotest.test_case "fork on a new network" `Quick
-            (run fork_on_new_network)
-        ; Alcotest.test_case "no fork genesis" `Quick (run no_fork_genesis)
-        ; Alcotest.test_case "pending fork genesis is refused" `Quick
-            (run pending_fork_genesis)
-        ; Alcotest.test_case "newest of two forks" `Quick
-            (run newest_of_two_forks)
-        ; Alcotest.test_case "dry run, then idempotent" `Quick
-            (run dry_run_and_idempotence)
-        ; Alcotest.test_case "late block of the ended chain" `Quick
-            (run late_block_of_ended_chain)
-        ; Alcotest.test_case "gap in the ended chain" `Quick
-            (run gap_in_ended_chain)
-        ; Alcotest.test_case "fork block behind a gap" `Quick
-            (run fork_block_behind_gap)
-        ] )
-    ; ( "canonical marking"
-      , [ Alcotest.test_case "new chain marked after settling" `Quick
-            (run marking_after_settle)
-        ; Alcotest.test_case "new chain marked without settling" `Quick
-            (run marking_without_settle)
-        ; Alcotest.test_case "backfill below the fork genesis, not settled"
-            `Quick
-            (run backfill_without_settle)
-        ; Alcotest.test_case "backfill after settling" `Quick
-            (run backfill_after_settle)
-        ; Alcotest.test_case "block after a gap in the ended chain" `Quick
-            (run gap_in_ended_chain_marked)
-        ] )
-    ; ( "startup"
-      , [ Alcotest.test_case "settles once" `Quick (run startup_settles_once)
-        ; Alcotest.test_case "without --settle-prefork-pending-blocks" `Quick
-            (run startup_without_settle)
-        ; Alcotest.test_case "refuses a pending fork genesis" `Quick
-            (run startup_refuses_pending_genesis)
-        ; Alcotest.test_case "with an older fork in the archive" `Quick
-            (run startup_with_older_fork)
-        ; Alcotest.test_case "fork block missing" `Quick
-            (run startup_fork_block_missing)
-        ; Alcotest.test_case "a new chain's config" `Quick
-            (run startup_new_chain)
-        ; Alcotest.test_case "two forks in turn" `Quick (run startup_two_forks)
-        ; Alcotest.test_case "two fork geneses on the fork block" `Quick
-            (run startup_two_geneses_on_fork_block)
-        ; Alcotest.test_case "flag without --config-file" `Quick
-            (run startup_settle_without_config)
-        ] )
+    [ group "settle_pending_blocks"
+        [ fork_in_canonical_chain
+        ; fork_same_version
+        ; fork_on_pending
+        ; fork_on_orphaned
+        ; fork_genesis_without_parent_link
+        ; fork_block_missing
+        ; fork_unanchored
+        ; fork_on_last_canonical
+        ; fork_on_new_network
+        ; no_fork_genesis
+        ; pending_fork_genesis
+        ; newest_of_two_forks
+        ; dry_run_and_idempotence
+        ; late_block_of_ended_chain
+        ; gap_in_ended_chain
+        ; fork_block_behind_gap
+        ]
+    ; group "canonical marking"
+        [ marking_after_settle
+        ; marking_without_settle
+        ; backfill_without_settle
+        ; backfill_after_settle
+        ; gap_in_ended_chain_marked
+        ]
+    ; group "startup"
+        [ startup_settles_once
+        ; startup_without_settle
+        ; startup_refuses_pending_genesis
+        ; startup_with_older_fork
+        ; startup_fork_block_missing
+        ; startup_new_chain
+        ; startup_two_forks
+        ; startup_two_geneses_on_fork_block
+        ; startup_settle_without_config
+        ]
     ]
