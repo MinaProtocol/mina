@@ -1,0 +1,16 @@
+(test
+ (name test_missing_blocks_guardian)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_unix
+  cohttp
+  cohttp-async
+  core
+  uri
+  ;; local libraries
+  logger
+  missing_blocks_guardian_lib)
+ (preprocess
+  (pps mina_ppx)))

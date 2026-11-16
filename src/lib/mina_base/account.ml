@@ -127,6 +127,13 @@ module Token_symbol = struct
 
   let default = ""
 
+  (* any bytes, as on chain: the protocol does no encoding check *)
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind len = Int.gen_incl 0 max_length in
+    String.gen_with_length len
+      (Char.gen_uniform_inclusive Char.min_value Char.max_value)
+
   (* 48 = max_length * 8 *)
   module Num_bits = Pickles_types.Nat.N48
 
