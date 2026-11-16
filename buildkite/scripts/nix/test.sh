@@ -42,3 +42,24 @@ wait
 if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" ]]; then
   nix "${NIX_OPTS[@]}" copy --all --to "$NIX_STORAGEBOX_CACHE_PUSH_URL"
 fi
+
+# Keep the public GCS cache (what developers substitute from, see flake.nix
+# nixConfig) current for the long-lived branches only. CI itself no longer reads
+# from it, and PR branches produced the bulk of the bucket without anyone ever
+# substituting them. Same store as above, so no second build; `nix copy` uploads
+# only the paths the bucket does not have. Uploads to GCS are free of egress.
+case "$BUILDKITE_BRANCH" in
+  compatible|develop|master)
+    if [[ "${NIX_CACHE_GCP_ID:-}" != "" ]] && [[ "${NIX_CACHE_GCP_SECRET:-}" != "" ]]; then
+      mkdir -p "$HOME/.aws"
+      cat <<CREDS> "$HOME/.aws/credentials"
+[default]
+aws_access_key_id=$NIX_CACHE_GCP_ID
+aws_secret_access_key=$NIX_CACHE_GCP_SECRET
+CREDS
+      nix "${NIX_OPTS[@]}" copy --all --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com"
+    else
+      echo "mainline branch but NIX_CACHE_GCP_ID/NIX_CACHE_GCP_SECRET unset: skipping the GCS cache update"
+    fi
+    ;;
+esac
