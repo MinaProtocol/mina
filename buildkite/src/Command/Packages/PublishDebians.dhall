@@ -89,6 +89,13 @@ let readFromCache
                   }
                   spec.releasePackages
 
+          let cacheRoot =
+              -- 4.0.4 arm64 backport only: MINA_READ_CACHE_ROOT, when set in
+              -- the build, names the build whose debians this step publishes.
+              -- It is read when the pipeline renders, because the publish
+              -- container does not get the variable.
+                env:MINA_READ_CACHE_ROOT as Text ? "\\\${BUILDKITE_BUILD_ID}"
+
           in  List/map
                 DebianVersions.DebVersion
                 Cmd.Type
@@ -97,7 +104,7 @@ let readFromCache
 
                       in  Cmd.run
                             (     "MINA_DEB_CODENAME=${lower}"
-                              ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
+                              ++  " ROOT=${cacheRoot}"
                               ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
                               ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
                               ++  " && ${roots}./buildkite/scripts/debian/select_release_packages.sh"
