@@ -5,7 +5,7 @@
 #   mkdeb.sh --output <file.deb> --package <name> --version <version>
 #            --architecture <arch> --description <text>
 #            [--depends <extra Depends>] [--suggests <pkgs>] [--provides <pkgs>]
-#            [--replaces <pkgs>] [--breaks <pkgs>]
+#            [--replaces <pkgs>] [--breaks <pkgs>] [--base-name <name>]
 #            [--githash <hash>] [--buildurl <url>]
 #            <source>:<destination> ... [--into <directory> <source> ...]
 #
@@ -26,6 +26,10 @@
 # depends on bookworm's library packages, and one built on jammy on jammy's.
 # --depends adds dependencies that are not shared libraries.
 #
+# --base-name is the package's name without a variant suffix. A package whose
+# name has a suffix (mina-generic-instrumented) provides its base name
+# (mina-generic) at its own version, so it satisfies what depends on that.
+#
 # Codename is the VERSION_CODENAME of /etc/os-release, which is where the
 # library dependencies come from.
 #
@@ -36,7 +40,7 @@ set -euo pipefail
 
 output="" package="" version="" architecture="" description=""
 depends="" suggests="" provides="" replaces="" breaks=""
-githash="" buildurl="" into=""
+githash="" buildurl="" into="" base_name=""
 installs=()
 
 while [[ $# -gt 0 ]]; do
@@ -51,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     --provides) provides="$2"; shift 2 ;;
     --replaces) replaces="$2"; shift 2 ;;
     --breaks) breaks="$2"; shift 2 ;;
+    --base-name) base_name="$2"; shift 2 ;;
     --githash) githash="$2"; shift 2 ;;
     --buildurl) buildurl="$2"; shift 2 ;;
     --into) into="$2"; shift 2 ;;
@@ -78,6 +83,10 @@ for v in output package version architecture description; do
     exit 2
   fi
 done
+
+if [[ -n "$base_name" && "$base_name" != "$package" ]]; then
+  provides="${base_name} (= ${version})${provides:+, ${provides}}"
+fi
 
 # The ELF machine names readelf prints for each Debian architecture.
 case "$architecture" in
