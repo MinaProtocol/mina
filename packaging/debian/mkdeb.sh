@@ -10,7 +10,8 @@
 #
 # <source>:<destination> installs <source> at <destination>. After
 # --into <directory>, a <source> on its own is installed in <directory> under
-# its own name. An ELF file or a script starting with #! is installed with
+# its own name, and a <source> that is a directory has each of its files
+# installed there. An ELF file or a script starting with #! is installed with
 # mode 0755, and anything else with 0644, whatever the mode of <source>.
 #
 # --architecture is what the package must be built for, normally dune's
@@ -56,7 +57,14 @@ while [[ $# -gt 0 ]]; do
         echo "mkdeb: $1 has no destination; give <source>:<destination> or --into" >&2
         exit 2
       fi
-      installs+=("$1:${into%/}/$(basename "$1")"); shift ;;
+      if [[ -d "$1" ]]; then
+        while IFS= read -r f; do
+          installs+=("${f}:${into%/}/$(basename "$f")")
+        done < <(find "$1" -maxdepth 1 -type f | LC_ALL=C sort)
+      else
+        installs+=("$1:${into%/}/$(basename "$1")")
+      fi
+      shift ;;
   esac
 done
 
