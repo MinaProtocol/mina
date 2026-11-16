@@ -48,6 +48,7 @@ let Spec =
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
           , verify : Bool
+          , releasePackages : Optional Text
           , label : Text
           , key : Text
           }
@@ -56,6 +57,7 @@ let Spec =
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , verify = True
+          , releasePackages = None Text
           , label = "Publish debians"
           , key = "publish-debians"
           }
@@ -72,23 +74,37 @@ let readFromCache
       -- LOCAL_DEB_FOLDER, and `release-manager publish` wants a
       -- {codename}/*.deb tree, so the codename is the folder rather than
       -- something the publish step has to reconstruct from file names.
+      --
+      -- releasePackages, when set, is the comma separated list of root
+      -- packages for select_release_packages.sh (MINA_RELEASE_PACKAGES), in
+      -- place of its default roots. A job that publishes only part of a
+      -- release names its packages here, so the selection fails when one of
+      -- them was not built instead of publishing what happens to be there.
           \(spec : Spec.Type)
-      ->  List/map
-            DebianVersions.DebVersion
-            Cmd.Type
-            (     \(codename : DebianVersions.DebVersion)
-              ->  let lower = DebianVersions.lowerName codename
+      ->  let roots =
+                merge
+                  { Some =
+                      \(packages : Text) -> "MINA_RELEASE_PACKAGES=${packages} "
+                  , None = ""
+                  }
+                  spec.releasePackages
 
-                  in  Cmd.run
-                        (     "MINA_DEB_CODENAME=${lower}"
-                          ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
-                          ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
-                          ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
-                          ++  " && ./buildkite/scripts/debian/select_release_packages.sh"
-                          ++  " ${debsFolder}/${lower} ${debsFolder}_excluded/${lower}"
-                        )
-            )
-            spec.codenames
+          in  List/map
+                DebianVersions.DebVersion
+                Cmd.Type
+                (     \(codename : DebianVersions.DebVersion)
+                  ->  let lower = DebianVersions.lowerName codename
+
+                      in  Cmd.run
+                            (     "MINA_DEB_CODENAME=${lower}"
+                              ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
+                              ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
+                              ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
+                              ++  " && ${roots}./buildkite/scripts/debian/select_release_packages.sh"
+                              ++  " ${debsFolder}/${lower} ${debsFolder}_excluded/${lower}"
+                            )
+                )
+                spec.codenames
 
 let publishCmd
     : Spec.Type -> Cmd.Type
