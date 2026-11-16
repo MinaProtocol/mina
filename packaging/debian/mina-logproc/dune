@@ -1,0 +1,37 @@
+; Defined only in the contexts of dune-workspace.packaging, so the default
+; build never makes packages.
+
+(rule
+ (enabled_if
+  (or
+   (= %{context_name} deb)
+   (= %{context_name} deb-instrumented)))
+ (alias debs)
+ (targets
+  mina-logproc%{env:DEB_SUFFIX=}_%{env:MINA_DEB_VERSION=0.0.0-experimental}_%{architecture}.deb)
+ (deps
+  (:mkdeb ../mkdeb.sh)
+  (:logproc %{workspace_root}/src/app/logproc/logproc.exe)
+  /etc/os-release
+  (env_var MINA_COMMIT_SHA1)
+  (env_var BUILDKITE_BUILD_URL))
+ (action
+  (run
+   %{mkdeb}
+   --output
+   %{targets}
+   --package
+   mina-logproc%{env:DEB_SUFFIX=}
+   --version
+   %{env:MINA_DEB_VERSION=0.0.0-experimental}
+   --architecture
+   %{architecture}
+   --description
+   "Utility for processing mina-daemon log output"
+   --depends
+   tzdata
+   --githash
+   %{env:MINA_COMMIT_SHA1=}
+   --buildurl
+   %{env:BUILDKITE_BUILD_URL=}
+   %{logproc}:/usr/local/bin/mina-logproc)))
