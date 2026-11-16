@@ -9,8 +9,8 @@
 #
 # <source>:<destination> installs <source> at <destination>. After
 # --into <directory>, a <source> on its own is installed in <directory> under
-# its own name. A file is installed with mode 0755 if <source> is executable,
-# and 0644 otherwise.
+# its own name. An ELF file or a script starting with #! is installed with
+# mode 0755, and anything else with 0644, whatever the mode of <source>.
 #
 # --architecture is what the package must be built for, normally dune's
 # %{architecture}: the target of the compiler that built the binaries. Every
@@ -83,12 +83,13 @@ elfs=()
 for entry in "${installs[@]}"; do
   src="${entry%%:*}"
   dest="${entry#*:}"
+  magic=$(head -c 4 "$src" | tr -d '\0')
   mode=0644
-  if [[ -x "$src" ]]; then
+  if [[ "$magic" == $'\x7fELF' || "$magic" == '#!'* ]]; then
     mode=0755
   fi
   install -D -m "$mode" "$src" "${root}${dest}"
-  if [[ "$(head -c 4 "$src")" == $'\x7fELF' ]]; then
+  if [[ "$magic" == $'\x7fELF' ]]; then
     machine=$(readelf -h "$src" | sed -n 's/^ *Machine: *//p')
     if [[ "$machine" != "$elf_machine" ]]; then
       echo "mkdeb: ${src} is built for '${machine}', not ${architecture}" >&2
