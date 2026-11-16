@@ -1031,6 +1031,61 @@ let%test_module "Bootstrap_controller tests" =
           | _ ->
               failwith "expected only the root snarked ledger's sync" )
 
+    (* [breadcrumb]'s block as it arrives from [peer_net]. *)
+    let incoming_block ~(peer_net : Fake_network.peer_network) breadcrumb =
+      Envelope.Incoming.wrap
+        ~data:
+          ( breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+          |> Mina_block.Validated.remember
+          |> Mina_block.Validation.reset_frontier_dependencies_validation
+          |> Mina_block.Validation.reset_staged_ledger_diff_validation )
+        ~sender:(Envelope.Sender.Remote peer_net.peer)
+
+    let%test_unit "A block that arrives after bootstrap finishes reaches the \
+                   frontier controller" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~ledger_sync_config
+            [ fresh_peer
+            ; peer_with_branch
+                ~frontier_branch_size:((max_frontier_length * 2) + 2)
+            ])
+        ~f:(fun fake_network ->
+          let [ my_net; peer_net ] = fake_network.peer_networks in
+          let block =
+            incoming_block ~peer_net
+              (Transition_frontier.best_tip peer_net.state.frontier)
+          in
+          let network_transition_pipe =
+            Swappable.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+          in
+          Swappable.write network_transition_pipe (`Block block, `Valid_cb None) ;
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let%bind (_
+                         : Transition_frontier.t * Transition_cache.element list
+                         ) =
+                run_bootstrap
+                  ~timeout_duration:(Block_time.Span.of_ms 30_000L)
+                  ~my_net ~network_transition_pipe ()
+              in
+              (* Bootstrap has finished, and the frontier controller hasn't
+                 taken the pipe over yet. *)
+              Swappable.write network_transition_pipe
+                (`Block block, `Valid_cb None) ;
+              let%bind () = Scheduler.yield_until_no_jobs_remain () in
+              let%bind reader = Swappable.swap_reader network_transition_pipe in
+              match%map
+                Clock.with_timeout (Time.Span.of_sec 5.)
+                  (Pipe_lib.Choosable_synchronous_pipe.read reader)
+              with
+              | `Result (`Ok _) ->
+                  ()
+              | `Result `Eof | `Timeout ->
+                  failwith "The block that arrived after bootstrap was lost" )
+          )
+
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
