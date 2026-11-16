@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Copies the ledger tarballs named by a genesis config into a directory.
+# Runs a command with the ledger tarballs named by a genesis config.
 #
-# Usage: ledger-tarballs.sh <config.json> <output directory>
+# Usage: ledger-tarballs.sh <config.json> <command> [<argument> ...]
+#
+# Copies the tarballs into a temporary directory, runs the command with that
+# directory as its last argument, and removes the directory afterwards.
 #
 # The config names each ledger by the SHA3-256 of its tarball (s3_data_hash).
 # The tarball of hash H is the one file in $LEDGER_TARBALLS_DIR/H/, and is
@@ -10,8 +13,12 @@
 
 set -euo pipefail
 
-config="${1:?usage: $0 <config.json> <output directory>}"
-out="${2:?usage: $0 <config.json> <output directory>}"
+config="${1:?usage: $0 <config.json> <command> [<argument> ...]}"
+shift
+if [[ $# -eq 0 ]]; then
+  echo "usage: $0 <config.json> <command> [<argument> ...]" >&2
+  exit 2
+fi
 tarballs_dir="${LEDGER_TARBALLS_DIR:-/var/storagebox/ledger-tarballs}"
 
 hashes=$(jq -r '[.ledger, .epoch_data.staking, .epoch_data.next]
@@ -21,7 +28,8 @@ if [[ -z "$hashes" ]]; then
   exit 1
 fi
 
-mkdir -p "$out"
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
 for hash in $hashes; do
   files=("${tarballs_dir}/${hash}"/*.tar.gz)
   if [[ ${#files[@]} -ne 1 || ! -f "${files[0]}" ]]; then
@@ -36,3 +44,5 @@ for hash in $hashes; do
     exit 1
   fi
 done
+
+"$@" "$out"

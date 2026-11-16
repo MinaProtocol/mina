@@ -19,18 +19,6 @@
 (rule
  (enabled_if
   (= %{context_name} deb))
- (targets
-  (dir ledger-tarballs))
- (deps
-  (:script ../ledger-tarballs.sh)
-  (:config %{workspace_root}/genesis_ledgers/devnet.json)
-  (env_var LEDGER_TARBALLS_DIR))
- (action
-  (run %{script} %{config} ledger-tarballs)))
-
-(rule
- (enabled_if
-  (= %{context_name} deb))
  (alias debs)
  (targets
   mina-devnet-config_%{env:MINA_DEB_VERSION=0.0.0-experimental}_all.deb)
@@ -38,9 +26,10 @@
   (:mkdeb ../mkdeb.sh)
   (:config %{workspace_root}/genesis_ledgers/devnet.json)
   (:service mina.service)
-  (:tarballs ledger-tarballs)
+  (:tarballs ../ledger-tarballs.sh)
   /etc/os-release
   (env_var GITHASH_CONFIG)
+  (env_var LEDGER_TARBALLS_DIR)
   (env_var MINA_COMMIT_SHA1)
   (env_var BUILDKITE_BUILD_URL))
  (action
@@ -48,6 +37,8 @@
    (system
     "[ -n \"$GITHASH_CONFIG\" ] || { echo 'GITHASH_CONFIG is not set' >&2; exit 1; }")
    (run
+    %{tarballs}
+    %{config}
     %{mkdeb}
     --output
     %{targets}
@@ -71,5 +62,4 @@
     %{config}:/var/lib/coda/devnet.json
     %{service}:/usr/lib/systemd/user/mina.service
     --into
-    /var/lib/coda
-    %{tarballs}))))
+    /var/lib/coda))))
