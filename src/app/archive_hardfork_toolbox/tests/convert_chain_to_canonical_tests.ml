@@ -129,6 +129,59 @@ let refuses_pending_genesis server_uri () =
       check_statuses db built blocks
         [ ("A", "canonical"); ("B", "pending"); ("genesis", "pending") ] )
 
+(* The command fails, writing nothing, when the boundary cannot be settled.
+   [scenario] builds the archive and returns its blocks with the statuses
+   they must keep; [mentioning] is part of the error. *)
+let fails_unsettled ~server_uri ~name ~mentioning scenario =
+  let s = B.create () in
+  let blocks, want = scenario s in
+  B.Db.with_fresh ~server_uri ~name (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind built = B.materialize s db in
+      let%bind () =
+        match%map.Deferred
+          Logic.convert_chain_to_canonical ~postgres_uri:db.uri ~dry_run:false
+            ()
+        with
+        | Ok () ->
+            Alcotest.failf "expected a failure mentioning %S" mentioning
+        | Error e ->
+            let msg = Error.to_string_hum e in
+            if not (String.is_substring msg ~substring:mentioning) then
+              Alcotest.failf "unexpected failure: %s" msg ;
+            Ok ()
+      in
+      check_statuses db built blocks want )
+
+(* The fork genesis's parent, the fork block, is not in the archive. *)
+let fails_without_fork_block server_uri () =
+  fails_unsettled ~server_uri ~name:"test_toolbox_convert_no_fork_block"
+    ~mentioning:"fork block is not in the archive" (fun s ->
+      let a = B.block s ~name:"A" ~height:1 Canonical in
+      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
+      let missing =
+        B.block (B.create ()) ~name:"fork block" ~height:2 Pending
+      in
+      let g =
+        B.block ~parent_hash:(B.state_hash missing) ~protocol_version:(5, 0, 0)
+          ~global_slot_since_hard_fork:0 s ~name:"genesis" ~height:3 Canonical
+      in
+      ( [ ("A", a); ("B", b); ("genesis", g) ]
+      , [ ("A", "canonical"); ("B", "pending"); ("genesis", "canonical") ] ) )
+
+(* No canonical block above the fork block. *)
+let fails_without_canonical_ancestor server_uri () =
+  fails_unsettled ~server_uri ~name:"test_toolbox_convert_no_anchor"
+    ~mentioning:"No canonical block below the fork block" (fun s ->
+      let a = B.block s ~name:"A" ~height:1 Pending in
+      let b = B.block ~parent:a s ~name:"B" ~height:2 Pending in
+      let g =
+        B.block ~parent:b ~protocol_version:(5, 0, 0)
+          ~global_slot_since_hard_fork:0 s ~name:"genesis" ~height:3 Canonical
+      in
+      ( [ ("A", a); ("B", b); ("genesis", g) ]
+      , [ ("A", "pending"); ("B", "pending"); ("genesis", "canonical") ] ) )
+
 let tests ~server_uri =
   let run f () =
     Thread_safe.block_on_async_exn (f server_uri) |> Or_error.ok_exn
@@ -137,5 +190,9 @@ let tests ~server_uri =
     , [ ("dry run, then run", `Quick, run dry_run_then_run)
       ; ("nothing to settle", `Quick, run nothing_to_settle)
       ; ("refuses a pending fork genesis", `Quick, run refuses_pending_genesis)
+      ; ("fails without the fork block", `Quick, run fails_without_fork_block)
+      ; ( "fails without a canonical ancestor"
+        , `Quick
+        , run fails_without_canonical_ancestor )
       ] )
   ]
