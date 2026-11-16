@@ -1,0 +1,22 @@
+(lang dune 3.1)
+
+; The build variants that Debian packages are made from, one dune context
+; each. Every context builds into its own _build/<context>/ tree, so two
+; variants never write to the same path.
+;
+;   dune build --workspace dune-workspace.packaging @debs
+;
+; DEB_SUFFIX is appended to the name of every package built in a context.
+
+(context
+ (default
+  (name deb)))
+
+(context
+ (default
+  (name deb-instrumented)
+  (instrument_with bisect_ppx)
+  (env
+   (_
+    (env-vars
+     (DEB_SUFFIX -instrumented))))))
