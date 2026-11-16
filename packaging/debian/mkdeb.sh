@@ -4,7 +4,8 @@
 # Usage:
 #   mkdeb.sh --output <file.deb> --package <name> --version <version>
 #            --architecture <arch> --description <text>
-#            [--depends <extra Depends>] [--githash <hash>] [--buildurl <url>]
+#            [--depends <extra Depends>] [--replaces <pkgs>] [--breaks <pkgs>]
+#            [--githash <hash>] [--buildurl <url>]
 #            <source>:<destination> ... [--into <directory> <source> ...]
 #
 # <source>:<destination> installs <source> at <destination>. After
@@ -15,7 +16,8 @@
 # --architecture is what the package must be built for, normally dune's
 # %{architecture}: the target of the compiler that built the binaries. Every
 # ELF file in the package is checked against it, so a binary built for a
-# different architecture fails the build instead of being packaged.
+# different architecture fails the build instead of being packaged. A package
+# of --architecture all may hold no ELF file at all.
 #
 # The shared libraries the binaries need are found by dpkg-shlibdeps, from the
 # libraries installed where the build runs. So a package built on bookworm
@@ -31,7 +33,7 @@
 set -euo pipefail
 
 output="" package="" version="" architecture="" description=""
-depends="" githash="" buildurl="" into=""
+depends="" replaces="" breaks="" githash="" buildurl="" into=""
 installs=()
 
 while [[ $# -gt 0 ]]; do
@@ -42,6 +44,8 @@ while [[ $# -gt 0 ]]; do
     --architecture) architecture="$2"; shift 2 ;;
     --description) description="$2"; shift 2 ;;
     --depends) depends="$2"; shift 2 ;;
+    --replaces) replaces="$2"; shift 2 ;;
+    --breaks) breaks="$2"; shift 2 ;;
     --githash) githash="$2"; shift 2 ;;
     --buildurl) buildurl="$2"; shift 2 ;;
     --into) into="$2"; shift 2 ;;
@@ -67,6 +71,7 @@ done
 case "$architecture" in
   amd64) elf_machine="Advanced Micro Devices X86-64" ;;
   arm64) elf_machine="AArch64" ;;
+  all) elf_machine="" ;;
   *) echo "mkdeb: no Debian package architecture for '${architecture}'" >&2; exit 1 ;;
 esac
 
@@ -91,7 +96,7 @@ for entry in "${installs[@]}"; do
   install -D -m "$mode" "$src" "${root}${dest}"
   if [[ "$magic" == $'\x7fELF' ]]; then
     machine=$(readelf -h "$src" | sed -n 's/^ *Machine: *//p')
-    if [[ "$machine" != "$elf_machine" ]]; then
+    if [[ -z "$elf_machine" || "$machine" != "$elf_machine" ]]; then
       echo "mkdeb: ${src} is built for '${machine}', not ${architecture}" >&2
       exit 1
     fi
@@ -122,6 +127,12 @@ installed_size=$(du -sk --exclude=DEBIAN "$root" | cut -f1)
   echo "Installed-Size: ${installed_size}"
   if [[ -n "$all_depends" ]]; then
     echo "Depends: ${all_depends}"
+  fi
+  if [[ -n "$replaces" ]]; then
+    echo "Replaces: ${replaces}"
+  fi
+  if [[ -n "$breaks" ]]; then
+    echo "Breaks: ${breaks}"
   fi
   echo "Section: base"
   echo "Priority: optional"
