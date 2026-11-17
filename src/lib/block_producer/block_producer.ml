@@ -74,6 +74,9 @@ let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
 
 let time_of_ms = Fn.compose Block_time.of_span_since_epoch Block_time.Span.of_ms
 
+let span_metadata span =
+  ("time", `Int (Block_time.Span.to_ms span |> Int64.to_int_exn))
+
 let lift_sync f =
   Interruptible.uninterruptible
     (Deferred.create (fun ivar ->
@@ -446,9 +449,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
     Error.tag err ~tag:"Error building breadcrumb from produced transition"
     |> Error.raise
   in
-  let time_metadata =
-    ("time", `Int (Block_time.Span.to_ms span |> Int64.to_int_exn))
-  in
+  let time_metadata = span_metadata span in
   let state_metadata =
     ("protocol_state", Protocol_state.Value.to_yojson protocol_state)
   in
@@ -552,10 +553,7 @@ let time ~logger ~time_controller label f =
   let t0 = Block_time.now time_controller in
   let%map x = f () in
   let span = Block_time.diff (Block_time.now time_controller) t0 in
-  [%log info]
-    ~metadata:
-      [ ("time", `Int (Block_time.Span.to_ms span |> Int64.to_int_exn)) ]
-    !"%s: $time %!" label ;
+  [%log info] ~metadata:[ span_metadata span ] !"%s: $time %!" label ;
   x
 
 let retry ?(max = 3) ~logger ~error_message f =
@@ -1067,8 +1065,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                     Block_time.diff (Block_time.now time_controller) start
                   in
                   let metadata =
-                    [ ( "time"
-                      , `Int (Block_time.Span.to_ms span |> Int64.to_int_exn) )
+                    [ span_metadata span
                     ; ( "protocol_state"
                       , Protocol_state.Value.to_yojson protocol_state )
                     ]
