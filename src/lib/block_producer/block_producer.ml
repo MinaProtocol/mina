@@ -1233,15 +1233,15 @@ module Next_step = struct
 end
 
 let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
-    ~coinbase_receiver ~(vrf_evaluation_state : Vrf_evaluation_state.t)
-    ~epoch_data_for_vrf ~ledger_snapshot : Next_step.t =
+    ~coinbase_receiver ~vrf_evaluator_status ~epoch_data_for_vrf
+    ~ledger_snapshot slot_won : Next_step.t =
   let new_global_slot =
     epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.global_slot
   in
   let open Context in
-  match Core.Queue.dequeue vrf_evaluation_state.queue with
+  match slot_won with
   | None -> (
-      match Vrf_evaluation_state.evaluator_status vrf_evaluation_state with
+      match (vrf_evaluator_status : Vrf_evaluation_state.status) with
       | Completed ->
           let epoch_end_time =
             Consensus.Hooks.epoch_end_time ~constants:consensus_constants
@@ -1253,7 +1253,7 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
           Poll_vrf_then_check last_slot
       | Start ->
           Poll_vrf_then_check new_global_slot )
-  | Some slot_won -> (
+  | Some (slot_won : Consensus.Data.Slot_won.t) -> (
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
         let t =
@@ -1340,10 +1340,13 @@ let iteration ~(act : Next_step.t -> unit Deferred.t)
       ~vrf_evaluation_state ~epoch_data_for_vrf i slot
   in
   let next_step =
+    let slot_won = Core.Queue.dequeue vrf_evaluation_state.queue in
     decide_next_step
       ~context:(module Context)
-      ~time_controller ~coinbase_receiver ~vrf_evaluation_state
-      ~epoch_data_for_vrf ~ledger_snapshot
+      ~time_controller ~coinbase_receiver
+      ~vrf_evaluator_status:
+        (Vrf_evaluation_state.evaluator_status vrf_evaluation_state)
+      ~epoch_data_for_vrf ~ledger_snapshot slot_won
   in
   Option.iter (producer_timing next_step) ~f:(fun timing ->
       set_next_producer_timing timing consensus_state ) ;
