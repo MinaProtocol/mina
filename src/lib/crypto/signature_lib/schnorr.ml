@@ -42,8 +42,6 @@ module type Message_intf = sig
 
   type curve_var
 
-  type curve_scalar_var
-
   type _ checked
 
   val hash_checked :
@@ -51,7 +49,7 @@ module type Message_intf = sig
     -> var
     -> public_key:curve_var
     -> r:field_var
-    -> curve_scalar_var checked
+    -> field_var checked
 end
 
 module type S = sig
@@ -67,19 +65,10 @@ module type S = sig
 
   type curve_scalar_var
 
-  module Shifted : sig
-    module type S =
-      Snarky_curves.Shifted_intf
-        with type curve_var := curve_var
-         and type boolean_var := Boolean.var
-         and type 'a checked := 'a Checked.t
-  end
-
   module Message :
     Message_intf
       with type boolean_var := Boolean.var
        and type curve_scalar := curve_scalar
-       and type curve_scalar_var := curve_scalar_var
        and type 'a checked := 'a Checked.t
        and type curve := curve
        and type curve_var := curve_var
@@ -109,7 +98,6 @@ module type S = sig
 
     val verifies :
          signature_kind:Mina_signature_kind.t
-      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -117,7 +105,6 @@ module type S = sig
 
     val assert_verifies :
          signature_kind:Mina_signature_kind.t
-      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -147,10 +134,6 @@ module Make
       module Scalar : sig
         type t [@@deriving sexp, equal]
 
-        type var
-
-        val typ : (var, t) Typ.t
-
         val zero : t
 
         val ( * ) : t -> t -> t
@@ -158,10 +141,6 @@ module Make
         val ( + ) : t -> t -> t
 
         val negate : t -> t
-
-        module Checked : sig
-          val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-        end
       end
 
       type t [@@deriving sexp]
@@ -183,10 +162,23 @@ module Make
       val scale : t -> Scalar.t -> t
 
       val to_affine_exn : t -> Field.t * Field.t
+    end) (Scale : sig
+      open Impl
+
+      (** The in-circuit representation of a curve scalar. *)
+      type scalar_var
+
+      val scalar_typ : (scalar_var, Curve.Scalar.t) Typ.t
+
+      (** [scaled_difference ~s ~e pk] is [s * one - e * pk], where the curve
+          scalar [e] is the integer value of a field element. It is not the
+          point at infinity.
+      *)
+      val scaled_difference :
+        s:scalar_var -> e:Field.Var.t -> Curve.var -> Curve.var Checked.t
     end)
     (Message : Message_intf
                  with type boolean_var := Impl.Boolean.var
-                  and type curve_scalar_var := Curve.Scalar.var
                   and type curve_scalar := Curve.Scalar.t
                   and type curve := Curve.t
                   and type curve_var := Curve.var
@@ -198,17 +190,16 @@ module Make
      and type curve := Curve.t
      and type curve_var := Curve.var
      and type curve_scalar := Curve.Scalar.t
-     and type curve_scalar_var := Curve.Scalar.var
-     and module Shifted := Curve.Checked.Shifted
+     and type curve_scalar_var := Scale.scalar_var
      and module Message := Message = struct
   open Impl
 
   module Signature = struct
     type t = Field.t * Curve.Scalar.t [@@deriving sexp]
 
-    type var = Field.Var.t * Curve.Scalar.var
+    type var = Field.Var.t * Scale.scalar_var
 
-    let typ : (var, t) Typ.t = Typ.tuple2 Field.typ Curve.Scalar.typ
+    let typ : (var, t) Typ.t = Typ.tuple2 Field.typ Scale.scalar_typ
   end
 
   module Private_key = struct
@@ -268,25 +259,11 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef_ verifier (type s) ~signature_kind ~equal ~final_check
-        ((module Shifted) as shifted :
-          (module Curve.Checked.Shifted.S with type t = s) )
+    let%snarkydef_ verifier ~signature_kind ~equal ~final_check
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
       let%bind e = Message.hash_checked ~signature_kind m ~public_key ~r in
-      (* s * g - e * public_key *)
-      let%bind e_pk =
-        Curve.Checked.scale shifted
-          (Curve.Checked.negate public_key)
-          (Curve.Scalar.Checked.to_bits e)
-          ~init:Shifted.zero
-      in
-      let%bind s_g_e_pk =
-        Curve.Checked.scale_known shifted Curve.one
-          (Curve.Scalar.Checked.to_bits s)
-          ~init:e_pk
-      in
-      let%bind rx, ry = Shifted.unshift_nonzero s_g_e_pk in
+      let%bind rx, ry = Scale.scaled_difference ~s ~e public_key in
       let%bind y_even = is_even ry in
       let%bind r_correct = equal r rx in
       final_check r_correct y_even
@@ -389,9 +366,7 @@ module Message = struct
           let open Random_oracle.Legacy.Checked in
           hash
             ~init:(Hash_prefix_states.signature_legacy ~signature_kind)
-            (pack_input input)
-          |> Digest.to_bits ~length:Field.size_in_bits
-          |> Bitstring_lib.Bitstring.Lsb_first.of_list )
+            (pack_input input) )
   end
 
   module Chunked = struct
@@ -463,14 +438,93 @@ module Message = struct
           let open Random_oracle.Checked in
           hash
             ~init:(Hash_prefix_states.signature ~signature_kind)
-            (pack_input input)
-          |> Digest.to_bits ~length:Field.size_in_bits
-          |> Bitstring_lib.Bitstring.Lsb_first.of_list )
+            (pack_input input) )
   end
 end
 
-module Legacy = Make (Tick) (Tick.Inner_curve) (Message.Legacy)
-module Chunked = Make (Tick) (Tick.Inner_curve) (Message.Chunked)
+(** Scalar multiplication with kimchi's [VarBaseMul] gate, via
+    [Pickles.Step_main_inputs.Ops.scale_fast2].
+
+    [scale_fast2] takes a scalar [s] as [(s >> 1, s odd)] with [s >> 1] at
+    most [num_bits - 1] bits, and computes [(s + offset) * g]. Its
+    ladder can never reach the incomplete-addition case in which a prover could
+    choose the result (the accumulator equalling the point being added). The
+    cases in which no witness exists (the ladder's other exceptional case, and
+    the final subtraction of [g] for an even [s] reaching the point at
+    infinity) each need a specific scalar, which neither a hash output nor a
+    signer can target.
+*)
+module Scale = struct
+  open Tick
+  module Ops = Pickles.Step_main_inputs.Ops
+
+  let num_bits = Inner_curve.Scalar.length_in_bits
+
+  type scalar_var = Field.Var.t * Boolean.var
+
+  let split_bits = function odd :: div_2 -> (div_2, odd) | [] -> assert false
+
+  let scalar_typ : (scalar_var, Inner_curve.Scalar.t) Typ.t =
+    Typ.transport
+      Typ.(Field.typ * Boolean.typ)
+      ~there:(fun s ->
+        let div_2, odd = split_bits (Inner_curve.Scalar.unpack s) in
+        (Field.project div_2, odd) )
+      ~back:(fun (div_2, odd) ->
+        Inner_curve.Scalar.project
+          (odd :: List.take (Field.unpack div_2) (num_bits - 1)) )
+
+  (** The power of two that [scale_fast2] adds to its scalar: [2] to the number
+      of bits its ladder uses, which rounds [num_bits - 1] up to whole chunks.
+  *)
+  let offset =
+    Fn.apply_n_times
+      ~n:(Ops.chunks_needed ~num_bits:(num_bits - 1) * Ops.bits_per_chunk)
+      (fun x -> Inner_curve.Scalar.(x + x))
+      Inner_curve.Scalar.one
+
+  let scaled_difference ~(s : scalar_var) ~(e : Field.Var.t)
+      (pk : Inner_curve.var) : Inner_curve.var Checked.t =
+    make_checked (fun () ->
+        let open Run in
+        let scale g x =
+          Ops.scale_fast2 g (Pickles_types.Shifted_value.Type2.Shifted_value x)
+            ~num_bits
+        in
+        let e_split =
+          exists
+            Typ.(Field.typ * Boolean.typ)
+            ~compute:(fun () ->
+              let div_2, odd =
+                split_bits (Field.Constant.unpack (As_prover.read_var e))
+              in
+              (Field.Constant.project div_2, odd) )
+        in
+        (* As with the [Random_oracle.Checked.Digest.to_bits] this replaces,
+           both [e] and [e + p] satisfy this when [e + p < 2^num_bits]. *)
+        Field.Assert.equal
+          Field.(
+            scale (fst e_split) (Constant.of_int 2) + (snd e_split :> Field.t))
+          e ;
+        let s_g = scale (Inner_curve.Checked.constant Inner_curve.one) s in
+        let e_pk = scale pk e_split in
+        let offset_pk = scale pk (Field.zero, Boolean.false_) in
+        let offset_g =
+          Inner_curve.Checked.constant Inner_curve.(scale one offset)
+        in
+        (* Accumulate onto a point chosen at random by the prover, so that a
+           signer, who chooses the nonce, cannot steer a partial sum to the
+           point at infinity, which [add_fast] rejects. *)
+        let sigma =
+          exists Inner_curve.typ ~compute:(fun () -> Inner_curve.random ())
+        in
+        let ( + ) p q = Ops.add_fast p q in
+        let negate = Inner_curve.Checked.negate in
+        sigma + s_g + negate offset_g + negate e_pk + offset_pk + negate sigma )
+end
+
+module Legacy = Make (Tick) (Tick.Inner_curve) (Scale) (Message.Legacy)
+module Chunked = Make (Tick) (Tick.Inner_curve) (Scale) (Message.Chunked)
 
 let gen_legacy =
   let open Quickcheck.Let_syntax in
@@ -539,13 +593,7 @@ let%test_unit "schnorr checked + unchecked" =
              Legacy.Signature.typ)
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
-           let open Tick.Checked in
-           let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
-           in
-           Legacy.Checked.verifies ~signature_kind
-             (module Shifted)
-             s public_key msg )
+           Legacy.Checked.verifies ~signature_kind s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
 
@@ -561,12 +609,63 @@ let%test_unit "schnorr checked + unchecked" =
              Chunked.Signature.typ)
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
-           let open Tick.Checked in
-           let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
-           in
-           Chunked.Checked.verifies ~signature_kind
-             (module Shifted)
-             s public_key msg )
+           Chunked.Checked.verifies ~signature_kind s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
+
+(** Signatures that must be rejected, derived from a valid signature [s] by
+    [private_key] on [msg], using a second key and message for the
+    substitutions.
+*)
+let invalid_cases ~signature:((r, s) : Tick.Field.t * Tick.Inner_curve.Scalar.t)
+    ~public_key ~msg ~other_public_key ~other_msg =
+  [ ("tampered s", (public_key, msg, (r, Tick.Inner_curve.Scalar.(s + one))))
+  ; ("tampered r", (public_key, msg, (Tick.Field.(r + one), s)))
+  ; ("wrong message", (public_key, other_msg, (r, s)))
+  ; ("wrong public key", (other_public_key, msg, (r, s)))
+  ]
+
+let%test_unit "schnorr checked rejects invalid legacy signatures" =
+  let signature_kind = Mina_signature_kind.Testnet in
+  Quickcheck.test ~trials:3 (Quickcheck.Generator.tuple2 gen_legacy gen_legacy)
+    ~f:(fun ((pk, msg), (other_pk, other_msg)) ->
+      let signature = Legacy.sign ~signature_kind pk msg in
+      let public_key = Tick.Inner_curve.(scale one pk) in
+      let other_public_key = Tick.Inner_curve.(scale one other_pk) in
+      List.iter
+        (invalid_cases ~signature ~public_key ~msg ~other_public_key ~other_msg)
+        ~f:(fun (name, ((public_key, msg, s) as case)) ->
+          if Legacy.verify ~signature_kind s public_key msg then
+            failwithf "%s: unchecked verification accepted it" name () ;
+          Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+            Tick.Typ.(
+              tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
+                Legacy.Signature.typ)
+            Tick.Boolean.typ
+            (fun (public_key, msg, s) ->
+              Legacy.Checked.verifies ~signature_kind s public_key msg )
+            (fun _ -> false)
+            case ) )
+
+let%test_unit "schnorr checked rejects invalid chunked signatures" =
+  let signature_kind = Mina_signature_kind.Testnet in
+  Quickcheck.test ~trials:3
+    (Quickcheck.Generator.tuple2 gen_chunked gen_chunked)
+    ~f:(fun ((pk, msg), (other_pk, other_msg)) ->
+      let signature = Chunked.sign ~signature_kind pk msg in
+      let public_key = Tick.Inner_curve.(scale one pk) in
+      let other_public_key = Tick.Inner_curve.(scale one other_pk) in
+      List.iter
+        (invalid_cases ~signature ~public_key ~msg ~other_public_key ~other_msg)
+        ~f:(fun (name, ((public_key, msg, s) as case)) ->
+          if Chunked.verify ~signature_kind s public_key msg then
+            failwithf "%s: unchecked verification accepted it" name () ;
+          Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+            Tick.Typ.(
+              tuple3 Tick.Inner_curve.typ (chunked_message_typ ())
+                Chunked.Signature.typ)
+            Tick.Boolean.typ
+            (fun (public_key, msg, s) ->
+              Chunked.Checked.verifies ~signature_kind s public_key msg )
+            (fun _ -> false)
+            case ) )
