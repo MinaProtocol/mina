@@ -294,6 +294,19 @@ let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
         "Error applying the diff $diff: $error" ;
       None
 
+let next_ledger_proof_statement ~previous_protocol_state ledger_proof_opt =
+  match ledger_proof_opt with
+  | Some proof ->
+      Ledger_proof.Cached.statement proof
+  | None ->
+      let state = previous_protocol_state |> Protocol_state.blockchain_state in
+      Blockchain_state.ledger_proof_statement state
+
+let supply_increase_of_ledger_proof ledger_proof_opt =
+  Option.value_map ledger_proof_opt
+    ~f:(fun proof -> (Ledger_proof.Cached.statement proof).supply_increase)
+    ~default:Currency.Amount.Signed.zero
+
 let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
@@ -390,25 +403,15 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   |> Blockchain_state.snarked_ledger_hash
                 in
                 let ledger_proof_statement =
-                  match ledger_proof_opt with
-                  | Some proof ->
-                      Ledger_proof.Cached.statement proof
-                  | None ->
-                      let state =
-                        previous_protocol_state
-                        |> Protocol_state.blockchain_state
-                      in
-                      Blockchain_state.ledger_proof_statement state
+                  next_ledger_proof_statement ~previous_protocol_state
+                    ledger_proof_opt
                 in
                 let genesis_ledger_hash =
                   previous_protocol_state |> Protocol_state.blockchain_state
                   |> Blockchain_state.genesis_ledger_hash
                 in
                 let supply_increase =
-                  Option.value_map ledger_proof_opt
-                    ~f:(fun proof ->
-                      (Ledger_proof.Cached.statement proof).supply_increase )
-                    ~default:Currency.Amount.Signed.zero
+                  supply_increase_of_ledger_proof ledger_proof_opt
                 in
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
