@@ -1233,9 +1233,8 @@ module Next_step = struct
 end
 
 let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
-    ~coinbase_receiver ~set_next_producer_timing ~consensus_state
-    ~(vrf_evaluation_state : Vrf_evaluation_state.t) ~epoch_data_for_vrf
-    ~ledger_snapshot : Next_step.t =
+    ~coinbase_receiver ~(vrf_evaluation_state : Vrf_evaluation_state.t)
+    ~epoch_data_for_vrf ~ledger_snapshot : Next_step.t =
   let new_global_slot =
     epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.global_slot
   in
@@ -1248,15 +1247,11 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
             Consensus.Hooks.epoch_end_time ~constants:consensus_constants
               epoch_data_for_vrf.epoch
           in
-          set_next_producer_timing (`Check_again epoch_end_time) consensus_state ;
           [%log info] "No more slots won in this epoch" ;
           Check_vrf_at_epoch_end epoch_end_time
       | At last_slot ->
-          set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
           Poll_vrf_then_check last_slot
       | Start ->
-          set_next_producer_timing (`Evaluating_vrf new_global_slot)
-            consensus_state ;
           Poll_vrf_then_check new_global_slot )
   | Some slot_won -> (
       let winning_global_slot = slot_won.global_slot in
@@ -1291,9 +1286,6 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
       | `Now ->
           (*produce now*)
           [%log info] "Producing a block now" ;
-          set_next_producer_timing
-            (`Produce_now (data, winner_pk))
-            consensus_state ;
           Produce_now (now, data, winner_pk)
       | `Passed ->
           [%log warn]
@@ -1319,11 +1311,20 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
                    winning_global_slot ))
             |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
           in
-          set_next_producer_timing
-            (`Produce (time, data, winner_pk))
-            consensus_state ;
           let scheduled_time = time_of_ms time in
           Schedule_production (scheduled_time, data, winner_pk) )
+
+let producer_timing : Next_step.t -> _ option = function
+  | Check_vrf_now | Check_vrf_at _ ->
+      None
+  | Check_vrf_at_epoch_end time ->
+      Some (`Check_again time)
+  | Poll_vrf_then_check slot ->
+      Some (`Evaluating_vrf slot)
+  | Produce_now (_, data, winner_pk) ->
+      Some (`Produce_now (data, winner_pk))
+  | Schedule_production (time, data, winner_pk) ->
+      Some (`Produce (time_to_ms time, data, winner_pk))
 
 let iteration ~(act : Next_step.t -> unit Deferred.t)
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
@@ -1340,12 +1341,15 @@ let iteration ~(act : Next_step.t -> unit Deferred.t)
     sync_vrf_evaluator ~logger ~vrf_evaluator ~vrf_poll_interval
       ~vrf_evaluation_state ~epoch_data_for_vrf i slot
   in
-  act
-    (decide_next_step
-       ~context:(module Context)
-       ~time_controller ~coinbase_receiver ~set_next_producer_timing
-       ~consensus_state ~vrf_evaluation_state ~epoch_data_for_vrf
-       ~ledger_snapshot )
+  let next_step =
+    decide_next_step
+      ~context:(module Context)
+      ~time_controller ~coinbase_receiver ~vrf_evaluation_state
+      ~epoch_data_for_vrf ~ledger_snapshot
+  in
+  Option.iter (producer_timing next_step) ~f:(fun timing ->
+      set_next_producer_timing timing consensus_state ) ;
+  act next_step
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
