@@ -58,8 +58,6 @@ let Arch = ../Constants/Arch.dhall
 
 let Prefork = ../Constants/Prefork.dhall
 
-let Expr = ../Pipeline/Expr.dhall
-
 let PackagingSpec =
       { Type =
           { prefix : Text
@@ -80,8 +78,6 @@ let PackagingSpec =
           , generic : Bool
           , suffix : Optional Text
           , if_ : Optional B/If
-          , includeIf : List Expr.Type
-          , excludeIf : List Expr.Type
           }
       , default =
           { prefix = "MinaArtifact"
@@ -102,8 +98,6 @@ let PackagingSpec =
           , docker_repo = DockerRepo.Type.InternalEurope
           , generic = False
           , if_ = None B/If
-          , includeIf = [] : List Expr.Type
-          , excludeIf = [] : List Expr.Type
           }
       }
 
@@ -131,8 +125,6 @@ let AppsSpec =
           , scope : List PipelineScope.Type
           , tags : List PipelineTag.Type
           , if_ : Optional B/If
-          , includeIf : List Expr.Type
-          , excludeIf : List Expr.Type
           }
       , default =
           { prefix = "MinaArtifact"
@@ -145,8 +137,6 @@ let AppsSpec =
           , scope = PipelineScope.Full
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , if_ = None B/If
-          , includeIf = [] : List Expr.Type
-          , excludeIf = [] : List Expr.Type
           }
       }
 
@@ -903,8 +893,6 @@ let pipelineBuilder
             , name = selfName spec
             , tags = spec.tags
             , scope = spec.scope
-            , includeIf = spec.includeIf
-            , excludeIf = spec.excludeIf
             }
           , steps = steps
           }
@@ -932,8 +920,6 @@ let appsPipeline
                                                                                               spec.arch}Apps"
             , tags = spec.tags
             , scope = spec.scope
-            , includeIf = spec.includeIf
-            , excludeIf = spec.excludeIf
             }
           , steps = [ build_apps spec ]
           }
@@ -948,8 +934,6 @@ let packagePipeline
             , name = selfName spec
             , tags = spec.tags
             , scope = spec.scope
-            , includeIf = spec.includeIf
-            , excludeIf = spec.excludeIf
             }
           , steps =
               let reused =
