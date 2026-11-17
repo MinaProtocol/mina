@@ -133,6 +133,12 @@ func TestConfigure(t *testing.T) {
 
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if testApp.P2p != nil {
+			panicOnErr(testApp.P2p.Close())
+		}
+		panicOnErr(os.RemoveAll(dir))
+	})
 
 	key, _, err := crypto.GenerateEd25519Key(crand.Reader)
 	require.NoError(t, err)

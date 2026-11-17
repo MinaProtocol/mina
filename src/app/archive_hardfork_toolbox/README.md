@@ -70,6 +70,26 @@ archive_hardfork_toolbox fork-candidate no-commands-after \
 - `--fork-state-hash`: Hash of the fork state
 - `--fork-slot`: Global slot since genesis of the fork block
 
+#### last-filled-block
+
+Prints the fork candidate: the last block with internal commands (coinbase,
+fee transfers) on the chain ending at the tip, as JSON
+(`{"state_hash", "slot_since_genesis", "height"}`). Blocks after the stop
+transaction slot have no commands, so this is the last block before it.
+Orphaned blocks in the archive are not considered, even when they are higher.
+
+**Usage:**
+```bash
+archive_hardfork_toolbox fork-candidate last-filled-block \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
+  [--latest-state-hash "3NKx..."]
+```
+
+**Parameters:**
+- `--postgres-uri`: URI for connecting to the mainnet archive database
+- `--latest-state-hash`: Tip of the chain to search, e.g. the best tip of a
+  daemon (default: the highest block in the archive)
+
 ### verify-upgrade
 
 Verifies the upgrade from pre-fork to post-fork database schema.

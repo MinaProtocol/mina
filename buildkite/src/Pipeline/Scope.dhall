@@ -56,6 +56,10 @@ let PullRequestOnly = [ Scope.PullRequest ]
 let AllButPullRequest =
       [ Scope.Nightly, Scope.MainlineNightly, Scope.Weekly, Scope.Release ]
 
+let AllButRelease =
+    -- every scope but Release: for jobs whose output must never reach a release
+      [ Scope.PullRequest, Scope.Nightly, Scope.MainlineNightly, Scope.Weekly ]
+
 let InfraOnly =
     -- tests of CI/packaging scripts: PR (dirtyWhen-gated), weekly sweep and release; not nightly
       [ Scope.PullRequest, Scope.Weekly, Scope.Release ]
@@ -64,6 +68,7 @@ in  { Type = Scope
     , Full = Full
     , PullRequestOnly = PullRequestOnly
     , AllButPullRequest = AllButPullRequest
+    , AllButRelease = AllButRelease
     , InfraOnly = InfraOnly
     , capitalName = capitalName
     , lowerName = lowerName

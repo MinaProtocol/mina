@@ -168,6 +168,7 @@ module Snark_work = struct
         let statement =
           Mina_state.Snarked_ledger_state.genesis
             ~genesis_ledger_hash:other_ledger_hash
+            ~genesis_total_currency:Currency.Amount.zero
         in
         let statement =
           { statement with

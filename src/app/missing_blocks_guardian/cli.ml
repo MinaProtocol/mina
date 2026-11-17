@@ -57,15 +57,8 @@ let blocks =
             BLOCKS_FORMAT; default: %s)"
            (Config.Block_format.to_string Config.Default.format) )
       (optional string)
-  and archive_blocks =
-    flag "--archive-blocks" ~aliases:[ "archive-blocks" ]
-      ~doc:
-        (sprintf
-           "PATH mina-archive-blocks program (or ARCHIVE_BLOCKS; default: %s)"
-           Config.Default.archive_blocks )
-      (optional string)
   in
-  fun ~env -> Config.blocks ~env ~url ~network ~format ~archive_blocks
+  fun ~env -> Config.blocks ~env ~url ~network ~format
 
 let interval =
   let%map_open interval =
@@ -98,10 +91,9 @@ let log_archive ~logger (archive : Config.archive) =
 let log_blocks ~logger (blocks : Config.blocks) =
   [%log info]
     "Block files $network-<height>-<state hash>.json from $url, in the $format \
-     format, written with $archive_blocks"
+     format"
     ~metadata:
       [ ("network", `String blocks.network)
       ; ("url", `String blocks.url)
       ; ("format", `String (Config.Block_format.to_string blocks.format))
-      ; ("archive_blocks", `String blocks.archive_blocks)
       ]

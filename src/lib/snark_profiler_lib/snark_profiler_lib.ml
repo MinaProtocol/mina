@@ -140,6 +140,11 @@ module Transaction_key = struct
         ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
+        ~total_currency:Currency.Amount.zero
+        ~ledger_after_coinbase:
+          (Frozen_ledger_hash.of_ledger_hash
+             (Mina_ledger.Ledger.merkle_root ledger) )
+        ~total_supply_after_coinbase:Currency.Amount.zero
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
           , `Pending_coinbase_of_statement
               { Transaction_snark.Pending_coinbase_stack_state.source =
@@ -595,6 +600,11 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                      ; second_pass_ledger = target_hash
                      ; pending_coinbase_stack = coinbase_stack_source
                      ; local_state = Mina_state.Local_state.empty ()
+                     ; fee_excess = Fee_excess.zero
+                     ; total_currency = Currency.Amount.zero
+                     ; ledger_after_coinbase =
+                         Sparse_ledger.merkle_root source_ledger
+                     ; total_supply_after_coinbase = Currency.Amount.zero
                      }
                  ; target =
                      { first_pass_ledger = target_hash
@@ -603,17 +613,18 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                          coinbase_stack_target ~genesis_constants
                            ~constraint_constants
                      ; local_state = Mina_state.Local_state.empty ()
+                     ; fee_excess =
+                         Transaction.fee_excess txn |> Or_error.ok_exn
+                     ; total_currency =
+                         Transaction.expected_supply_increase txn
+                         |> Or_error.ok_exn
+                     ; ledger_after_coinbase = target_hash
+                     ; total_supply_after_coinbase =
+                         Transaction.expected_supply_increase txn
+                         |> Or_error.ok_exn
                      }
                  ; connecting_ledger_left = target_hash
                  ; connecting_ledger_right = target_hash
-                 ; supply_increase =
-                     (let magnitude =
-                        Transaction.expected_supply_increase txn
-                        |> Or_error.ok_exn
-                      in
-                      let sgn = Sgn.Pos in
-                      Currency.Amount.Signed.create ~magnitude ~sgn )
-                 ; fee_excess = Transaction.fee_excess txn |> Or_error.ok_exn
                  }
                ~init_stack:coinbase_stack_source
                { Transaction_protocol_state.Poly.transaction = valid_txn
