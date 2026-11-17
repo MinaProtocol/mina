@@ -767,6 +767,21 @@ let wait_for_frontier_inclusion ~transition_registry ~time_controller state_hash
   Transition_registry.unregister registration ;
   inclusion
 
+let build_breadcrumb_for_produced_block ~logger ~time_controller
+    ~precomputed_values ~verifier ~trust_system ?transaction_pool_proxy ~label
+    ~parent ~transition ~transition_receipt_time ~staged_ledger_diff () =
+  time ~logger ~time_controller label (fun () ->
+      Transition_frontier.Breadcrumb.build ~logger ~precomputed_values ~verifier
+        ~get_completed_work:(Fn.const None) ~trust_system ~parent ~transition
+        ~sender:None (* Consider skipping `All here *)
+        ~skip_staged_ledger_verification:`Proofs ~transition_receipt_time
+        ?transaction_pool_proxy () )
+  |> Deferred.Result.map_error ~f:(function
+       | `Invalid_staged_ledger_diff e ->
+           `Invalid_staged_ledger_diff (e, Lazy.force staged_ledger_diff)
+       | (`Fatal_error _ | `Invalid_staged_ledger_hash _) as err ->
+           err )
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -964,33 +979,20 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               in
               let transition_receipt_time = Some (Time.now ()) in
               let%bind breadcrumb =
-                time ~logger ~time_controller
-                  "Build breadcrumb on produced block" (fun () ->
-                    Breadcrumb.build ~logger ~precomputed_values ~verifier
-                      ~get_completed_work:(Fn.const None) ~trust_system
-                      ~parent:crumb ~transition
-                      ~sender:None (* Consider skipping `All here *)
-                      ~skip_staged_ledger_verification:`Proofs
-                      ~transition_receipt_time
-                      ~transaction_pool_proxy:
-                        { find_by_hash =
-                            Network_pool.Transaction_pool.Resource_pool
-                            .find_by_hash transaction_resource_pool
-                        }
-                      () )
-                |> Deferred.Result.map_error ~f:(function
-                     | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff
-                           ( e
-                           , Staged_ledger_diff.read_all_proofs_from_disk
-                               staged_ledger_diff )
-                     | ( `Fatal_error _
-                       | `Invalid_genesis_protocol_state
-                       | `Invalid_staged_ledger_hash _
-                       | `Not_selected_over_frontier_root
-                       | `Parent_missing_from_frontier
-                       | `Prover_error _ ) as err ->
-                         err )
+                build_breadcrumb_for_produced_block ~logger ~time_controller
+                  ~precomputed_values ~verifier ~trust_system
+                  ~transaction_pool_proxy:
+                    { find_by_hash =
+                        Network_pool.Transaction_pool.Resource_pool.find_by_hash
+                          transaction_resource_pool
+                    }
+                  ~label:"Build breadcrumb on produced block" ~parent:crumb
+                  ~transition ~transition_receipt_time
+                  ~staged_ledger_diff:
+                    ( lazy
+                      (Staged_ledger_diff.read_all_proofs_from_disk
+                         staged_ledger_diff ) )
+                  ()
               in
               let txs =
                 Mina_block.transactions ~constraint_constants
@@ -1491,22 +1493,12 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           let transition_receipt_time = None in
           let%bind breadcrumb =
-            time ~logger ~time_controller
-              "Build breadcrumb on produced block (precomputed)" (fun () ->
-                Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~get_completed_work:(Fn.const None) ~trust_system
-                  ~parent:crumb ~transition ~sender:None
-                  ~skip_staged_ledger_verification:`Proofs
-                  ~transition_receipt_time ()
-                |> Deferred.Result.map_error ~f:(function
-                     | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
-                     | ( `Fatal_error _
-                       | `Invalid_genesis_protocol_state
-                       | `Invalid_staged_ledger_hash _
-                       | `Not_selected_over_frontier_root
-                       | `Parent_missing_from_frontier ) as err ->
-                         err ) )
+            build_breadcrumb_for_produced_block ~logger ~time_controller
+              ~precomputed_values ~verifier ~trust_system
+              ~label:"Build breadcrumb on produced block (precomputed)"
+              ~parent:crumb ~transition ~transition_receipt_time
+              ~staged_ledger_diff:(Lazy.from_val staged_ledger_diff)
+              ()
           in
           [%str_log trace]
             ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
