@@ -59,12 +59,12 @@ let versioned_reads_sample () =
     Yojson.Safe.from_string Sample_precomputed_block.sample_block_json
   in
   match Mina_block.Precomputed.Versioned.of_yojson json with
-  | Ok (V4 _ as block) ->
+  | Ok (V3 _) ->
+      failwith "read the version 5 sample as version 3"
+  | Ok block ->
       assert (
         Yojson.Safe.equal json
           (Mina_block.Precomputed.Versioned.to_yojson block) )
-  | Ok (V3 _) ->
-      failwith "read the version 4 sample as version 3"
   | Error err ->
       failwith err
 
@@ -100,6 +100,28 @@ let versioned_rejects_unknown_version () =
   assert (
     Result.is_error
       (Mina_block.Precomputed.Versioned.of_yojson (`Assoc [ ("data", `Null) ])) )
+
+let v4_block_file =
+  "mainnet-2-3NKaTb2EEadeFbv9MyCbHZckWvroG9SdtMBdoMB4asExPEy4Vhw3.json"
+
+let v4_block_state_hash = "3NKaTb2EEadeFbv9MyCbHZckWvroG9SdtMBdoMB4asExPEy4Vhw3"
+
+let versioned_hashes_v4_by_its_own_rules () =
+  let json = Yojson.Safe.from_file v4_block_file in
+  match Mina_block.Precomputed.Versioned.of_yojson json with
+  | Ok (V4 _ as block) ->
+      assert (
+        Yojson.Safe.equal json
+          (Mina_block.Precomputed.Versioned.to_yojson block) ) ;
+      [%test_eq: string] v4_block_state_hash
+        (Mina_base.State_hash.to_base58_check
+           (Mina_block.Precomputed.Versioned.state_hashes block).state_hash )
+  | Ok block ->
+      failwithf "expected a V4 block, read version %d"
+        (Mina_block.Precomputed.Versioned.version block)
+        ()
+  | Error err ->
+      failwith err
 
 let large_precomputed_json_file = "hetzner-itn-1-1795.json"
 
@@ -140,8 +162,10 @@ let read_v3 filename =
   with
   | Ok (V3 block) ->
       block
-  | Ok (V4 _) ->
-      failwith "read a version 3 block as version 4"
+  | Ok block ->
+      failwithf "read a version 3 block as version %d"
+        (Mina_block.Precomputed.Versioned.version block)
+        ()
   | Error err ->
       failwith err
 
@@ -207,6 +231,8 @@ let () =
             versioned_state_hash_matches_latest
         ; test_case "rejects unknown versions" `Quick
             versioned_rejects_unknown_version
+        ; test_case "hashes a V4 block by V4's rules" `Quick
+            versioned_hashes_v4_by_its_own_rules
         ] )
     ; ( "version 3"
       , [ test_case "mainnet blocks roundtrip" `Quick v3_roundtrips

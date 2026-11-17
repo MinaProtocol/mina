@@ -26,5 +26,5 @@ let commands_with_hashes ({ diff } : t) :
     (User_command.t * Mina_transaction.Transaction_hash.t) pre_diffs =
   map_commands diff ~f:(fun command -> (command, User_command.hash command))
 
-let to_mesa ({ diff } : t) : Diff.Stable.Latest.t =
+let to_mesa ({ diff } : t) : Diff.Stable.V3.t =
   { diff = map_commands diff ~f:User_command.to_mesa }

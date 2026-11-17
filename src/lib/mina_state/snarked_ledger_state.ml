@@ -25,8 +25,8 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'sok_digest
         , 'local_state )
         A.Poly.V2.t
-       and type Stable.V2.t = A.V2.t
-       and type With_sok.Stable.V2.t = A.With_sok.V2.t
+       and type Stable.V3.t = A.V3.t
+       and type With_sok.Stable.V3.t = A.With_sok.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -189,6 +189,20 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        ( Frozen_ledger_hash.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V2.t
+        , unit
+        , Local_state.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving compare, equal, hash, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
@@ -200,7 +214,27 @@ module Make_str (A : Wire_types.Concrete) = struct
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : Latest.t =
+        { t with fee_excess = Fee_excess.Stable.V1.to_latest t.fee_excess }
+
+      let to_input
+          ({ source
+           ; target
+           ; connecting_ledger_left
+           ; connecting_ledger_right
+           ; supply_increase
+           ; fee_excess
+           ; sok_digest = _
+           } :
+            t ) =
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+          [| Registers.to_input source
+           ; Registers.to_input target
+           ; Frozen_ledger_hash.to_input connecting_ledger_left
+           ; Frozen_ledger_hash.to_input connecting_ledger_right
+           ; Amount.Signed.to_input supply_increase
+           ; Fee_excess.Stable.V1.to_input fee_excess
+          |]
     end
   end]
 
@@ -343,6 +377,20 @@ module Make_str (A : Wire_types.Concrete) = struct
   module With_sok = struct
     [%%versioned
     module Stable = struct
+      module V3 = struct
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V2.t
+          , Sok_message.Digest.Stable.V1.t
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V2.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
@@ -354,7 +402,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
-        let to_latest = Fn.id
+        let to_latest (t : t) : Latest.t =
+          { t with fee_excess = Fee_excess.Stable.V1.to_latest t.fee_excess }
       end
     end]
 

@@ -8,10 +8,16 @@ module Ledger = Mina_ledger.Ledger
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V3 : sig
+  module V4 : sig
     type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
+  end
+
+  module V3 : sig
+    type t
+
+    val to_latest : t -> V4.t
   end
 end]
 
