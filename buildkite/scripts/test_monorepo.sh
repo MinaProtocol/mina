@@ -23,9 +23,6 @@ MONOREPO_SCRIPT="$SCRIPT_DIR/monorepo.sh"
 # Test temp directory
 TEST_DIR=""
 
-# Mainline branches for excludeIf/includeIf tests
-MAINLINE_BRANCHES=(mesa compatible develop master)
-MAINLINE_BRANCHES_COMMA_SEPARATED="$(IFS=,; echo "${MAINLINE_BRANCHES[*]}")"
 # Setup function
 setup() {
   TEST_DIR=$(mktemp -d)
@@ -229,7 +226,6 @@ EOF
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "Including job IntegrationTest" "Should include matching job"
@@ -259,7 +255,6 @@ EOF
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "rejected job due to tags mismatch" "Should reject job with non-matching tags"
@@ -288,7 +283,6 @@ EOF
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "rejected job due to scope mismatch" "Should reject job with non-matching scope"
@@ -362,7 +356,6 @@ EOF
     --selection-mode triaged \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/dep_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "Including job DepBench" "Bench job selected by dirty-when"
@@ -402,7 +395,6 @@ EOF
     --selection-mode triaged \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/dep_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   # DepBuild is a shared dependency of DepBench and DepBench2, uploaded once.
@@ -459,7 +451,6 @@ EOF
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "Including job FullDepTest" "Dependent test is selected"

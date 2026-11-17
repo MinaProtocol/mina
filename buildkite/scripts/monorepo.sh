@@ -25,8 +25,7 @@
 #     4. filter-mode         (any or all)      - Determines if any or all tags must match.
 #     5. jobs                PATH              - Path to the jobs directory containing .yml files.
 #     6. git-diff-file       PATH              - Path to the git diff file for dirty-when checks.
-#     7. mainline-branches   STRING            - Comma-separated list of mainline branches for ancestor detection.
-#     8. debug               FLAG              - Optional flag to enable debug output.
+#     7. debug               FLAG              - Optional flag to enable debug output.
 
 set -euo pipefail
 
@@ -50,7 +49,6 @@ Options:
   --git-diff-file FILE   STRING    File containing git diff output
   --dry-run              BOOL      Dry run mode (True/False)
   --filter-mode MODE     STRING    Filter mode (any or all)
-  --mainline-branches    STRING    Comma-separated list of mainline branches
   --debug                          Enable debug mode
   --h, --help             Show this help message
 EOF
@@ -62,7 +60,6 @@ JOBS=""
 TAGS=""
 SCOPES=""
 GIT_DIFF_FILE=""
-MAINLINE_BRANCHES=()
 DEBUG=false
 DRY_RUN=false
 
@@ -81,9 +78,6 @@ while [[ $# -gt 0 ]]; do
       FILTER_MODE="$2"; shift 2;;
     --git-diff-file)
       GIT_DIFF_FILE="$2"; shift 2;;
-    --mainline-branches)
-      IFS=',' read -r -a MAINLINE_BRANCHES <<< "$2"
-      shift; shift;;
     --debug)
       DEBUG=true; shift;;
     --dry-run)
@@ -101,12 +95,6 @@ if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" || -z "$F
   exit 1
 fi
 
-# Check if mainline branches were provided
-if [[ ${#MAINLINE_BRANCHES[@]} -eq 0 ]]; then
-  echo "Error: --mainline-branches is required."
-  exit 1
-fi
-
 # Debug output
 if [[ "${DEBUG:-false}" == true ]]; then
   echo "Debug: SELECTION_MODE=$SELECTION_MODE"
@@ -119,7 +107,6 @@ if [[ "${DEBUG:-false}" == true ]]; then
     echo "Debug: Contents of GIT_DIFF_FILE ($GIT_DIFF_FILE):"
     cat "$GIT_DIFF_FILE"
   fi
-  echo "Debug: MAINLINE_BRANCHES=${MAINLINE_BRANCHES[*]}"
   echo "Debug: DRY_RUN=$DRY_RUN"
 
 fi
