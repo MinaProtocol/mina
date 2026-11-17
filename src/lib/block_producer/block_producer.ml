@@ -1180,6 +1180,28 @@ let pregenerate_genesis_proof_one_slot_before
   let%bind () = after span_till_time in
   generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader ()
 
+let sync_vrf_evaluator ~logger ~vrf_evaluator ~vrf_poll_interval
+    ~vrf_evaluation_state ~epoch_data_for_vrf i slot =
+  let i' =
+    Mina_numbers.Length.succ
+      epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.epoch
+  in
+  let new_global_slot = epoch_data_for_vrf.global_slot in
+  let%bind () =
+    if Mina_numbers.Length.(i' > i) then
+      Vrf_evaluation_state.update_epoch_data ~vrf_evaluator ~epoch_data_for_vrf
+        ~logger vrf_evaluation_state ~vrf_poll_interval
+    else Deferred.unit
+  in
+  (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
+  if
+    Mina_numbers.Global_slot_since_hard_fork.(new_global_slot > slot)
+    && not (Vrf_evaluation_state.finished vrf_evaluation_state)
+  then
+    Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
+      ~vrf_poll_interval
+  else Deferred.unit
+
 let iteration ~schedule_next_vrf_check ~produce_block_now
     ~schedule_block_production ~next_vrf_check_now ~genesis_breadcrumb
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
@@ -1192,27 +1214,13 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
     Transition_frontier.(
       best_tip transition_frontier |> Breadcrumb.consensus_state)
   in
-  let i' =
-    Mina_numbers.Length.succ
-      epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.epoch
+  let new_global_slot =
+    epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.global_slot
   in
-  let new_global_slot = epoch_data_for_vrf.global_slot in
   let open Context in
   let%bind () =
-    if Mina_numbers.Length.(i' > i) then
-      Vrf_evaluation_state.update_epoch_data ~vrf_evaluator ~epoch_data_for_vrf
-        ~logger vrf_evaluation_state ~vrf_poll_interval
-    else Deferred.unit
-  in
-  let%bind () =
-    (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
-    if
-      Mina_numbers.Global_slot_since_hard_fork.(new_global_slot > slot)
-      && not (Vrf_evaluation_state.finished vrf_evaluation_state)
-    then
-      Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
-        ~vrf_poll_interval
-    else Deferred.unit
+    sync_vrf_evaluator ~logger ~vrf_evaluator ~vrf_poll_interval
+      ~vrf_evaluation_state ~epoch_data_for_vrf i slot
   in
   match Core.Queue.dequeue vrf_evaluation_state.queue with
   | None -> (
