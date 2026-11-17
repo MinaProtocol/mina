@@ -682,6 +682,33 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
       in
       go max_num_retries )
 
+let assert_selected_over_parent_and_root ~context:(module Context : CONTEXT)
+    ~frontier ~previous_transition consensus_state_with_hashes =
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  assert (
+    phys_equal
+      (Consensus.Hooks.select
+         ~context:(module Context)
+         ~existing:
+           (With_hash.map ~f:Mina_block.consensus_state previous_transition)
+         ~candidate:consensus_state_with_hashes )
+      `Take
+    || failwith
+         "newly generated consensus states should be selected over their parent" ) ;
+  assert (
+    let root_consensus_state_with_hashes =
+      Transition_frontier.root frontier
+      |> Breadcrumb.consensus_state_with_hashes
+    in
+    phys_equal
+      (Consensus.Hooks.select
+         ~context:(module Context)
+         ~existing:root_consensus_state_with_hashes
+         ~candidate:consensus_state_with_hashes )
+      `Take
+    || failwith
+         "newly generated consensus states should be selected over the tf root" )
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -823,33 +850,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               ] ;
           Internal_tracing.with_state_hash protocol_state_hashes.state_hash
           @@ fun () ->
-          assert (
-            phys_equal
-              (Consensus.Hooks.select
-                 ~context:(module Context)
-                 ~existing:
-                   (With_hash.map ~f:Mina_block.consensus_state
-                      previous_transition )
-                 ~candidate:consensus_state_with_hashes )
-              `Take
-            || failwith
-                 "newly generated consensus states should be selected over \
-                  their parent" ) ;
-
-          assert (
-            let root_consensus_state_with_hashes =
-              Transition_frontier.root frontier
-              |> Breadcrumb.consensus_state_with_hashes
-            in
-            phys_equal
-              (Consensus.Hooks.select
-                 ~context:(module Context)
-                 ~existing:root_consensus_state_with_hashes
-                 ~candidate:consensus_state_with_hashes )
-              `Take
-            || failwith
-                 "newly generated consensus states should be selected over the \
-                  tf root" ) ;
+          assert_selected_over_parent_and_root
+            ~context:(module Context)
+            ~frontier ~previous_transition consensus_state_with_hashes ;
           Interruptible.uninterruptible
             (let open Deferred.Let_syntax in
             let emit_breadcrumb () =
@@ -1447,32 +1450,9 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           Header.protocol_state
           @@ Mina_block.header (With_hash.data previous_transition)
         in
-        assert (
-          phys_equal
-            (Consensus.Hooks.select
-               ~context:(module Context)
-               ~existing:
-                 (With_hash.map ~f:Mina_block.consensus_state
-                    previous_transition )
-               ~candidate:consensus_state_with_hashes )
-            `Take
-          || failwith
-               "newly generated consensus states should be selected over their \
-                parent" ) ;
-        assert (
-          let root_consensus_state_with_hashes =
-            Transition_frontier.root frontier
-            |> Breadcrumb.consensus_state_with_hashes
-          in
-          phys_equal
-            (Consensus.Hooks.select
-               ~context:(module Context)
-               ~existing:root_consensus_state_with_hashes
-               ~candidate:consensus_state_with_hashes )
-            `Take
-          || failwith
-               "newly generated consensus states should be selected over the \
-                tf root" ) ;
+        assert_selected_over_parent_and_root
+          ~context:(module Context)
+          ~frontier ~previous_transition consensus_state_with_hashes ;
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
           let previous_protocol_state_hash =
