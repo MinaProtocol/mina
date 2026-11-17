@@ -197,6 +197,138 @@ let enforce_block_reward_threshold ~logger ~constraint_constants
         ] ;
     Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff )
 
+let%test_module "enforce_block_reward_threshold" =
+  ( module struct
+    module Quickcheck = Core.Quickcheck
+    module Amount = Currency.Amount
+    module Fee = Currency.Fee
+    module Diff = Staged_ledger_diff.With_valid_signatures_and_proofs
+
+    let logger = Logger.null ()
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
+    let keypair =
+      Quickcheck.random_value ~seed:(`Deterministic "fee payer")
+        Signature_lib.Keypair.gen
+
+    let prover =
+      Quickcheck.random_value ~seed:(`Deterministic "prover")
+        Signature_lib.Public_key.Compressed.gen
+
+    let work ~fee : Transaction_snark_work.Checked.t =
+      let statements =
+        Quickcheck.random_value ~seed:(`Deterministic "statements")
+          Transaction_snark_work.Statement.gen
+      in
+      Transaction_snark_work.Checked.create_unsafe
+        { fee
+        ; proofs =
+            One_or_two.map statements ~f:(fun statement ->
+                Ledger_proof.For_tests.Cached.mk_dummy_proof ~statement ~fee
+                  ~prover )
+        ; prover
+        }
+
+    let payment ~fee : User_command.Valid.t With_status.t =
+      let fee_payer_pk = Signature_lib.Public_key.compress keypair.public_key in
+      let payload =
+        Signed_command.Payload.create ~fee ~fee_payer_pk
+          ~nonce:Account.Nonce.zero ~memo:Signed_command_memo.dummy
+          ~valid_until:None
+          ~body:(Payment { receiver_pk = fee_payer_pk; amount = Amount.zero })
+      in
+      { data =
+          Signed_command
+            (Signed_command.sign ~signature_kind:Testnet keypair payload)
+      ; status = Applied
+      }
+
+    let diff ~command_fees ~work_fees : Diff.t =
+      { diff =
+          ( { completed_works = List.map work_fees ~f:(fun fee -> work ~fee)
+            ; commands = List.map command_fees ~f:(fun fee -> payment ~fee)
+            ; coinbase = One None
+            ; internal_command_statuses = []
+            }
+          , None )
+      }
+
+    let mina = Fee.of_mina_int_exn
+
+    let outcome ?(constraint_constants = constraint_constants)
+        ?(supercharge_coinbase = false) ~threshold diff =
+      let result =
+        enforce_block_reward_threshold ~logger ~constraint_constants
+          ~supercharge_coinbase ~threshold diff
+      in
+      if phys_equal result diff then `Kept
+      else if phys_equal result Diff.empty_diff then `Emptied
+      else failwith "expected the diff to be kept or replaced by empty_diff"
+
+    let just_above amount =
+      Amount.(amount + of_nanomina_int_exn 1) |> Option.value_exn
+
+    let%test "a block whose reward meets the threshold is kept" =
+      let diff = diff ~command_fees:[ mina 1 ] ~work_fees:[] in
+      Poly.equal (outcome ~threshold:(Amount.of_mina_int_exn 21) diff) `Kept
+
+    let%test "a block whose reward falls short of the threshold is emptied" =
+      let diff = diff ~command_fees:[ mina 1 ] ~work_fees:[] in
+      Poly.equal
+        (outcome ~threshold:(just_above (Amount.of_mina_int_exn 21)) diff)
+        `Emptied
+
+    let%test_unit "the empty block that replaces it earns no reward" =
+      let { Diff.diff = first, second } = Diff.empty_diff in
+      assert (List.is_empty first.completed_works) ;
+      assert (List.is_empty first.commands) ;
+      assert (Poly.equal first.coinbase Staged_ledger_diff.At_most_two.Zero) ;
+      assert (Option.is_none second) ;
+      [%test_eq: Amount.t option]
+        (Staged_ledger_diff.net_return ~constraint_constants
+           ~supercharge_coinbase:false
+           (Staged_ledger_diff.forget Diff.empty_diff) )
+        (Some Amount.zero)
+
+    let%test "snark work fees count against transaction fees and the coinbase" =
+      (* 20 coinbase + 5 fees - (15 + 1) snark work = 9 *)
+      let diff = diff ~command_fees:[ mina 5 ] ~work_fees:[ mina 15; mina 1 ] in
+      Poly.equal (outcome ~threshold:(Amount.of_mina_int_exn 9) diff) `Kept
+      && Poly.equal
+           (outcome ~threshold:(just_above (Amount.of_mina_int_exn 9)) diff)
+           `Emptied
+
+    let%test "expensive snark work can empty a block whose coinbase alone \
+              meets the threshold" =
+      (* 20 coinbase - 15 snark work = 5 *)
+      let diff = diff ~command_fees:[] ~work_fees:[ mina 15 ] in
+      Poly.equal (outcome ~threshold:(Amount.of_mina_int_exn 10) diff) `Emptied
+
+    let%test "a supercharged coinbase counts in full" =
+      let constraint_constants =
+        { constraint_constants with supercharged_coinbase_factor = 2 }
+      in
+      let diff = diff ~command_fees:[] ~work_fees:[] in
+      let threshold = Amount.of_mina_int_exn 30 in
+      Poly.equal
+        (outcome ~constraint_constants ~supercharge_coinbase:false ~threshold
+           diff )
+        `Emptied
+      && Poly.equal
+           (outcome ~constraint_constants ~supercharge_coinbase:true ~threshold
+              diff )
+           `Kept
+
+    let%test "a reward that cannot be computed counts as zero" =
+      (* 20 coinbase - 25 snark work underflows *)
+      let diff = diff ~command_fees:[] ~work_fees:[ mina 25 ] in
+      Poly.equal
+        (outcome ~threshold:(Amount.of_nanomina_int_exn 1) diff)
+        `Emptied
+  end )
+
 let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
     ~staged_ledger ~(block_data : Consensus.Data.Block_data.t)
     ~previous_state_view ~transactions ~get_completed_work ~log_block_creation
