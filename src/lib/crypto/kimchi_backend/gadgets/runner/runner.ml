@@ -3,7 +3,7 @@ module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
 
 module Impl = Kimchi_pasta_snarky_backend.Step_impl
 
-let generate_and_verify_proof ?cs ?proof_keypair circuit =
+let generate_and_verify_proof ?proof_keypair circuit =
   let proof_keypair =
     match proof_keypair with
     | Some proof_keypair ->
@@ -11,12 +11,8 @@ let generate_and_verify_proof ?cs ?proof_keypair circuit =
     | None ->
         (* Generate constraint system for the circuit *)
         let constraint_system =
-          match cs with
-          | Some cs ->
-              cs
-          | None ->
-              Impl.constraint_system ~input_typ:Impl.Typ.unit
-                ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
+          Impl.constraint_system ~input_typ:Impl.Typ.unit
+            ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
         in
         (* Generate the indexes from the constraint system *)
         Tick.Keypair.create ~prev_challenges:0 constraint_system
