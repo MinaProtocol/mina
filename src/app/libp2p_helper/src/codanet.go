@@ -57,6 +57,9 @@ var (
 	logger      = logging.Logger("codanet.Helper")
 	NoDHT       bool // option for testing to completely disable the DHT
 	WithPrivate bool // option for testing to allow private IPs
+	// option for testing to shrink the memtable that badger preallocates for
+	// each datastore; zero keeps go-ds-badger's default
+	BadgerMaxTableSize int64
 
 	privateCIDRs = []string{
 		"10.0.0.0/8",
@@ -722,6 +725,9 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	initPrivateIpFilter()
 
 	dso := dsb.DefaultOptions
+	if BadgerMaxTableSize != 0 {
+		dso.MaxTableSize = BadgerMaxTableSize
+	}
 
 	ds, err := dsb.NewDatastore(path.Join(statedir, "libp2p-peerstore-v0"), &dso)
 	if err != nil {
@@ -729,6 +735,9 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	}
 
 	dsoDht := dsb.DefaultOptions
+	if BadgerMaxTableSize != 0 {
+		dsoDht.MaxTableSize = BadgerMaxTableSize
+	}
 	dsDht, err := dsb.NewDatastore(path.Join(statedir, "libp2p-dht-v0"), &dsoDht)
 	if err != nil {
 		return nil, err
