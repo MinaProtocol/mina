@@ -30,6 +30,8 @@ let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Prefork = ../Constants/Prefork.dhall
+
 let DebianInstallMode
     : Type
     = < NoInstall | DownloadOnly >
@@ -82,7 +84,7 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bookworm
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_legacy_version = Prefork.version
           , docker_target = None Text
           , base_image = None Text
           , deb_profile = Profiles.Type.Devnet
@@ -166,8 +168,7 @@ let generateStep =
               -- Only Daemon/Rosetta ("*-config" images) need an arch marker
               -- baked into the custom suffix build-arg on top of --platform;
               -- --platform alone already derives -arm64 for everyone else
-              -- (scripts/docker/helper.sh get_platform_suffix), which is the
-              -- only arch suffix manager.sh verify's tag ever expects.
+              -- (scripts/docker/helper.sh get_platform_suffix).
                 merge
                   { Base = ""
                   , DaemonGeneric = ""
