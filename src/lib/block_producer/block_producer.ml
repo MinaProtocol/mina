@@ -307,6 +307,24 @@ let supply_increase_of_ledger_proof ledger_proof_opt =
     ~f:(fun proof -> (Ledger_proof.Cached.statement proof).supply_increase)
     ~default:Currency.Amount.Signed.zero
 
+let create_internal_transition ~(block_data : Consensus.Data.Block_data.t)
+    ~protocol_state ~consensus_transition_data ~pending_coinbase_update ~diff
+    ~ledger_proof_opt =
+  let snark_transition =
+    O1trace.sync_thread "generate_snark_transition" (fun () ->
+        Snark_transition.create_value
+          ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
+          ~consensus_transition:consensus_transition_data
+          ~pending_coinbase_update () )
+  in
+  O1trace.sync_thread "generate_internal_transition" (fun () ->
+      Internal_transition.create ~snark_transition
+        ~prover_state:(Consensus.Data.Block_data.prover_state block_data)
+        ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+        ~ledger_proof:
+          (Option.map ledger_proof_opt ~f:(fun proof ->
+               Ledger_proof.Cached.read_proof_from_disk proof ) ) )
+
 let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
@@ -445,23 +463,10 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~constraint_constants ) )
           in
           lift_sync (fun () ->
-              let snark_transition =
-                O1trace.sync_thread "generate_snark_transition" (fun () ->
-                    Snark_transition.create_value
-                      ~blockchain_state:
-                        (Protocol_state.blockchain_state protocol_state)
-                      ~consensus_transition:consensus_transition_data
-                      ~pending_coinbase_update () )
-              in
               let internal_transition =
-                O1trace.sync_thread "generate_internal_transition" (fun () ->
-                    Internal_transition.create ~snark_transition
-                      ~prover_state:
-                        (Consensus.Data.Block_data.prover_state block_data)
-                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                      ~ledger_proof:
-                        (Option.map ledger_proof_opt ~f:(fun proof ->
-                             Ledger_proof.Cached.read_proof_from_disk proof ) ) )
+                create_internal_transition ~block_data ~protocol_state
+                  ~consensus_transition_data ~pending_coinbase_update ~diff
+                  ~ledger_proof_opt
               in
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =
