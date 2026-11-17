@@ -1232,9 +1232,9 @@ module Next_step = struct
     | Schedule_production of production
 end
 
-let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
-    ~coinbase_receiver ~vrf_evaluator_status ~epoch_data_for_vrf
-    ~ledger_snapshot slot_won : Next_step.t =
+let decide_next_step ~context:(module Context : CONTEXT) ~now ~coinbase_receiver
+    ~vrf_evaluator_status ~epoch_data_for_vrf ~ledger_snapshot slot_won :
+    Next_step.t =
   let new_global_slot =
     epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.global_slot
   in
@@ -1269,7 +1269,6 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
                 to_yojson @@ of_uint32 slot) )
           ; ("epoch", Mina_numbers.Length.to_yojson epoch)
           ] ;
-      let now = Block_time.now time_controller in
       let curr_global_slot =
         Consensus.Data.Consensus_time.(
           of_time_exn ~constants:consensus_constants now |> to_global_slot)
@@ -1277,7 +1276,7 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
       let winner_pk = fst slot_won.delegator in
       let data =
         Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
-          ~coinbase_receiver:!coinbase_receiver
+          ~coinbase_receiver
       in
       match
         won_slot_timing ~current_global_slot:curr_global_slot
@@ -1343,7 +1342,8 @@ let iteration ~(act : Next_step.t -> unit Deferred.t)
     let slot_won = Core.Queue.dequeue vrf_evaluation_state.queue in
     decide_next_step
       ~context:(module Context)
-      ~time_controller ~coinbase_receiver
+      ~now:(Block_time.now time_controller)
+      ~coinbase_receiver:!coinbase_receiver
       ~vrf_evaluator_status:
         (Vrf_evaluation_state.evaluator_status vrf_evaluation_state)
       ~epoch_data_for_vrf ~ledger_snapshot slot_won
