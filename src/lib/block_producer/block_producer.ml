@@ -736,6 +736,37 @@ let validate_produced_block ~context:(module Context : CONTEXT) ~frontier
         ~is_block_in_frontier:
           (Fn.compose Option.is_some (Transition_frontier.find frontier))
 
+let wait_for_frontier_inclusion ~transition_registry ~time_controller state_hash
+    =
+  let open Transition_frontier.Extensions in
+  let registration =
+    Transition_registry.register transition_registry state_hash
+  in
+  let%map inclusion =
+    Deferred.choose
+      [ Deferred.choice
+          (Transition_registry.wait registration)
+          (Fn.const `Transition_accepted)
+      ; Deferred.choice
+          ( Block_time.Timeout.create time_controller
+              (* We allow up to 20 seconds for the transition
+                 to make its way from the transition_writer to
+                 the frontier.
+                 This value is chosen to be reasonably
+                 generous. In theory, this should not take
+                 terribly long. But long cycles do happen in
+                 our system, and with medium curves those long
+                 cycles can be substantial.
+              *)
+              (Block_time.Span.of_ms 20000L)
+              ~f:(Fn.const ())
+          |> Block_time.Timeout.to_deferred )
+          (Fn.const `Timed_out)
+      ]
+  in
+  Transition_registry.unregister registration ;
+  inclusion
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -998,33 +1029,12 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               [%log internal] "Wait_for_confirmation" ;
               [%log debug] ~metadata
                 "Waiting for block $state_hash to be inserted into frontier" ;
-              let registration =
-                Transition_registry.register transition_registry
-                  protocol_state_hashes.state_hash
+              let%bind.Async.Deferred inclusion =
+                wait_for_frontier_inclusion ~transition_registry
+                  ~time_controller protocol_state_hashes.state_hash
               in
-              Deferred.choose
-                [ Deferred.choice
-                    (Transition_registry.wait registration)
-                    (Fn.const (Ok `Transition_accepted))
-                ; Deferred.choice
-                    ( Block_time.Timeout.create time_controller
-                        (* We allow up to 20 seconds for the transition
-                           to make its way from the transition_writer to
-                           the frontier.
-                           This value is chosen to be reasonably
-                           generous. In theory, this should not take
-                           terribly long. But long cycles do happen in
-                           our system, and with medium curves those long
-                           cycles can be substantial.
-                        *)
-                        (Block_time.Span.of_ms 20000L)
-                        ~f:(Fn.const ())
-                    |> Block_time.Timeout.to_deferred )
-                    (Fn.const (Ok `Timed_out))
-                ]
-              >>= function
+              match inclusion with
               | `Transition_accepted ->
-                  Transition_registry.unregister registration ;
                   [%log internal] "Transition_accepted" ;
                   [%log info] ~metadata
                     "Generated transition $state_hash was accepted into \
@@ -1038,7 +1048,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   (* FIXME #3167: this should be fatal, and more
                      importantly, shouldn't happen.
                   *)
-                  Transition_registry.unregister registration ;
                   [%log internal] "Transition_accept_timeout" ;
                   let msg : (_, unit, string, unit) format4 =
                     "Timed out waiting for generated transition $state_hash to \
@@ -1519,24 +1528,12 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           [%log debug] ~metadata
             "Waiting for block $state_hash to be inserted into frontier" ;
-          let registration =
-            Transition_registry.register transition_registry
+          let%bind.Async.Deferred inclusion =
+            wait_for_frontier_inclusion ~transition_registry ~time_controller
               protocol_state_hashes.state_hash
           in
-          Deferred.choose
-            [ Deferred.choice
-                (Transition_registry.wait registration)
-                (Fn.const (Ok `Transition_accepted))
-            ; Deferred.choice
-                ( Block_time.Timeout.create time_controller
-                    (Block_time.Span.of_ms 20000L)
-                    ~f:(Fn.const ())
-                |> Block_time.Timeout.to_deferred )
-                (Fn.const (Ok `Timed_out))
-            ]
-          >>= function
+          match inclusion with
           | `Transition_accepted ->
-              Transition_registry.unregister registration ;
               [%log info] ~metadata
                 "Generated transition $state_hash was accepted into transition \
                  frontier" ;
@@ -1545,7 +1542,6 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               (* FIXME #3167: this should be fatal, and more importantly,
                  shouldn't happen.
               *)
-              Transition_registry.unregister registration ;
               [%log fatal] ~metadata
                 "Timed out waiting for generated transition $state_hash to \
                  enter transition frontier. Continuing to produce new blocks \
