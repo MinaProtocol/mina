@@ -1304,14 +1304,12 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
           [%log info] "Producing a block in $slots slots"
             ~metadata:
               [ ("slots", Mina_numbers.Global_slot_span.to_yojson slot_diff) ] ;
-          let time =
+          let scheduled_time =
             Consensus.Data.Consensus_time.(
               start_time ~constants:consensus_constants
                 (of_global_slot ~constants:consensus_constants
                    winning_global_slot ))
-            |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
           in
-          let scheduled_time = time_of_ms time in
           Schedule_production (scheduled_time, data, winner_pk) )
 
 let producer_timing : Next_step.t -> _ option = function
