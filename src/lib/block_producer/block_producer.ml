@@ -1202,6 +1202,21 @@ let sync_vrf_evaluator ~logger ~vrf_evaluator ~vrf_poll_interval
       ~vrf_poll_interval
   else Deferred.unit
 
+let won_slot_timing ~current_global_slot winning_global_slot =
+  if
+    Mina_numbers.Global_slot_since_hard_fork.(
+      current_global_slot = winning_global_slot)
+  then `Now
+  else
+    match
+      Mina_numbers.Global_slot_since_hard_fork.diff winning_global_slot
+        current_global_slot
+    with
+    | None ->
+        `Passed
+    | Some slot_diff ->
+        `In slot_diff
+
 let iteration ~schedule_next_vrf_check ~produce_block_now
     ~schedule_block_production ~next_vrf_check_now ~genesis_breadcrumb
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
@@ -1275,59 +1290,55 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
         Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
           ~coinbase_receiver:!coinbase_receiver
       in
-      if
-        Mina_numbers.Global_slot_since_hard_fork.(
-          curr_global_slot = winning_global_slot)
-      then (
-        (*produce now*)
-        [%log info] "Producing a block now" ;
-        set_next_producer_timing
-          (`Produce_now (data, winner_pk))
-          consensus_state ;
-        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-        let%bind () =
-          generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader
-            ()
-        in
-        produce_block_now (now, data, winner_pk) )
-      else
-        match
-          Mina_numbers.Global_slot_since_hard_fork.diff winning_global_slot
-            curr_global_slot
-        with
-        | None ->
-            [%log warn]
-              "Skipping block production for global slot $slot_won because it \
-               has passed. Current global slot is $curr_slot"
-              ~metadata:
-                [ ( "slot_won"
-                  , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                      winning_global_slot )
-                ; ( "curr_slot"
-                  , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                      curr_global_slot )
-                ] ;
-            next_vrf_check_now ()
-        | Some slot_diff ->
-            [%log info] "Producing a block in $slots slots"
-              ~metadata:
-                [ ("slots", Mina_numbers.Global_slot_span.to_yojson slot_diff) ] ;
-            let time =
-              Consensus.Data.Consensus_time.(
-                start_time ~constants:consensus_constants
-                  (of_global_slot ~constants:consensus_constants
-                     winning_global_slot ))
-              |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
-            in
-            set_next_producer_timing
-              (`Produce (time, data, winner_pk))
-              consensus_state ;
-            Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-            let scheduled_time = time_of_ms time in
-            don't_wait_for
-              (pregenerate_genesis_proof_one_slot_before ~constraint_constants
-                 ~time_controller ~genesis_breadcrumb ~frontier_reader time ) ;
-            schedule_block_production (scheduled_time, data, winner_pk) )
+      match
+        won_slot_timing ~current_global_slot:curr_global_slot
+          winning_global_slot
+      with
+      | `Now ->
+          (*produce now*)
+          [%log info] "Producing a block now" ;
+          set_next_producer_timing
+            (`Produce_now (data, winner_pk))
+            consensus_state ;
+          Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+          let%bind () =
+            generate_genesis_proof_if_needed ~genesis_breadcrumb
+              ~frontier_reader ()
+          in
+          produce_block_now (now, data, winner_pk)
+      | `Passed ->
+          [%log warn]
+            "Skipping block production for global slot $slot_won because it \
+             has passed. Current global slot is $curr_slot"
+            ~metadata:
+              [ ( "slot_won"
+                , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                    winning_global_slot )
+              ; ( "curr_slot"
+                , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                    curr_global_slot )
+              ] ;
+          next_vrf_check_now ()
+      | `In slot_diff ->
+          [%log info] "Producing a block in $slots slots"
+            ~metadata:
+              [ ("slots", Mina_numbers.Global_slot_span.to_yojson slot_diff) ] ;
+          let time =
+            Consensus.Data.Consensus_time.(
+              start_time ~constants:consensus_constants
+                (of_global_slot ~constants:consensus_constants
+                   winning_global_slot ))
+            |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+          in
+          set_next_producer_timing
+            (`Produce (time, data, winner_pk))
+            consensus_state ;
+          Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+          let scheduled_time = time_of_ms time in
+          don't_wait_for
+            (pregenerate_genesis_proof_one_slot_before ~constraint_constants
+               ~time_controller ~genesis_breadcrumb ~frontier_reader time ) ;
+          schedule_block_production (scheduled_time, data, winner_pk) )
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
