@@ -1700,6 +1700,24 @@ module AccountObj = struct
             ~resolve:(fun _ permission -> permission.Permissions.Poly.set_timing)
         ] )
 
+  (* A token symbol or zkApp URI is any bytes on chain. The string field of the
+     account shows it as text; this object carries the exact value. *)
+  let arbitrary_bytes : (Mina_lib.t, string option) typ =
+    obj "ArbitraryBytes"
+      ~doc:
+        "A value that is arbitrary bytes on chain, such as a token symbol or a \
+         zkApp URI" ~fields:(fun _ ->
+        [ field "hex" ~typ:(non_null string) ~doc:"The exact bytes, hex-encoded"
+            ~args:Arg.[]
+            ~resolve:(fun _ s -> Graphql_lib.Arbitrary_bytes.to_hex s)
+        ; field "utf8" ~typ:string
+            ~doc:
+              "The bytes as text when they are valid UTF-8, null when they are \
+               not"
+            ~args:Arg.[]
+            ~resolve:(fun _ s -> Graphql_lib.Arbitrary_bytes.utf8_opt s)
+        ] )
+
   let account_vk =
     obj "AccountVerificationKeyWithHash" ~doc:"Verification key with hash"
       ~fields:(fun _ ->
@@ -1924,11 +1942,18 @@ module AccountObj = struct
            ; field "zkappUri" ~typ:string
                ~doc:
                  "The URI associated with this account, usually pointing to \
-                  the zkApp source code"
+                  the zkApp source code. A byte that is not valid UTF-8 is \
+                  returned as the character U+00XX; zkappUriBytes has the \
+                  exact bytes"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
-                 Option.value_map account.zkapp ~default:None ~f:(fun zkapp ->
-                     Some zkapp.zkapp_uri ) )
+                 Option.map account.zkapp ~f:(fun zkapp ->
+                     Graphql_lib.Arbitrary_bytes.to_utf8 zkapp.zkapp_uri ) )
+           ; field "zkappUriBytes" ~typ:arbitrary_bytes
+               ~doc:"The exact bytes of the zkApp URI"
+               ~args:Arg.[]
+               ~resolve:(fun _ { account; _ } ->
+                 Option.map account.zkapp ~f:(fun zkapp -> zkapp.zkapp_uri) )
            ; field "zkappState"
                ~typ:
                  ( list @@ non_null
@@ -1958,7 +1983,14 @@ module AccountObj = struct
            ; field "tokenSymbol" ~typ:string
                ~doc:
                  "The symbol for the token owned by this account, if there is \
-                  one"
+                  one. A byte that is not valid UTF-8 is returned as the \
+                  character U+00XX; tokenSymbolBytes has the exact bytes"
+               ~args:Arg.[]
+               ~resolve:(fun _ { account; _ } ->
+                 Option.map account.Account.Poly.token_symbol
+                   ~f:Graphql_lib.Arbitrary_bytes.to_utf8 )
+           ; field "tokenSymbolBytes" ~typ:arbitrary_bytes
+               ~doc:"The exact bytes of the token symbol"
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
                  account.Account.Poly.token_symbol )
@@ -2411,6 +2443,20 @@ let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
             Some (Yojson.Safe.to_basic (Proof.to_yojson_full proof)) )
       ] )
 
+let protocol_version : (Mina_lib.t, Protocol_version.t option) typ =
+  obj "ProtocolVersion" ~fields:(fun _ ->
+      [ field "transaction" ~typ:(non_null int)
+          ~doc:"Transaction version, changed by hard forks"
+          ~args:Arg.[]
+          ~resolve:(fun _ version -> Protocol_version.transaction version)
+      ; field "network" ~typ:(non_null int) ~doc:"Network version"
+          ~args:Arg.[]
+          ~resolve:(fun _ version -> Protocol_version.network version)
+      ; field "patch" ~typ:(non_null int) ~doc:"Patch version"
+          ~args:Arg.[]
+          ~resolve:(fun _ version -> Protocol_version.patch version)
+      ] )
+
 let block :
     ( Mina_lib.t
     , (Filtered_external_transition.t, State_hash.t) With_hash.t option )
@@ -2467,6 +2513,19 @@ let block :
           ~typ:(non_null @@ list @@ non_null completed_work)
           ~args:Arg.[]
           ~resolve:(fun _ { With_hash.data; _ } -> data.snark_jobs)
+      ; field "currentProtocolVersion"
+          ~typ:(non_null protocol_version)
+          ~doc:"Protocol version that the block was produced under"
+          ~args:Arg.[]
+          ~resolve:(fun _ { With_hash.data; _ } -> data.current_protocol_version)
+      ; field "proposedProtocolVersion" ~typ:protocol_version
+          ~doc:
+            "Protocol version signalled by the block producer, if any. This is \
+             carried in the block header outside of the protocol state, so it \
+             is not covered by the state hash or the proof"
+          ~args:Arg.[]
+          ~resolve:(fun _ { With_hash.data; _ } ->
+            data.proposed_protocol_version_opt )
       ] )
 
 let snark_worker =

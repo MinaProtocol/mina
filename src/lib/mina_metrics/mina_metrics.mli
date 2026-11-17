@@ -471,6 +471,18 @@ module Transition_frontier : sig
 
   val finalized_staged_txns : Counter.t
 
+  (** Count the proposed protocol versions signalled by the given blocks, as
+      version strings, or [None] for a block that signals none.
+
+      The gauge [proposed_protocol_version_blocks] reports the counts for the
+      [proposed_protocol_version_labels] most common values, labelled
+      [version="none"] or by the version, with the remaining blocks summed
+      under [version="other"]. Block producers choose these versions, so the
+      cap keeps them from adding an unbounded number of series. *)
+  val update_proposed_protocol_versions : string option list -> unit
+
+  val proposed_protocol_version_labels : int
+
   module TPS_30min : sig
     val v : Gauge.t
 

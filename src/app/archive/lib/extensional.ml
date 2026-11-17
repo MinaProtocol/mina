@@ -116,7 +116,7 @@ module Block = struct
   module Stable = struct
     [@@@with_versioned_json]
 
-    module V3 = struct
+    module V4 = struct
       (* in accounts_accessed, the int is the ledger index
          in tokens_used, the account id is the token owner
       *)
@@ -154,6 +154,101 @@ module Block = struct
       [@@deriving yojson, equal]
 
       let to_latest = Fn.id
+    end
+
+    module V3 = struct
+      (* in accounts_accessed, the int is the ledger index
+         in tokens_used, the account id is the token owner
+      *)
+      type t =
+        { state_hash : State_hash.Stable.V1.t
+        ; parent_hash : State_hash.Stable.V1.t
+        ; creator : Public_key.Compressed.Stable.V1.t
+        ; block_winner : Public_key.Compressed.Stable.V1.t
+        ; last_vrf_output : Consensus_vrf.Output.Truncated.Stable.V1.t
+        ; snarked_ledger_hash : Frozen_ledger_hash.Stable.V1.t
+        ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
+        ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
+        ; min_window_density : Mina_numbers.Length.Stable.V1.t
+        ; total_currency : Currency.Amount.Stable.V1.t
+        ; sub_window_densities : Mina_numbers.Length.Stable.V1.t list
+        ; ledger_hash : Ledger_hash.Stable.V1.t
+        ; height : Unsigned_extended.UInt32.Stable.V1.t
+        ; global_slot_since_hard_fork :
+            Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
+        ; global_slot_since_genesis :
+            Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        ; timestamp : Block_time.Stable.V1.t
+        ; user_cmds : User_command.Stable.V2.t list
+        ; internal_cmds : Internal_command.Stable.V2.t list
+        ; zkapp_cmds : Zkapp_command.Stable.V2.t list
+        ; protocol_version : Protocol_version.Stable.V2.t
+        ; proposed_protocol_version : Protocol_version.Stable.V2.t option
+        ; chain_status : Chain_status.Stable.V1.t
+        ; accounts_accessed : (int * Account.Stable.V3.t) list
+        ; accounts_created :
+            (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+        ; tokens_used :
+            (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
+        }
+      [@@deriving yojson, equal]
+
+      let to_latest
+          ({ state_hash
+           ; parent_hash
+           ; creator
+           ; block_winner
+           ; last_vrf_output
+           ; snarked_ledger_hash
+           ; staking_epoch_data
+           ; next_epoch_data
+           ; min_window_density
+           ; total_currency
+           ; sub_window_densities
+           ; ledger_hash
+           ; height
+           ; global_slot_since_hard_fork
+           ; global_slot_since_genesis
+           ; timestamp
+           ; user_cmds
+           ; internal_cmds
+           ; zkapp_cmds
+           ; protocol_version
+           ; proposed_protocol_version
+           ; chain_status
+           ; accounts_accessed
+           ; accounts_created
+           ; tokens_used
+           } :
+            t ) : Latest.t =
+        { state_hash
+        ; parent_hash
+        ; creator
+        ; block_winner
+        ; last_vrf_output
+        ; snarked_ledger_hash
+        ; staking_epoch_data
+        ; next_epoch_data
+        ; min_window_density
+        ; total_currency
+        ; sub_window_densities
+        ; ledger_hash
+        ; height
+        ; global_slot_since_hard_fork
+        ; global_slot_since_genesis
+        ; timestamp
+        ; user_cmds
+        ; internal_cmds
+        ; zkapp_cmds
+        ; protocol_version
+        ; proposed_protocol_version
+        ; chain_status
+        ; accounts_accessed =
+            List.map accounts_accessed
+              ~f:(Tuple2.map_snd ~f:Account.Stable.V3.to_latest)
+        ; accounts_created
+        ; tokens_used
+        }
     end
   end]
 end
