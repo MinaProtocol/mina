@@ -709,6 +709,33 @@ let assert_selected_over_parent_and_root ~context:(module Context : CONTEXT)
     || failwith
          "newly generated consensus states should be selected over the tf root" )
 
+let validate_produced_block ~context:(module Context : CONTEXT) ~frontier
+    ~previous_protocol_state ~previous_state_hash ~protocol_state_hashes ~header
+    ~body =
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  let open Result.Let_syntax in
+  Validation.wrap_header
+    { With_hash.hash = protocol_state_hashes; data = header }
+  |> Validation.skip_delta_block_chain_validation
+       `This_block_was_not_received_via_gossip
+  |> Validation.skip_time_received_validation
+       `This_block_was_not_received_via_gossip
+  |> Fn.flip Validation.with_body body
+  |> Validation.skip_protocol_versions_validation
+       `This_block_has_valid_protocol_versions
+  |> Validation.validate_genesis_protocol_state_block
+       ~genesis_state_hash:
+         (Protocol_state.genesis_state_hash
+            ~state_hash:(Some previous_state_hash) previous_protocol_state )
+  >>| Validation.skip_proof_validation `This_block_was_generated_internally
+  >>= Validation.validate_frontier_dependencies ~to_header:Mina_block.header
+        ~context:(module Context)
+        ~root_consensus_state:
+          ( Transition_frontier.root frontier
+          |> Breadcrumb.consensus_state_with_hashes )
+        ~is_block_in_frontier:
+          (Fn.compose Option.is_some (Transition_frontier.find frontier))
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -898,32 +925,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               in
               let body = Body.create staged_ledger_diff in
               let%bind transition =
-                let open Result.Let_syntax in
-                Validation.wrap_header
-                  { With_hash.hash = protocol_state_hashes; data = header }
-                |> Validation.skip_delta_block_chain_validation
-                     `This_block_was_not_received_via_gossip
-                |> Validation.skip_time_received_validation
-                     `This_block_was_not_received_via_gossip
-                |> Fn.flip Validation.with_body body
-                |> Validation.skip_protocol_versions_validation
-                     `This_block_has_valid_protocol_versions
-                |> Validation.validate_genesis_protocol_state_block
-                     ~genesis_state_hash:
-                       (Protocol_state.genesis_state_hash
-                          ~state_hash:(Some previous_state_hash)
-                          previous_protocol_state )
-                >>| Validation.skip_proof_validation
-                      `This_block_was_generated_internally
-                >>= Validation.validate_frontier_dependencies
-                      ~to_header:Mina_block.header
-                      ~context:(module Context)
-                      ~root_consensus_state:
-                        ( Transition_frontier.root frontier
-                        |> Breadcrumb.consensus_state_with_hashes )
-                      ~is_block_in_frontier:
-                        (Fn.compose Option.is_some
-                           (Transition_frontier.find frontier) )
+                validate_produced_block
+                  ~context:(module Context)
+                  ~frontier ~previous_protocol_state ~previous_state_hash
+                  ~protocol_state_hashes ~header ~body
                 |> Deferred.return
               in
               let transition_receipt_time = Some (Time.now ()) in
@@ -1468,32 +1473,11 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  ~proof_cache_db staged_ledger_diff )
           in
           let%bind transition =
-            let open Result.Let_syntax in
-            Validation.wrap_header
-              { With_hash.hash = protocol_state_hashes; data = header }
-            |> Validation.skip_delta_block_chain_validation
-                 `This_block_was_not_received_via_gossip
-            |> Validation.skip_time_received_validation
-                 `This_block_was_not_received_via_gossip
-            |> Fn.flip Validation.with_body body
-            |> Validation.skip_protocol_versions_validation
-                 `This_block_has_valid_protocol_versions
-            |> Validation.skip_proof_validation
-                 `This_block_was_generated_internally
-            |> Validation.validate_genesis_protocol_state_block
-                 ~genesis_state_hash:
-                   (Protocol_state.genesis_state_hash
-                      ~state_hash:(Some previous_protocol_state_hash)
-                      previous_protocol_state )
-            >>= Validation.validate_frontier_dependencies
-                  ~to_header:Mina_block.header
-                  ~context:(module Context)
-                  ~root_consensus_state:
-                    ( Transition_frontier.root frontier
-                    |> Breadcrumb.consensus_state_with_hashes )
-                  ~is_block_in_frontier:
-                    (Fn.compose Option.is_some
-                       (Transition_frontier.find frontier) )
+            validate_produced_block
+              ~context:(module Context)
+              ~frontier ~previous_protocol_state
+              ~previous_state_hash:previous_protocol_state_hash
+              ~protocol_state_hashes ~header ~body
             |> Deferred.return
           in
           let transition_receipt_time = None in
