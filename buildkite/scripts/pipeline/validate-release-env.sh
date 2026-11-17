@@ -49,8 +49,8 @@ DEBIAN_ACCEPTED=(
 )
 
 # What the packaging jobs declare (Command/MinaArtifact.dhall,
-# PackagingSpec.docker_repo), and so the registry in the image tags when
-# MINA_RELEASE_DOCKER_REPO is unset.
+# PackagingSpec.docker_repo) and what the publish job pushes to
+# (Jobs/Release/PublishDockers.dhall) when MINA_RELEASE_DOCKER_REPO is unset.
 DOCKER_DEFAULT="${DOCKER_UNION}.InternalEurope"
 
 # What Jobs/Release/PublishDebians.dhall declares, and so where the packages

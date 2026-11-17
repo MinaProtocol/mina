@@ -3,7 +3,7 @@
 open Core
 open Async
 
-type missing_parent = { hash : string; height : int }
+type missing_parent = { hash : string; height : int } [@@deriving equal]
 
 (* The auditor logs each block whose parent is missing with the parent's
    hash and height in the metadata. *)
@@ -18,26 +18,30 @@ let missing_parent (message : Logger.Message.t) =
       None
 
 (* Runs the auditor, relays its log and returns the first missing parent it
-   reports. Its exit code is a bit set of the problems it found, so only its
-   log is read. Exits with 1 if it cannot run or its log cannot be read. *)
+   reports. Its exit code is a bit set of the problems it found, and a
+   database error also exits with 1, so its log tells whether it failed: an
+   error in the log, or no log at all, is an [Error] with the reason. *)
 let check ~logger ~prog ~archive_uri =
   let uri = Uri.to_string archive_uri in
-  let log_metadata = [ ("prog", `String prog) ] in
-  match%bind
+  let failed error = Error (sprintf "%s failed: %s" prog error) in
+  match%map
     Subprocess.run ~logger ~secrets:[ uri ] ~prog ~args:[ "--archive-uri"; uri ]
       ()
   with
   | Error err ->
-      [%log fatal] "Could not run $prog: $error"
-        ~metadata:(("error", `String (Error.to_string_hum err)) :: log_metadata) ;
-      exit 1
+      failed (sprintf "it could not be run: %s" (Error.to_string_hum err))
   | Ok output -> (
-      match App_log.parse output.stdout with
-      | Error err ->
-          [%log fatal] "Could not read the log of $prog: $error"
-            ~metadata:
-              (("error", `String (Error.to_string_hum err)) :: log_metadata) ;
-          exit 1
-      | Ok messages ->
-          App_log.relay ~logger messages ;
-          return (List.find_map messages ~f:missing_parent) )
+      let messages, other_lines = App_log.parse output.stdout in
+      App_log.relay ~logger messages ;
+      App_log.warn_other_lines ~logger ~prog other_lines ;
+      match (App_log.first_error messages, output.exit_status) with
+      | Some message, _ ->
+          failed (App_log.describe message)
+      | None, _ when List.is_empty messages ->
+          failed "it wrote no log message; is it mina-missing-blocks-auditor?"
+      | None, Error (`Signal signal) ->
+          failed
+            (sprintf "it was killed by signal %s%s" (Signal.to_string signal)
+               (Subprocess.wrote output) )
+      | None, (Ok () | Error (`Exit_non_zero _)) ->
+          Ok (List.find_map messages ~f:missing_parent) )

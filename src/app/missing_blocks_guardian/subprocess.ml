@@ -5,8 +5,8 @@ open Async
 
 (* Runs [prog] with [args] and waits for it. The error is the reason the
    program could not be started. [secrets] are replaced by <hidden> in the
-   logged arguments, in the logged stderr and in the error. The output is
-   returned as the program wrote it. *)
+   logged arguments, in stderr and in the error. The stdout is returned as
+   the program wrote it. *)
 let run ~logger ?(secrets = []) ~prog ~args () =
   let hide text =
     List.fold secrets ~init:text ~f:(fun text secret ->
@@ -23,8 +23,15 @@ let run ~logger ?(secrets = []) ~prog ~args () =
       return (Error (Error.of_string (hide (Error.to_string_hum err))))
   | Ok process ->
       let%map output = Process.collect_output_and_wait process in
+      let output = { output with stderr = hide output.stderr } in
       if not (String.is_empty output.stderr) then
         [%log warn] "$prog wrote to stderr: $stderr"
           ~metadata:
-            [ ("prog", `String prog); ("stderr", `String (hide output.stderr)) ] ;
+            [ ("prog", `String prog); ("stderr", `String output.stderr) ] ;
       Ok output
+
+(* What the program wrote to stderr, as the end of a sentence about its
+   failure: " and wrote: <text>", or nothing. *)
+let wrote (output : Process.Output.t) =
+  if String.is_empty (String.strip output.stderr) then ""
+  else sprintf " and wrote: %s" (String.strip output.stderr)
