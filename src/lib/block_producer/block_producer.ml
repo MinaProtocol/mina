@@ -84,6 +84,12 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
+let abort_production () =
+  Interruptible.lift (Deferred.never ()) (Deferred.return ())
+
+let cancellable_from_here ivar =
+  Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
+
 module Singleton_scheduler : sig
   type t
 
@@ -890,7 +896,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   [ ( "best_tip"
                     , State_hash.to_yojson (Breadcrumb.state_hash best_tip) )
                   ] ;
-              Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
+              abort_production () )
         else return best_tip
       in
       let start = Block_time.now time_controller in
@@ -921,7 +927,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               [%log error]
                 "Aborting block production: cannot generate a genesis proof"
                 ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
-              Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
+              abort_production () )
         else
           return
             ( Header.protocol_state_proof
@@ -934,7 +940,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         |> Sequence.map
              ~f:Transaction_hash.User_command_with_valid_signature.data
       in
-      let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
+      let%bind () = cancellable_from_here ivar in
       [%log internal] "Generate_next_state" ;
       let%bind next_state_opt =
         generate_next_state ~commit_id ~constraint_constants ~scheduled_time
