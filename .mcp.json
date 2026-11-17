@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mina": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@o1-labs/mina-mcp-server",
+        "--mode",
+        "live",
+        "--network",
+        "devnet"
+      ]
+    }
+  }
+}
