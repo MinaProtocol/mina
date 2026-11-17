@@ -782,6 +782,13 @@ let build_breadcrumb_for_produced_block ~logger ~time_controller
        | (`Fatal_error _ | `Invalid_staged_ledger_hash _) as err ->
            err )
 
+let record_block_produced_metrics ~scheduled_time =
+  Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
+  Mina_metrics.Block_producer.(
+    Block_production_delay_histogram.observe block_production_delay
+      Time.(
+        Span.to_ms @@ diff (now ()) @@ Block_time.to_time_exn scheduled_time))
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -1012,13 +1019,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 Block_produced ;
               (* let uptime service (and any other waiters) know about breadcrumb *)
               Bvar.broadcast block_produced_bvar breadcrumb ;
-              Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
-              Mina_metrics.Block_producer.(
-                Block_production_delay_histogram.observe block_production_delay
-                  Time.(
-                    Span.to_ms
-                    @@ diff (now ())
-                    @@ Block_time.to_time_exn scheduled_time)) ;
+              record_block_produced_metrics ~scheduled_time ;
               [%log internal] "Send_breadcrumb_to_transition_frontier" ;
               let%bind.Async.Deferred () =
                 Strict_pipe.Writer.write transition_writer breadcrumb
@@ -1508,13 +1509,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               , State_hash.to_yojson protocol_state_hashes.state_hash )
             ]
           in
-          Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
-          Mina_metrics.Block_producer.(
-            Block_production_delay_histogram.observe block_production_delay
-              Time.(
-                Span.to_ms
-                @@ diff (now ())
-                @@ Block_time.to_time_exn scheduled_time)) ;
+          record_block_produced_metrics ~scheduled_time ;
           let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
