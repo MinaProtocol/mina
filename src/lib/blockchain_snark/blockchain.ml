@@ -4,10 +4,10 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
-  module V3 = struct
+  module V4 = struct
     module T = struct
       type t =
-        { state : Protocol_state.Value.Stable.V3.t; proof : Proof.Stable.V2.t }
+        { state : Protocol_state.Value.Stable.V4.t; proof : Proof.Stable.V2.t }
       [@@deriving fields, sexp, yojson]
     end
 
@@ -31,6 +31,21 @@ module Stable = struct
           with type t := T.t
            and type 'a creator :=
             state:Protocol_state.Value.t -> proof:Proof.t -> 'a )
+  end
+
+  module V3 = struct
+    module T = struct
+      type t =
+        { state : Protocol_state.Value.Stable.V3.t; proof : Proof.Stable.V2.t }
+      [@@deriving fields, sexp, yojson]
+    end
+
+    include T
+
+    let to_latest ({ state; proof } : t) : Latest.t =
+      Latest.create
+        ~state:(Protocol_state.Value.Stable.V3.to_latest state)
+        ~proof
   end
 end]
 

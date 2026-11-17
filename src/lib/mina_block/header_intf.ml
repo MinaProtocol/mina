@@ -6,8 +6,14 @@ module type Full = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
+    module V4 : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+
     module V3 : sig
       type t [@@deriving sexp, to_yojson]
+
+      val to_latest : t -> V4.t
     end
   end]
 

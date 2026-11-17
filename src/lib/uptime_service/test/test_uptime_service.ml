@@ -51,7 +51,10 @@ let build_input (fixture : Fixture.t) =
     Mina_ledger.Ledger.merkle_root fixture.first_pass_ledger
     |> Frozen_ledger_hash.of_ledger_hash
   in
-  let base = Mina_state.Snarked_ledger_state.genesis ~genesis_ledger_hash in
+  let base =
+    Mina_state.Snarked_ledger_state.genesis ~genesis_ledger_hash
+      ~genesis_total_currency:Currency.Amount.zero
+  in
   let source_stack = Pending_coinbase.Stack.empty in
   let target_stack =
     Pending_coinbase.Stack.push_state state_body_hash fixture.global_slot

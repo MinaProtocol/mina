@@ -5,11 +5,18 @@ module type S = Ledger_proof_intf.S
 
 [%%versioned
 module Stable = struct
+  module V3 = struct
+    type t = Transaction_snark.Stable.V3.t
+    [@@deriving compare, equal, sexp, yojson, hash]
+
+    let to_latest = Fn.id
+  end
+
   module V2 = struct
     type t = Transaction_snark.Stable.V2.t
     [@@deriving compare, equal, sexp, yojson, hash]
 
-    let to_latest = Fn.id
+    let to_latest = Transaction_snark.Stable.V2.to_latest
   end
 end]
 

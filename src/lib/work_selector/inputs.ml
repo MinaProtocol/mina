@@ -60,11 +60,20 @@ module Test_inputs = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V3 = struct
+        type t = Transaction_snark.Statement.Stable.V3.t One_or_two.Stable.V1.t
+        [@@deriving hash, compare, sexp]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
         [@@deriving hash, compare, sexp]
 
-        let to_latest = Fn.id
+        let to_latest : t -> Latest.t =
+          One_or_two.Stable.V1.to_latest
+            Transaction_snark.Statement.Stable.V2.to_latest
       end
     end]
 

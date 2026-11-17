@@ -323,7 +323,16 @@ let protocol_state =
             "account_update_index": "0",
             "failure_status_tbl": [],
             "will_succeed": true
-          }
+          },
+          "fee_excess": {
+            "magnitude": "0",
+            "sgn": [
+              "Pos"
+            ]
+          },
+          "total_currency": "1014480845000001000",
+          "ledger_after_coinbase": "jw8by1TB1dqKwsj5NnPBZXiYnb291qe952gA7dhoeDo1VbzAAnB",
+          "total_supply_after_coinbase": "1014480845000001000"
         },
         "target": {
           "first_pass_ledger": "jwDuoXtzggxSeFpfepCqHAvoqnp7feWUPjRx5n8e2ToHey5qk59",
@@ -357,36 +366,19 @@ let protocol_state =
             "account_update_index": "0",
             "failure_status_tbl": [],
             "will_succeed": true
-          }
+          },
+          "fee_excess": {
+            "magnitude": "0",
+            "sgn": [
+              "Pos"
+            ]
+          },
+          "total_currency": "1014488754000001000",
+          "ledger_after_coinbase": "jwDuoXtzggxSeFpfepCqHAvoqnp7feWUPjRx5n8e2ToHey5qk59",
+          "total_supply_after_coinbase": "1014488754000001000"
         },
         "connecting_ledger_left": "jxmWGjNGaQNfoSuCfKamSGASFso7Xvbcqzzn1E3aA9iwwPV77Zq",
         "connecting_ledger_right": "jwGo7QJzxT2STkRzevRYQ1d79WAzYsFSgEFpSZZwcdptR7BWbZ7",
-        "supply_increase": {
-          "magnitude": "7909000000000",
-          "sgn": [
-            "Pos"
-          ]
-        },
-        "fee_excess": [
-          {
-            "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-            "amount": {
-              "magnitude": "0",
-              "sgn": [
-                "Pos"
-              ]
-            }
-          },
-          {
-            "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-            "amount": {
-              "magnitude": "0",
-              "sgn": [
-                "Pos"
-              ]
-            }
-          }
-        ],
         "sok_digest": null
       },
       "timestamp": "1681333381000",

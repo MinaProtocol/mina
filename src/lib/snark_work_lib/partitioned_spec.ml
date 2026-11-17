@@ -38,9 +38,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      (Single_spec.Stable.V2.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V3.t, Sub_zkapp_spec.Stable.V3.t) Poly.Stable.V1.t
     [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
@@ -50,6 +50,23 @@ module Stable = struct
           Single_spec.Poly.statement spec
       | Sub_zkapp_command { spec; _ } ->
           Sub_zkapp_spec.Stable.Latest.statement spec
+
+    let sok_message : t -> Mina_base.Sok_message.t = function
+      | Single { sok_message; _ } | Sub_zkapp_command { sok_message; _ } ->
+          sok_message
+  end
+
+  module V2 = struct
+    type t =
+      (Single_spec.Stable.V2.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+    [@@deriving sexp, yojson]
+
+    let to_latest : t -> Latest.t = function
+      | Single job ->
+          Single (With_job_meta.map ~f_spec:Single_spec.Stable.V2.to_latest job)
+      | Sub_zkapp_command job ->
+          Sub_zkapp_command
+            (With_job_meta.map ~f_spec:Sub_zkapp_spec.Stable.V2.to_latest job)
 
     let sok_message : t -> Mina_base.Sok_message.t = function
       | Single { sok_message; _ } | Sub_zkapp_command { sok_message; _ } ->

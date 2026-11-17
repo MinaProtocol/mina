@@ -450,12 +450,13 @@ module For_tests = struct
         Option.value_map ledger_proof_opt ~f:Ledger_proof.Cached.statement
           ~default:previous_ledger_proof_stmt
       in
-      let supply_increase =
+      let total_currency =
         match ledger_proof_opt with
         | Some proof ->
-            (Ledger_proof.Cached.statement proof).supply_increase
+            (Ledger_proof.Cached.statement proof).target.total_currency
         | None ->
-            Currency.Amount.Signed.zero
+            Consensus.Data.Consensus_state.total_currency
+              (Protocol_state.consensus_state previous_protocol_state)
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -481,7 +482,7 @@ module For_tests = struct
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }
-          ~coinbase_receiver ~supercharge_coinbase ~supply_increase
+          ~coinbase_receiver ~supercharge_coinbase ~total_currency
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
