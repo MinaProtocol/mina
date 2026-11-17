@@ -29,6 +29,10 @@
 
 (rule
  (alias runtest)
+ (enabled_if
+  (=
+   %{read:../../../../MINA_CODEBASE_NETWORK}
+   %{read:../../../../MINA_MAINNET_NETWORK}))
  (action
   (diff dev_chain_id.txt dev_chain_id.txt.computed)))
 
@@ -42,6 +46,10 @@
 
 (rule
  (alias runtest)
+ (enabled_if
+  (=
+   %{read:../../../../MINA_CODEBASE_NETWORK}
+   %{read:../../../../MINA_MAINNET_NETWORK}))
  (action
   (diff devnet_chain_id.txt devnet_chain_id.txt.computed)))
 
@@ -55,5 +63,9 @@
 
 (rule
  (alias runtest)
+ (enabled_if
+  (=
+   %{read:../../../../MINA_CODEBASE_NETWORK}
+   %{read:../../../../MINA_MAINNET_NETWORK}))
  (action
   (diff mainnet_chain_id.txt mainnet_chain_id.txt.computed)))

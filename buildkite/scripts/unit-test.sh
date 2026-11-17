@@ -39,10 +39,9 @@ time make libp2p_helper
 
 # Turn on the proof-cache assertion, so that CI will fail if the proofs need to
 # be updated.
-#
-# Disabled on develop until its circuits stabilise: the proof caches are
-# maintained on compatible, and develop's circuit changes make them miss.
-# export ERROR_ON_PROOF=true
+if [[ "$(cat MINA_CODEBASE_NETWORK)" == "$(cat MINA_MAINNET_NETWORK)" ]]; then
+    export ERROR_ON_PROOF=true
+fi
 
 
 # When coverage instrumentation is enabled and this is not a PR build (i.e. nightly),
