@@ -52,6 +52,13 @@ if [[ -z "$PREFORK" ]]; then
   usage "Error: --fork-from must be provided."
 fi
 
+REPO_ROOT="$(dirname "${BASH_SOURCE[0]}")/../.."
+CODEBASE_NETWORK="$(cat "$REPO_ROOT/MINA_CODEBASE_NETWORK")"
+if [[ "$CODEBASE_NETWORK" == "$(cat "$REPO_ROOT/MINA_MAINNET_NETWORK")" ]]; then
+  echo "Skipping: this codebase targets $CODEBASE_NETWORK, the network already live on mainnet, so there is no fork to test"
+  exit 0
+fi
+
 export MINA_PROFILE="devnet"
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
