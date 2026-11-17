@@ -250,6 +250,25 @@ module GetFilteredLogEntries =
   }
 |}]
 
+(* A query of its own: a daemon without these fields rejects the whole query, and
+   Account has to keep working against released daemons. *)
+module Account_bytes =
+[%graphql
+{|
+  query ($public_key: PublicKey!, $token: UInt64) {
+    account (publicKey : $public_key, token : $token) {
+      tokenSymbol
+      tokenSymbolBytes { hex
+                         utf8
+                       }
+      zkappUri
+      zkappUriBytes { hex
+                      utf8
+                    }
+    }
+  }
+|}]
+
 module Account =
 [%graphql
 {|
@@ -318,6 +337,39 @@ module Daemon_status =
         peerId
         host
         libp2pPort
+      }
+    }
+  }
+|}]
+
+module Bootstrap_status =
+[%graphql
+{|
+  query {
+    bootstrapStatus {
+      phase
+      phaseStartedAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+      bootstrapStartedAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+      bootstrapAttempts
+      lastAttemptFailure
+      ledgerSyncs {
+        ledger
+        target
+        active
+        progress {
+          targets
+          targetSetAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+          pendingChildHashes
+          pendingContents
+          synced
+          answersAccepted
+          answersIgnored
+          answersRejected
+          lastAcceptedAnswerAt @ppxCustom(module: "Graphql_lib.Scalars.Time")
+          numAccounts
+          accountsSettled
+          accountsReceived
+        }
       }
     }
   }

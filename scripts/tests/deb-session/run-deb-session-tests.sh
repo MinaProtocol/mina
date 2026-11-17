@@ -20,55 +20,29 @@
 # Each test step uses assert functions to verify correctness, and the script
 # will exit with an error if any assertion fails.
 #
-# The suite runs against one of two interchangeable engines, selected by the
-# SESSION_ENGINE env var:
-#
-#   bash          (default) — the scripts/debian/session/deb-session-*.sh scripts
-#   deb-toolkit             — `deb-toolkit session <verb>` (binary on PATH, or
-#                             $DEB_TOOLKIT)
-#
-# Both engines expose the same verbs with the same argument order and produce
-# the same session-directory layout, so the assertions below are shared. Run
-# once per engine (in CI, bash in the toolchain image and deb-toolkit in the
-# release-toolkit image), and identical conclusions == parity.
+# The verbs come from `deb-toolkit session` (MinaProtocol/mina-release-toolkit),
+# taken from PATH or from $DEB_TOOLKIT. CI runs this suite in the toolchain
+# image, which is where the mina callers of these verbs run.
 # ------------------------------------------------------------------------------
 
 set -eux -o pipefail
 
-# Determine the directory of this test script and the session scripts directory
-TEST_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
-SESSION_SCRIPTS_DIR="$(realpath "$TEST_DIR/../../debian/session")"
-
-SESSION_ENGINE="${SESSION_ENGINE:-bash}"
 DEB_TOOLKIT="${DEB_TOOLKIT:-deb-toolkit}"
 
 # Log a message with a test prefix
 log() {
-  echo "[deb-session-test][$SESSION_ENGINE] $*"
+  echo "[deb-session-test] $*"
 }
 
 # Print an error message and exit
 fail() {
-  echo "[deb-session-test][$SESSION_ENGINE][ERROR] $*" >&2
+  echo "[deb-session-test][ERROR] $*" >&2
   exit 1
 }
 
-# Dispatch a session verb to the selected engine. Both engines take the verb's
-# arguments in the same order, so this is a straight pass-through.
+# Run a deb-toolkit session verb
 session_verb() {
-  local verb="$1"
-  shift
-  case "$SESSION_ENGINE" in
-    bash)
-      "$SESSION_SCRIPTS_DIR/deb-session-${verb}.sh" "$@"
-      ;;
-    deb-toolkit)
-      "$DEB_TOOLKIT" session "$verb" "$@"
-      ;;
-    *)
-      fail "Unknown SESSION_ENGINE '$SESSION_ENGINE' (expected 'bash' or 'deb-toolkit')"
-      ;;
-  esac
+  "$DEB_TOOLKIT" session "$@"
 }
 
 # Assert that a file's contents match the expected string
@@ -99,10 +73,9 @@ assert_exists() {
 }
 
 # Assert that a control field, with all spaces removed, contains a needle.
-# Dependency constraints render with engine-specific spacing — the bash scripts
-# emit `(>=X)` while deb-toolkit emits the canonical `(>= X)` — so the raw text
-# differs even when the meaning is identical. Comparing with spaces stripped
-# makes the assertion depend on the value, not the whitespace. Pass the needle
+# deb-toolkit rewrites dependency constraints in the canonical `(>= X)` form,
+# while the sample package uses `(>=X)`. Comparing with spaces stripped makes
+# the assertion depend on the value, not the whitespace. Pass the needle
 # already space-free.
 assert_control_field_contains() {
   local field="$1" needle="$2" value
@@ -177,11 +150,7 @@ echo "ledger-one" > "$INSERT_FILE1"
 echo "ledger-two" > "$INSERT_FILE2"
 
 # Insert two files into /var/lib/coda/ in the session.
-#
-# The destination directory is given explicitly with -d, which both engines
-# accept. The original test relied on a trailing slash to signal "directory"
-# — a bash-only convention; deb-toolkit does not infer it and requires -d for a
-# multi-source insert, so -d is used here for both.
+# The destination directory is given explicitly with -d.
 session_verb insert -d \
   "$SESSION_DIR" \
   "/var/lib/coda" \

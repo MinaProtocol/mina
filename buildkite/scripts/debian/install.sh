@@ -86,9 +86,23 @@ else
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
       ;;
       mina-devnet|mina-mainnet)
-        # Download mina-logproc and sub debians (apps and config) too
+        # mina-<network> is an empty tent. Its dependency chain is
+        #   mina-<network> -> mina-<network>-config
+        #                  -> mina-<network>-generic -> mina-<network>-profile
+        #                                            -> mina-generic (binaries)
+        # apt resolves only from local files here, so every link of the chain
+        # has to be downloaded, plus mina-logproc.
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-generic_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-profile_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-generic_${VERSION}_*"
+      ;;
+      mina-devnet-generic|mina-mainnet-generic)
+        # The profile tent: mina-<network>-profile plus mina-generic.
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i%-generic}-profile_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-generic_${VERSION}_*"
       ;;
       mina-devnet-instrumented|mina-mainnet-instrumented)
         # Instrumented daemon depends on mina-logproc and the non-instrumented
@@ -98,8 +112,10 @@ else
           fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${network_pkg}-config*"
       ;;
       mina-*-prefork*)
-        # Download mina-logproc legacy too
-        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}*"
+        # The legacy cache keeps several versions. Fetch only the pinned one:
+        # every .deb fetched here goes to apt-get, which installs one of them,
+        # and the file order decides which.
+        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${FORCE_VERSION:-*}_*"
     esac
     fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*"
   done
@@ -129,6 +145,15 @@ done < <(find "$ABS_DEB_FOLDER" -maxdepth 1 \( -name "*_${DEB_ARCH}.deb" -o -nam
 if [ "${#deb_files[@]}" -eq 0 ]; then
   echo "No ${DEB_ARCH} .deb files were downloaded into '$LOCAL_DEB_FOLDER'. Nothing to install."
   ls -la "$LOCAL_DEB_FOLDER"
+  exit 1
+fi
+
+# Several versions of one package means the caller did not pin it, and apt would
+# install one of them by file order. Refuse rather than guess.
+duplicate_packages=$(printf '%s\n' "${deb_files[@]##*/}" | cut -d_ -f1 | sort | uniq -d)
+if [ -n "$duplicate_packages" ]; then
+  echo "Several versions staged for: ${duplicate_packages//$'\n'/ }. Set FORCE_VERSION to the one to install." >&2
+  printf '  %s\n' "${deb_files[@]}" >&2
   exit 1
 fi
 

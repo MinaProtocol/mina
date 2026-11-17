@@ -44,7 +44,7 @@ module Answer = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V4 = struct
+    module V5 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
         , Account.Stable.V3.t )
