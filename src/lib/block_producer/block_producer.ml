@@ -1226,6 +1226,7 @@ module Next_step = struct
   type t =
     | Check_vrf_now
     | Check_vrf_at of Block_time.t
+    | Poll_vrf_then_check
     | Produce_now of production
     | Schedule_production of production
 end
@@ -1251,15 +1252,6 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
   in
   match Core.Queue.dequeue vrf_evaluation_state.queue with
   | None -> (
-      (*Keep trying until we get some slots*)
-      let poll () =
-        let%bind () = Async.after vrf_poll_interval in
-        let%bind () =
-          Vrf_evaluation_state.poll ~vrf_evaluator ~logger vrf_evaluation_state
-            ~vrf_poll_interval
-        in
-        act (Check_vrf_at (Block_time.now time_controller))
-      in
       match Vrf_evaluation_state.evaluator_status vrf_evaluation_state with
       | Completed ->
           let epoch_end_time =
@@ -1271,11 +1263,11 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
           act (Check_vrf_at epoch_end_time)
       | At last_slot ->
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
-          poll ()
+          act Poll_vrf_then_check
       | Start ->
           set_next_producer_timing (`Evaluating_vrf new_global_slot)
             consensus_state ;
-          poll () )
+          act Poll_vrf_then_check )
   | Some slot_won -> (
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
@@ -1466,13 +1458,21 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~f:next_vrf_check_now
                   : (_, _) Interruptible.t )
             in
-            let act : Next_step.t -> unit Deferred.t = function
+            let rec act : Next_step.t -> unit Deferred.t = function
               | Check_vrf_now ->
                   Deferred.return (next_vrf_check_now ())
               | Check_vrf_at time ->
                   Deferred.return
                     (Singleton_scheduler.schedule scheduler time
                        ~f:next_vrf_check_now )
+              (*Keep trying until we get some slots*)
+              | Poll_vrf_then_check ->
+                  let%bind () = Async.after vrf_poll_interval in
+                  let%bind () =
+                    Vrf_evaluation_state.poll ~vrf_evaluator ~logger
+                      vrf_evaluation_state ~vrf_poll_interval
+                  in
+                  act (Check_vrf_at (Block_time.now time_controller))
               | Produce_now production ->
                   Deferred.return (produce_block_now production)
               | Schedule_production ((time, _, _) as production) ->
