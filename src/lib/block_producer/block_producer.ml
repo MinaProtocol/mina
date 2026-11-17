@@ -1231,9 +1231,8 @@ module Next_step = struct
     | Schedule_production of production
 end
 
-let decide_next_step ~context:(module Context : CONTEXT) ~genesis_breadcrumb
-    ~time_controller ~coinbase_receiver ~frontier_reader
-    ~set_next_producer_timing ~consensus_state
+let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
+    ~coinbase_receiver ~set_next_producer_timing ~consensus_state
     ~(vrf_evaluation_state : Vrf_evaluation_state.t) ~epoch_data_for_vrf
     ~ledger_snapshot : Next_step.t =
   let new_global_slot =
@@ -1325,16 +1324,12 @@ let decide_next_step ~context:(module Context : CONTEXT) ~genesis_breadcrumb
             consensus_state ;
           Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
           let scheduled_time = time_of_ms time in
-          don't_wait_for
-            (pregenerate_genesis_proof_one_slot_before ~constraint_constants
-               ~time_controller ~genesis_breadcrumb ~frontier_reader time ) ;
           Schedule_production (scheduled_time, data, winner_pk) )
 
-let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
+let iteration ~(act : Next_step.t -> unit Deferred.t)
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
-    ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
-    ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot i slot =
+    ~coinbase_receiver ~set_next_producer_timing ~transition_frontier
+    ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i slot =
   O1trace.thread "block_producer_iteration"
   @@ fun () ->
   let consensus_state =
@@ -1349,9 +1344,9 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
   act
     (decide_next_step
        ~context:(module Context)
-       ~genesis_breadcrumb ~time_controller ~coinbase_receiver ~frontier_reader
-       ~set_next_producer_timing ~consensus_state ~vrf_evaluation_state
-       ~epoch_data_for_vrf ~ledger_snapshot )
+       ~time_controller ~coinbase_receiver ~set_next_producer_timing
+       ~consensus_state ~vrf_evaluation_state ~epoch_data_for_vrf
+       ~ledger_snapshot )
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
@@ -1489,17 +1484,21 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   in
                   Deferred.return (produce_block_now production)
               | Schedule_production ((time, _, _) as production) ->
+                  don't_wait_for
+                    (pregenerate_genesis_proof_one_slot_before
+                       ~constraint_constants ~time_controller
+                       ~genesis_breadcrumb ~frontier_reader (time_to_ms time) ) ;
                   Singleton_scheduler.schedule scheduler time ~f:(fun () ->
                       produce_block_now production ) ;
                   Deferred.unit
             in
             don't_wait_for
-              ( iteration ~act ~genesis_breadcrumb
+              ( iteration ~act
                   ~context:(module Context)
                   ~vrf_evaluator ~time_controller ~coinbase_receiver
-                  ~frontier_reader ~set_next_producer_timing
-                  ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-                  ~ledger_snapshot i slot
+                  ~set_next_producer_timing ~transition_frontier
+                  ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i
+                  slot
                 : unit Deferred.t )
       in
       let start () =
