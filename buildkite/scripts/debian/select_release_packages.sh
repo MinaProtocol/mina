@@ -13,6 +13,12 @@
 # published package whose dependency is not published cannot be installed.
 # Files that are not reached (test tools, legacy packages nothing depends on,
 # other architectures) are moved to <excluded-folder> and listed.
+#
+# One name and version built for two architectures fails when the selection
+# reaches it: the files are keyed by name and version, so the script cannot
+# tell which one to keep. Keep each architecture in its own folder. When the
+# selection does not reach it (for example a legacy package that the legacy
+# cache has for amd64 and arm64), all its files are moved out.
 
 set -euo pipefail
 
@@ -29,22 +35,31 @@ excluded="${2:-${folder%/}.excluded}"
 declare -A file_of=()      # "name=version" -> file
 declare -A versions_of=()  # name -> space separated versions
 declare -A depends_of=()   # "name=version" -> Depends field
+declare -A arch_of=()      # "name=version" -> Architecture field
+declare -A other_files=()  # "name=version" -> files of other architectures
 
 shopt -s nullglob
 for f in "${folder}"/*.deb; do
-  name="" version="" depends=""
+  name="" version="" depends="" arch=""
   while IFS= read -r line; do
     case "$line" in
       Package:*) name="${line#Package: }" ;;
       Version:*) version="${line#Version: }" ;;
       Depends:*) depends="${line#Depends: }" ;;
+      Architecture:*) arch="${line#Architecture: }" ;;
     esac
-  done < <(dpkg-deb -f "$f" Package Version Depends)
+  done < <(dpkg-deb -f "$f" Package Version Depends Architecture)
   if [[ -z "$name" || -z "$version" ]]; then
     echo "❌ ${f}: no Package or Version in the control file" >&2
     exit 1
   fi
-  file_of["${name}=${version}"]="$f"
+  key="${name}=${version}"
+  if [[ -n "${file_of[$key]:-}" && "${arch_of[$key]}" != "$arch" ]]; then
+    other_files["$key"]="${other_files[$key]:-}${f}"$'\n'
+    continue
+  fi
+  file_of["$key"]="$f"
+  arch_of["$key"]="$arch"
   versions_of["$name"]="${versions_of[$name]:-} ${version}"
   depends_of["${name}=${version}"]="$depends"
 done
@@ -94,6 +109,14 @@ while [[ ${#queue[@]} -gt 0 ]]; do
     missing=1
     continue
   fi
+  if [[ -n "${other_files[$key]:-}" ]]; then
+    echo "❌ ${key%%=*} (= ${key#*=}) is in ${folder} for two architectures:" \
+      "${arch_of[$key]} ($(basename "${file_of[$key]}")) and" \
+      "$(while IFS= read -r o; do [[ -n "$o" ]] && printf '%s ' "$(basename "$o")"; done <<< "${other_files[$key]}")." \
+      "Select each architecture from its own folder." >&2
+    missing=1
+    continue
+  fi
   keep["$key"]=1
   IFS=',' read -ra deps <<< "${depends_of[$key]}"
   for d in "${deps[@]}"; do
@@ -112,5 +135,10 @@ for key in "${!file_of[@]}"; do
   else
     mv "${file_of[$key]}" "$excluded/"
     echo "  - $(basename "${file_of[$key]}") (not a release package or dependency)"
+    while IFS= read -r o; do
+      [[ -n "$o" ]] || continue
+      mv "$o" "$excluded/"
+      echo "  - $(basename "$o") (not a release package or dependency)"
+    done <<< "${other_files[$key]:-}"
   fi
 done | sort

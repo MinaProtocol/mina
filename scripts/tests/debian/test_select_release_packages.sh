@@ -135,11 +135,74 @@ test_two_versions_of_a_root_fail() {
   fi
 }
 
+# The Bookworm arm64 build of the Lightnet release pipeline, with the roots
+# Jobs/Release/PublishDebiansArm64Lightnet.dhall names.
+lightnet_arm64_folder() {
+  local d="$1"
+  deb "$d" mina-devnet "$V" arm64 "mina-devnet-generic (=$V), mina-devnet-config (=$V)"
+  deb "$d" mina-devnet-config "$V" all
+  deb "$d" mina-devnet-generic "$V" arm64 "mina-generic (=$V), mina-devnet-profile (=$V)"
+  deb "$d" mina-devnet-profile "$V" arm64
+  deb "$d" mina-generic "$V" arm64 "libssl3, libgmp10, mina-logproc"
+  deb "$d" mina-logproc "$V" arm64 "libssl3"
+  deb "$d" mina-archive-devnet "$V" arm64 "mina-archive-generic (=$V), mina-devnet-profile (=$V)"
+  deb "$d" mina-archive-generic "$V" arm64 "libpq-dev, curl"
+  deb "$d" mina-rosetta-devnet "$V" arm64 "mina-rosetta-generic (=$V), mina-devnet-profile (=$V)"
+  deb "$d" mina-rosetta-generic "$V" arm64
+}
+
+test_lightnet_arm64_roots_keep_only_what_lightnet_installs() {
+  local d="$WORK/t6/bookworm"
+  lightnet_arm64_folder "$d"
+  MINA_RELEASE_PACKAGES="mina-devnet-generic,mina-archive-devnet,mina-logproc" \
+    "$SCRIPT" "$d" > "$WORK/t6.log" 2>&1 || { fail "exit $?: $(cat "$WORK/t6.log")"; return; }
+  expect_kept "$d" \
+    "mina-devnet-generic_${V}_arm64.deb" "mina-devnet-profile_${V}_arm64.deb" \
+    "mina-generic_${V}_arm64.deb" "mina-logproc_${V}_arm64.deb" \
+    "mina-archive-devnet_${V}_arm64.deb" "mina-archive-generic_${V}_arm64.deb"
+}
+
+# One name and version for two architectures: the selection keys files by name
+# and version, so it must stop rather than drop or leak one of them.
+test_one_version_for_two_architectures_fails() {
+  local d="$WORK/t7/bookworm"
+  mainnet_folder "$d"
+  deb "$d" mina-generic "$V" arm64 "libssl3, libgmp10, mina-logproc"
+  if "$SCRIPT" "$d" > "$WORK/t7.log" 2>&1; then
+    fail "succeeded with mina-generic for amd64 and arm64"
+  else
+    grep -q "two architectures" "$WORK/t7.log" && pass || fail "error does not name the cause: $(cat "$WORK/t7.log")"
+  fi
+}
+
+# A package that the selection does not reach may be there for two
+# architectures (the legacy cache has amd64 and arm64 builds): both files are
+# moved out and the selection goes on.
+test_two_architectures_of_an_unreached_package_are_excluded() {
+  local d="$WORK/t8/bookworm"
+  lightnet_arm64_folder "$d"
+  deb "$d" mina-create-devnet-prefork-genesis-ledger "$LEGACY" amd64
+  deb "$d" mina-create-devnet-prefork-genesis-ledger "$LEGACY" arm64
+  MINA_RELEASE_PACKAGES="mina-devnet-generic,mina-archive-devnet,mina-logproc" \
+    "$SCRIPT" "$d" > "$WORK/t8.log" 2>&1 || { fail "exit $?: $(cat "$WORK/t8.log")"; return; }
+  expect_kept "$d" \
+    "mina-devnet-generic_${V}_arm64.deb" "mina-devnet-profile_${V}_arm64.deb" \
+    "mina-generic_${V}_arm64.deb" "mina-logproc_${V}_arm64.deb" \
+    "mina-archive-devnet_${V}_arm64.deb" "mina-archive-generic_${V}_arm64.deb"
+  local x="$WORK/t8/bookworm.excluded"
+  [[ -f "$x/mina-create-devnet-prefork-genesis-ledger_${LEGACY}_amd64.deb" \
+     && -f "$x/mina-create-devnet-prefork-genesis-ledger_${LEGACY}_arm64.deb" ]] && pass \
+    || fail "both architectures of the unreached package must be in the excluded folder"
+}
+
 run test_default_roots_keep_the_dependency_closure
 run test_legacy_kept_only_when_depended_on
 run test_missing_dependency_fails
 run test_unknown_requested_package_fails
 run test_two_versions_of_a_root_fail
+run test_lightnet_arm64_roots_keep_only_what_lightnet_installs
+run test_one_version_for_two_architectures_fails
+run test_two_architectures_of_an_unreached_package_are_excluded
 
 echo
 echo "Results: ${PASS} passed, ${FAIL} failed"
