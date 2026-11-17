@@ -377,11 +377,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let verification_keys_compat =
       compatible_item requested_update.verification_key
         ledger_update.verification_key
-        ~equal:
-          [%equal:
-            ( Pickles.Side_loaded.Verification_key.t
-            , Pickles.Backend.Tick.Field.t )
-            With_hash.t]
+        ~equal:Mina_base.Verification_key_wire.equal
     in
     let permissions_compat =
       compatible_item requested_update.permissions ledger_update.permissions

@@ -183,7 +183,8 @@ module Values (S : Sample) = struct
 
   let verification_key : unit -> Mina_base.Verification_key_wire.t =
    fun () ->
-    bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t S.vk
+    bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t
+      (Mina_base.Verification_key_wire.of_hashed S.vk)
 
   let side_loaded_proof : Proof_cache_tag.t =
     let cmd = List.hd_exn S.generated_zkapps in

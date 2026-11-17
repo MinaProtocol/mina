@@ -99,7 +99,10 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
               ; set_token_symbol = Proof
               }
           ; zkapp =
-              Some { Zkapp_account.default with verification_key = Some vk }
+              Some
+                { Zkapp_account.default with
+                  verification_key = Some (Verification_key_wire.of_hashed vk)
+                }
           }
         |> Or_error.ok_exn |> ignore )
   in
@@ -490,8 +493,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       | Error err ->
           failwith (Error.to_string_hum err)
     in
-    let hash = Zkapp_account.digest_vk data in
-    Zkapp_basic.Set_or_keep.Set { With_hash.data; hash }
+    Zkapp_basic.Set_or_keep.Set (Verification_key_wire.of_data data)
   in
   let spec =
     { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)

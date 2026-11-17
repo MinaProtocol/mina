@@ -730,15 +730,7 @@ module Deploy_account_update = struct
     ; token_id
     ; update =
         { Account_update.Update.dummy with
-          verification_key =
-            Set
-              { data = vk
-              ; hash =
-                  (* TODO: This function should live in
-                     [Side_loaded_verification_key].
-                  *)
-                  Zkapp_account.digest_vk vk
-              }
+          verification_key = Set (Verification_key_wire.of_data vk)
         ; permissions =
             Set
               { edit_state = Proof

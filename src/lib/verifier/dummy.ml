@@ -94,7 +94,11 @@ let verify_commands { proof_level; signature_kind; _ }
         | Ok (`Assuming _) ->
             valid cmd
       in
-      let f cmd = convert_check_res cmd (Common.check ~signature_kind cmd) in
+      let f cmd =
+        convert_check_res cmd
+          (Common.check ~signature_kind ~hash_of_vk:Verification_key_wire.hash
+             cmd )
+      in
       List.map cs ~f |> Deferred.Or_error.return
   | Full ->
       let read_proof (vk, stmt, proof) =
@@ -106,7 +110,8 @@ let verify_commands { proof_level; signature_kind; _ }
           ~f:
             (Fn.compose
                (Result.map ~f:read_proofs)
-               (Common.check ~signature_kind) )
+               (Common.check ~signature_kind
+                  ~hash_of_vk:Verification_key_wire.hash ) )
       in
       let to_verify =
         List.concat_map
