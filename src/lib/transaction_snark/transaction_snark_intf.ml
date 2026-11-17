@@ -227,6 +227,8 @@ module type Full = sig
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
     -> total_currency:Currency.Amount.t
+    -> ledger_after_coinbase:Frozen_ledger_hash.t
+    -> total_supply_after_coinbase:Currency.Amount.t
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
        * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
        * [ `Ledger of Mina_ledger.Ledger.t

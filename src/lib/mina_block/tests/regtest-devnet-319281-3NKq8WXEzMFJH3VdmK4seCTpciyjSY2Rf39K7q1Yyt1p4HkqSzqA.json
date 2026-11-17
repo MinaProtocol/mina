@@ -58,7 +58,9 @@
                   "Pos"
                 ]
               },
-              "total_currency":"1427472720000001000"
+              "total_currency":"1427472720000001000",
+              "ledger_after_coinbase":"jwMjBY2j29JTFUk9PMmjyEcgtX9NbDsqz8Wth8nkk62oouCsP4B",
+              "total_supply_after_coinbase":"1427472720000001000"
             },
             "target":{
               "first_pass_ledger":"jxfbCyNvacQHLVNKpFiVP4EiwdzRGUWdheFcPbGVPATCJYbmAmi",
@@ -101,7 +103,9 @@
                   "Pos"
                 ]
               },
-              "total_currency":"1427488560000001000"
+              "total_currency":"1427488560000001000",
+              "ledger_after_coinbase":"jxhzvgPzo6jtrcCuP6Xf45fZL4ix9ankYeq4zDvjSGQpxWpGLhj",
+              "total_supply_after_coinbase":"1427488560000001000"
             },
             "connecting_ledger_left":"jwiCRYzbDsjEr6KLhc5JBq96dGQCneb3h1F4QoByHEp5GudzUPG",
             "connecting_ledger_right":"jxfbCyNvacQHLVNKpFiVP4EiwdzRGUWdheFcPbGVPATCJYbmAmi",
@@ -222,7 +226,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwYVSTUb2kGkj3jnHfHmpV6dHvDpMfHy9wxDXkVLHhThMBgBpgW",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwYVSTUb2kGkj3jnHfHmpV6dHvDpMfHy9wxDXkVLHhThMBgBpgW",
@@ -265,7 +271,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxCCWSsZRnkudmPUq71q2HJySntyqPyAVF5ZBr2bcpmy4tCRm2N",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwYVSTUb2kGkj3jnHfHmpV6dHvDpMfHy9wxDXkVLHhThMBgBpgW",
                     "connecting_ledger_right":"jwYVSTUb2kGkj3jnHfHmpV6dHvDpMfHy9wxDXkVLHhThMBgBpgW",
@@ -316,7 +324,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxtAziT9GopGncFs6S7d1UCpNfFfwac6K6prDpCi8BTJdmFZBZj",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwj65DJitZDmc3w81Pm36xBqw9MqygVLpFbvdJ1yd6KdxyMK2LR",
@@ -359,7 +369,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwnrigAZHbTm17n7wC8J4Pz8T65CRkEvo8cmMGDrwjmEB1qk2mW",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxtAziT9GopGncFs6S7d1UCpNfFfwac6K6prDpCi8BTJdmFZBZj",
                     "connecting_ledger_right":"jxtAziT9GopGncFs6S7d1UCpNfFfwac6K6prDpCi8BTJdmFZBZj",
@@ -417,7 +429,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwnrigAZHbTm17n7wC8J4Pz8T65CRkEvo8cmMGDrwjmEB1qk2mW",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxtAziT9GopGncFs6S7d1UCpNfFfwac6K6prDpCi8BTJdmFZBZj",
@@ -460,7 +474,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwdPjDzHhmKpy6pxBVzJLN11khxFpZa6pnXHh7kuyyw1nK1QyzR",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxtAziT9GopGncFs6S7d1UCpNfFfwac6K6prDpCi8BTJdmFZBZj",
                     "connecting_ledger_right":"jxtAziT9GopGncFs6S7d1UCpNfFfwac6K6prDpCi8BTJdmFZBZj",
@@ -511,7 +527,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwnw5ZXDBxr6auQ4XBaVPEiDQoa1QmKSoc9u6dWqWTVakC7ShM8",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxYNQFdqfxYqrzDZfszAcspK2xwL7iUcfEJTmzCPXxhAM6m5AyN",
@@ -554,7 +572,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jx3zxxp227eDn41p7XSyL6mB6feHdfjYHmwjTiHoxc3tat3G936",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwnw5ZXDBxr6auQ4XBaVPEiDQoa1QmKSoc9u6dWqWTVakC7ShM8",
                     "connecting_ledger_right":"jwnw5ZXDBxr6auQ4XBaVPEiDQoa1QmKSoc9u6dWqWTVakC7ShM8",
@@ -612,7 +632,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jx3zxxp227eDn41p7XSyL6mB6feHdfjYHmwjTiHoxc3tat3G936",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwnw5ZXDBxr6auQ4XBaVPEiDQoa1QmKSoc9u6dWqWTVakC7ShM8",
@@ -655,7 +677,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxiYVyEXF6gaVfke21cNGxc6RHuJrpx2HAjNRJsGTNGXvhSCnKR",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwnw5ZXDBxr6auQ4XBaVPEiDQoa1QmKSoc9u6dWqWTVakC7ShM8",
                     "connecting_ledger_right":"jwnw5ZXDBxr6auQ4XBaVPEiDQoa1QmKSoc9u6dWqWTVakC7ShM8",
@@ -706,7 +730,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jw7zuVqAUVkZMyioCmK4UWQGoSfvaw9iySQjveU5imRjcg9WMGf",
@@ -749,7 +775,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwSWT8mPxDhjkefr1y3K9pJENFetDPW6Dnh7PGBds6ZvSJ6P4aA",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
                     "connecting_ledger_right":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
@@ -807,7 +835,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwSWT8mPxDhjkefr1y3K9pJENFetDPW6Dnh7PGBds6ZvSJ6P4aA",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jw9YggKo1LRufMJh3pzthZgaXbm8oFQBSDDoDsNo2fUAWUg6Kej",
@@ -850,7 +880,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxbMNzZxu7KgMp9Qdx4NjUqq6HuVNibmd6BRW4JR2p3B8dGkCu6",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
                     "connecting_ledger_right":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
@@ -901,7 +933,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxbMNzZxu7KgMp9Qdx4NjUqq6HuVNibmd6BRW4JR2p3B8dGkCu6",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jw7cdyjb6cKWKYMjgStcLPD7Y98AY696Bs6mNKcCw7akCGAzeBo",
@@ -944,7 +978,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwXvg3s5CAfj5SmSVkhD7ScNQH8pYpE5RnyKvLzw1QE9zXWKppv",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
                     "connecting_ledger_right":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
@@ -1002,7 +1038,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwXvg3s5CAfj5SmSVkhD7ScNQH8pYpE5RnyKvLzw1QE9zXWKppv",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jx1yvc5sjaJBLZshr23KwTKdNeNErUzGNdVcmJiriyF2ZVPBgVB",
@@ -1045,7 +1083,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwd1bQKu96Rmoa1fHuhNCaUvA3HAmY4UUBSHnd3kkyVdQYcCGHB",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
                     "connecting_ledger_right":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
@@ -1096,7 +1136,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487841000001000"
+                      "total_currency":"1427487841000001000",
+                      "ledger_after_coinbase":"jwd1bQKu96Rmoa1fHuhNCaUvA3HAmY4UUBSHnd3kkyVdQYcCGHB",
+                      "total_supply_after_coinbase":"1427487841000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwXwLLaTRWKa8itonf1YhGes7wY9JD4jxoyADh42mKMGC39hTsB",
@@ -1139,7 +1181,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwuBqPWfJozCdq2KBqqPKVp9ccNAJAC4mQcYPuZPfvFe6yn1wBc",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
                     "connecting_ledger_right":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
@@ -1197,7 +1241,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwuBqPWfJozCdq2KBqqPKVp9ccNAJAC4mQcYPuZPfvFe6yn1wBc",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwtoBEAm2bJUdP1Vji4R4KJEZfFjNKDW2nJisFhE56t1QJJzNN3",
@@ -1240,7 +1286,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxwNeMU2eYMozoB16m63mRgU8LoRMLRicp7aHTq47PMNZ5tQAg7",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwovazw3WQAaWLNUSAtswxApruDpS4o52LvUCsgZYtR19KsY6Yb",
                     "connecting_ledger_right":"jwSz2WSjgTAZEA6HCzv7W5n3kZ88YFzJop5FNys5wXHdVUex7Nj",
@@ -1291,7 +1339,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxwNeMU2eYMozoB16m63mRgU8LoRMLRicp7aHTq47PMNZ5tQAg7",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwktMzmLnK729cDBycf3jy8gdGf2NeARyUMjjxD7fEwyHh2TjxD",
@@ -1334,7 +1384,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jx1MA2SWVdwCGGWW5JmkM2ksgqWWPwYU5fyjGdyheYpjRX8bW9k",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwSz2WSjgTAZEA6HCzv7W5n3kZ88YFzJop5FNys5wXHdVUex7Nj",
                     "connecting_ledger_right":"jxytnsoRLJ22xgvrw7KpufxRWEuVaNo8633cnaUsvbE3K4EHfuo",
@@ -1392,7 +1444,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jx1MA2SWVdwCGGWW5JmkM2ksgqWWPwYU5fyjGdyheYpjRX8bW9k",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwRpnLQKZuhi1A3FgqJseKecuiQ1aJR6zsKRkThbVwWC1bsLTUb",
@@ -1435,7 +1489,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jw9AUx4ccrSnG9UC8PSwR1rYijqHhxkjiTZ9Y23q5sCz1cNjquz",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxytnsoRLJ22xgvrw7KpufxRWEuVaNo8633cnaUsvbE3K4EHfuo",
                     "connecting_ledger_right":"jxytnsoRLJ22xgvrw7KpufxRWEuVaNo8633cnaUsvbE3K4EHfuo",
@@ -1486,7 +1542,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jw9AUx4ccrSnG9UC8PSwR1rYijqHhxkjiTZ9Y23q5sCz1cNjquz",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxs4kd1ST4kDhnkjm4cGbiwEby6GVC6qykaxhXeKfXC7GSAX8Lz",
@@ -1529,7 +1587,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwedMxaYq7bQZjGPAsMDQ5ZukMSwBSwq6eBtX4AqVfLh9zLioGW",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxytnsoRLJ22xgvrw7KpufxRWEuVaNo8633cnaUsvbE3K4EHfuo",
                     "connecting_ledger_right":"jwDfm2k1iSc7UfpQBUKouNYtZ57F87Sk2m8AHR4V1EYcCQM37PE",
@@ -1587,7 +1647,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwedMxaYq7bQZjGPAsMDQ5ZukMSwBSwq6eBtX4AqVfLh9zLioGW",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwwFjGqAFBiD7CPZwJjZCSkjJ2MUdJQHKBAvS1wCLQva58W4CYi",
@@ -1630,7 +1692,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxu4UD4wHSK77Xd3HrC8BKYKhrWECE9fvHZn6XuHoqkoLsUwviz",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwDfm2k1iSc7UfpQBUKouNYtZ57F87Sk2m8AHR4V1EYcCQM37PE",
                     "connecting_ledger_right":"jxu4UD4wHSK77Xd3HrC8BKYKhrWECE9fvHZn6XuHoqkoLsUwviz",
@@ -1681,7 +1745,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxu4UD4wHSK77Xd3HrC8BKYKhrWECE9fvHZn6XuHoqkoLsUwviz",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxu4UD4wHSK77Xd3HrC8BKYKhrWECE9fvHZn6XuHoqkoLsUwviz",
@@ -1724,7 +1790,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwsdwhdgQb1SbiPRipEs9qopTF1w4E8sWzfAjsVtqjytyuaPvJH",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxu4UD4wHSK77Xd3HrC8BKYKhrWECE9fvHZn6XuHoqkoLsUwviz",
                     "connecting_ledger_right":"jxu4UD4wHSK77Xd3HrC8BKYKhrWECE9fvHZn6XuHoqkoLsUwviz",
@@ -1782,7 +1850,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwWQntjeZhXgC8gVT8EmmVkjkBUJhg3zqtfJ8858f4HZwNBbKnH",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jw91t5wjYBwZMb6Fn1JVX11b25HCinjUUNUWd1AaTYzdMWgqpMS",
@@ -1825,7 +1895,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwWMp9dnLuy9AnSNiqNvaLKMgvk3KsXhkziYdQfp66h22yHRESZ",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwWQntjeZhXgC8gVT8EmmVkjkBUJhg3zqtfJ8858f4HZwNBbKnH",
                     "connecting_ledger_right":"jwWQntjeZhXgC8gVT8EmmVkjkBUJhg3zqtfJ8858f4HZwNBbKnH",
@@ -1876,7 +1948,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwWMp9dnLuy9AnSNiqNvaLKMgvk3KsXhkziYdQfp66h22yHRESZ",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwWQntjeZhXgC8gVT8EmmVkjkBUJhg3zqtfJ8858f4HZwNBbKnH",
@@ -1919,7 +1993,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jweWu8Fh6VdDthLbQUqxPyNfj2KVyRVDu4sEJKMp3s844NU2pkD",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwWQntjeZhXgC8gVT8EmmVkjkBUJhg3zqtfJ8858f4HZwNBbKnH",
                     "connecting_ledger_right":"jwWQntjeZhXgC8gVT8EmmVkjkBUJhg3zqtfJ8858f4HZwNBbKnH",
@@ -1977,7 +2053,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwArqGEkUuorDQtMGAfs7GcGJ76eu3UebTQgVrhHBvKFcL6fyTN",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxJD2gtLjpbJUeDVMZbNRwFCSTEo6j1pdM4RpmTA1DcP9oUheS1",
@@ -2020,7 +2098,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxXCtiiWN5JwiaRPi3ZfqHJ8pVAmenyUFcFJdTATFdeALPGSMqh",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwArqGEkUuorDQtMGAfs7GcGJ76eu3UebTQgVrhHBvKFcL6fyTN",
                     "connecting_ledger_right":"jwArqGEkUuorDQtMGAfs7GcGJ76eu3UebTQgVrhHBvKFcL6fyTN",
@@ -2071,7 +2151,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxXCtiiWN5JwiaRPi3ZfqHJ8pVAmenyUFcFJdTATFdeALPGSMqh",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwu79xtRShUgDZGQNW4Tteb3dnp9tXvPBo7pyc7yK1Bq7T8wDmo",
@@ -2114,7 +2196,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwNvF17cKnmsKJXJGjYbCLQdXrZxamMAn4nsVHkT7CC6fs5NXHW",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwArqGEkUuorDQtMGAfs7GcGJ76eu3UebTQgVrhHBvKFcL6fyTN",
                     "connecting_ledger_right":"jwRFASvXYL5thunF87j8LLrH1GzE7TcwYQJanDJnMHjSHsJ7Bfx",
@@ -2172,7 +2256,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jwTKk9mdb7idHD6PEEUePLXiCEvk7UpqePEZVbgzSv1cyYReLeK",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxjU1U5XTwrkLW4bZvxd7n9VeQvpSuN3KgeLPENXnpyxDYqN62E",
@@ -2215,7 +2301,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxCmQNB42ESkyHMPNSjssfwjquXPPUT1AMUsbcjTsv3tiLNePvr",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwoqQuA2FvoHDXhwHcYwhaNko3UqFTrJHvY9pZU8DmADmWvd7Ep",
                     "connecting_ledger_right":"jxChn3i97J1PXvB86HCxuqZgXRhkSNDkAfxpsgyL8BoSpBrdTSw",
@@ -2266,7 +2354,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxCmQNB42ESkyHMPNSjssfwjquXPPUT1AMUsbcjTsv3tiLNePvr",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwQAnxTzUF9r5c5osC98KRti3NafYZZ4QaAGPmZx95Va7SbGXvf",
@@ -2309,7 +2399,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxFQAgcrQbNawd9kuaKQgbEfnPu2cxJSBzAutvMzopFkoBxQSsE",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxChn3i97J1PXvB86HCxuqZgXRhkSNDkAfxpsgyL8BoSpBrdTSw",
                     "connecting_ledger_right":"jxsfHVdPLA564BJFDxQCEm9AS2eRVYUNansCdDmwTHEbH5iwvLv",
@@ -2367,7 +2459,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jxFQAgcrQbNawd9kuaKQgbEfnPu2cxJSBzAutvMzopFkoBxQSsE",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jx1XSCAsDJrAGBTxqQwtuym1AkLqZvEWm2g4yyrza73XVVy9dgV",
@@ -2410,7 +2504,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxBf8jc8nbbZ6RhnJQiydQ59GU6JETHAZXi5wvV4vdfQTi5EwDF",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxsfHVdPLA564BJFDxQCEm9AS2eRVYUNansCdDmwTHEbH5iwvLv",
                     "connecting_ledger_right":"jx1XSCAsDJrAGBTxqQwtuym1AkLqZvEWm2g4yyrza73XVVy9dgV",
@@ -2461,7 +2557,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxJr5KJySrRgHiUG98wcnAmPo8S4bFqXTuMA9waWgpLZX39LHHq",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwYJkmfXWhuZnT6PWM68nEJXA9oTpSFRd7breWxvD771ohsrLH7",
@@ -2504,7 +2602,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxuD3mu6TP5QnvfwzHisnbzrHhpKQJRfKs26T7TAAvCEF4oMZ3s",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxJr5KJySrRgHiUG98wcnAmPo8S4bFqXTuMA9waWgpLZX39LHHq",
                     "connecting_ledger_right":"jxE8qoWQqiq79Gwa2Na8MnaKVSn5qBjH8F1rzsSTGkjvjAx2ntQ",
@@ -2562,7 +2662,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jxuD3mu6TP5QnvfwzHisnbzrHhpKQJRfKs26T7TAAvCEF4oMZ3s",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwcuRewUJq33RWRNsqpELHhyfCUjxAVs1ibijjZWFRcsAG2gxV7",
@@ -2605,7 +2707,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxuWRksheVgTCp9yRpKAhiBRoUR8huRzrW5rhnMgzC8VV3FEsWx",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxE8qoWQqiq79Gwa2Na8MnaKVSn5qBjH8F1rzsSTGkjvjAx2ntQ",
                     "connecting_ledger_right":"jwsnsbpXNGfe3rF2GHmLBdVDnpLRB2CT2vXVS5nsMp6Tuthmht2",
@@ -2656,7 +2760,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jxuWRksheVgTCp9yRpKAhiBRoUR8huRzrW5rhnMgzC8VV3FEsWx",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxgdstpM2dUFeEFFJ3XPH9svCR6u8usyAsZe8CfFJifeUaJziY8",
@@ -2699,7 +2805,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jweMcmKHHBipVfVcTsr2e9jJtnPTMpg3TvsAFPK3nJj4Hh1NsAr",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwsnsbpXNGfe3rF2GHmLBdVDnpLRB2CT2vXVS5nsMp6Tuthmht2",
                     "connecting_ledger_right":"jxgdstpM2dUFeEFFJ3XPH9svCR6u8usyAsZe8CfFJifeUaJziY8",
@@ -2757,7 +2865,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxYw98Ay8QNeFe9N2UDx2YGChNDAqzHu5fmJGVxajhRzJf6CiAY",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxu19JYFYEiraWtVsas2W9WfAu8ZTviLju72o8Vbc58azB2kfWh",
@@ -2800,7 +2910,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwdjDo3bENviUSz9yaEiPYwuoGgmtDNkvLXdkuRFgThC6zazWk5",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxYw98Ay8QNeFe9N2UDx2YGChNDAqzHu5fmJGVxajhRzJf6CiAY",
                     "connecting_ledger_right":"jxYdhK2FNjbw5T3Ht2cHiuDcnUmYqqZYUZYg3u5DMkWNz9LWvEy",
@@ -2851,7 +2963,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwdjDo3bENviUSz9yaEiPYwuoGgmtDNkvLXdkuRFgThC6zazWk5",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxfsxrTrY2dx4VHkJn8KVTTpzvcTTSLmAZGkBv4JPuMG9QtHduf",
@@ -2894,7 +3008,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwGE3Uw6AJchWCLv33spx84XGPAaJrF9dVZ769dWRp6kfWUSQfB",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxYdhK2FNjbw5T3Ht2cHiuDcnUmYqqZYUZYg3u5DMkWNz9LWvEy",
                     "connecting_ledger_right":"jx1LDW3dcu7XxGtMrEfmhssKwSGMWkzN3iCVkuPi6tCciBEsq6j",
@@ -2952,7 +3068,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487121000001000"
+                      "total_currency":"1427487121000001000",
+                      "ledger_after_coinbase":"jwGE3Uw6AJchWCLv33spx84XGPAaJrF9dVZ769dWRp6kfWUSQfB",
+                      "total_supply_after_coinbase":"1427487121000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxT5Mt79bFy2FCxEpvD3XMwAVKzzrZmXWMM4Lko4Yx8FAuXm9MF",
@@ -2995,7 +3113,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwpNgifgQWSL2kosy7oMrcFePY3XLQnqYjZJD3EwfCm8aDQKC8Z",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jx1LDW3dcu7XxGtMrEfmhssKwSGMWkzN3iCVkuPi6tCciBEsq6j",
                     "connecting_ledger_right":"jxT5Mt79bFy2FCxEpvD3XMwAVKzzrZmXWMM4Lko4Yx8FAuXm9MF",
@@ -3046,7 +3166,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwJVtUp3MVWCo7KvW71Cf1iH7wydDXF8L9MK1YhFS34XaAPzWun",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwJVtUp3MVWCo7KvW71Cf1iH7wydDXF8L9MK1YhFS34XaAPzWun",
@@ -3089,7 +3211,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwNVQsjEXLo4xY9iLt6BN6cesFqjTBqjFc6W4hYy1k7g9Vus4x1",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwJVtUp3MVWCo7KvW71Cf1iH7wydDXF8L9MK1YhFS34XaAPzWun",
                     "connecting_ledger_right":"jwJVtUp3MVWCo7KvW71Cf1iH7wydDXF8L9MK1YhFS34XaAPzWun",
@@ -3147,7 +3271,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxrFdtZ1x3mwGH3HFzj1zbHhMhZNFZXPEt8dk51MdpLee62zg5G",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxrFdtZ1x3mwGH3HFzj1zbHhMhZNFZXPEt8dk51MdpLee62zg5G",
@@ -3190,7 +3316,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxr7sjroadXkGxGvUXHK6N1CBHtNJMiKcs3QPFGyhy9ad93hwQo",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxrFdtZ1x3mwGH3HFzj1zbHhMhZNFZXPEt8dk51MdpLee62zg5G",
                     "connecting_ledger_right":"jxrFdtZ1x3mwGH3HFzj1zbHhMhZNFZXPEt8dk51MdpLee62zg5G",
@@ -3241,7 +3369,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxKUcz29fDpt9eC5WHPVChj6GseLEbZDxvo9ZofE8eYx1fNbch4",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwFEwCUgWk9rYQozCbQdnMhuypobkiagpL6FTnqHrqeSQixmzvb",
@@ -3284,7 +3414,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwsg6EpwTQHLZK8LgEUnF475ZB4bYEdSmqaFKQuEA789a2jHD5P",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxKUcz29fDpt9eC5WHPVChj6GseLEbZDxvo9ZofE8eYx1fNbch4",
                     "connecting_ledger_right":"jwzTcyiwovzRrsWWGBACXRkrG2yVuKR6CY6rbPu91jmswn5AT1D",
@@ -3342,7 +3474,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwsg6EpwTQHLZK8LgEUnF475ZB4bYEdSmqaFKQuEA789a2jHD5P",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxLqeJSeSX7kLiaJjoos5SfjHCDd3fKjy9Rcs1CmwvzLUk2vHkY",
@@ -3385,7 +3519,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwCgFFZtHRZtvTnuvLTRcp7qSaExhPdaHW9yt6duziw4EAsvQCn",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwzTcyiwovzRrsWWGBACXRkrG2yVuKR6CY6rbPu91jmswn5AT1D",
                     "connecting_ledger_right":"jy1m4gXwa63pwX1SHKBVKNKfhtAX5cGMjq8vsaxR5NcCMdhTye5",
@@ -3436,7 +3572,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwCgFFZtHRZtvTnuvLTRcp7qSaExhPdaHW9yt6duziw4EAsvQCn",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jx7mENT6EXB9D28V5MFLiEfTogtHBt2HrK3nxmEjpHadyHvX5PQ",
@@ -3479,7 +3617,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwm2Eqi9WJNg4t7Z16nYoQgTWUU2ZPaVLJQQ4Er6miqvdX6L7Vd",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jy1m4gXwa63pwX1SHKBVKNKfhtAX5cGMjq8vsaxR5NcCMdhTye5",
                     "connecting_ledger_right":"jx6D3cdRqm1w16xRoAGG3MxA1BtuFMUhWqpkT2ttRhbqNGYP7n9",
@@ -3537,7 +3677,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jwm2Eqi9WJNg4t7Z16nYoQgTWUU2ZPaVLJQQ4Er6miqvdX6L7Vd",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxy6mWwTWjY6TEv5k7MTUAFkWPAnjBcy7um47SUrhot16Z9c7j8",
@@ -3580,7 +3722,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jw6wWR1gHsKdzWqW7u5WMp5gkht45F1RNmxN3zwVFun63g5X8Dp",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jx6D3cdRqm1w16xRoAGG3MxA1BtuFMUhWqpkT2ttRhbqNGYP7n9",
                     "connecting_ledger_right":"jxymufDyw9DUfP4j8PkhycWuz74nA8YdTjW2FsjP3oBByUg6BLE",
@@ -3631,7 +3775,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427486400000001000"
+                      "total_currency":"1427486400000001000",
+                      "ledger_after_coinbase":"jw6wWR1gHsKdzWqW7u5WMp5gkht45F1RNmxN3zwVFun63g5X8Dp",
+                      "total_supply_after_coinbase":"1427486400000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxoL5mpzCXHEddu9Z5GztbaAewi7sQ31SvDm9z4XqtzaZbqSf3H",
@@ -3674,7 +3820,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxoL5mpzCXHEddu9Z5GztbaAewi7sQ31SvDm9z4XqtzaZbqSf3H",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxymufDyw9DUfP4j8PkhycWuz74nA8YdTjW2FsjP3oBByUg6BLE",
                     "connecting_ledger_right":"jxoL5mpzCXHEddu9Z5GztbaAewi7sQ31SvDm9z4XqtzaZbqSf3H",
@@ -3732,7 +3880,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxZENDZbCF6itwRVq3LxKsVZaD883smUm7PfpzmZeoh1u7A4mdT",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxoV413bShjap9aZYDnKFwe3H2jgDkzY3c1Cs2iEDfBJHKWjbit",
@@ -3775,7 +3925,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jw6r1fE741eszxABiar35dmL3L5cDjMgqUQy2DwcEVyLSCjceq8",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxZENDZbCF6itwRVq3LxKsVZaD883smUm7PfpzmZeoh1u7A4mdT",
                     "connecting_ledger_right":"jwikWuzJtBthd2LuDStmrMYdBFBZhUaR1T9qwWGo4WTHgzWzdwH",
@@ -3826,7 +3978,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jw6r1fE741eszxABiar35dmL3L5cDjMgqUQy2DwcEVyLSCjceq8",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jx2dZKwE7v2TXuA36KA3A8ZtbYV4DhpMWmX5vHCL3qRmp96NCSQ",
@@ -3869,7 +4023,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwcmna9p8jirta9G2mm1X9WYijPu7TEeSw1AVWpRhkmKqHvGuzP",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwikWuzJtBthd2LuDStmrMYdBFBZhUaR1T9qwWGo4WTHgzWzdwH",
                     "connecting_ledger_right":"jx2dZKwE7v2TXuA36KA3A8ZtbYV4DhpMWmX5vHCL3qRmp96NCSQ",
@@ -3927,7 +4083,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427486400000001000"
+                      "total_currency":"1427486400000001000",
+                      "ledger_after_coinbase":"jx7H8BpZUxLtVNHEFTPRi8haxM82u8ftSjG9Aou42vQqdyJYGDd",
+                      "total_supply_after_coinbase":"1427486400000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxAiqQ4jBxiXMpfrFWp8feZaiRTYEUDqwjUF5ApX43TB67X75kS",
@@ -3970,7 +4128,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxkzHGHNd64e5kYd725xoa2p6Zn2RDj7s6w5Tv9Pv1LZRxCioij",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jx7H8BpZUxLtVNHEFTPRi8haxM82u8ftSjG9Aou42vQqdyJYGDd",
                     "connecting_ledger_right":"jxAiqQ4jBxiXMpfrFWp8feZaiRTYEUDqwjUF5ApX43TB67X75kS",
@@ -4021,7 +4181,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487840000001000"
+                      "total_currency":"1427487840000001000",
+                      "ledger_after_coinbase":"jxaKFW5iVj2EjH4Hd5h3CYCPvqeg4Wjj6ovEoYKuLRhRENbytXn",
+                      "total_supply_after_coinbase":"1427487840000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxrdE2kSu3zDVi8RNsmY2zeQgkyr7A9nhR74WUt43yLgAffqH74",
@@ -4064,7 +4226,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwp2ZWEsmmz1DBZuqaUgEUtWT7iobpPVSgRNQV6QhTwkFWQj59E",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxaKFW5iVj2EjH4Hd5h3CYCPvqeg4Wjj6ovEoYKuLRhRENbytXn",
                     "connecting_ledger_right":"jxeSAPsWzm7Hz9UURvKtjtH2gX5Y9YB5cHYbKsPpwWn2AdmoFiH",
@@ -4122,7 +4286,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427486400000001000"
+                      "total_currency":"1427486400000001000",
+                      "ledger_after_coinbase":"jwp2ZWEsmmz1DBZuqaUgEUtWT7iobpPVSgRNQV6QhTwkFWQj59E",
+                      "total_supply_after_coinbase":"1427486400000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwF5qPUKvGYJaqK7UxigeXqZJzMjMSb1ucVjrB3sVmwQdFve6yF",
@@ -4165,7 +4331,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwyMon5fYkYhovAirzzNW49LXNjTpcY3967nAkT6TSZthUzdPaC",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxeSAPsWzm7Hz9UURvKtjtH2gX5Y9YB5cHYbKsPpwWn2AdmoFiH",
                     "connecting_ledger_right":"jwhY9vafim6by4qeRFcDPUDsxWp8PXBb17iteAsKHbzwah8oSJ5",
@@ -4216,7 +4384,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jwyMon5fYkYhovAirzzNW49LXNjTpcY3967nAkT6TSZthUzdPaC",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jx2ktrsJv5dRU7766kfjhpbrQQG3U33HKX8L942No2w4rvqKLBh",
@@ -4259,7 +4429,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxkdWtJNN68k2GZvLB5uGX6vawrJivpU3daCfTDBp2hCqTbgGsh",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwhY9vafim6by4qeRFcDPUDsxWp8PXBb17iteAsKHbzwah8oSJ5",
                     "connecting_ledger_right":"jxMHxxSHPEdsUSZQsRiDE1LdybMmrqNP81Gjw7FjhfwKwDk4qAS",
@@ -4317,7 +4489,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427485680000001000"
+                      "total_currency":"1427485680000001000",
+                      "ledger_after_coinbase":"jxkdWtJNN68k2GZvLB5uGX6vawrJivpU3daCfTDBp2hCqTbgGsh",
+                      "total_supply_after_coinbase":"1427485680000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxfNFJS5NS8fiv5QTpoYdDeGDEU4f7PZtnWJuEf4CNAzHCfTJwd",
@@ -4360,7 +4534,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwpn4iBty3h8c3sbewqybR4wXC6QGquAoS24MPwzruwRhTCr2Rp",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxMHxxSHPEdsUSZQsRiDE1LdybMmrqNP81Gjw7FjhfwKwDk4qAS",
                     "connecting_ledger_right":"jwYoZfxVW8acRNHDVvCsBjW9gv5vxiuS4tPDDbunPsVqwJUNU2b",
@@ -4411,7 +4587,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427487120000001000"
+                      "total_currency":"1427487120000001000",
+                      "ledger_after_coinbase":"jwpn4iBty3h8c3sbewqybR4wXC6QGquAoS24MPwzruwRhTCr2Rp",
+                      "total_supply_after_coinbase":"1427487120000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxnQTqVGUvTuXF7zDdZsTQKFHhFduU4XhroBEoGrvEwVWA2EkAt",
@@ -4454,7 +4632,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwq1j6ywnaSYa5RmXFhcSkssNwcXhAg2kj8BSDJpoVRHW7VpwqF",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwYoZfxVW8acRNHDVvCsBjW9gv5vxiuS4tPDDbunPsVqwJUNU2b",
                     "connecting_ledger_right":"jwy4TaqL3wQECQNRqn2jp5ZjgsBityFXuqUA1KVwvgKm2XyCtFn",
@@ -4512,7 +4692,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427484960000001000"
+                      "total_currency":"1427484960000001000",
+                      "ledger_after_coinbase":"jw6z6vQPdKNEJCcHA7GT66o9zNtPRu3nF5V9kGAzcKijyLKEdeJ",
+                      "total_supply_after_coinbase":"1427484960000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwDivnSCanuJ85a9ejnaZRR82UgRT1zQUjvN5yHemDTKbmqdPvv",
@@ -4555,7 +4737,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxfiCDJ5Dqdfde1GDyVotWdWkdiRcvsDimesSqxQHhA1CgfXt4E",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jw6z6vQPdKNEJCcHA7GT66o9zNtPRu3nF5V9kGAzcKijyLKEdeJ",
                     "connecting_ledger_right":"jwCgnFXUnKfCZc4hS9dT4UcY7WaxG7Xe6wB1QZdaWpgRWjpoPr4",
@@ -4606,7 +4790,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427484961000001000"
+                      "total_currency":"1427484961000001000",
+                      "ledger_after_coinbase":"jxfiCDJ5Dqdfde1GDyVotWdWkdiRcvsDimesSqxQHhA1CgfXt4E",
+                      "total_supply_after_coinbase":"1427484961000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxtRTTeeZXjFaJui8JNZueHWLkNyov1EQ1eyPsPdYTvNCsGMMdR",
@@ -4649,7 +4835,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwFCUViBcccWKHe1Vm2QUuLYnTQE9CvEASHFHAR4bRFyPJhhnUX",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwCgnFXUnKfCZc4hS9dT4UcY7WaxG7Xe6wB1QZdaWpgRWjpoPr4",
                     "connecting_ledger_right":"jxtRTTeeZXjFaJui8JNZueHWLkNyov1EQ1eyPsPdYTvNCsGMMdR",
@@ -4707,7 +4895,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427485680000001000"
+                      "total_currency":"1427485680000001000",
+                      "ledger_after_coinbase":"jxJrVYqkWtz4wcqUKxeYNUMg5H3P33P7fmno85DMVNYRJLv536U",
+                      "total_supply_after_coinbase":"1427485680000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwVeFGTPBNBLb6FTZVZyBu5vYjDEXxhfJZnoNhbm3o1U8HZrTDQ",
@@ -4750,7 +4940,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxceiUxJHMXrrzNnFntVoNJaMSCReMW4WuwNyqfDZyFSk6kDyyS",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxJrVYqkWtz4wcqUKxeYNUMg5H3P33P7fmno85DMVNYRJLv536U",
                     "connecting_ledger_right":"jxF9Tq3c6NjanyQRj4qEcfeaRPnHq5MHoVi1whAtYahr8izYE4s",
@@ -4801,7 +4993,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427484960000001000"
+                      "total_currency":"1427484960000001000",
+                      "ledger_after_coinbase":"jxceiUxJHMXrrzNnFntVoNJaMSCReMW4WuwNyqfDZyFSk6kDyyS",
+                      "total_supply_after_coinbase":"1427484960000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwxwWdDCGrnzpcZFoUvMVK35YzbkWi6Jwv4kbZLbbRz138kdUbN",
@@ -4844,7 +5038,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwPG4Tfs77bSaQF9FQr8W1dTt8PoehMVoVb8XfCoW1GYWHm5o4P",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxF9Tq3c6NjanyQRj4qEcfeaRPnHq5MHoVi1whAtYahr8izYE4s",
                     "connecting_ledger_right":"jwxwWdDCGrnzpcZFoUvMVK35YzbkWi6Jwv4kbZLbbRz138kdUbN",
@@ -4902,7 +5098,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427479925000001000"
+                      "total_currency":"1427479925000001000",
+                      "ledger_after_coinbase":"jxGhgEu3ejya81MpYv4XpHStRT8tpY6SDypniGL9NSbdPn8PdoT",
+                      "total_supply_after_coinbase":"1427479925000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jx4kDjyd4ZNrxSvXVWHBrhrYcKmcWAVpyG7VNMEyx7Tz2dT1ank",
@@ -4945,7 +5143,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwvuXspeBdJqqBmY7EuhKvJL97qNkdEK7D6RsCBGriD7TmJEPbf",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jxY3wVb46sGh414YRAMWx9xLsQLXS7JaFgaA1sdGUYyMVS1Twh1",
                     "connecting_ledger_right":"jwvuXspeBdJqqBmY7EuhKvJL97qNkdEK7D6RsCBGriD7TmJEPbf",
@@ -4996,7 +5196,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427482080000001000"
+                      "total_currency":"1427482080000001000",
+                      "ledger_after_coinbase":"jwvuXspeBdJqqBmY7EuhKvJL97qNkdEK7D6RsCBGriD7TmJEPbf",
+                      "total_supply_after_coinbase":"1427482080000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jwQk6upm6qW2eDuz4MuZ3QdHqVxWvZmr8M7MgZUBjw4zhqwR7oS",
@@ -5039,7 +5241,9 @@
                           "Neg"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jwQk6upm6qW2eDuz4MuZ3QdHqVxWvZmr8M7MgZUBjw4zhqwR7oS",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwvuXspeBdJqqBmY7EuhKvJL97qNkdEK7D6RsCBGriD7TmJEPbf",
                     "connecting_ledger_right":"jwQk6upm6qW2eDuz4MuZ3QdHqVxWvZmr8M7MgZUBjw4zhqwR7oS",
@@ -5097,7 +5301,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427472720000001000"
+                      "total_currency":"1427472720000001000",
+                      "ledger_after_coinbase":"jwMjBY2j29JTFUk9PMmjyEcgtX9NbDsqz8Wth8nkk62oouCsP4B",
+                      "total_supply_after_coinbase":"1427472720000001000"
                     },
                     "target":{
                       "first_pass_ledger":"jxfbCyNvacQHLVNKpFiVP4EiwdzRGUWdheFcPbGVPATCJYbmAmi",
@@ -5140,7 +5346,9 @@
                           "Pos"
                         ]
                       },
-                      "total_currency":"1427488560000001000"
+                      "total_currency":"1427488560000001000",
+                      "ledger_after_coinbase":"jxhzvgPzo6jtrcCuP6Xf45fZL4ix9ankYeq4zDvjSGQpxWpGLhj",
+                      "total_supply_after_coinbase":"1427488560000001000"
                     },
                     "connecting_ledger_left":"jwiCRYzbDsjEr6KLhc5JBq96dGQCneb3h1F4QoByHEp5GudzUPG",
                     "connecting_ledger_right":"jxfbCyNvacQHLVNKpFiVP4EiwdzRGUWdheFcPbGVPATCJYbmAmi",

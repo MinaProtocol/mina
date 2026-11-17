@@ -51,7 +51,10 @@ let sample_block_sexp =
              (success true) (account_update_index 0) (failure_status_tbl ())
              (will_succeed true)))
            (fee_excess ((magnitude 0) (sgn Pos)))
-           (total_currency 10016120000000000)))
+           (total_currency 10016120000000000)
+           (ledger_after_coinbase
+            4958998934359971061501155897206360741418847934692582646141869034661458403276)
+           (total_supply_after_coinbase 10016120000000000)))
          (target
           ((first_pass_ledger
             4958998934359971061501155897206360741418847934692582646141869034661458403276)
@@ -75,7 +78,10 @@ let sample_block_sexp =
              (success true) (account_update_index 0) (failure_status_tbl ())
              (will_succeed true)))
            (fee_excess ((magnitude 0) (sgn Pos)))
-           (total_currency 10016120000000000)))
+           (total_currency 10016120000000000)
+           (ledger_after_coinbase
+            4958998934359971061501155897206360741418847934692582646141869034661458403276)
+           (total_supply_after_coinbase 10016120000000000)))
          (connecting_ledger_left
           4958998934359971061501155897206360741418847934692582646141869034661458403276)
          (connecting_ledger_right
@@ -544,7 +550,9 @@ let sample_block_json =
                   "Pos"
                 ]
               },
-              "total_currency": "10016120000000000"
+              "total_currency": "10016120000000000",
+              "ledger_after_coinbase": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
+              "total_supply_after_coinbase": "10016120000000000"
             },
             "target": {
               "first_pass_ledger": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
@@ -585,7 +593,9 @@ let sample_block_json =
                   "Pos"
                 ]
               },
-              "total_currency": "10016120000000000"
+              "total_currency": "10016120000000000",
+              "ledger_after_coinbase": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
+              "total_supply_after_coinbase": "10016120000000000"
             },
             "connecting_ledger_left": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
             "connecting_ledger_right": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",

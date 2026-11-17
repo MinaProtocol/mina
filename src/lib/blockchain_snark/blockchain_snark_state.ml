@@ -82,6 +82,8 @@ let non_pc_registers_equal_var t1 t2 =
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
         ~fee_excess:(f !Fee_excess.equal_checked)
         ~total_currency:(f !Currency.Amount.equal_var)
+        ~ledger_after_coinbase:(f !Frozen_ledger_hash.equal_var)
+        ~total_supply_after_coinbase:(f !Currency.Amount.equal_var)
       |> Impl.Boolean.all )
 
 let txn_statement_ledger_hashes_equal

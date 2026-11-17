@@ -330,7 +330,9 @@ let protocol_state =
               "Pos"
             ]
           },
-          "total_currency": "1014480845000001000"
+          "total_currency": "1014480845000001000",
+          "ledger_after_coinbase": "jw8by1TB1dqKwsj5NnPBZXiYnb291qe952gA7dhoeDo1VbzAAnB",
+          "total_supply_after_coinbase": "1014480845000001000"
         },
         "target": {
           "first_pass_ledger": "jwDuoXtzggxSeFpfepCqHAvoqnp7feWUPjRx5n8e2ToHey5qk59",
@@ -371,7 +373,9 @@ let protocol_state =
               "Pos"
             ]
           },
-          "total_currency": "1014488754000001000"
+          "total_currency": "1014488754000001000",
+          "ledger_after_coinbase": "jwDuoXtzggxSeFpfepCqHAvoqnp7feWUPjRx5n8e2ToHey5qk59",
+          "total_supply_after_coinbase": "1014488754000001000"
         },
         "connecting_ledger_left": "jxmWGjNGaQNfoSuCfKamSGASFso7Xvbcqzzn1E3aA9iwwPV77Zq",
         "connecting_ledger_right": "jwGo7QJzxT2STkRzevRYQ1d79WAzYsFSgEFpSZZwcdptR7BWbZ7",
