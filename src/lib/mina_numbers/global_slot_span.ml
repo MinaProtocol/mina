@@ -44,6 +44,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Stable.Latest.t = Global_slot_span of T.t
+  [@@unboxed] [@@deriving hash, sexp, compare, equal]
+
   let to_uint32 (Global_slot_span u32) : uint32 = u32
 
   let of_uint32 u32 : t = Global_slot_span u32

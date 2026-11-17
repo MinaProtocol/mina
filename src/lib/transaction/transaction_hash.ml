@@ -238,6 +238,8 @@ module User_command = struct
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving sexp, hash, to_yojson]
+
   let create (c : User_command.Stable.Latest.t) : t =
     { data = c; hash = hash_command c }
 

@@ -3,8 +3,6 @@ open Mina_base
 module Common : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t
     end
@@ -38,8 +36,6 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V4 : sig
       type t
 
@@ -97,8 +93,6 @@ end
 module Minimal : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t
 

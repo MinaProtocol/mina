@@ -21,8 +21,6 @@ module Consensus_time = Consensus.Data.Consensus_time
 module Block_producer_keys = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = (Keypair.Stable.V1.t * Public_key.Compressed.Stable.V1.t) list
       [@@deriving sexp]
@@ -37,8 +35,6 @@ end
 module Evaluator_status = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = At of Global_slot_since_hard_fork.Stable.V1.t | Completed
 
@@ -53,8 +49,6 @@ end
 module Vrf_evaluation_result = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { slots_won : Consensus.Data.Slot_won.Stable.V2.t list

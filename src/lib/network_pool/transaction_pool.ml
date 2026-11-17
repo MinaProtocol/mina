@@ -39,8 +39,6 @@ end
 module Diff_versioned = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t = User_command.Stable.V3.t list [@@deriving sexp, yojson, hash]
 
@@ -61,8 +59,6 @@ module Diff_versioned = struct
   module Diff_error = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V3 = struct
         type t =
           | Insufficient_replace_fee
@@ -162,8 +158,6 @@ module Diff_versioned = struct
   module Rejected = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V4 = struct
         type t = (User_command.Stable.V3.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]

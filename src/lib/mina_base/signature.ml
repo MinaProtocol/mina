@@ -11,6 +11,9 @@ module Poly = struct
       [@@deriving sexp, compare, equal, hash]
     end
   end]
+
+  type ('field, 'scalar) t = ('field, 'scalar) Stable.Latest.t
+  [@@deriving sexp, compare, equal, hash]
 end
 
 [%%versioned
@@ -47,6 +50,8 @@ module Stable = struct
     let gen = Quickcheck.Generator.tuple2 Field.gen Inner_curve.Scalar.gen
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, compare, equal, hash]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
 

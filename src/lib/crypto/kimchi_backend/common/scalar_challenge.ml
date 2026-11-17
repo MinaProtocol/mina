@@ -8,6 +8,9 @@ module Stable = struct
   end
 end]
 
+type 'f t = 'f Stable.Latest.t = { inner : 'f }
+[@@deriving sexp, compare, equal, yojson, hash]
+
 let create t = { inner = t }
 
 module Make_typ (Impl : Snarky_backendless.Snark_intf.Run) = struct

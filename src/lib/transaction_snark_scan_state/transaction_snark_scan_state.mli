@@ -6,8 +6,6 @@ module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V3 : sig
     type t
 

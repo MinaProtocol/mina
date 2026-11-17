@@ -24,6 +24,8 @@ module Sequence_number = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 (**Each node on the tree is viewed as a job that needs to be completed. When a
@@ -38,6 +40,8 @@ module Job_status = struct
     end
   end]
 
+  type t = Stable.Latest.t = Todo | Done [@@deriving sexp]
+
   let to_string = function Todo -> "Todo" | Done -> "Done"
 end
 
@@ -47,8 +51,6 @@ end
 module Weight = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = { base : int; merge : int } [@@deriving sexp]
 
@@ -74,6 +76,10 @@ module Base = struct
       end
     end]
 
+    type 'base t = 'base Stable.Latest.t =
+      { job : 'base; seq_no : Sequence_number.t; status : Job_status.t }
+    [@@deriving sexp]
+
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t = { t with job = f t.job }
   end
 
@@ -85,6 +91,9 @@ module Base = struct
         [@@deriving sexp]
       end
     end]
+
+    type 'base t = 'base Stable.Latest.t = Empty | Full of 'base Record.t
+    [@@deriving sexp]
 
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
       match t with Empty -> Empty | Full r -> Full (Record.map r ~f)
@@ -99,6 +108,8 @@ module Base = struct
       [@@deriving sexp]
     end
   end]
+
+  type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 
   let map ((x, j) : 'a t) ~(f : 'a -> 'b) : 'b t = (x, Job.map j ~f)
 end
@@ -119,6 +130,14 @@ module Merge = struct
       end
     end]
 
+    type 'merge t = 'merge Stable.Latest.t =
+      { left : 'merge
+      ; right : 'merge
+      ; seq_no : Sequence_number.t
+      ; status : Job_status.t
+      }
+    [@@deriving sexp]
+
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
       { t with left = f t.left; right = f t.right }
   end
@@ -134,6 +153,12 @@ module Merge = struct
         [@@deriving sexp]
       end
     end]
+
+    type 'merge t = 'merge Stable.Latest.t =
+      | Empty
+      | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
+      | Full of 'merge Record.t
+    [@@deriving sexp]
 
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
       match t with
@@ -161,6 +186,8 @@ module Merge = struct
       [@@deriving sexp]
     end
   end]
+
+  type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 
   let map ((x, j) : 'a t) ~(f : 'a -> 'b) : 'b t = (x, Job.map j ~f)
 end
@@ -192,6 +219,9 @@ module Space_partition = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = { first : int * int; second : (int * int) option }
+  [@@deriving sexp]
 end
 
 (**Per-tree counts for the daemon's gauges, oldest tree first.*)
@@ -216,6 +246,10 @@ module Job_view = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      { seq_no : Sequence_number.t; status : Job_status.t }
+    [@@deriving sexp]
   end
 
   module Node = struct
@@ -231,6 +265,14 @@ module Job_view = struct
         [@@deriving sexp]
       end
     end]
+
+    type 'a t = 'a Stable.Latest.t =
+      | BEmpty
+      | BFull of ('a * Extra.t)
+      | MEmpty
+      | MPart of 'a
+      | MFull of ('a * 'a * Extra.t)
+    [@@deriving sexp]
   end
 
   [%%versioned
@@ -240,6 +282,9 @@ module Job_view = struct
       [@@deriving sexp]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t = { position : int; value : 'a Node.t }
+  [@@deriving sexp]
 end
 
 module Hash = struct
@@ -261,6 +306,15 @@ module Tree = struct
       [@@deriving sexp]
     end
   end]
+
+  type ('merge_t, 'base_t) t = ('merge_t, 'base_t) Stable.Latest.t =
+    | Leaf of 'base_t
+    | Node of
+        { depth : int
+        ; value : 'merge_t
+        ; sub_tree : ('merge_t * 'merge_t, 'base_t * 'base_t) t
+        }
+  [@@deriving sexp]
 
   (*Eg: Tree depth = 3
 
@@ -804,8 +858,6 @@ module T = struct
   module Binable_arg = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
         type ('merge, 'base) t =
           { trees :
@@ -870,6 +922,17 @@ module T = struct
           end)
     end
   end]
+
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    { trees : ('merge Merge.t, 'base Base.t) Tree.t Mina_stdlib.Nonempty_list.t
+          (*use non empty list*)
+    ; acc : ('merge * 'base list) option
+          (*last emitted proof and the corresponding transactions*)
+    ; curr_job_seq_no : int (*Sequence number for the jobs added every block*)
+    ; max_base_jobs : int (*transaction_capacity_log_2*)
+    ; delay : int
+    }
+  [@@deriving sexp]
 
   [%%define_locally Stable.Latest.(with_leaner_trees)]
 

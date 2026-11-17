@@ -20,6 +20,18 @@ module Stable = struct
   end
 end]
 
+type 'comm t = 'comm Stable.Latest.t =
+  { sigma_comm : 'comm Plonk_types.Permuts_vec.t
+  ; coefficients_comm : 'comm Plonk_types.Columns_vec.t
+  ; generic_comm : 'comm
+  ; psm_comm : 'comm
+  ; complete_add_comm : 'comm
+  ; mul_comm : 'comm
+  ; emul_comm : 'comm
+  ; endomul_scalar_comm : 'comm
+  }
+[@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+
 (* TODO: Remove unused functions *)
 
 let map

@@ -7,6 +7,8 @@ module Stable = struct
   end
 end]
 
+type 'a t = 'a Stable.Latest.t = { checksum : Core_kernel.Md5.t; data : 'a }
+
 let md5 (tc : 'a Binable.m) data = Md5.digest_string (Binable.to_string tc data)
 
 let wrap tc data : string t =

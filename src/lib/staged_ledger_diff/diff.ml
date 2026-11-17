@@ -4,8 +4,6 @@ open Mina_base
 module At_most_two = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
       [@@deriving equal, compare, sexp, yojson]
@@ -37,8 +35,6 @@ end
 module At_most_one = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = Zero | One of 'a option
       [@@deriving equal, compare, sexp, yojson]
@@ -61,8 +57,6 @@ end
 module Ft = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t = Coinbase.Fee_transfer.Stable.V1.t
       [@@deriving equal, compare, sexp, yojson]
@@ -77,8 +71,6 @@ end
 module Pre_diff_two = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
@@ -109,8 +101,6 @@ end
 module Pre_diff_one = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
@@ -141,8 +131,6 @@ end
 module Pre_diff_with_at_most_two_coinbase = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         ( Transaction_snark_work.Stable.V2.t
@@ -175,8 +163,6 @@ end
 module Pre_diff_with_at_most_one_coinbase = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         ( Transaction_snark_work.Stable.V2.t
@@ -233,8 +219,6 @@ module Diff = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         Pre_diff_with_at_most_two_coinbase.Stable.V3.t
@@ -274,8 +258,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t = { diff : Diff.Stable.V3.t } [@@deriving equal, sexp, yojson]
 

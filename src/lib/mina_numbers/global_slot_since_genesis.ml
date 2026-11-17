@@ -49,6 +49,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
     end]
 
+    type t = Stable.Latest.t = Since_genesis of T.t
+    [@@unboxed] [@@deriving hash, sexp, compare, equal]
+
     module T = T
 
     let to_uint32 (Since_genesis u32) : uint32 = u32

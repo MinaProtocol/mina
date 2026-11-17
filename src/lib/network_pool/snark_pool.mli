@@ -81,8 +81,6 @@ include S with type transition_frontier := Transition_frontier.t
 module Diff_versioned : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of

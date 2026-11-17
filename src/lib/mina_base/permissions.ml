@@ -57,6 +57,17 @@ module Auth_required = struct
     end
   end]
 
+  type t = Stable.Latest.t =
+    | None
+    | Either
+    | Proof
+    | Signature
+    | Impossible (* Both and either can both be subsumed in verification key.
+                    It is good to have "Either" as a separate thing to spare the owner from
+                    having to make a proof instead of a signature. Both, I'm not sure if there's
+                    a good justification for. *)
+  [@@deriving sexp, equal, compare, hash, yojson, enum]
+
   let from ~auth_tag : t =
     match auth_tag with
     | Control.Tag.Proof ->
@@ -376,6 +387,24 @@ module Poly = struct
     end
   end]
 
+  type ('controller, 'txn_version) t =
+        ('controller, 'txn_version) Stable.Latest.t =
+    { edit_state : 'controller
+    ; access : 'controller
+    ; send : 'controller
+    ; receive : 'controller
+    ; set_delegate : 'controller
+    ; set_permissions : 'controller
+    ; set_verification_key : 'controller * 'txn_version
+    ; set_zkapp_uri : 'controller
+    ; edit_action_state : 'controller
+    ; set_token_symbol : 'controller
+    ; increment_nonce : 'controller
+    ; set_voting_for : 'controller
+    ; set_timing : 'controller
+    }
+  [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
+
   let to_input controller txn_version t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
@@ -405,6 +434,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
 let gen ~auth_tag : t Quickcheck.Generator.t =
   let auth_required_gen =

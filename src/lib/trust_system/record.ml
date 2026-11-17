@@ -13,6 +13,12 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  { trust : float
+  ; trust_last_updated : Core.Time.t
+  ; banned_until_opt : Core.Time.t option
+  }
+
 module type S = sig
   val init : unit -> t
 

@@ -3,8 +3,6 @@ open Core_kernel
 module User_command : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t = Mina_base.User_command.Stable.V3.t [@@deriving sexp, yojson]
 
@@ -18,8 +16,6 @@ end
 module Staged_ledger_diff : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t = Staged_ledger_diff.Stable.V3.t =
         { diff :

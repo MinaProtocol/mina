@@ -4,8 +4,6 @@ open Signature_lib
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       { delegator : Account.Index.Stable.V1.t

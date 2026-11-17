@@ -11,6 +11,10 @@ module Stable = struct
   end
 end]
 
+type ('a, 'p) t = ('a, 'p) Stable.Latest.t =
+  { data : 'a [@key "statement"]; proof : 'p }
+[@@deriving compare, equal, fields, hash, sexp, yojson]
+
 let map { data; proof } ~f = { data = f data; proof }
 
 let map_proof { data; proof } ~f = { data; proof = f proof }

@@ -15,6 +15,12 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t =
+  { secret : Mina_stdlib.Bounded_types.String.t
+  ; public : Mina_stdlib.Bounded_types.String.t
+  ; peer_id : Peer.Id.t
+  }
+
 let secret { secret; _ } = secret
 
 let generate_random helper =

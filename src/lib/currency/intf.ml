@@ -297,6 +297,8 @@ module type Full = sig
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
+
     include Basic with type t := Stable.Latest.t
 
     include Arithmetic_intf with type t := t
@@ -332,6 +334,8 @@ module type Full = sig
         type t [@@deriving sexp, compare, hash, equal, yojson]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, equal, yojson]
 
     include Basic with type t := Stable.Latest.t
 
@@ -395,6 +399,8 @@ module type Full = sig
         type t [@@deriving sexp, compare, hash, yojson, equal]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
     include Basic with type t := Stable.Latest.t
 

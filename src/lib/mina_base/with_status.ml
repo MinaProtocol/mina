@@ -12,6 +12,9 @@ module Stable = struct
   end
 end]
 
+type 'a t = 'a Stable.Latest.t = { data : 'a; status : Transaction_status.t }
+[@@deriving sexp, yojson, equal, compare, fields]
+
 let map ~f { data; status } = { data = f data; status }
 
 let map_opt ~f { data; status } =

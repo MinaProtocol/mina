@@ -22,8 +22,6 @@ module Body : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, hash, yojson]
     end
@@ -76,6 +74,16 @@ module Common : sig
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
+
+    type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
+          ('fee, 'public_key, 'nonce, 'global_slot, 'memo) Stable.Latest.t =
+      { fee : 'fee
+      ; fee_payer_pk : 'public_key
+      ; nonce : 'nonce
+      ; valid_until : 'global_slot
+      ; memo : 'memo
+      }
+    [@@deriving equal, sexp, hash, yojson]
   end
 
   [%%versioned:
@@ -103,6 +111,8 @@ module Common : sig
       [@@deriving compare, equal, sexp, hash, yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving compare, equal, sexp, hash, yojson]
 
   val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
@@ -146,6 +156,10 @@ module Poly : sig
         -> (('common2, 'body2) t, 'err) Result.t
     end
   end]
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    { common : 'common; body : 'body }
+  [@@deriving equal, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned:
@@ -164,6 +178,8 @@ module Stable : sig
     val to_latest : t -> Latest.t
   end
 end]
+
+type t = Stable.Latest.t [@@deriving compare, equal, sexp, hash, yojson]
 
 val create :
      fee:Currency.Fee.t

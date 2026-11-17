@@ -4,8 +4,6 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t [@@deriving sexp, to_yojson]
     end

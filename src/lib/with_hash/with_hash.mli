@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     type ('a, 'h) t = ('a, 'h) Mina_wire_types.With_hash.V1.t =
       { data : 'a; hash : 'h }

@@ -25,6 +25,11 @@ module Poly = struct
             failwith "Snapp_command"
     end
   end]
+
+  type ('u, 's) t = ('u, 's) Stable.Latest.t =
+    | Signed_command of 'u
+    | Zkapp_command of 's
+  [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
@@ -78,8 +83,6 @@ let gen =
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       (Signed_command.Stable.V2.t, Zkapp_command.Stable.V2.t) Poly.Stable.V2.t
@@ -177,6 +180,8 @@ module Zero_one_or_two = struct
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
+
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, equal, hash, yojson]
 end
 
 module Verifiable = struct

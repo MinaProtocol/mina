@@ -8,6 +8,8 @@ module type Full = sig
     end
   end]
 
+  type t = Stable.Latest.t [@@deriving compare, equal, sexp, yojson]
+
   include Comparable.S with type t := t
 
   val transaction : t -> int

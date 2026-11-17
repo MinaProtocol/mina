@@ -23,6 +23,8 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t [@@deriving compare, sexp]
+
 [%%define_locally Stable.Latest.(gen)]
 
 let create () = Inner_curve.Scalar.random ()

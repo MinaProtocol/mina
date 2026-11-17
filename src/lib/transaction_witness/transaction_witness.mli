@@ -7,8 +7,6 @@ module Zkapp_command_segment_witness : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type t =
         { global_first_pass_ledger : Sparse_ledger.Stable.V3.t
@@ -86,8 +84,6 @@ end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V3 : sig
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V3.t

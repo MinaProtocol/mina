@@ -3,8 +3,6 @@ open Mina_base
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V1 = struct
     type 'proof t = 'proof Mina_wire_types.Network_pool.Priced_proof.V1.t =
       { proof : 'proof; fee : Fee_with_prover.Stable.V1.t }

@@ -63,6 +63,15 @@ module Result = struct
     end
   end]
 
+  type ('spec, 'single) t = ('spec, 'single) Stable.Latest.t =
+    { proofs : 'single One_or_two.t
+    ; metrics :
+        (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ]) One_or_two.t
+    ; spec : 'spec
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
+  [@@deriving fields]
+
   let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
     { proofs = One_or_two.map ~f:f_single proofs
     ; metrics

@@ -522,6 +522,9 @@ module With_version (N : Nat.Intf) = struct
       end
     end]
 
+    type 'a t = 'a Stable.Latest.t
+    [@@deriving compare, yojson, sexp, hash, equal]
+
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val of_list_exn : 'a list -> 'a t
@@ -535,8 +538,6 @@ module Vector_2 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N2.n) vec
 
@@ -556,8 +557,6 @@ module Vector_4 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N4.n) vec
 
@@ -577,8 +576,6 @@ module Vector_5 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N5.n) vec
 
@@ -598,8 +595,6 @@ module Vector_6 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N6.n) vec
 
@@ -619,8 +614,6 @@ module Vector_7 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N7.n) vec
 
@@ -640,8 +633,6 @@ module Vector_8 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N8.n) vec
 
@@ -661,8 +652,6 @@ module Vector_15 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N15.n) vec
 
@@ -682,8 +671,6 @@ module Vector_16 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N16.n) vec
 
@@ -703,8 +690,6 @@ module Vector_32 = struct
 
   [%%versioned_binable
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'a t = ('a, Nat.N32.n) vec
 

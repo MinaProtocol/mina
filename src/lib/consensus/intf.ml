@@ -28,6 +28,8 @@ module type Constants = sig
     end
   end]
 
+  type t = Stable.Latest.t
+
   val create : protocol_constants:Genesis_constants.Protocol.t -> t
 
   val gc_parameters :
@@ -310,6 +312,17 @@ module type S = sig
       end
     end]
 
+    type t = Stable.Latest.t =
+      { delta : int
+      ; k : int
+      ; slots_per_epoch : int
+      ; slot_duration : int
+      ; epoch_duration : int
+      ; genesis_state_timestamp : Block_time.t
+      ; acceptable_network_delay : int
+      }
+    [@@deriving yojson, fields]
+
     val t :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> protocol_constants:Genesis_constants.Protocol.t
@@ -450,8 +463,6 @@ module type S = sig
     module Prover_state : sig
       [%%versioned:
       module Stable : sig
-        [@@@no_toplevel_latest_type]
-
         module V3 : sig
           type t
 
@@ -485,6 +496,8 @@ module type S = sig
             type t [@@deriving sexp, to_yojson]
           end
         end]
+
+        type t = Stable.Latest.t [@@deriving sexp, to_yojson]
       end
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
@@ -499,6 +512,8 @@ module type S = sig
           type t [@@deriving compare, sexp, yojson]
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
       val to_string_hum : t -> string
 
@@ -539,6 +554,8 @@ module type S = sig
             type t [@@deriving hash, equal, compare, sexp, yojson]
           end
         end]
+
+        type t = Stable.Latest.t [@@deriving hash, equal, compare, sexp, yojson]
 
         module For_tests : sig
           val with_global_slot_since_genesis :
@@ -684,6 +701,18 @@ module type S = sig
           val to_latest : t -> t
         end
       end]
+
+      type t = Stable.Latest.t =
+        { epoch_ledger : Mina_base.Epoch_ledger.Value.t
+        ; epoch_seed : Mina_base.Epoch_seed.t
+        ; epoch : Mina_numbers.Length.t
+        ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
+        ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+        ; delegatee_table :
+            Mina_base.Account.t Mina_base.Account.Index.Stable.V1.Table.t
+            Public_key.Compressed.Stable.V1.Table.t
+        }
+      [@@deriving sexp]
     end
 
     module Slot_won : sig
@@ -705,6 +734,16 @@ module type S = sig
           val to_latest : t -> t
         end
       end]
+
+      type t = Stable.Latest.t =
+        { delegator :
+            Signature_lib.Public_key.Compressed.t * Mina_base.Account.Index.t
+        ; producer : Signature_lib.Keypair.t
+        ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
+        ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+        ; vrf_result : Consensus_vrf.Output_hash.t
+        }
+      [@@deriving sexp]
     end
   end
 

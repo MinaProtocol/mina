@@ -10,5 +10,9 @@ module Stable = struct
   end
 end]
 
+type ('spec, 'job_id) t = ('spec, 'job_id) Stable.Latest.t =
+  { spec : 'spec; job_id : 'job_id; sok_message : Mina_base.Sok_message.t }
+[@@deriving sexp, yojson]
+
 let map ~(f_spec : 's1 -> 's2) (t : ('s1, 'id) t) : ('s2, 'id) t =
   { t with spec = f_spec t.spec }

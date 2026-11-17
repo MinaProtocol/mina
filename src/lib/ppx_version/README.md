@@ -94,13 +94,14 @@ Just past the most recent Vn, a definition is generated:
 
   module Latest = Vn
 
-A type definition is generated just past the `Stable` module:
+No type definition is generated outside the `Stable` module. A module
+that wants a toplevel type declares it explicitly, typically
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving ...]
 
-Sometimes that causes compilation issues, which can be avoided by
-adding the annotation `[@@@no_toplevel_latest_type]` at the start of
-the `Stable` module, in either structures or signatures.
+or, to keep a record's fields or a variant's constructors in scope,
+a re-declaration with `Stable.Latest.t` as its manifest. Declaring it
+explicitly lets the toplevel type later differ from the wire type.
 
 For compatibility with older code, there is the annotation:
 

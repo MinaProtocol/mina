@@ -3,8 +3,6 @@ open Mina_base
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V1 : sig
     type t [@@deriving sexp, compare, hash, equal]
   end
@@ -82,8 +80,6 @@ module User_command : sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t = private (User_command.Stable.V3.t, hash) With_hash.Stable.V1.t
       [@@deriving sexp, compare, hash, to_yojson]

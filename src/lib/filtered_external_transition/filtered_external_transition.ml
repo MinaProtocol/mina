@@ -13,13 +13,14 @@ module Fee_transfer_type = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t = Fee_transfer | Fee_transfer_via_coinbase
+  [@@deriving quickcheck, compare, sexp]
 end
 
 module Transactions = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         { commands :
@@ -53,12 +54,16 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { previous_state_hash : State_hash.t
+    ; blockchain_state : Mina_state.Blockchain_state.Value.t
+    ; consensus_state : Consensus.Data.Consensus_state.Value.t
+    }
 end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t

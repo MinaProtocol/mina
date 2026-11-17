@@ -16,6 +16,9 @@ module Signed_command_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t = { user_command : Signed_command.t With_status.t }
+    [@@deriving sexp, to_yojson]
   end
 
   module Body = struct
@@ -32,6 +35,13 @@ module Signed_command_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    type t = Stable.Latest.t =
+      | Payment of { new_accounts : Account_id.t list }
+      | Stake_delegation of
+          { previous_delegate : Public_key.Compressed.t option }
+      | Failed
+    [@@deriving sexp, to_yojson]
   end
 
   [%%versioned
@@ -44,6 +54,9 @@ module Signed_command_applied = struct
     end
   end]
 
+  type t = Stable.Latest.t = { common : Common.t; body : Body.t }
+  [@@deriving sexp, to_yojson]
+
   let new_accounts (t : t) =
     match t.body with
     | Payment { new_accounts; _ } ->
@@ -55,8 +68,6 @@ end
 module Zkapp_command_applied = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { accounts : (Account_id.Stable.V2.t * Account.Stable.V3.t option) list
@@ -99,8 +110,6 @@ end
 module Command_applied = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         | Signed_command of Signed_command_applied.Stable.V2.t
@@ -145,6 +154,13 @@ module Fee_transfer_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { fee_transfer : Fee_transfer.t With_status.t
+    ; new_accounts : Account_id.t list
+    ; burned_tokens : Currency.Amount.t
+    }
+  [@@deriving sexp, to_yojson]
 end
 
 module Coinbase_applied = struct
@@ -161,13 +177,18 @@ module Coinbase_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { coinbase : Coinbase.t With_status.t
+    ; new_accounts : Account_id.t list
+    ; burned_tokens : Currency.Amount.t
+    }
+  [@@deriving sexp, to_yojson]
 end
 
 module Varying : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t [@@deriving sexp, to_yojson]
     end
@@ -188,8 +209,6 @@ module Varying : sig
 end = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         | Command of Command_applied.Stable.V3.t
@@ -228,8 +247,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V3 = struct
     type t =
       { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V3.t }

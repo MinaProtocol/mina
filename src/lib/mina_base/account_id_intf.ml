@@ -10,6 +10,8 @@ module type S = sig
       end
     end]
 
+    type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+
     val of_field : Snark_params.Tick.Field.t -> t
 
     val to_field_unsafe : t -> Snark_params.Tick.Field.t
@@ -64,6 +66,8 @@ module type S = sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
   val create : Public_key.Compressed.t -> Digest.t -> t
 

@@ -54,6 +54,9 @@ module Stable : sig
   end
 end]
 
+type t = Stable.Latest.t
+[@@deriving compare, equal, sexp, hash, compare, yojson]
+
 val dummy : t
 
 (** [gen ?source_pk max_amount] *)

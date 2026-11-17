@@ -2,8 +2,6 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = { staged_ledger_diff : Diff.Stable.V3.t }
     [@@deriving equal, fields, sexp]

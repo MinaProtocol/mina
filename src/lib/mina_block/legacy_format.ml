@@ -33,8 +33,6 @@ module User_command = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = User_command.Stable.V3.t [@@deriving sexp]
 
@@ -108,8 +106,6 @@ end
 module Staged_ledger_diff = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t = Staged_ledger_diff.Stable.V3.t =
         { diff :

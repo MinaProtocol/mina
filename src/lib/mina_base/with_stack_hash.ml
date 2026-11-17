@@ -10,4 +10,8 @@ module Stable = struct
   end
 end]
 
+type ('a, 'field) t = ('a, 'field) Stable.Latest.t =
+  { elt : 'a; stack_hash : 'field }
+[@@deriving sexp, compare, equal, hash, yojson, fields, quickcheck]
+
 let map t ~f = { t with elt = f t.elt }

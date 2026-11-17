@@ -11,3 +11,6 @@ module Stable = struct
     type 'a t = { message : 'a; nonce : int } [@@deriving compare, sexp, yojson]
   end
 end]
+
+type 'a t = 'a Stable.Latest.t = { message : 'a; nonce : int }
+[@@deriving compare, sexp, yojson]

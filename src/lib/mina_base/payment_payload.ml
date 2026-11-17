@@ -29,6 +29,10 @@ module Poly = struct
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
     end
   end]
+
+  type ('public_key, 'amount) t = ('public_key, 'amount) Stable.Latest.t =
+    { receiver_pk : 'public_key; amount : 'amount }
+  [@@deriving equal, sexp, hash, yojson, compare, hlist]
 end
 
 [%%versioned
@@ -55,6 +59,8 @@ module Stable = struct
     let to_latest _ = failwith "Not implemented"
   end
 end]
+
+type t = Stable.Latest.t [@@deriving equal, sexp, hash, compare, yojson]
 
 let dummy =
   Poly.{ receiver_pk = Public_key.Compressed.empty; amount = Amount.zero }

@@ -6,8 +6,6 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       type t = Field.t [@@deriving sexp, compare, hash, yojson]
 

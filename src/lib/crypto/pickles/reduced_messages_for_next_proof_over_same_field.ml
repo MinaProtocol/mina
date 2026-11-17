@@ -29,6 +29,14 @@ module Step = struct
     end
   end]
 
+  type ('s, 'challenge_polynomial_commitments, 'bpcs) t =
+        ('s, 'challenge_polynomial_commitments, 'bpcs) Stable.Latest.t =
+    { app_state : 's
+    ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
+    ; old_bulletproof_challenges : 'bpcs
+    }
+  [@@deriving sexp, yojson, sexp, compare, hash, equal]
+
   let prepare ~dlog_plonk_index
       { app_state
       ; challenge_polynomial_commitments
@@ -50,8 +58,6 @@ module Wrap = struct
 
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t

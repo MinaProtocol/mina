@@ -20,6 +20,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type t = Stable.Latest.t = { transaction : int; network : int; patch : int }
+  [@@deriving compare, equal, sexp, yojson, fields]
+
   include Comparable.Make (Stable.V2)
 
   let create = Fields.create

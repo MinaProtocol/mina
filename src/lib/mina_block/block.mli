@@ -3,8 +3,6 @@ open Mina_transaction
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V3 : sig
     type t [@@deriving sexp, equal]
 

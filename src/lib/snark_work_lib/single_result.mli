@@ -13,13 +13,15 @@ module Poly : sig
     end
   end]
 
+  type ('single_spec, 'proof) t = ('single_spec, 'proof) Stable.Latest.t =
+    { spec : 'single_spec; proof : 'proof; elapsed : Mina_stdlib.Time.Span.t }
+  [@@deriving to_yojson]
+
   val map : f_spec:('a -> 'b) -> f_proof:('c -> 'd) -> ('a, 'c) t -> ('b, 'd) t
 end
 
 [%%versioned:
 module Stable : sig
-  [@@@no_toplevel_latest_type]
-
   module V2 : sig
     type t =
       (Single_spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Poly.Stable.V1.t

@@ -6,8 +6,6 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, yojson, hash]
 

@@ -12,6 +12,10 @@ module type Full = sig
         [@@deriving equal, ord, hash, sexp, to_yojson]
       end
     end]
+
+    type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
+      { previous_state_hash : 'state_hash; body : 'body }
+    [@@deriving equal, ord, hash, sexp, to_yojson]
   end
 
   val hashes_abstract :
@@ -27,6 +31,9 @@ module type Full = sig
           type ('a, 'b, 'c, 'd) t [@@deriving sexp]
         end
       end]
+
+      type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) Stable.Latest.t
+      [@@deriving sexp]
     end
 
     module Value : sig
@@ -42,6 +49,8 @@ module type Full = sig
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
         end
       end]
+
+      type t = Stable.Latest.t [@@deriving equal, ord, hash, sexp, yojson]
     end
 
     type var =
@@ -82,6 +91,8 @@ module type Full = sig
         [@@deriving sexp, compare, equal, yojson]
       end
     end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson]
 
     include Hashable.S with type t := t
   end

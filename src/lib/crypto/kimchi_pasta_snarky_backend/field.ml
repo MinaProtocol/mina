@@ -127,8 +127,6 @@ end
 module type S_with_version = sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V1 : sig
       [@@@with_all_version_tags]
 

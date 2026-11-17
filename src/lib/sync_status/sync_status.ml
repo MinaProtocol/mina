@@ -71,6 +71,8 @@ module T = struct
       include Hashable.Make (T)
     end
   end]
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, equal, enumerate]
 end
 
 include T
