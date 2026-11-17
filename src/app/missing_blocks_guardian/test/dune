@@ -11,6 +11,7 @@
   uri
   ;; local libraries
   logger
+  mina_caqti
   missing_blocks_guardian_lib)
  (preprocess
   (pps mina_ppx)))
