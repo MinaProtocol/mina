@@ -335,11 +335,15 @@ let remove_node' t (node : Node.t) =
         ( Cached.invalidate_with_failure c
           : Mina_block.initial_valid_block Envelope.Incoming.t )
   | To_build_breadcrumb (_parent, c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      ignore
-        ( Cached.invalidate_with_failure c
-          : Mina_block.almost_valid_block Envelope.Incoming.t )
+      (* Once the breadcrumb built from [c] has been handed to the transition
+         processor, the processor finalizes it and fires [vc]. Invalidating
+         [c] then would finalize the breadcrumb under the processor. *)
+      if not (Cached.was_consumed c) then (
+        Option.value_map ~default:ignore
+          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
+        ignore
+          ( Cached.invalidate_with_failure c
+            : Mina_block.almost_valid_block Envelope.Incoming.t ) )
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with

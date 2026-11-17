@@ -107,9 +107,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~catchup_scheduler
     ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
     ?transaction_pool_proxy =
-  let is_block_in_frontier =
-    Fn.compose Option.is_some @@ Transition_frontier.find frontier
-  in
   let open Context in
   let header, transition_hash, transition_receipt_time, sender, validation =
     match block_or_header with
@@ -131,10 +128,6 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   in
   let parent_hash =
     Protocol_state.previous_state_hash (Header.protocol_state header)
-  in
-  let root_consensus_state =
-    Transition_frontier.(
-      Breadcrumb.consensus_state_with_hashes @@ root frontier)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   let state_hash = transition_hash in
@@ -161,19 +154,19 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       let header_with_hash, _ = Envelope.Incoming.data env in
       [%log internal] "Validate_frontier_dependencies" ;
       match
-        Mina_block.Validation.validate_frontier_dependencies
+        Catchup_classifier.relation
           ~context:(module Context)
-          ~root_consensus_state ~is_block_in_frontier ~to_header:ident
+          frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
-      | Ok _ | Error `Parent_missing_from_frontier ->
+      | `Extends _ | `Needs_ancestry ->
           [%log internal] "Schedule_catchup" ;
           Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
             ~header_with_hash ;
           return ()
-      | Error `Not_selected_over_frontier_root ->
+      | `Not_better `Not_selected_over_root ->
           handle_not_selected ()
-      | Error `Already_in_frontier ->
+      | `Not_better `Already_in_frontier ->
           [%log internal] "Failure"
             ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
           [%log warn] ~metadata
@@ -192,21 +185,20 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         in
         [%log internal] "Validate_frontier_dependencies" ;
         match
-          Mina_block.Validation.validate_frontier_dependencies
+          Catchup_classifier.relation
             ~context:(module Context)
-            ~root_consensus_state ~is_block_in_frontier
-            ~to_header:Mina_block.header initially_validated_transition
+            frontier ~to_header:Mina_block.header initially_validated_transition
         with
-        | Ok t ->
+        | `Extends t ->
             return (Ok t)
-        | Error `Not_selected_over_frontier_root ->
+        | `Not_better `Not_selected_over_root ->
             let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
               Cached.invalidate_with_failure
                 cached_initially_validated_transition
             in
             let%map () = handle_not_selected () in
             Error ()
-        | Error `Already_in_frontier ->
+        | `Not_better `Already_in_frontier ->
             [%log internal] "Failure"
               ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
             [%log warn] ~metadata
@@ -217,7 +209,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                 cached_initially_validated_transition
             in
             return (Error ())
-        | Error `Parent_missing_from_frontier -> (
+        | `Needs_ancestry -> (
             [%log internal] "Schedule_catchup" ;
             match validation with
             | ( _
