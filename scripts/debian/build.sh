@@ -255,7 +255,10 @@ main() {
       BUILDDIR="${BUILD_DIR}/deb-build/${safe_token}"
       export BUILDDIR
       mkdir -p "$BUILDDIR"
-      _build_one "$t" || exit 1
+      # No "|| exit 1" here: in such a list bash ignores "set -e" in all of
+      # _build_one, and a failed command (for example a cp of a missing
+      # binary) does not stop the build. "set -e" stops it.
+      _build_one "$t"
     done
   else
     echo "--- Building ${#targets[@]} debian package(s) with up to ${mina_deb_jobs} parallel jobs"

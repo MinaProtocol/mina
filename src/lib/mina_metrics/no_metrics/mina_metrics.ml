@@ -462,6 +462,11 @@ module Transition_frontier = struct
 
   let finalized_staged_txns : Counter.t = ()
 
+  let update_proposed_protocol_versions : string option list -> unit =
+   fun _ -> ()
+
+  let proposed_protocol_version_labels = 3
+
   module TPS_30min = struct
     let v : Gauge.t = ()
 

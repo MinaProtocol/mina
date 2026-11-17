@@ -56,6 +56,8 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Prefork = ../Constants/Prefork.dhall
+
 let Expr = ../Pipeline/Expr.dhall
 
 let PackagingSpec =
@@ -94,7 +96,7 @@ let PackagingSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "3.5.0-mainnet-stop-slot-8110ede"
+          , deb_legacy_version = Prefork.version
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_repo = DockerRepo.Type.InternalEurope
@@ -410,10 +412,9 @@ let build_artifacts
                 }
 
 let commonBuildEnvs =
-    -- MINA_DEB_RELEASE is the channel. builder-helpers.sh writes it into every
-    -- control file as `Suite:` and defaults it to "unstable", so before it was
-    -- passed here a package built for stable still declared itself unstable,
-    -- and only the promotion step put that right.
+    -- MINA_DEB_RELEASE is the channel: the apt component the packages are
+    -- published into. builder-helpers.sh checks it against the known channels
+    -- and defaults it to "unstable".
           \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
@@ -991,4 +992,5 @@ in  { onlyDebianPipeline = onlyDebianPipeline
     , buildDebian = build_debian
     , buildDebianFromApps = buildDebianFromApps
     , debianTokens = debianTokens
+    , ownBuildCacheDir = ownBuildCacheDir
     }

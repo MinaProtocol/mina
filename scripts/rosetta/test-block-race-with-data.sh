@@ -14,9 +14,9 @@ NUM_PAYMENTS=110
 
 # Just an arbitrary dump from mainnet. It's important to use a mainnet dump to have performance
 # characteristics of archive node operation similar to mainnet.
-# If this value is changed, it's important to update the runtime config json in the ledger
-# archive below.
-DUMP_SQL="mainnet-archive-dump-2026-10-06_0000.sql"
+# Its schema must match the archive under test. test-block-race.sh forks the
+# generated chain off the dump's tip, so the ledger archive below needs no update.
+DUMP_SQL="mainnet-archive-dump-2026-10-26_0000.sql"
 DUMP_ARCHIVE="mainnet-archive-dump.tar.gz"
 ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/$DUMP_SQL.tar.gz"
 
@@ -29,10 +29,8 @@ ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/$DUMP_SQL.ta
 #     -p 1 -k 1 --pad-app-state --mina-binary ... --runtime-genesis-ledger-binary ...
 # Keys are renamed to bp1/plain1 and the ledger tars go under ledgers/.
 #
-# After generation, `runtime-config.json` was manually extended with `proof` section
-# containing the fork config. This fork config was populated with data of the most recent
-# block extract from the archive dump via SQL:
-# `select state_hash, height, global_slot_since_genesis from blocks ORDER BY height DESC LIMIT 1`
+# Its runtime_config.json `proof.fork` and genesis timestamp are overwritten at run time
+# from the dump's tip block (see test-block-race.sh).
 LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger-mesa.tar"
 
 # Local paths

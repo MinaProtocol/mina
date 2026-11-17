@@ -6,6 +6,7 @@
   archive_lib
   integers
   bignum
+  zarith
   async_kernel
   base.caml
   base.base_internalhash_types
@@ -24,6 +25,8 @@
   splittable_random
   stdio
   ;; local libraries
+  syncable_ledger
+  bootstrap_status
   mina_stdlib
   mina_wire_types
   network_pool
@@ -54,6 +57,7 @@
   transaction_snark_work
   unsigned_extended
   precomputed_values
+  protocol_version
   transaction_inclusion_status
   graphql_lib
   block_time

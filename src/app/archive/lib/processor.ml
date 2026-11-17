@@ -319,7 +319,8 @@ end
 module Token_symbols = struct
   type t = string
 
-  let typ = Caqti_type.string
+  (* bytea: the value is any bytes, not necessarily UTF-8 *)
+  let typ = Caqti_type.octets
 
   let table_name = "token_symbols"
 
@@ -335,7 +336,7 @@ module Token_symbols = struct
 
   let load =
     let query =
-      find_req Caqti_type.int Caqti_type.string
+      find_req Caqti_type.int typ
         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ])
     in
     fun (module Conn : CONNECTION) id -> Conn.find query id
@@ -863,7 +864,8 @@ end
 module Zkapp_uri = struct
   type t = string
 
-  let typ = Caqti_type.string
+  (* bytea: the value is any bytes, not necessarily UTF-8 *)
+  let typ = Caqti_type.octets
 
   let table_name = "zkapp_uris"
 
@@ -879,7 +881,7 @@ module Zkapp_uri = struct
 
   let load =
     let query =
-      find_req Caqti_type.int Caqti_type.string
+      find_req Caqti_type.int typ
         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ])
     in
     fun (module Conn : Mina_caqti.CONNECTION) id -> Conn.find query id
