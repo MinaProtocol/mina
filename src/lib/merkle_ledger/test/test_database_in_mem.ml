@@ -683,6 +683,66 @@ module Make (Test : Test_intf) = struct
               (MT.token_owner mdb (Account_id.derive_token_id ~owner:x_id))
               (Some x_id) ) )
 
+  (* The addresses and hashes of the nodes of the subtree at leaves 12-15. *)
+  let last_subtree_nodes mdb =
+    [ (2, 3); (1, 6); (1, 7); (0, 12); (0, 13); (0, 14); (0, 15) ]
+    |> List.map ~f:(fun (height, index) ->
+           let addr = subtree_address mdb ~height index in
+           (addr, MT.get_inner_hash_at_addr_exn mdb addr) )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn given the subtree's hashes writes the \
+       same ledger" (fun () ->
+        (* Leaves 12-15 hold accounts 12 and 13; keep only account 12. *)
+        let write ?subtree_hashes mdb accounts =
+          MT.set_all_accounts_rooted_at_exn ?subtree_hashes mdb
+            (subtree_address mdb ~height:2 3)
+            [ List.nth_exn accounts 12 ]
+        in
+        with_fourteen_accounts (fun reference accounts ->
+            write reference accounts ;
+            let subtree_hashes = last_subtree_nodes reference in
+            with_fourteen_accounts (fun mdb accounts ->
+                write ~subtree_hashes mdb accounts ;
+                [%test_eq: Md5.t] (MT.merkle_root reference)
+                  (MT.merkle_root mdb) ;
+                [%test_eq: (MT.Addr.t * Md5.t) list] subtree_hashes
+                  (last_subtree_nodes mdb) ;
+                check_holds_exactly mdb
+                  ~expected:(indexed (List.take accounts 13))
+                  ~removed:[ List.nth_exn accounts 13 ] ) ) )
+
+  let () =
+    add_test
+      "set_all_accounts_rooted_at_exn stores the given hashes rather than \
+       computing them" (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let addr = subtree_address mdb ~height:1 6 in
+            let given = Md5.digest_string "not the hash of leaves 12 and 13" in
+            MT.set_all_accounts_rooted_at_exn
+              ~subtree_hashes:[ (addr, given) ]
+              mdb
+              (subtree_address mdb ~height:2 3)
+              (List.slice accounts 12 14) ;
+            [%test_eq: Md5.t] given (MT.get_inner_hash_at_addr_exn mdb addr) ) )
+
+  let () =
+    add_test "set_all_accounts_rooted_at_exn rejects hashes outside the subtree"
+      (fun () ->
+        with_fourteen_accounts (fun mdb accounts ->
+            let outside = subtree_address mdb ~height:3 1 in
+            let root_before = MT.merkle_root mdb in
+            assert (
+              Exn.does_raise (fun () ->
+                  MT.set_all_accounts_rooted_at_exn
+                    ~subtree_hashes:
+                      [ (outside, MT.get_inner_hash_at_addr_exn mdb outside) ]
+                    mdb
+                    (subtree_address mdb ~height:2 3)
+                    [ List.nth_exn accounts 12 ] ) ) ;
+            [%test_eq: Md5.t] root_before (MT.merkle_root mdb) ) )
+
   let () =
     add_test "set_all_accounts_rooted_at_exn with no accounts empties a subtree"
       (fun () ->

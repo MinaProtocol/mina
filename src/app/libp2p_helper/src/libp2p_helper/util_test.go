@@ -78,8 +78,8 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
+		panicOnErr(helper.Close())
 		panicOnErr(os.RemoveAll(dir))
-		panicOnErr(helper.Host.Close())
 	})
 	outChan := make(chan *capnp.Message, 64)
 	bitswapCtx := NewBitswapCtxWithMaxBlockSize(1<<9, ctx, outChan)

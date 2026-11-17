@@ -10,6 +10,11 @@ export MINA_PROFILE
 
 echo "--- Testing chain_id command for ${MINA_DEBIAN_NETWORK}"
 
+if [[ "$(cat MINA_CODEBASE_NETWORK)" != "$(cat MINA_MAINNET_NETWORK)" ]]; then
+    echo "Skipping: this codebase targets $(cat MINA_CODEBASE_NETWORK), not $(cat MINA_MAINNET_NETWORK)"
+    exit 0
+fi
+
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 

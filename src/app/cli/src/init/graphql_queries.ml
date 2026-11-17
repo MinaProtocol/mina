@@ -246,6 +246,18 @@ query get_peers {
 }
 |}]
 
+module Protocol_version_signals =
+[%graphql
+{|
+query ($max_length: Int) {
+  bestChain(maxLength: $max_length) {
+    creatorAccount { publicKey }
+    protocolState { consensusState { blockHeight } }
+    proposedProtocolVersion { transaction network patch }
+  }
+}
+|}]
+
 module Add_peers =
 [%graphql
 {|

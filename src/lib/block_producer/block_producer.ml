@@ -74,6 +74,9 @@ let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
 
 let time_of_ms = Fn.compose Block_time.of_span_since_epoch Block_time.Span.of_ms
 
+let span_metadata span =
+  ("time", `Int (Block_time.Span.to_ms span |> Int64.to_int_exn))
+
 let lift_sync f =
   Interruptible.uninterruptible
     (Deferred.create (fun ivar ->
@@ -446,9 +449,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
     Error.tag err ~tag:"Error building breadcrumb from produced transition"
     |> Error.raise
   in
-  let time_metadata =
-    ("time", `Int (Block_time.Span.to_ms span |> Int64.to_int_exn))
-  in
+  let time_metadata = span_metadata span in
   let state_metadata =
     ("protocol_state", Protocol_state.Value.to_yojson protocol_state)
   in
@@ -552,10 +553,7 @@ let time ~logger ~time_controller label f =
   let t0 = Block_time.now time_controller in
   let%map x = f () in
   let span = Block_time.diff (Block_time.now time_controller) t0 in
-  [%log info]
-    ~metadata:
-      [ ("time", `Int (Block_time.Span.to_ms span |> Int64.to_int_exn)) ]
-    !"%s: $time %!" label ;
+  [%log info] ~metadata:[ span_metadata span ] !"%s: $time %!" label ;
   x
 
 let retry ?(max = 3) ~logger ~error_message f =
@@ -649,6 +647,10 @@ end
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
+let wait_for_frontier frontier_reader =
+  Broadcast_pipe.Reader.iter_until frontier_reader
+    ~f:(Fn.compose Deferred.return Option.is_some)
+
 let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
   let open Context in
   let started = ref false in
@@ -681,6 +683,113 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
               return (Error err) )
       in
       go max_num_retries )
+
+let assert_selected_over_parent_and_root ~context:(module Context : CONTEXT)
+    ~frontier ~previous_transition consensus_state_with_hashes =
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  assert (
+    phys_equal
+      (Consensus.Hooks.select
+         ~context:(module Context)
+         ~existing:
+           (With_hash.map ~f:Mina_block.consensus_state previous_transition)
+         ~candidate:consensus_state_with_hashes )
+      `Take
+    || failwith
+         "newly generated consensus states should be selected over their parent" ) ;
+  assert (
+    let root_consensus_state_with_hashes =
+      Transition_frontier.root frontier
+      |> Breadcrumb.consensus_state_with_hashes
+    in
+    phys_equal
+      (Consensus.Hooks.select
+         ~context:(module Context)
+         ~existing:root_consensus_state_with_hashes
+         ~candidate:consensus_state_with_hashes )
+      `Take
+    || failwith
+         "newly generated consensus states should be selected over the tf root" )
+
+let validate_produced_block ~context:(module Context : CONTEXT) ~frontier
+    ~previous_protocol_state ~previous_state_hash ~protocol_state_hashes ~header
+    ~body =
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  let open Result.Let_syntax in
+  Validation.wrap_header
+    { With_hash.hash = protocol_state_hashes; data = header }
+  |> Validation.skip_delta_block_chain_validation
+       `This_block_was_not_received_via_gossip
+  |> Validation.skip_time_received_validation
+       `This_block_was_not_received_via_gossip
+  |> Fn.flip Validation.with_body body
+  |> Validation.skip_protocol_versions_validation
+       `This_block_has_valid_protocol_versions
+  |> Validation.validate_genesis_protocol_state_block
+       ~genesis_state_hash:
+         (Protocol_state.genesis_state_hash
+            ~state_hash:(Some previous_state_hash) previous_protocol_state )
+  >>| Validation.skip_proof_validation `This_block_was_generated_internally
+  >>= Validation.validate_frontier_dependencies ~to_header:Mina_block.header
+        ~context:(module Context)
+        ~root_consensus_state:
+          ( Transition_frontier.root frontier
+          |> Breadcrumb.consensus_state_with_hashes )
+        ~is_block_in_frontier:
+          (Fn.compose Option.is_some (Transition_frontier.find frontier))
+
+let wait_for_frontier_inclusion ~transition_registry ~time_controller state_hash
+    =
+  let open Transition_frontier.Extensions in
+  let registration =
+    Transition_registry.register transition_registry state_hash
+  in
+  let%map inclusion =
+    Deferred.choose
+      [ Deferred.choice
+          (Transition_registry.wait registration)
+          (Fn.const `Transition_accepted)
+      ; Deferred.choice
+          ( Block_time.Timeout.create time_controller
+              (* We allow up to 20 seconds for the transition
+                 to make its way from the transition_writer to
+                 the frontier.
+                 This value is chosen to be reasonably
+                 generous. In theory, this should not take
+                 terribly long. But long cycles do happen in
+                 our system, and with medium curves those long
+                 cycles can be substantial.
+              *)
+              (Block_time.Span.of_ms 20000L)
+              ~f:(Fn.const ())
+          |> Block_time.Timeout.to_deferred )
+          (Fn.const `Timed_out)
+      ]
+  in
+  Transition_registry.unregister registration ;
+  inclusion
+
+let build_breadcrumb_for_produced_block ~logger ~time_controller
+    ~precomputed_values ~verifier ~trust_system ?transaction_pool_proxy ~label
+    ~parent ~transition ~transition_receipt_time ~staged_ledger_diff () =
+  time ~logger ~time_controller label (fun () ->
+      Transition_frontier.Breadcrumb.build ~logger ~precomputed_values ~verifier
+        ~get_completed_work:(Fn.const None) ~trust_system ~parent ~transition
+        ~sender:None (* Consider skipping `All here *)
+        ~skip_staged_ledger_verification:`Proofs ~transition_receipt_time
+        ?transaction_pool_proxy () )
+  |> Deferred.Result.map_error ~f:(function
+       | `Invalid_staged_ledger_diff e ->
+           `Invalid_staged_ledger_diff (e, Lazy.force staged_ledger_diff)
+       | (`Fatal_error _ | `Invalid_staged_ledger_hash _) as err ->
+           err )
+
+let record_block_produced_metrics ~scheduled_time =
+  Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
+  Mina_metrics.Block_producer.(
+    Block_production_delay_histogram.observe block_production_delay
+      Time.(
+        Span.to_ms @@ diff (now ()) @@ Block_time.to_time_exn scheduled_time))
 
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
@@ -823,33 +932,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               ] ;
           Internal_tracing.with_state_hash protocol_state_hashes.state_hash
           @@ fun () ->
-          assert (
-            phys_equal
-              (Consensus.Hooks.select
-                 ~context:(module Context)
-                 ~existing:
-                   (With_hash.map ~f:Mina_block.consensus_state
-                      previous_transition )
-                 ~candidate:consensus_state_with_hashes )
-              `Take
-            || failwith
-                 "newly generated consensus states should be selected over \
-                  their parent" ) ;
-
-          assert (
-            let root_consensus_state_with_hashes =
-              Transition_frontier.root frontier
-              |> Breadcrumb.consensus_state_with_hashes
-            in
-            phys_equal
-              (Consensus.Hooks.select
-                 ~context:(module Context)
-                 ~existing:root_consensus_state_with_hashes
-                 ~candidate:consensus_state_with_hashes )
-              `Take
-            || failwith
-                 "newly generated consensus states should be selected over the \
-                  tf root" ) ;
+          assert_selected_over_parent_and_root
+            ~context:(module Context)
+            ~frontier ~previous_transition consensus_state_with_hashes ;
           Interruptible.uninterruptible
             (let open Deferred.Let_syntax in
             let emit_breadcrumb () =
@@ -888,67 +973,35 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               [%log internal] "Produce_validated_transition" ;
               let header =
                 Header.create ~protocol_state ~protocol_state_proof
-                  ~delta_block_chain_proof ()
+                  ~delta_block_chain_proof
+                  ?proposed_protocol_version_opt:
+                    (Protocol_version.get_proposed_opt ())
+                  ()
               in
               let body = Body.create staged_ledger_diff in
               let%bind transition =
-                let open Result.Let_syntax in
-                Validation.wrap_header
-                  { With_hash.hash = protocol_state_hashes; data = header }
-                |> Validation.skip_delta_block_chain_validation
-                     `This_block_was_not_received_via_gossip
-                |> Validation.skip_time_received_validation
-                     `This_block_was_not_received_via_gossip
-                |> Fn.flip Validation.with_body body
-                |> Validation.skip_protocol_versions_validation
-                     `This_block_has_valid_protocol_versions
-                |> Validation.validate_genesis_protocol_state_block
-                     ~genesis_state_hash:
-                       (Protocol_state.genesis_state_hash
-                          ~state_hash:(Some previous_state_hash)
-                          previous_protocol_state )
-                >>| Validation.skip_proof_validation
-                      `This_block_was_generated_internally
-                >>= Validation.validate_frontier_dependencies
-                      ~to_header:Mina_block.header
-                      ~context:(module Context)
-                      ~root_consensus_state:
-                        ( Transition_frontier.root frontier
-                        |> Breadcrumb.consensus_state_with_hashes )
-                      ~is_block_in_frontier:
-                        (Fn.compose Option.is_some
-                           (Transition_frontier.find frontier) )
+                validate_produced_block
+                  ~context:(module Context)
+                  ~frontier ~previous_protocol_state ~previous_state_hash
+                  ~protocol_state_hashes ~header ~body
                 |> Deferred.return
               in
               let transition_receipt_time = Some (Time.now ()) in
               let%bind breadcrumb =
-                time ~logger ~time_controller
-                  "Build breadcrumb on produced block" (fun () ->
-                    Breadcrumb.build ~logger ~precomputed_values ~verifier
-                      ~get_completed_work:(Fn.const None) ~trust_system
-                      ~parent:crumb ~transition
-                      ~sender:None (* Consider skipping `All here *)
-                      ~skip_staged_ledger_verification:`Proofs
-                      ~transition_receipt_time
-                      ~transaction_pool_proxy:
-                        { find_by_hash =
-                            Network_pool.Transaction_pool.Resource_pool
-                            .find_by_hash transaction_resource_pool
-                        }
-                      () )
-                |> Deferred.Result.map_error ~f:(function
-                     | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff
-                           ( e
-                           , Staged_ledger_diff.read_all_proofs_from_disk
-                               staged_ledger_diff )
-                     | ( `Fatal_error _
-                       | `Invalid_genesis_protocol_state
-                       | `Invalid_staged_ledger_hash _
-                       | `Not_selected_over_frontier_root
-                       | `Parent_missing_from_frontier
-                       | `Prover_error _ ) as err ->
-                         err )
+                build_breadcrumb_for_produced_block ~logger ~time_controller
+                  ~precomputed_values ~verifier ~trust_system
+                  ~transaction_pool_proxy:
+                    { find_by_hash =
+                        Network_pool.Transaction_pool.Resource_pool.find_by_hash
+                          transaction_resource_pool
+                    }
+                  ~label:"Build breadcrumb on produced block" ~parent:crumb
+                  ~transition ~transition_receipt_time
+                  ~staged_ledger_diff:
+                    ( lazy
+                      (Staged_ledger_diff.read_all_proofs_from_disk
+                         staged_ledger_diff ) )
+                  ()
               in
               let txs =
                 Mina_block.transactions ~constraint_constants
@@ -968,13 +1021,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 Block_produced ;
               (* let uptime service (and any other waiters) know about breadcrumb *)
               Bvar.broadcast block_produced_bvar breadcrumb ;
-              Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
-              Mina_metrics.Block_producer.(
-                Block_production_delay_histogram.observe block_production_delay
-                  Time.(
-                    Span.to_ms
-                    @@ diff (now ())
-                    @@ Block_time.to_time_exn scheduled_time)) ;
+              record_block_produced_metrics ~scheduled_time ;
               [%log internal] "Send_breadcrumb_to_transition_frontier" ;
               let%bind.Async.Deferred () =
                 Strict_pipe.Writer.write transition_writer breadcrumb
@@ -987,33 +1034,12 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               [%log internal] "Wait_for_confirmation" ;
               [%log debug] ~metadata
                 "Waiting for block $state_hash to be inserted into frontier" ;
-              let registration =
-                Transition_registry.register transition_registry
-                  protocol_state_hashes.state_hash
+              let%bind.Async.Deferred inclusion =
+                wait_for_frontier_inclusion ~transition_registry
+                  ~time_controller protocol_state_hashes.state_hash
               in
-              Deferred.choose
-                [ Deferred.choice
-                    (Transition_registry.wait registration)
-                    (Fn.const (Ok `Transition_accepted))
-                ; Deferred.choice
-                    ( Block_time.Timeout.create time_controller
-                        (* We allow up to 20 seconds for the transition
-                           to make its way from the transition_writer to
-                           the frontier.
-                           This value is chosen to be reasonably
-                           generous. In theory, this should not take
-                           terribly long. But long cycles do happen in
-                           our system, and with medium curves those long
-                           cycles can be substantial.
-                        *)
-                        (Block_time.Span.of_ms 20000L)
-                        ~f:(Fn.const ())
-                    |> Block_time.Timeout.to_deferred )
-                    (Fn.const (Ok `Timed_out))
-                ]
-              >>= function
+              match inclusion with
               | `Transition_accepted ->
-                  Transition_registry.unregister registration ;
                   [%log internal] "Transition_accepted" ;
                   [%log info] ~metadata
                     "Generated transition $state_hash was accepted into \
@@ -1027,7 +1053,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   (* FIXME #3167: this should be fatal, and more
                      importantly, shouldn't happen.
                   *)
-                  Transition_registry.unregister registration ;
                   [%log internal] "Transition_accept_timeout" ;
                   let msg : (_, unit, string, unit) format4 =
                     "Timed out waiting for generated transition $state_hash to \
@@ -1040,8 +1065,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                     Block_time.diff (Block_time.now time_controller) start
                   in
                   let metadata =
-                    [ ( "time"
-                      , `Int (Block_time.Span.to_ms span |> Int64.to_int_exn) )
+                    [ span_metadata span
                     ; ( "protocol_state"
                       , Protocol_state.Value.to_yojson protocol_state )
                     ]
@@ -1277,10 +1301,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         | None ->
             log_bootstrap_mode ~logger () ;
             don't_wait_for
-              (let%map () =
-                 Broadcast_pipe.Reader.iter_until frontier_reader
-                   ~f:(Fn.compose Deferred.return Option.is_some)
-               in
+              (let%map () = wait_for_frontier frontier_reader in
                check_next_block_timing slot i () )
         | Some transition_frontier ->
             let consensus_state =
@@ -1444,32 +1465,9 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           Header.protocol_state
           @@ Mina_block.header (With_hash.data previous_transition)
         in
-        assert (
-          phys_equal
-            (Consensus.Hooks.select
-               ~context:(module Context)
-               ~existing:
-                 (With_hash.map ~f:Mina_block.consensus_state
-                    previous_transition )
-               ~candidate:consensus_state_with_hashes )
-            `Take
-          || failwith
-               "newly generated consensus states should be selected over their \
-                parent" ) ;
-        assert (
-          let root_consensus_state_with_hashes =
-            Transition_frontier.root frontier
-            |> Breadcrumb.consensus_state_with_hashes
-          in
-          phys_equal
-            (Consensus.Hooks.select
-               ~context:(module Context)
-               ~existing:root_consensus_state_with_hashes
-               ~candidate:consensus_state_with_hashes )
-            `Take
-          || failwith
-               "newly generated consensus states should be selected over the \
-                tf root" ) ;
+        assert_selected_over_parent_and_root
+          ~context:(module Context)
+          ~frontier ~previous_transition consensus_state_with_hashes ;
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
           let previous_protocol_state_hash =
@@ -1485,52 +1483,21 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  ~proof_cache_db staged_ledger_diff )
           in
           let%bind transition =
-            let open Result.Let_syntax in
-            Validation.wrap_header
-              { With_hash.hash = protocol_state_hashes; data = header }
-            |> Validation.skip_delta_block_chain_validation
-                 `This_block_was_not_received_via_gossip
-            |> Validation.skip_time_received_validation
-                 `This_block_was_not_received_via_gossip
-            |> Fn.flip Validation.with_body body
-            |> Validation.skip_protocol_versions_validation
-                 `This_block_has_valid_protocol_versions
-            |> Validation.skip_proof_validation
-                 `This_block_was_generated_internally
-            |> Validation.validate_genesis_protocol_state_block
-                 ~genesis_state_hash:
-                   (Protocol_state.genesis_state_hash
-                      ~state_hash:(Some previous_protocol_state_hash)
-                      previous_protocol_state )
-            >>= Validation.validate_frontier_dependencies
-                  ~to_header:Mina_block.header
-                  ~context:(module Context)
-                  ~root_consensus_state:
-                    ( Transition_frontier.root frontier
-                    |> Breadcrumb.consensus_state_with_hashes )
-                  ~is_block_in_frontier:
-                    (Fn.compose Option.is_some
-                       (Transition_frontier.find frontier) )
+            validate_produced_block
+              ~context:(module Context)
+              ~frontier ~previous_protocol_state
+              ~previous_state_hash:previous_protocol_state_hash
+              ~protocol_state_hashes ~header ~body
             |> Deferred.return
           in
           let transition_receipt_time = None in
           let%bind breadcrumb =
-            time ~logger ~time_controller
-              "Build breadcrumb on produced block (precomputed)" (fun () ->
-                Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~get_completed_work:(Fn.const None) ~trust_system
-                  ~parent:crumb ~transition ~sender:None
-                  ~skip_staged_ledger_verification:`Proofs
-                  ~transition_receipt_time ()
-                |> Deferred.Result.map_error ~f:(function
-                     | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
-                     | ( `Fatal_error _
-                       | `Invalid_genesis_protocol_state
-                       | `Invalid_staged_ledger_hash _
-                       | `Not_selected_over_frontier_root
-                       | `Parent_missing_from_frontier ) as err ->
-                         err ) )
+            build_breadcrumb_for_produced_block ~logger ~time_controller
+              ~precomputed_values ~verifier ~trust_system
+              ~label:"Build breadcrumb on produced block (precomputed)"
+              ~parent:crumb ~transition ~transition_receipt_time
+              ~staged_ledger_diff:(Lazy.from_val staged_ledger_diff)
+              ()
           in
           [%str_log trace]
             ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
@@ -1540,36 +1507,18 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               , State_hash.to_yojson protocol_state_hashes.state_hash )
             ]
           in
-          Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
-          Mina_metrics.Block_producer.(
-            Block_production_delay_histogram.observe block_production_delay
-              Time.(
-                Span.to_ms
-                @@ diff (now ())
-                @@ Block_time.to_time_exn scheduled_time)) ;
+          record_block_produced_metrics ~scheduled_time ;
           let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
           [%log debug] ~metadata
             "Waiting for block $state_hash to be inserted into frontier" ;
-          let registration =
-            Transition_registry.register transition_registry
+          let%bind.Async.Deferred inclusion =
+            wait_for_frontier_inclusion ~transition_registry ~time_controller
               protocol_state_hashes.state_hash
           in
-          Deferred.choose
-            [ Deferred.choice
-                (Transition_registry.wait registration)
-                (Fn.const (Ok `Transition_accepted))
-            ; Deferred.choice
-                ( Block_time.Timeout.create time_controller
-                    (Block_time.Span.of_ms 20000L)
-                    ~f:(Fn.const ())
-                |> Block_time.Timeout.to_deferred )
-                (Fn.const (Ok `Timed_out))
-            ]
-          >>= function
+          match inclusion with
           | `Transition_accepted ->
-              Transition_registry.unregister registration ;
               [%log info] ~metadata
                 "Generated transition $state_hash was accepted into transition \
                  frontier" ;
@@ -1578,7 +1527,6 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               (* FIXME #3167: this should be fatal, and more importantly,
                  shouldn't happen.
               *)
-              Transition_registry.unregister registration ;
               [%log fatal] ~metadata
                 "Timed out waiting for generated transition $state_hash to \
                  enter transition frontier. Continuing to produce new blocks \
@@ -1596,10 +1544,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
         log_bootstrap_mode ~logger () ;
-        let%bind () =
-          Broadcast_pipe.Reader.iter_until frontier_reader
-            ~f:(Fn.compose Deferred.return Option.is_some)
-        in
+        let%bind () = wait_for_frontier frontier_reader in
         emit_next_block precomputed_blocks
     | Some _transition_frontier -> (
         match Sequence.next precomputed_blocks with

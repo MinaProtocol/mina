@@ -232,4 +232,11 @@ let () =
           ] )
     ; Valid_size.tests
     ; Nonce_related.tests
+    ; Byte_value_test.
+        ( "any-byte values"
+        , [ test_case "Token symbol JSON and bin_prot round trips." `Quick
+              token_symbol_round_trips
+          ; test_case "zkApp URI JSON and bin_prot round trips." `Quick
+              zkapp_uri_round_trips
+          ] )
     ]
