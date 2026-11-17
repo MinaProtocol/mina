@@ -1231,25 +1231,15 @@ module Next_step = struct
     | Schedule_production of production
 end
 
-let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
-    ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
-    ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
-    ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot i slot =
-  O1trace.thread "block_producer_iteration"
-  @@ fun () ->
-  let consensus_state =
-    Transition_frontier.(
-      best_tip transition_frontier |> Breadcrumb.consensus_state)
-  in
+let decide_next_step ~context:(module Context : CONTEXT) ~genesis_breadcrumb
+    ~time_controller ~coinbase_receiver ~frontier_reader
+    ~set_next_producer_timing ~consensus_state
+    ~(vrf_evaluation_state : Vrf_evaluation_state.t) ~epoch_data_for_vrf
+    ~ledger_snapshot : Next_step.t =
   let new_global_slot =
     epoch_data_for_vrf.Consensus.Data.Epoch_data_for_vrf.global_slot
   in
   let open Context in
-  let%bind () =
-    sync_vrf_evaluator ~logger ~vrf_evaluator ~vrf_poll_interval
-      ~vrf_evaluation_state ~epoch_data_for_vrf i slot
-  in
   match Core.Queue.dequeue vrf_evaluation_state.queue with
   | None -> (
       match Vrf_evaluation_state.evaluator_status vrf_evaluation_state with
@@ -1260,14 +1250,14 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
           in
           set_next_producer_timing (`Check_again epoch_end_time) consensus_state ;
           [%log info] "No more slots won in this epoch" ;
-          act (Check_vrf_at epoch_end_time)
+          Check_vrf_at epoch_end_time
       | At last_slot ->
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
-          act Poll_vrf_then_check
+          Poll_vrf_then_check
       | Start ->
           set_next_producer_timing (`Evaluating_vrf new_global_slot)
             consensus_state ;
-          act Poll_vrf_then_check )
+          Poll_vrf_then_check )
   | Some slot_won -> (
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
@@ -1305,7 +1295,7 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
             (`Produce_now (data, winner_pk))
             consensus_state ;
           Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-          act (Produce_now (now, data, winner_pk))
+          Produce_now (now, data, winner_pk)
       | `Passed ->
           [%log warn]
             "Skipping block production for global slot $slot_won because it \
@@ -1318,7 +1308,7 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
                 , Mina_numbers.Global_slot_since_hard_fork.to_yojson
                     curr_global_slot )
               ] ;
-          act Check_vrf_now
+          Check_vrf_now
       | `In slot_diff ->
           [%log info] "Producing a block in $slots slots"
             ~metadata:
@@ -1338,7 +1328,30 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
           don't_wait_for
             (pregenerate_genesis_proof_one_slot_before ~constraint_constants
                ~time_controller ~genesis_breadcrumb ~frontier_reader time ) ;
-          act (Schedule_production (scheduled_time, data, winner_pk)) )
+          Schedule_production (scheduled_time, data, winner_pk) )
+
+let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
+    ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
+    ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
+    ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
+    ~ledger_snapshot i slot =
+  O1trace.thread "block_producer_iteration"
+  @@ fun () ->
+  let consensus_state =
+    Transition_frontier.(
+      best_tip transition_frontier |> Breadcrumb.consensus_state)
+  in
+  let open Context in
+  let%bind () =
+    sync_vrf_evaluator ~logger ~vrf_evaluator ~vrf_poll_interval
+      ~vrf_evaluation_state ~epoch_data_for_vrf i slot
+  in
+  act
+    (decide_next_step
+       ~context:(module Context)
+       ~genesis_breadcrumb ~time_controller ~coinbase_receiver ~frontier_reader
+       ~set_next_producer_timing ~consensus_state ~vrf_evaluation_state
+       ~epoch_data_for_vrf ~ledger_snapshot )
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
