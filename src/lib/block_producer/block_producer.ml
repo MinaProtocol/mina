@@ -870,6 +870,28 @@ let choose_parent ~logger ~frontier ~block_data =
         None )
   else Some best_tip
 
+let parent_proof ~logger ~(precomputed_values : Precomputed_values.t)
+    ~genesis_breadcrumb ~previous_protocol_state previous_transition =
+  let open Interruptible.Let_syntax in
+  if
+    Consensus.Data.Consensus_state.is_genesis_state
+      (Protocol_state.consensus_state previous_protocol_state)
+    && Option.is_none precomputed_values.proof_data
+  then (
+    match%bind Interruptible.uninterruptible (genesis_breadcrumb ()) with
+    | Ok block ->
+        let proof = Blockchain_snark.Blockchain.proof block in
+        Interruptible.lift (Deferred.return proof) (Deferred.never ())
+    | Error err ->
+        [%log error]
+          "Aborting block production: cannot generate a genesis proof"
+          ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+        abort_production () )
+  else
+    return
+      ( Header.protocol_state_proof
+      @@ Mina_block.header (With_hash.data previous_transition) )
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -921,24 +943,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         @@ Mina_block.header (With_hash.data previous_transition)
       in
       let%bind previous_protocol_state_proof =
-        if
-          Consensus.Data.Consensus_state.is_genesis_state
-            (Protocol_state.consensus_state previous_protocol_state)
-          && Option.is_none precomputed_values.proof_data
-        then (
-          match%bind Interruptible.uninterruptible (genesis_breadcrumb ()) with
-          | Ok block ->
-              let proof = Blockchain_snark.Blockchain.proof block in
-              Interruptible.lift (Deferred.return proof) (Deferred.never ())
-          | Error err ->
-              [%log error]
-                "Aborting block production: cannot generate a genesis proof"
-                ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
-              abort_production () )
-        else
-          return
-            ( Header.protocol_state_proof
-            @@ Mina_block.header (With_hash.data previous_transition) )
+        parent_proof ~logger ~precomputed_values ~genesis_breadcrumb
+          ~previous_protocol_state previous_transition
       in
       [%log internal] "Get_transactions_from_pool" ;
       let transactions =
