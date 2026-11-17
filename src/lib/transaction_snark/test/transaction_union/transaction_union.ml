@@ -44,7 +44,9 @@ let suite () =
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
     end
 
-    let of_user_command' (sok_digest : Sok_message.Digest.t) ledger
+    let of_user_command' ?(source_fee_excess = Fee_excess.zero)
+        ?(source_total_currency = Currency.Amount.zero)
+        (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
       let module T = (val Lazy.force U.snark_module) in
@@ -64,6 +66,16 @@ let suite () =
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
+      let target_total_currency =
+        match
+          Currency.Amount.add_signed_flagged source_total_currency
+            user_command_supply_increase
+        with
+        | total, `Overflow false ->
+            total
+        | _, `Overflow true ->
+            failwith "total currency out of range"
+      in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let statement =
             let txn =
@@ -75,9 +87,12 @@ let suite () =
               ~source_first_pass_ledger:source ~target_first_pass_ledger:target
               ~source_second_pass_ledger:target
               ~target_second_pass_ledger:target ~connecting_ledger_left:target
-              ~connecting_ledger_right:target ~sok_digest
-              ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
-              ~supply_increase:user_command_supply_increase
+              ~connecting_ledger_right:target ~sok_digest ~source_fee_excess
+              ~target_fee_excess:
+                (Or_error.ok_exn
+                   (Fee_excess.combine source_fee_excess
+                      (Or_error.ok_exn (Transaction.fee_excess txn)) ) )
+              ~source_total_currency ~target_total_currency
               ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )
@@ -541,8 +556,10 @@ let suite () =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
-                of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_state2.init_stack
+                of_user_command'
+                  ~source_fee_excess:
+                    (Transaction_snark.statement proof12).target.fee_excess
+                  sok_digest ledger t2 pending_coinbase_stack_state2.init_stack
                   pending_coinbase_stack_state2.pc state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
