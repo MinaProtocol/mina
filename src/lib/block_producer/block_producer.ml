@@ -1157,6 +1157,29 @@ let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
   | None ->
       Deferred.return ()
 
+let pregenerate_genesis_proof_one_slot_before
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~time_controller ~genesis_breadcrumb ~frontier_reader slot_start_ms =
+  (* Attempt to generate a genesis proof in the slot
+     immediately before we'll actually need it, so that
+     it isn't limiting our block production time in the
+     won slot.
+     This also allows non-genesis blocks to be received
+     in the meantime and alleviate the need to produce
+     one at all, if this won't have block height 1.
+  *)
+  let scheduled_genesis_time =
+    time_of_ms
+      Int64.(
+        slot_start_ms - of_int constraint_constants.block_window_duration_ms)
+  in
+  let span_till_time =
+    Block_time.diff scheduled_genesis_time (Block_time.now time_controller)
+    |> Block_time.Span.to_time_span
+  in
+  let%bind () = after span_till_time in
+  generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader ()
+
 let iteration ~schedule_next_vrf_check ~produce_block_now
     ~schedule_block_production ~next_vrf_check_now ~genesis_breadcrumb
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
@@ -1294,27 +1317,8 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
             Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
             let scheduled_time = time_of_ms time in
             don't_wait_for
-              ((* Attempt to generate a genesis proof in the slot
-                  immediately before we'll actually need it, so that
-                  it isn't limiting our block production time in the
-                  won slot.
-                  This also allows non-genesis blocks to be received
-                  in the meantime and alleviate the need to produce
-                  one at all, if this won't have block height 1.
-               *)
-               let scheduled_genesis_time =
-                 time_of_ms
-                   Int64.(
-                     time - of_int constraint_constants.block_window_duration_ms)
-               in
-               let span_till_time =
-                 Block_time.diff scheduled_genesis_time
-                   (Block_time.now time_controller)
-                 |> Block_time.Span.to_time_span
-               in
-               let%bind () = after span_till_time in
-               generate_genesis_proof_if_needed ~genesis_breadcrumb
-                 ~frontier_reader () ) ;
+              (pregenerate_genesis_proof_one_slot_before ~constraint_constants
+                 ~time_controller ~genesis_breadcrumb ~frontier_reader time ) ;
             schedule_block_production (scheduled_time, data, winner_pk) )
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
