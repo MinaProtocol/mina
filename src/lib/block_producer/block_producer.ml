@@ -1226,7 +1226,8 @@ module Next_step = struct
   type t =
     | Check_vrf_now
     | Check_vrf_at of Block_time.t
-    | Poll_vrf_then_check
+    | Check_vrf_at_epoch_end of Block_time.t
+    | Poll_vrf_then_check of Mina_numbers.Global_slot_since_hard_fork.t
     | Produce_now of production
     | Schedule_production of production
 end
@@ -1249,14 +1250,14 @@ let decide_next_step ~context:(module Context : CONTEXT) ~time_controller
           in
           set_next_producer_timing (`Check_again epoch_end_time) consensus_state ;
           [%log info] "No more slots won in this epoch" ;
-          Check_vrf_at epoch_end_time
+          Check_vrf_at_epoch_end epoch_end_time
       | At last_slot ->
           set_next_producer_timing (`Evaluating_vrf last_slot) consensus_state ;
-          Poll_vrf_then_check
+          Poll_vrf_then_check last_slot
       | Start ->
           set_next_producer_timing (`Evaluating_vrf new_global_slot)
             consensus_state ;
-          Poll_vrf_then_check )
+          Poll_vrf_then_check new_global_slot )
   | Some slot_won -> (
       let winning_global_slot = slot_won.global_slot in
       let slot, epoch =
@@ -1463,12 +1464,12 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             let rec act : Next_step.t -> unit Deferred.t = function
               | Check_vrf_now ->
                   Deferred.return (next_vrf_check_now ())
-              | Check_vrf_at time ->
+              | Check_vrf_at time | Check_vrf_at_epoch_end time ->
                   Deferred.return
                     (Singleton_scheduler.schedule scheduler time
                        ~f:next_vrf_check_now )
               (*Keep trying until we get some slots*)
-              | Poll_vrf_then_check ->
+              | Poll_vrf_then_check _ ->
                   let%bind () = Async.after vrf_poll_interval in
                   let%bind () =
                     Vrf_evaluation_state.poll ~vrf_evaluator ~logger
