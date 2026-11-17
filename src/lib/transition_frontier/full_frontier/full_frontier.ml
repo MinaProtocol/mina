@@ -132,6 +132,7 @@ let best_tip t = find_exn ~message:"best_tip" t t.best_tip
 
 let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+  Mina_metrics.Transition_frontier.update_proposed_protocol_versions [] ;
   ignore
     ( Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
         (Breadcrumb.mask (root t))
@@ -879,7 +880,13 @@ let update_metrics_with_diff (type mutant)
         Gauge.set Transition_frontier.best_tip_block_height
           (Mina_numbers.Length.to_int height |> Int.to_float) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
-          (Int.to_float (empty_blocks_at_best_tip t)))
+          (Int.to_float (empty_blocks_at_best_tip t)) ;
+        Transition_frontier.update_proposed_protocol_versions
+          (List.map (root t :: best_tip_path t) ~f:(fun breadcrumb ->
+               Breadcrumb.block breadcrumb
+               |> Mina_block.header
+               |> Mina_block.Header.proposed_protocol_version_opt
+               |> Option.map ~f:Protocol_version.to_string ) ))
 
 let apply_diffs ({ context = (module Context); _ } as t) diffs
     ~enable_epoch_ledger_sync ~has_long_catchup_job =

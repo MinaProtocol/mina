@@ -72,14 +72,14 @@ let%test_module "Catchup state of a loaded frontier" =
               Transition_frontier.load
                 ~context:(module Context)
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ~catchup_mode:`Super ()
+                ~persistent_frontier ()
             with
             | Ok loaded ->
                 loaded
             | Error _ ->
                 failwith "Couldn't load the persisted frontier" )
       in
-      let (Full catchup_tree) = Transition_frontier.catchup_state loaded in
+      let catchup_tree = Transition_frontier.catchup_tree loaded in
       List.iter state_hashes ~f:(fun state_hash ->
           if not (Hashtbl.mem catchup_tree.nodes state_hash) then
             failwithf "The catchup tree lacks breadcrumb %s"
