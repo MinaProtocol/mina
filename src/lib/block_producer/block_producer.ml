@@ -649,6 +649,10 @@ end
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
+let wait_for_frontier frontier_reader =
+  Broadcast_pipe.Reader.iter_until frontier_reader
+    ~f:(Fn.compose Deferred.return Option.is_some)
+
 let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
   let open Context in
   let started = ref false in
@@ -1300,10 +1304,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         | None ->
             log_bootstrap_mode ~logger () ;
             don't_wait_for
-              (let%map () =
-                 Broadcast_pipe.Reader.iter_until frontier_reader
-                   ~f:(Fn.compose Deferred.return Option.is_some)
-               in
+              (let%map () = wait_for_frontier frontier_reader in
                check_next_block_timing slot i () )
         | Some transition_frontier ->
             let consensus_state =
@@ -1546,10 +1547,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
         log_bootstrap_mode ~logger () ;
-        let%bind () =
-          Broadcast_pipe.Reader.iter_until frontier_reader
-            ~f:(Fn.compose Deferred.return Option.is_some)
-        in
+        let%bind () = wait_for_frontier frontier_reader in
         emit_next_block precomputed_blocks
     | Some _transition_frontier -> (
         match Sequence.next precomputed_blocks with
