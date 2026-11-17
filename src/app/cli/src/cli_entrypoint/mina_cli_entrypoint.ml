@@ -1188,10 +1188,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
           let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
-          let genesis_ledger_hash =
-            Precomputed_values.genesis_ledger precomputed_values
-            |> Lazy.force |> Mina_ledger.Ledger.merkle_root
-          in
           let block_production_keypairs =
             block_production_keypair
             |> Option.map ~f:(fun kp ->
@@ -1369,8 +1365,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               }
           in
           let net_config =
-            { Mina_networking.Config.genesis_ledger_hash
-            ; log_gossip_heard
+            { Mina_networking.Config.log_gossip_heard
             ; is_seed
             ; creatable_gossip_net =
                 Mina_networking.Gossip_net.(
