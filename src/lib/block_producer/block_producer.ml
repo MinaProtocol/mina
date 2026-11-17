@@ -173,6 +173,24 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
+let enforce_block_reward_threshold ~logger ~constraint_constants
+    ~supercharge_coinbase ~threshold diff =
+  let net_return =
+    Option.value ~default:Currency.Amount.zero
+      (Staged_ledger_diff.net_return ~constraint_constants ~supercharge_coinbase
+         (Staged_ledger_diff.forget diff) )
+  in
+  if Currency.Amount.(net_return >= threshold) then diff
+  else (
+    [%log info]
+      "Block reward $reward is less than the min-block-reward $threshold, \
+       creating empty block"
+      ~metadata:
+        [ ("threshold", Currency.Amount.to_yojson threshold)
+        ; ("reward", Currency.Amount.to_yojson net_return)
+        ] ;
+    Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff )
+
 let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
@@ -257,26 +275,10 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     [%log internal] "Create_staged_ledger_diff_done" ;
                     match (diff_result, block_reward_threshold) with
                     | Ok diff, Some threshold ->
-                        let net_return =
-                          Option.value ~default:Currency.Amount.zero
-                            (Staged_ledger_diff.net_return ~constraint_constants
-                               ~supercharge_coinbase
-                               (Staged_ledger_diff.forget diff) )
-                        in
-                        if Currency.Amount.(net_return >= threshold) then
-                          diff_result
-                        else (
-                          [%log info]
-                            "Block reward $reward is less than the \
-                             min-block-reward $threshold, creating empty block"
-                            ~metadata:
-                              [ ( "threshold"
-                                , Currency.Amount.to_yojson threshold )
-                              ; ("reward", Currency.Amount.to_yojson net_return)
-                              ] ;
-                          Ok
-                            Staged_ledger_diff.With_valid_signatures_and_proofs
-                            .empty_diff )
+                        Ok
+                          (enforce_block_reward_threshold ~logger
+                             ~constraint_constants ~supercharge_coinbase
+                             ~threshold diff )
                     | _ ->
                         diff_result )
           in
