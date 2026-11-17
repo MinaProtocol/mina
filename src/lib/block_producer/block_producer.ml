@@ -892,6 +892,23 @@ let parent_proof ~logger ~(precomputed_values : Precomputed_values.t)
       ( Header.protocol_state_proof
       @@ Mina_block.header (With_hash.data previous_transition) )
 
+let prove_block ~logger ~time_controller ~prover ~previous_protocol_state
+    ~previous_protocol_state_proof ~protocol_state ~internal_transition
+    ~pending_coinbase_witness =
+  time ~logger ~time_controller "Protocol_state_proof proving time(ms)"
+    (fun () ->
+      O1trace.thread "dispatch_block_proving" (fun () ->
+          Prover.prove prover ~prev_state:previous_protocol_state
+            ~prev_state_proof:previous_protocol_state_proof
+            ~next_state:protocol_state internal_transition
+            pending_coinbase_witness )
+      |> Deferred.Result.map_error ~f:(fun err ->
+             `Prover_error
+               ( err
+               , ( previous_protocol_state_proof
+                 , internal_transition
+                 , pending_coinbase_witness ) ) ) )
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -1000,19 +1017,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 ~metadata:[ ("transactions_count", `Int transactions_count) ]
                 "Produce_state_transition_proof" ;
               let%bind protocol_state_proof =
-                time ~logger ~time_controller
-                  "Protocol_state_proof proving time(ms)" (fun () ->
-                    O1trace.thread "dispatch_block_proving" (fun () ->
-                        Prover.prove prover ~prev_state:previous_protocol_state
-                          ~prev_state_proof:previous_protocol_state_proof
-                          ~next_state:protocol_state internal_transition
-                          pending_coinbase_witness )
-                    |> Deferred.Result.map_error ~f:(fun err ->
-                           `Prover_error
-                             ( err
-                             , ( previous_protocol_state_proof
-                               , internal_transition
-                               , pending_coinbase_witness ) ) ) )
+                prove_block ~logger ~time_controller ~prover
+                  ~previous_protocol_state ~previous_protocol_state_proof
+                  ~protocol_state ~internal_transition ~pending_coinbase_witness
               in
               let staged_ledger_diff =
                 Internal_transition.staged_ledger_diff internal_transition
