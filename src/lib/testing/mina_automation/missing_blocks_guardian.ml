@@ -23,8 +23,6 @@ module Env_var = struct
   let blocks_format = "BLOCKS_FORMAT"
 
   let missing_blocks_auditor = "MISSING_BLOCKS_AUDITOR"
-
-  let archive_blocks = "ARCHIVE_BLOCKS"
 end
 
 module Config = struct
@@ -36,7 +34,6 @@ module Config = struct
     ; network : string
     ; run_mode : mode
     ; missing_blocks_auditor : string
-    ; archive_blocks : string
     ; block_format : [ `Precomputed | `Extensional ]
     }
 
@@ -82,7 +79,6 @@ module Config = struct
                 | `Extensional ->
                     "extensional" )
             ; (Env_var.missing_blocks_auditor, t.missing_blocks_auditor)
-            ; (Env_var.archive_blocks, t.archive_blocks)
             ] )
 end
 

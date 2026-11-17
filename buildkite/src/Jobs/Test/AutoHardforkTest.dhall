@@ -63,6 +63,9 @@ let dirtyWhen =
       , S.exactly "scripts/hardfork/dispatcher" "sh"
       , S.exactly "scripts/hardfork/create_runtime_config" "sh"
       , S.exactly "scripts/hardfork/release/check-fork-dump" "py"
+      , S.exactly
+          "buildkite/scripts/hardfork/release/fetch-hardfork-config"
+          "sh"
       , S.strictlyStart (S.contains "buildkite/scripts/tests/hardfork")
       , S.exactly "scripts/docker/build" "sh"
       , S.exactly "scripts/debian/builder-helpers" "sh"
@@ -151,8 +154,8 @@ in  Pipeline.build
                 Toolchain.select
                   Toolchain.Spec::{ debVersion = debVersion, arch = arch }
                   ([] : List Text)
-                  "python3 buildkite/scripts/tests/hardfork/check-fork-dump-tests.py"
-            , label = "Auto Hardfork: check-fork-dump Tests"
+                  "python3 buildkite/scripts/tests/hardfork/check-fork-dump-tests.py && python3 buildkite/scripts/tests/hardfork/fetch-hardfork-config-tests.py"
+            , label = "Auto Hardfork: hardfork config script Tests"
             , key = "auto-hardfork-check-fork-dump-tests"
             , target = Size.Small
             }
