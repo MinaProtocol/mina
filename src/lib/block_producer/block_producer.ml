@@ -1305,10 +1305,6 @@ let iteration ~(act : Next_step.t -> unit Deferred.t) ~genesis_breadcrumb
             (`Produce_now (data, winner_pk))
             consensus_state ;
           Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-          let%bind () =
-            generate_genesis_proof_if_needed ~genesis_breadcrumb
-              ~frontier_reader ()
-          in
           act (Produce_now (now, data, winner_pk))
       | `Passed ->
           [%log warn]
@@ -1474,6 +1470,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   in
                   act (Check_vrf_at (Block_time.now time_controller))
               | Produce_now production ->
+                  let%bind () =
+                    generate_genesis_proof_if_needed ~genesis_breadcrumb
+                      ~frontier_reader ()
+                  in
                   Deferred.return (produce_block_now production)
               | Schedule_production ((time, _, _) as production) ->
                   Singleton_scheduler.schedule scheduler time ~f:(fun () ->
