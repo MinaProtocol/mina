@@ -191,6 +191,59 @@ let enforce_block_reward_threshold ~logger ~constraint_constants
         ] ;
     Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff )
 
+let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
+    ~staged_ledger ~(block_data : Consensus.Data.Block_data.t)
+    ~previous_state_view ~transactions ~get_completed_work ~log_block_creation
+    ~supercharge_coinbase ~zkapp_cmd_limit ~block_reward_threshold ~slot_tx_end
+    =
+  let global_slot_since_hard_fork =
+    Consensus.Data.Block_data.global_slot block_data
+  in
+  let global_slot =
+    Consensus.Data.Block_data.global_slot_since_genesis block_data
+  in
+  let coinbase_receiver =
+    Consensus.Data.Block_data.coinbase_receiver block_data
+  in
+  match slot_tx_end with
+  | Some slot_tx_end
+    when Mina_numbers.Global_slot_since_hard_fork.(
+           global_slot_since_hard_fork >= slot_tx_end) ->
+      [%log info] "Reached slot_tx_end $slot_tx_end, producing empty block"
+        ~metadata:
+          [ ( "slot_tx_end"
+            , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_tx_end )
+          ] ;
+      Result.return
+        Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
+  | Some _ | None ->
+      O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
+          [%log internal] "Create_staged_ledger_diff" ;
+          (* TODO: handle transaction inclusion failures here *)
+          let diff_result =
+            Staged_ledger.create_diff ~constraint_constants ~global_slot
+              staged_ledger ~coinbase_receiver ~logger
+              ~current_state_view:previous_state_view
+              ~transactions_by_fee:transactions ~get_completed_work
+              ~log_block_creation ~supercharge_coinbase ~zkapp_cmd_limit
+            |> Result.map ~f:(fun (diff, failed_txns) ->
+                   if not (List.is_empty failed_txns) then
+                     don't_wait_for
+                       (report_transaction_inclusion_failures ~logger ~commit_id
+                          failed_txns ) ;
+                   diff )
+            |> Result.map_error ~f:(fun err ->
+                   Staged_ledger.Staged_ledger_error.Pre_diff err )
+          in
+          [%log internal] "Create_staged_ledger_diff_done" ;
+          match (diff_result, block_reward_threshold) with
+          | Ok diff, Some threshold ->
+              Ok
+                (enforce_block_reward_threshold ~logger ~constraint_constants
+                   ~supercharge_coinbase ~threshold diff )
+          | _ ->
+              diff_result )
+
 let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
@@ -239,48 +292,10 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
             Consensus.Data.Block_data.coinbase_receiver block_data
           in
           let diff =
-            match slot_tx_end with
-            | Some slot_tx_end
-              when Mina_numbers.Global_slot_since_hard_fork.(
-                     global_slot_since_hard_fork >= slot_tx_end) ->
-                [%log info]
-                  "Reached slot_tx_end $slot_tx_end, producing empty block"
-                  ~metadata:
-                    [ ( "slot_tx_end"
-                      , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                          slot_tx_end )
-                    ] ;
-                Result.return
-                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
-            | Some _ | None ->
-                O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-                    [%log internal] "Create_staged_ledger_diff" ;
-                    (* TODO: handle transaction inclusion failures here *)
-                    let diff_result =
-                      Staged_ledger.create_diff ~constraint_constants
-                        ~global_slot staged_ledger ~coinbase_receiver ~logger
-                        ~current_state_view:previous_state_view
-                        ~transactions_by_fee:transactions ~get_completed_work
-                        ~log_block_creation ~supercharge_coinbase
-                        ~zkapp_cmd_limit
-                      |> Result.map ~f:(fun (diff, failed_txns) ->
-                             if not (List.is_empty failed_txns) then
-                               don't_wait_for
-                                 (report_transaction_inclusion_failures ~logger
-                                    ~commit_id failed_txns ) ;
-                             diff )
-                      |> Result.map_error ~f:(fun err ->
-                             Staged_ledger.Staged_ledger_error.Pre_diff err )
-                    in
-                    [%log internal] "Create_staged_ledger_diff_done" ;
-                    match (diff_result, block_reward_threshold) with
-                    | Ok diff, Some threshold ->
-                        Ok
-                          (enforce_block_reward_threshold ~logger
-                             ~constraint_constants ~supercharge_coinbase
-                             ~threshold diff )
-                    | _ ->
-                        diff_result )
+            select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
+              ~staged_ledger ~block_data ~previous_state_view ~transactions
+              ~get_completed_work ~log_block_creation ~supercharge_coinbase
+              ~zkapp_cmd_limit ~block_reward_threshold ~slot_tx_end
           in
           [%log internal] "Apply_staged_ledger_diff" ;
           match%map
