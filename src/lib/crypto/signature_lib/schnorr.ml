@@ -176,6 +176,11 @@ module Make
       *)
       val scaled_difference :
         s:scalar_var -> e:Field.Var.t -> Curve.var -> Curve.var Checked.t
+    end) (Parity : sig
+      open Impl
+
+      (** The low bit of the canonical representative of a field element. *)
+      val parity_var : Field.Var.t -> Boolean.var Checked.t
     end)
     (Message : Message_intf
                  with type boolean_var := Impl.Boolean.var
@@ -252,9 +257,7 @@ module Make
 
     let compress ((x, _) : Curve.var) = to_bits x
 
-    let is_even y =
-      let%map bs = Field.Checked.unpack_full y in
-      Bitstring_lib.Bitstring.Lsb_first.to_list bs |> List.hd_exn |> Boolean.not
+    let is_even y = Checked.map (Parity.parity_var y) ~f:Boolean.not
 
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
@@ -523,8 +526,11 @@ module Scale = struct
         sigma + s_g + negate offset_g + negate e_pk + offset_pk + negate sigma )
 end
 
-module Legacy = Make (Tick) (Tick.Inner_curve) (Scale) (Message.Legacy)
-module Chunked = Make (Tick) (Tick.Inner_curve) (Scale) (Message.Chunked)
+module Legacy =
+  Make (Tick) (Tick.Inner_curve) (Scale) (Non_zero_curve_point) (Message.Legacy)
+module Chunked =
+  Make (Tick) (Tick.Inner_curve) (Scale) (Non_zero_curve_point)
+    (Message.Chunked)
 
 let gen_legacy =
   let open Quickcheck.Let_syntax in
