@@ -426,6 +426,23 @@ module type S = sig
       end
     end
 
+    module Delegator_stake : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t =
+            { public_key : Signature_lib.Public_key.Compressed.Stable.V1.t
+            ; balance : Currency.Balance.Stable.V1.t
+            }
+          [@@deriving sexp]
+
+          val to_latest : t -> t
+        end
+      end]
+
+      val of_account : Mina_base.Account.t -> t
+    end
+
     module Vrf : sig
       val check :
            context:(module CONTEXT)
@@ -436,7 +453,7 @@ module type S = sig
         -> total_stake:Amount.t
         -> get_delegators:
              (   Public_key.Compressed.t
-              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
+              -> Delegator_stake.t Mina_base.Account.Index.Table.t option )
         -> ( ( [ `Vrf_eval of string ]
              * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
              * [> `Delegator of
@@ -666,7 +683,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V3 : sig
+        module V4 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -675,7 +692,7 @@ module type S = sig
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V3.t
+                Delegator_stake.Stable.V1.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }
