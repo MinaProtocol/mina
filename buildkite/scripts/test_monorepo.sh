@@ -159,6 +159,28 @@ test_find_closest_ancestor() {
   local MAINLINE_BRANCHES=(master compatible gone develop)
   assert_equals "compatible" "$(closest my-feature compatible)" \
     "find_closest_ancestor: a branch missing from origin is skipped"
+  # compatible and develop tie here; with no usable preference the last wins.
+  assert_equals "develop" "$(closest my-feature gone)" \
+    "find_closest_ancestor: a PR base missing from origin falls back to distance"
+
+  # A merge-back into develop: develop merged into compatible after compatible
+  # gained three commits, so compatible is 2 commits away and develop 4.
+  (
+    cd "$repo"
+    git checkout -q --detach origin/compatible
+    for i in 1 2 3; do
+      git -c user.name=t -c user.email=t@t commit -q --allow-empty -m "compatible-$i"
+    done
+    git update-ref refs/remotes/origin/compatible HEAD
+    git -c user.name=t -c user.email=t@t merge -q --no-ff --no-edit origin/develop
+  )
+  local MAINLINE_BRANCHES=(master compatible develop)
+  assert_equals "compatible" "$(closest merge-back "")" \
+    "find_closest_ancestor: by distance a merge-back is closest to compatible"
+  assert_equals "develop" "$(closest merge-back develop)" \
+    "find_closest_ancestor: a PR's mainline base branch beats a closer branch"
+  assert_equals "compatible" "$(closest merge-back my-parent-pr)" \
+    "find_closest_ancestor: a non-mainline PR base falls back to distance"
 }
 
 # Test: has_matching_tags with filter_any mode

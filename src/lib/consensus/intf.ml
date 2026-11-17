@@ -229,6 +229,27 @@ module type State_hooks = sig
     -> protocol_state * consensus_transition
 
   (**
+   * Recompute the protocol state that [generate_transition] would produce
+   * for [candidate], a block extending [previous_protocol_state] whose
+   * blockchain state should be [blockchain_state].
+   *
+   * Inputs known only to the block producer are taken from [candidate]: the
+   * global slot, the truncated VRF output, the block stake winner, block
+   * creator and coinbase receiver, whether the coinbase is supercharged, and
+   * the next epoch seed while it absorbs the VRF output (in the seed update
+   * range). Every other field is derived locally.
+  *)
+  val expected_protocol_state :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> previous_protocol_state:protocol_state
+    -> previous_protocol_state_hash:Mina_base.State_hash.t
+    -> blockchain_state:blockchain_state
+    -> supply_increase:Currency.Amount.Signed.t
+    -> candidate:protocol_state
+    -> logger:Logger.t
+    -> protocol_state Or_error.t
+
+  (**
    * Create a constrained, checked var for the next consensus state of
    * a given consensus state and snark transition.
   *)
@@ -247,14 +268,14 @@ module type State_hooks = sig
 
   module For_tests : sig
     val gen_consensus_state :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> constants:Constants.t
+         constants:Constants.t
       -> slot_advancement:int
       -> (   previous_protocol_state:
                protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
+          -> supply_increase:Currency.Amount.Signed.t
           -> consensus_state )
          Quickcheck.Generator.t
   end
@@ -431,10 +452,16 @@ module type S = sig
       module Stable : sig
         [@@@no_toplevel_latest_type]
 
-        module V3 : sig
+        module V4 : sig
           type t
 
           val to_latest : t -> t
+        end
+
+        module V3 : sig
+          type t
+
+          val to_latest : t -> V4.t
         end
       end]
 
@@ -645,7 +672,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V3 : sig
+        module V4 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -820,6 +847,7 @@ module type S = sig
                  Network_peer.Envelope.Incoming.t )
                Pipe.Writer.t
             -> unit )
+      -> bootstrap_status:Bootstrap_status.t
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

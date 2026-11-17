@@ -588,7 +588,7 @@ let user_default : t =
          The logic around the version is only active in 'proof' mode, so the
          choice of *any* number is a no-op here.
       *)
-      (Signature, Mina_numbers.Txn_version.of_uint32 (Unsigned.UInt32.of_int 4))
+      (Signature, Mina_numbers.Txn_version.mesa)
   ; set_zkapp_uri = Signature
   ; edit_action_state = Signature
   ; set_token_symbol = Signature

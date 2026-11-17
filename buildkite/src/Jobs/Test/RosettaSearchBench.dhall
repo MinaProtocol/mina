@@ -8,6 +8,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
@@ -43,17 +45,18 @@ in  Pipeline.build
             , key = "rosetta-search-bench"
             , label = "Rosetta /search/transactions latency bench"
             , runCommands =
-              [ FixPermissions.command Arch.Type.Amd64
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  [ "BUILDKITE_BRANCH", "BUILDKITE_COMMIT" ]
-                  ( Some
-                      ( RunWithPostgres.ScriptOrArchive.Script
-                          "src/app/rosetta/search_bench/init.sql"
+                  RunInToolchain.submodulesInit True
+                # [ FixPermissions.command Arch.Type.Amd64
+                  , RunWithPostgres.runInDockerWithPostgresConn
+                      [ "BUILDKITE_BRANCH", "BUILDKITE_COMMIT" ]
+                      ( Some
+                          ( RunWithPostgres.ScriptOrArchive.Script
+                              "src/app/rosetta/search_bench/init.sql"
+                          )
                       )
-                  )
-                  ContainerImages.minaToolchain
-                  "./buildkite/scripts/tests/rosetta-search-bench.sh"
-              ]
+                      ContainerImages.minaToolchain
+                      "./buildkite/scripts/tests/rosetta-search-bench.sh"
+                  ]
             }
         ]
       }

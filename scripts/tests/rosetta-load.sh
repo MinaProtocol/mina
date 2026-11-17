@@ -338,42 +338,35 @@ function load_accounts_from_db() {
     load_from_db "$1" "SELECT value FROM public_keys LIMIT $MAX_TEST_DATA_ITEMS;" "accounts"
 }
 
-# Load payment transaction hashes from the database for testing
+# Load hashes of commands included in at least one canonical block
 #
-# Retrieves the first 100 payment transaction hashes from the user_commands
-# table to use in payment transaction API tests. These represent real
-# payment transactions that can be queried during load testing.
+# /search/transactions skips orphaned blocks, so a command found only in
+# orphaned blocks would be reported as missing.
 #
 # Globals:
-#   load (associative array) - Modified to store payment transaction hashes
+#   load (associative array) - Modified to store the hashes under key $5
 #
 # Arguments:
 #   $1 - PostgreSQL connection string
+#   $2 - Command table (user_commands, zkapp_commands)
+#   $3 - Block link table (blocks_user_commands, blocks_zkapp_commands)
+#   $4 - Command id column of the link table
+#   $5 - Key in the load array
 #
 # Returns:
-#   None (modifies global load array with 'payment_transactions' key)
-function load_payment_transactions_from_db() {
-    echo "Loading payment transactions from database..."
-    load_from_db "$1" "SELECT hash FROM user_commands LIMIT $MAX_TEST_DATA_ITEMS;" "payment_transactions"
+#   None (modifies global load array)
+function load_canonical_command_hashes_from_db() {
+    load_from_db "$1" "SELECT c.hash FROM $2 c WHERE EXISTS (SELECT 1 FROM $3 l JOIN blocks b ON b.id = l.block_id WHERE l.$4 = c.id AND b.chain_status = 'canonical') LIMIT $MAX_TEST_DATA_ITEMS;" "$5"
 }
 
-# Load zkApp transaction hashes from the database for testing
-#
-# Retrieves the first 100 zkApp transaction hashes from the zkapp_commands
-# table to use in zkApp transaction API tests. These represent real
-# zkApp transactions that can be queried during load testing.
-#
-# Globals:
-#   load (associative array) - Modified to store zkApp transaction hashes
-#
-# Arguments:
-#   $1 - PostgreSQL connection string
-#
-# Returns:
-#   None (modifies global load array with 'zkapp_transactions' key)
+function load_payment_transactions_from_db() {
+    echo "Loading payment transactions from database..."
+    load_canonical_command_hashes_from_db "$1" user_commands blocks_user_commands user_command_id "payment_transactions"
+}
+
 function load_zkapp_transactions_from_db() {
     echo "Loading zkapp transactions from database..."
-    load_from_db "$1" "SELECT hash FROM zkapp_commands LIMIT $MAX_TEST_DATA_ITEMS;" "zkapp_transactions"
+    load_canonical_command_hashes_from_db "$1" zkapp_commands blocks_zkapp_commands zkapp_command_id "zkapp_transactions"
 }
 
 

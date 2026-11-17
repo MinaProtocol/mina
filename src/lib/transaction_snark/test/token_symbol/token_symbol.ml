@@ -1,3 +1,4 @@
+open Core_kernel
 open Mina_base
 
 module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
@@ -16,7 +17,16 @@ struct
   let is_non_zkapp_update = true
 end
 
-let%test_module "Update account token symbol" =
-  ( module struct
-    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
-  end )
+let suite () =
+  Transaction_snark_test_suite.make ~name:"token_symbol"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  let module _ = struct
+    include
+      Transaction_snark_tests.Test_zkapp_update.Make
+        (Test_input)
+        (struct
+          let test = test
+        end)
+  end in
+  ()

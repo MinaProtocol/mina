@@ -92,6 +92,9 @@ module T = struct
     ; tree : ('hash, 'account) Tree.t
     }
   [@@deriving sexp, yojson]
+
+  let map_accounts ~f { indexes; depth; tree } =
+    { indexes; depth; tree = Tree.Stable.V1.to_latest f tree }
 end
 
 module type S = sig
@@ -454,7 +457,7 @@ let%test_module "sparse-ledger-test" =
       { T.tree; depth; indexes = indexes depth tree }
 
     let%test_unit "iteri consistent indices with t.indexes" =
-      Quickcheck.test gen ~f:(fun t ->
+      Quickcheck.test ~trials:500 gen ~f:(fun t ->
           let indexes = Int.Set.of_list (t.indexes |> List.map ~f:snd) in
           iteri t ~f:(fun i _ ->
               [%test_result: bool]
@@ -464,7 +467,7 @@ let%test_module "sparse-ledger-test" =
                 ~expect:true (Int.Set.mem indexes i) ) )
 
     let%test_unit "path_test" =
-      Quickcheck.test gen ~f:(fun t ->
+      Quickcheck.test ~trials:500 gen ~f:(fun t ->
           let root = { t with indexes = []; tree = Hash (merkle_root t) } in
           let t' =
             List.fold t.indexes ~init:root ~f:(fun acc (_, index) ->

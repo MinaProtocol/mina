@@ -8,6 +8,13 @@ type t [@@deriving yojson]
 
 val empty : unit -> t
 
+(** [replace_contents t ~by] makes [t] hold the proofs currently in [by].
+
+    A cache passed to [compile] is held by the compiled provers, so this is
+    how to change the proofs available to circuits that are already compiled.
+*)
+val replace_contents : t -> by:t -> unit
+
 (** Perform a lookup on the raw cache. *)
 val get_proof :
      t

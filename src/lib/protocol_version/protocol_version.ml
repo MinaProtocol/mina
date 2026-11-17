@@ -57,6 +57,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     ; patch = current_patch
     }
 
+  let default_proposed_opt =
+    Option.map Node_config_version.proposed_protocol_version
+      ~f:(fun (transaction, network, patch) -> { transaction; network; patch })
+
   let (proposed_protocol_version_opt : t option ref) = ref None
 
   let set_proposed_opt t_opt = proposed_protocol_version_opt := t_opt

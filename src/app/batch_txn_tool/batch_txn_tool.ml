@@ -122,7 +122,9 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
     in
     match querry_result with
     | Ok res ->
-        return res.nonce
+        (* Prefer the nonce inferred from the transaction pool, so that we
+           build on any of our commands that are already pending. *)
+        return (Option.value res.inferred_nonce ~default:res.nonce)
     | Error _ ->
         [%log error] "txn burst tool: could not get nonce of pk"
           ~metadata:
@@ -150,6 +152,8 @@ let get_keypair ~logger path pw_option =
 
 let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~txn_fee_option ~rate_limit ~rate_limit_level ~rate_limit_interval
+    ~pool_backpressure ~pool_high_watermark ~pool_low_watermark
+    ~pool_poll_interval ~retry_delay ~max_consecutive_failures
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
@@ -231,6 +235,58 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
   let node_ingress_uri = ingress_uri ~graphql_target_node in
 
+  (* Back-pressure from the target node's transaction pool. Once the pool is
+     over capacity it evicts its lowest-fee commands along with every later
+     nonce from the same sender, which leaves all of our subsequent commands
+     building on a nonce the pool no longer has. Keeping the pool below its
+     capacity avoids triggering that eviction in the first place. *)
+  let pool_backpressure = ref pool_backpressure in
+  (* Number of commands we may send before polling the pool again. Only a
+     quarter of the headroom seen at the last poll is spent, so that several
+     spammers sharing a pool do not each spend all of it and overshoot the
+     high watermark; near the watermark this polls before every command. *)
+  let pool_budget = ref 0 in
+  let rec wait_for_pool_capacity ~paused () =
+    if (not !pool_backpressure) || !pool_budget > 0 then Deferred.return ()
+    else
+      match%bind
+        Client.get_transaction_pool_status ~logger node_ingress_uri
+      with
+      | Error e ->
+          [%log warn]
+            "txn burst tool: could not query the transaction pool status, \
+             disabling back-pressure: %s"
+            (Error.to_string_hum e) ;
+          pool_backpressure := false ;
+          Deferred.return ()
+      | Ok { size; max_size; _ } ->
+          let pause_at =
+            Float.(to_int (pool_high_watermark *. of_int max_size))
+          in
+          let resume_at =
+            Float.(to_int (pool_low_watermark *. of_int max_size))
+          in
+          if (paused && size > resume_at) || ((not paused) && size >= pause_at)
+          then (
+            if not paused then
+              [%log info]
+                "txn burst tool: transaction pool holds %d of %d commands, \
+                 pausing until it drains to %d"
+                size max_size resume_at ;
+            let%bind () =
+              Async.after (Time.Span.create ~ms:pool_poll_interval ())
+            in
+            wait_for_pool_capacity ~paused:true () )
+          else (
+            if paused then
+              [%log info]
+                "txn burst tool: transaction pool holds %d of %d commands, \
+                 resuming"
+                size max_size ;
+            pool_budget := max 1 ((pause_at - size) / 4) ;
+            Deferred.return () )
+  in
+
   (* get the keypairs from files *)
   let%bind origin_keypair =
     get_keypair ~logger origin_sender_secret_key_path
@@ -256,6 +312,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       (pub_key_to_string receiver_kp.public_key)
       (Currency.Amount.to_string initial_send_amount)
       (Currency.Fee.to_string fee_amount) ;
+    let%bind () = wait_for_pool_capacity ~paused:false () in
+    decr pool_budget ;
     let%bind res =
       Client.sign_and_send_payment ~logger node_ingress_uri
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
@@ -263,16 +321,21 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
         ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
         ~signature_kind
     in
-    let%bind () =
+    let sent =
       match res with
       | Ok _ ->
-          return ([%log info] "txn burst tool: txn sent successfully!")
+          [%log info] "txn burst tool: txn sent successfully!" ;
+          true
       | Error e ->
-          return
-            ([%log info] "txn burst tool: txn failed with error %s"
-               (Error.to_string_hum e) )
+          [%log info] "txn burst tool: txn failed with error %s"
+            (Error.to_string_hum e) ;
+          (* The pool may have changed under us; look again before the next
+             command. *)
+          pool_budget := 0 ;
+          false
     in
-    limit ()
+    let%map () = limit () in
+    sent
   in
 
   (* there... *)
@@ -284,7 +347,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
             ~pub_key:origin_pub_key
         in
         (* we could also get the origin nonce outside the iter and then just increment by 1 every iter *)
-        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce )
+        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce
+        |> Deferred.ignore_m )
   in
 
   (* and back again... *)
@@ -294,17 +358,65 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
           get_nonce ~logger ~ingress_uri:node_ingress_uri
             ~pub_key:(Signature_lib.Public_key.compress kp.public_key)
         in
-        let rec do_command n : unit Deferred.t =
-          (* nce = returner_nonce + ( num_txn_per_acct - n ) *)
-          let nce =
-            UInt32.add returner_nonce (UInt32.of_int (num_txn_per_acct - n))
-          in
-          let%bind () =
-            do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce:nce
-          in
-          if n > 1 then do_command (n - 1) else return ()
+        let returner_pub_key =
+          Signature_lib.Public_key.compress kp.public_key
         in
-        do_command num_txn_per_acct )
+        let target_nonce =
+          UInt32.add returner_nonce (UInt32.of_int num_txn_per_acct)
+        in
+        (* After a failure, resume from the nonce that the node expects next.
+           If the pool evicted some of our commands, that is lower than the
+           nonce we were about to send, and the evicted nonces are sent
+           again. *)
+        let resync_nonce ~nonce =
+          let account_id =
+            Account_id.create returner_pub_key Mina_base.Token_id.default
+          in
+          match%map
+            Client.get_account_data node_ingress_uri ~logger ~account_id
+          with
+          | Ok res ->
+              let inferred_nonce =
+                Option.value res.inferred_nonce ~default:res.nonce
+              in
+              if UInt32.compare inferred_nonce nonce < 0 then
+                [%log info]
+                  "txn burst tool: the node no longer has nonces %d to %d, \
+                   resending them"
+                  (UInt32.to_int inferred_nonce)
+                  (UInt32.to_int nonce - 1) ;
+              inferred_nonce
+          | Error e ->
+              [%log warn]
+                "txn burst tool: could not get nonce, retrying nonce %d: %s"
+                (UInt32.to_int nonce) (Error.to_string_hum e) ;
+              nonce
+        in
+        let rec do_command ~nonce ~consecutive_failures : unit Deferred.t =
+          if UInt32.compare nonce target_nonce >= 0 then return ()
+          else if consecutive_failures >= max_consecutive_failures then (
+            [%log error]
+              "txn burst tool: giving up after %d consecutive failures, with \
+               %d of %d txns outstanding"
+              consecutive_failures
+              (UInt32.to_int target_nonce - UInt32.to_int nonce)
+              num_txn_per_acct ;
+            return () )
+          else
+            match%bind
+              do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce
+            with
+            | true ->
+                do_command ~nonce:(UInt32.succ nonce) ~consecutive_failures:0
+            | false ->
+                let%bind () =
+                  Async.after (Time.Span.create ~ms:retry_delay ())
+                in
+                let%bind nonce = resync_nonce ~nonce in
+                do_command ~nonce
+                  ~consecutive_failures:(consecutive_failures + 1)
+        in
+        do_command ~nonce:returner_nonce ~consecutive_failures:0 )
   in
 
   return ()
@@ -369,6 +481,43 @@ let output_there_and_back_cmds =
            "NUM_MILLISECONDS Interval that the rate-limiter is applied over. \
             Used for rate limiting (default: 300000)"
          (optional_with_default 300000 int)
+     and pool_backpressure =
+       flag "--pool-backpressure" ~aliases:[ "pool-backpressure" ]
+         ~doc:
+           "TRUE/FALSE Whether to pause sending while the target node's \
+            transaction pool is nearly full (default: true)"
+         (optional_with_default true bool)
+     and pool_high_watermark =
+       flag "--pool-high-watermark" ~aliases:[ "pool-high-watermark" ]
+         ~doc:
+           "FRACTION Fraction of the transaction pool's capacity at which to \
+            pause sending (default: 0.9)"
+         (optional_with_default 0.9 float)
+     and pool_low_watermark =
+       flag "--pool-low-watermark" ~aliases:[ "pool-low-watermark" ]
+         ~doc:
+           "FRACTION Fraction of the transaction pool's capacity that the pool \
+            must drain to before sending resumes (default: 0.75)"
+         (optional_with_default 0.75 float)
+     and pool_poll_interval =
+       flag "--pool-poll-interval" ~aliases:[ "pool-poll-interval" ]
+         ~doc:
+           "NUM_MILLISECONDS How often to poll the transaction pool while \
+            paused (default: 1000)"
+         (optional_with_default 1000 int)
+     and retry_delay =
+       flag "--retry-delay" ~aliases:[ "retry-delay" ]
+         ~doc:
+           "NUM_MILLISECONDS How long to wait after a failed submission before \
+            resyncing the nonce and retrying (default: 5000)"
+         (optional_with_default 5000 int)
+     and max_consecutive_failures =
+       flag "--max-consecutive-failures"
+         ~aliases:[ "max-consecutive-failures" ]
+         ~doc:
+           "NUM Number of consecutive failed submissions after which to give \
+            up (default: 60)"
+         (optional_with_default 60 int)
      and origin_sender_secret_key_path =
        flag "--origin-sender-sk-path"
          ~aliases:[ "origin-sender-sk-path" ]
@@ -407,6 +556,8 @@ let output_there_and_back_cmds =
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
+       ~pool_backpressure ~pool_high_watermark ~pool_low_watermark
+       ~pool_poll_interval ~retry_delay ~max_consecutive_failures
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
        ~graphql_target_node_option ~minimum_user_command_fee

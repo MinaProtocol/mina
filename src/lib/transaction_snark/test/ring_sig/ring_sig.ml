@@ -59,7 +59,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
-let%test_unit "1-of-1" =
+let test_1_of_1 () =
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk = Private_key.gen and msg = Field.gen_uniform in
@@ -77,7 +77,7 @@ let%test_unit "1-of-1" =
       |> Checked.map ~f:As_prover.return
       |> run_and_check |> Or_error.ok_exn )
 
-let%test_unit "1-of-2" =
+let test_1_of_2 () =
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk0 = Private_key.gen
@@ -99,7 +99,8 @@ let%test_unit "1-of-2" =
       |> run_and_check |> Or_error.ok_exn )
 
 (* test a snapp tx with a 3-account_update ring *)
-let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
+let test_ring_sig_zkapp_tx () =
+  let proof_cache = Transaction_snark_test_suite.proof_cache in
   let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -122,7 +123,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover ] =
-            Pickles.compile () ~cache:Cache_dir.cache
+            Pickles.compile () ~cache:Cache_dir.cache ~proof_cache
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
               ~max_proofs_verified:(module Nat.N0)
               ~name:"ringsig"
@@ -131,7 +132,9 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
           ( if debug_mode then
-            Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
+            Binable.to_string
+              (module Side_loaded_verification_key.Stable.Latest)
+              vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
             |> printf "vk:\n%s\n\n" )
           |> fun () ->
@@ -336,3 +339,11 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           |> fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+
+let suite () =
+  Transaction_snark_test_suite.make ~name:"ring_sig"
+    ~proof_cache_json:Proof_cache_json.contents
+  @@ fun ~test ->
+  test "1-of-1" test_1_of_1 ;
+  test "1-of-2" test_1_of_2 ;
+  test "ring-signature zkapp tx with 3 zkapp_command" test_ring_sig_zkapp_tx

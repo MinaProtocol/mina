@@ -123,6 +123,7 @@ type t =
   ; commit_id : string
   ; proof_cache_db : Proof_cache_tag.cache_db
   ; signature_kind : Mina_signature_kind.t
+  ; bootstrap_status : Bootstrap_status.t
   }
 [@@deriving fields]
 
@@ -423,10 +424,9 @@ let get_node_state t =
     | None ->
         None
     | Some tf ->
-        let (Full catchup_state) = Transition_frontier.catchup_state tf in
         Some
           (Transition_frontier.Full_catchup_tree.to_node_status_report
-             catchup_state )
+             (Transition_frontier.catchup_tree tf) )
   in
   let block_height_at_best_tip =
     best_tip t
@@ -2229,6 +2229,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
+          let bootstrap_status = Bootstrap_status.create () in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2240,13 +2241,13 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~persistent_frontier_location:config.persistent_frontier_location
               ~get_current_frontier
               ~frontier_broadcast_writer:frontier_broadcast_pipe_w
-              ~catchup_mode:`Super ~network_transition_reader:block_reader
+              ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_most_recent_valid_block
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ~transaction_pool_proxy
-              ~ledger_backing:config.ledger_backing ()
+              ~ledger_backing:config.ledger_backing ~bootstrap_status ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2627,6 +2628,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; commit_id
           ; proof_cache_db
           ; signature_kind
+          ; bootstrap_status
           } ) )
 
 let net { components = { net; _ }; _ } = net
