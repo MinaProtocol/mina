@@ -38,8 +38,13 @@ module type Stack_frame_digest_intf = sig
 
   open Pickles.Impls.Step
 
+  type value := t
+
   module Checked : sig
     include Digest_intf.S_checked
+
+    (** A digest known when the circuit is built. *)
+    val constant : value -> t
 
     val create :
          hash_zkapp_command:
