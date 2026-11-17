@@ -835,6 +835,41 @@ let record_block_produced_metrics ~scheduled_time =
       Time.(
         Span.to_ms @@ diff (now ()) @@ Block_time.to_time_exn scheduled_time))
 
+let choose_parent ~logger ~frontier ~block_data =
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  let best_tip = Transition_frontier.best_tip frontier in
+  let crumb_global_slot_since_genesis =
+    Breadcrumb.protocol_state best_tip
+    |> Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.global_slot_since_genesis
+  in
+  let block_global_slot_since_genesis =
+    Consensus.Proof_of_stake.Data.Block_data.global_slot_since_genesis
+      block_data
+  in
+  if
+    Mina_numbers.Global_slot_since_genesis.equal crumb_global_slot_since_genesis
+      block_global_slot_since_genesis
+  then (
+    (* We received a block for this slot over the network before
+       attempting to produce our own. Build upon its parent instead
+       of attempting (and failing) to build upon the block itself.
+    *)
+    match
+      Transition_frontier.find frontier (Breadcrumb.parent_hash best_tip)
+    with
+    | Some parent ->
+        Some parent
+    | None ->
+        [%log error]
+          "Aborting block production: parent of $best_tip not found in \
+           frontier (unexpected case, there is likely a bug somewhere)"
+          ~metadata:
+            [ ("best_tip", State_hash.to_yojson (Breadcrumb.state_hash best_tip))
+            ] ;
+        None )
+  else Some best_tip
+
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
@@ -865,39 +900,11 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           Transition_registry
       in
       let%bind crumb =
-        let best_tip = Transition_frontier.best_tip frontier in
-        let crumb_global_slot_since_genesis =
-          Breadcrumb.protocol_state best_tip
-          |> Protocol_state.consensus_state
-          |> Consensus.Data.Consensus_state.global_slot_since_genesis
-        in
-        let block_global_slot_since_genesis =
-          Consensus.Proof_of_stake.Data.Block_data.global_slot_since_genesis
-            block_data
-        in
-        if
-          Mina_numbers.Global_slot_since_genesis.equal
-            crumb_global_slot_since_genesis block_global_slot_since_genesis
-        then (
-          (* We received a block for this slot over the network before
-             attempting to produce our own. Build upon its parent instead
-             of attempting (and failing) to build upon the block itself.
-          *)
-          match
-            Transition_frontier.find frontier (Breadcrumb.parent_hash best_tip)
-          with
-          | Some parent ->
-              return parent
-          | None ->
-              [%log error]
-                "Aborting block production: parent of $best_tip not found in \
-                 frontier (unexpected case, there is likely a bug somewhere)"
-                ~metadata:
-                  [ ( "best_tip"
-                    , State_hash.to_yojson (Breadcrumb.state_hash best_tip) )
-                  ] ;
-              abort_production () )
-        else return best_tip
+        match choose_parent ~logger ~frontier ~block_data with
+        | Some crumb ->
+            return crumb
+        | None ->
+            abort_production ()
       in
       let start = Block_time.now time_controller in
       [%log info]
