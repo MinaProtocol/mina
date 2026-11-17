@@ -65,6 +65,11 @@ if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" ]]; then
   exit 1
 fi
 
+if [[ "$(cat MINA_CODEBASE_NETWORK)" != "$(cat MINA_MAINNET_NETWORK)" ]]; then
+  echo "Skipping: this codebase targets $(cat MINA_CODEBASE_NETWORK), not $(cat MINA_MAINNET_NETWORK)"
+  exit 0
+fi
+
 CLEAR='\033[0m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
