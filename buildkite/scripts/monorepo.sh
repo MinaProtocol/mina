@@ -159,16 +159,8 @@ else
   exit 1
 fi
 
-# Check for forced closest ancestor via environment variable
-# Used only in testing or if git is on fire
-if [[ -n "${FORCE_CLOSEST_ANCESTOR:-}" ]]; then
-  closest_ancestor="$FORCE_CLOSEST_ANCESTOR"
-else
-  closest_ancestor=$(find_closest_ancestor)
-fi
-
-# Phase 1: triage. Collect every job that passes tags, scope, dirty-when and
-# include/exclude filters into the SELECTED_FILES set. Nothing is uploaded yet:
+# Phase 1: triage. Collect every job that passes tags, scope and dirty-when
+# filters into the SELECTED_FILES set. Nothing is uploaded yet:
 # their dependencies must be pulled in first (Phase 2).
 declare -A SELECTED_FILES=()
 
@@ -194,26 +186,6 @@ while IFS= read -r file; do
 
   if [[ $job_selected -ne 1 ]]; then
     echo "🧹🚫 $job_name rejected job as it does not fall into dirty when: $file" >&2
-    continue
-  fi
-
-  # Check if both includeIf and excludeIf are set - this is not allowed
-  has_include_if=$(yq -r '.spec.includeIf | length' "$file")
-  has_exclude_if=$(yq -r '.spec.excludeIf | length' "$file")
-  if [[ "$has_include_if" != "null" && "$has_include_if" -gt 0 && "$has_exclude_if" != "null" && "$has_exclude_if" -gt 0 ]]; then
-    echo "❌ Error: $job_name has both includeIf and excludeIf set. This is not allowed. Please use only one of them." >&2
-    exit 1
-  fi
-
-  is_excluded=$(check_exclude_if "$file" "$job_name" "$closest_ancestor")
-
-  if [[ $is_excluded -eq 1 ]]; then
-    continue
-  fi
-
-  is_included=$(check_include_if "$file" "$job_name" "$closest_ancestor")
-
-  if [[ $is_included -ne 1 ]]; then
     continue
   fi
 

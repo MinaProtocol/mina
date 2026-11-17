@@ -26,9 +26,6 @@ TEST_DIR=""
 # Mainline branches for excludeIf/includeIf tests
 MAINLINE_BRANCHES=(mesa compatible develop master)
 MAINLINE_BRANCHES_COMMA_SEPARATED="$(IFS=,; echo "${MAINLINE_BRANCHES[*]}")"
-TEST_CLOSEST_ANCESTOR="develop"
-TEST_NONMATCH_ANCESTOR="nonmatchingbranch"
-TEST_CLOSEST_ANCESTOR_UPPER=$(echo "$TEST_CLOSEST_ANCESTOR" | tr '[:lower:]' '[:upper:]')
 # Setup function
 setup() {
   TEST_DIR=$(mktemp -d)
@@ -110,77 +107,6 @@ assert_not_contains() {
 # Source the functions from monorepo_lib.sh for unit testing
 source_monorepo_functions() {
   source "$SCRIPT_DIR/monorepo_lib.sh"
-}
-
-# find_closest_ancestor in a throwaway repo: master's commit is also the tip of
-# compatible and develop (the state after a forward merge), and develop has one
-# commit more.
-test_find_closest_ancestor() {
-  local repo="$TEST_DIR/ancestry"
-  git init -q "$repo"
-  (
-    cd "$repo"
-    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m base
-    git update-ref refs/remotes/origin/master HEAD
-    git update-ref refs/remotes/origin/compatible HEAD
-    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m develop-only
-    git update-ref refs/remotes/origin/develop HEAD
-    git update-ref refs/remotes/origin/mesa HEAD~1
-    git checkout -q --detach HEAD~1
-  )
-
-  local MAINLINE_BRANCHES=(master compatible mesa develop)
-  closest() {
-    (cd "$repo" && BUILDKITE_BRANCH="$1" BUILDKITE_PULL_REQUEST_BASE_BRANCH="$2" \
-      find_closest_ancestor 2>/dev/null)
-  }
-
-  assert_equals "master" "$(closest master "")" \
-    "find_closest_ancestor: a master build wins the tie"
-  assert_equals "compatible" "$(closest compatible "")" \
-    "find_closest_ancestor: a compatible build wins the tie"
-  assert_equals "compatible" "$(closest my-feature compatible)" \
-    "find_closest_ancestor: a PR's base branch wins the tie"
-  # develop contains this commit, so it ties too, and it is listed last.
-  assert_equals "develop" "$(closest my-feature "")" \
-    "find_closest_ancestor: with no preference the last tied branch wins"
-
-  (cd "$repo" && git checkout -q --detach origin/develop)
-  assert_equals "develop" "$(closest master "")" \
-    "find_closest_ancestor: a strictly closer branch beats the preference"
-
-  # A listed branch with no origin ref has no merge-base; it is skipped, so it
-  # does not read as distance 0 and win over the real base of the PR.
-  (
-    cd "$repo"
-    git checkout -q --detach origin/compatible
-    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m pr-change
-  )
-  local MAINLINE_BRANCHES=(master compatible gone develop)
-  assert_equals "compatible" "$(closest my-feature compatible)" \
-    "find_closest_ancestor: a branch missing from origin is skipped"
-  # compatible and develop tie here; with no usable preference the last wins.
-  assert_equals "develop" "$(closest my-feature gone)" \
-    "find_closest_ancestor: a PR base missing from origin falls back to distance"
-
-  # A merge-back into develop: develop merged into compatible after compatible
-  # gained three commits, so compatible is 2 commits away and develop 4.
-  (
-    cd "$repo"
-    git checkout -q --detach origin/compatible
-    for i in 1 2 3; do
-      git -c user.name=t -c user.email=t@t commit -q --allow-empty -m "compatible-$i"
-    done
-    git update-ref refs/remotes/origin/compatible HEAD
-    git -c user.name=t -c user.email=t@t merge -q --no-ff --no-edit origin/develop
-  )
-  local MAINLINE_BRANCHES=(master compatible develop)
-  assert_equals "compatible" "$(closest merge-back "")" \
-    "find_closest_ancestor: by distance a merge-back is closest to compatible"
-  assert_equals "develop" "$(closest merge-back develop)" \
-    "find_closest_ancestor: a PR's mainline base branch beats a closer branch"
-  assert_equals "compatible" "$(closest merge-back my-parent-pr)" \
-    "find_closest_ancestor: a non-mainline PR base falls back to distance"
 }
 
 # Test: has_matching_tags with filter_any mode
@@ -280,257 +206,6 @@ EOF
   assert_equals "0" "$result" "Should not select job when dirty pattern doesn't match"
 }
 
-# Test: check_exclude_if with no excludeIf
-test_check_exclude_if_no_conditions() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (no conditions)${NC}"
-
-  cat > "$TEST_DIR/NoExclude.yml" << 'EOF'
-spec:
-  name: NoExclude
-  tags: [Lint]
-  scope: [PullRequest]
-EOF
-
-  local result
-  result=$(check_exclude_if "$TEST_DIR/NoExclude.yml" "NoExclude" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "0" "$result" "Should not exclude when no excludeIf present"
-}
-
-# Test: check_exclude_if with matching ancestor
-test_check_exclude_if_matching() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (matching ancestor)${NC}"
-
-  cat > "$TEST_DIR/ExcludeMatch.yml" << EOF
-spec:
-  name: ExcludeMatch
-  tags: [Lint]
-  scope: [PullRequest]
-  excludeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Test exclusion"
-EOF
-
-  local result output
-  output=$(check_exclude_if "$TEST_DIR/ExcludeMatch.yml" "ExcludeMatch" "$TEST_CLOSEST_ANCESTOR" 2>&1)
-  result=$(echo "$output" | tail -1)
-
-  assert_equals "1" "$result" "Should exclude when ancestor matches"
-  assert_contains "$output" "excluded based on excludeIf condition" "Should show exclusion message"
-}
-
-# Test: check_exclude_if with non-matching ancestor
-test_check_exclude_if_not_matching() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (non-matching ancestor)${NC}"
-
-  cat > "$TEST_DIR/ExcludeNoMatch.yml" << EOF
-spec:
-  name: ExcludeNoMatch
-  tags: [Lint]
-  scope: [PullRequest]
-  excludeIf:
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Test exclusion"
-EOF
-
-  local result
-  result=$(check_exclude_if "$TEST_DIR/ExcludeNoMatch.yml" "ExcludeNoMatch" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "0" "$result" "Should not exclude when ancestor doesn't match"
-}
-
-# Test: check_exclude_if with non-ancestor excludeIf items
-test_check_exclude_if_skip_non_ancestor() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (skip non-ancestor items)${NC}"
-
-  cat > "$TEST_DIR/ExcludeMixed.yml" << EOF
-spec:
-  name: ExcludeMixed
-  tags: [Lint]
-  scope: [PullRequest]
-  excludeIf:
-    - someOtherField: value
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Test exclusion"
-    - futureType: something
-EOF
-
-  local result output
-  output=$(check_exclude_if "$TEST_DIR/ExcludeMixed.yml" "ExcludeMixed" "$TEST_CLOSEST_ANCESTOR" 2>&1)
-  result=$(echo "$output" | tail -1)
-
-  assert_equals "0" "$result" "Should not exclude when no ancestor matches"
-  assert_contains "$output" "Skipping excludeIf" "Should show skip messages for non-ancestor items"
-}
-
-# Test: check_exclude_if case-insensitive matching
-# Note: dhall produces branch names with capital letters (e.g., "Mesa")
-# while git branch names may be lowercase (e.g., "mesa"), so comparison must be case-insensitive
-test_check_exclude_if_exact_case() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (case-insensitive matching)${NC}"
-
-  cat > "$TEST_DIR/ExcludeCase.yml" << EOF
-spec:
-  name: ExcludeCase
-  tags: [Lint]
-  scope: [PullRequest]
-  excludeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR_UPPER
-      reason: "Test case insensitive"
-EOF
-
-  local result
-  result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "1" "$result" "Should exclude with case-insensitive matching"
-}
-
-# Test: check_include_if with no includeIf
-test_check_include_if_no_conditions() {
-  echo -e "\n${YELLOW}Testing: check_include_if (no conditions)${NC}"
-
-  cat > "$TEST_DIR/NoInclude.yml" << 'EOF'
-spec:
-  name: NoInclude
-  tags: [Lint]
-  scope: [PullRequest]
-EOF
-
-  local result
-  result=$(check_include_if "$TEST_DIR/NoInclude.yml" "NoInclude" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "1" "$result" "Should include by default when no includeIf present"
-}
-
-# Test: check_include_if with matching ancestor
-test_check_include_if_matching() {
-  echo -e "\n${YELLOW}Testing: check_include_if (matching ancestor)${NC}"
-
-  cat > "$TEST_DIR/IncludeMatch.yml" << EOF
-spec:
-  name: IncludeMatch
-  tags: [Lint]
-  scope: [PullRequest]
-  includeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Only run on Mesa descendants"
-EOF
-
-  local result output
-  output=$(check_include_if "$TEST_DIR/IncludeMatch.yml" "IncludeMatch" "$TEST_CLOSEST_ANCESTOR" 2>&1)
-  result=$(echo "$output" | tail -1)
-
-  assert_equals "1" "$result" "Should include when ancestor matches"
-  assert_contains "$output" "included based on includeIf condition" "Should show inclusion message"
-}
-
-# Test: check_include_if with non-matching ancestor
-test_check_include_if_not_matching() {
-  echo -e "\n${YELLOW}Testing: check_include_if (non-matching ancestor)${NC}"
-
-  cat > "$TEST_DIR/IncludeNoMatch.yml" << EOF
-spec:
-  name: IncludeNoMatch
-  tags: [Lint]
-  scope: [PullRequest]
-  includeIf:
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Only run on Develop descendants"
-EOF
-
-  local result output
-  output=$(check_include_if "$TEST_DIR/IncludeNoMatch.yml" "IncludeNoMatch" "$TEST_CLOSEST_ANCESTOR" 2>&1)
-  result=$(echo "$output" | tail -1)
-
-  assert_equals "0" "$result" "Should exclude when ancestor doesn't match any includeIf condition"
-  assert_contains "$output" "none of the includeIf conditions matched" "Should show exclusion message"
-}
-
-# Test: check_include_if with multiple conditions (one matches)
-test_check_include_if_multiple_one_matches() {
-  echo -e "\n${YELLOW}Testing: check_include_if (multiple conditions, one matches)${NC}"
-
-  cat > "$TEST_DIR/IncludeMultiple.yml" << EOF
-spec:
-  name: IncludeMultiple
-  tags: [Lint]
-  scope: [PullRequest]
-  includeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Run on closest"
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Run on non-matching"
-    - ancestor: nonexistent
-      reason: "Run on nonexistent"
-EOF
-
-  local result
-  result=$(check_include_if "$TEST_DIR/IncludeMultiple.yml" "IncludeMultiple" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "1" "$result" "Should include when at least one includeIf condition matches"
-}
-
-# Test: check_include_if with multiple conditions (none match)
-test_check_include_if_multiple_none_match() {
-  echo -e "\n${YELLOW}Testing: check_include_if (multiple conditions, none match)${NC}"
-
-  cat > "$TEST_DIR/IncludeNoneMatch.yml" << EOF
-spec:
-  name: IncludeNoneMatch
-  tags: [Lint]
-  scope: [PullRequest]
-  includeIf:
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Run on non-matching"
-    - ancestor: nonexistent
-      reason: "Run on nonexistent"
-EOF
-
-  local result
-  result=$(check_include_if "$TEST_DIR/IncludeNoneMatch.yml" "IncludeNoneMatch" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "0" "$result" "Should exclude when no includeIf conditions match"
-}
-
-# Test: check_include_if case-insensitive matching
-# Note: dhall produces branch names with capital letters (e.g., "Mesa")
-# while git branch names may be lowercase (e.g., "mesa"), so comparison must be case-insensitive
-test_check_include_if_exact_case() {
-  echo -e "\n${YELLOW}Testing: check_include_if (case-insensitive matching)${NC}"
-
-  cat > "$TEST_DIR/IncludeCase.yml" << EOF
-spec:
-  name: IncludeCase
-  tags: [Lint]
-  scope: [PullRequest]
-  includeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR_UPPER
-      reason: "Test case insensitive"
-EOF
-
-  local result
-  result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
-  assert_equals "1" "$result" "Should include with case-insensitive matching"
-}
-
-# Test: check_include_if with non-ancestor includeIf items
-test_check_include_if_skip_non_ancestor() {
-  echo -e "\n${YELLOW}Testing: check_include_if (skip non-ancestor items)${NC}"
-
-  cat > "$TEST_DIR/IncludeMixed.yml" << EOF
-spec:
-  name: IncludeMixed
-  tags: [Lint]
-  scope: [PullRequest]
-  includeIf:
-    - someOtherField: value
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Run on Mesa"
-    - futureType: something
-EOF
-
-  local result output
-  output=$(check_include_if "$TEST_DIR/IncludeMixed.yml" "IncludeMixed" "$TEST_CLOSEST_ANCESTOR" 2>&1)
-  result=$(echo "$output" | tail -1)
-
-  assert_equals "1" "$result" "Should include when at least one ancestor condition matches"
-  assert_contains "$output" "Skipping includeIf" "Should show skip messages for non-ancestor items"
-}
-
 # Test: Integration test - full script execution
 test_integration_full_selection() {
   echo -e "\n${YELLOW}Testing: Integration - full selection${NC}"
@@ -547,7 +222,7 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/IntegrationTest.dirtywhen"
 
   local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+  output=$("$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
@@ -577,7 +252,7 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/TagFilterTest.dirtywhen"
 
   local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+  output=$("$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
@@ -606,7 +281,7 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/ScopeFilterTest.dirtywhen"
 
   local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+  output=$("$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
@@ -617,72 +292,6 @@ EOF
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "rejected job due to scope mismatch" "Should reject job with non-matching scope"
-}
-
-# Test: Integration test - includeIf with matching ancestor
-test_integration_include_if_matching() {
-  echo -e "\n${YELLOW}Testing: Integration - includeIf matching${NC}"
-
-  cat > "$TEST_DIR/jobs/IncludeIfMatch.yml" << EOF
-spec:
-  name: IncludeIfMatch
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  includeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Only run on Develop descendants"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/IncludeIfMatch.dirtywhen"
-
-  local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "included based on includeIf condition" "Should show includeIf inclusion message"
-  assert_contains "$output" "Including job IncludeIfMatch" "Should include job when includeIf matches"
-}
-
-# Test: Integration test - includeIf with non-matching ancestor
-test_integration_include_if_not_matching() {
-  echo -e "\n${YELLOW}Testing: Integration - includeIf not matching${NC}"
-
-  cat > "$TEST_DIR/jobs/IncludeIfNoMatch.yml" << 'EOF'
-spec:
-  name: IncludeIfNoMatch
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  includeIf:
-    - ancestor: nonexistent
-      reason: "Only run on Nonexistent descendants"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/IncludeIfNoMatch.dirtywhen"
-
-  local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "none of the includeIf conditions matched" "Should show includeIf exclusion message"
-  assert_not_contains "$output" "Including job IncludeIfNoMatch" "Should not include job when includeIf doesn't match"
 }
 
 # Test: Integration test - dependency resolution
@@ -746,7 +355,7 @@ EOF
   echo "buildkite/scripts/bench/run.sh" > "$TEST_DIR/dep_diff.txt"
 
   local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+  output=$("$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags deptest \
     --filter-mode any \
@@ -786,7 +395,7 @@ EOF
   echo "bench" > "$TEST_DIR/jobs/DepBench2.dirtywhen"
 
   local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+  output=$("$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags deptest \
     --filter-mode any \
@@ -843,7 +452,7 @@ EOF
   # Full selection: every job is selected on its own, so the build is uploaded
   # by its own step and must NOT be pulled as a dependency.
   local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+  output=$("$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags fulldep \
     --filter-mode any \
@@ -855,79 +464,6 @@ EOF
 
   assert_contains "$output" "Including job FullDepTest" "Dependent test is selected"
   assert_not_contains "$output" "Including dependency job FullDepBuild" "Selectable build is NOT pulled as a dependency"
-}
-
-# Test: Integration test - both excludeIf and includeIf (includeIf matches, excludeIf doesn't)
-test_integration_both_include_exclude_include_wins() {
-  echo -e "\n${YELLOW}Testing: Integration - includeIf matches, excludeIf doesn't${NC}"
-
-  cat > "$TEST_DIR/jobs/BothIncludeWins.yml" << EOF
-spec:
-  name: BothIncludeWins
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  excludeIf:
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Exclude on Mesa"
-  includeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Include on Develop"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/BothIncludeWins.dirtywhen"
-
-  local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "Including job BothIncludeWins" "Should include job when includeIf matches and excludeIf doesn't"
-}
-
-# Test: Integration test - both excludeIf and includeIf (excludeIf matches)
-test_integration_both_include_exclude_exclude_wins() {
-  echo -e "\n${YELLOW}Testing: Integration - excludeIf matches (takes priority)${NC}"
-
-  cat > "$TEST_DIR/jobs/BothExcludeWins.yml" << EOF
-spec:
-  name: BothExcludeWins
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  excludeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Exclude on Develop"
-  includeIf:
-    - ancestor: $TEST_CLOSEST_ANCESTOR
-      reason: "Include on Develop"
-    - ancestor: $TEST_NONMATCH_ANCESTOR
-      reason: "Include on Mesa"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/BothExcludeWins.dirtywhen"
-
-  local output
-  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "excluded based on excludeIf condition" "Should show excludeIf message"
-  assert_not_contains "$output" "Including job BothExcludeWins" "Should not include job when excludeIf matches (even if includeIf also matches)"
 }
 
 # Main test runner
@@ -961,25 +497,11 @@ main() {
   test_scope_matches
   test_select_job_full
   test_select_job_triaged
-  test_check_exclude_if_no_conditions
-  test_check_exclude_if_matching
-  test_check_exclude_if_not_matching
-  test_check_exclude_if_skip_non_ancestor
-  test_check_exclude_if_exact_case
-  test_check_include_if_no_conditions
-  test_check_include_if_matching
-  test_check_include_if_not_matching
-  test_check_include_if_multiple_one_matches
-  test_check_include_if_multiple_none_match
-  test_check_include_if_exact_case
-  test_check_include_if_skip_non_ancestor
-  test_find_closest_ancestor
 
   # Run integration tests
   test_integration_full_selection
   test_integration_tag_filtering
   test_integration_scope_filtering
-  test_integration_include_if_not_matching
   test_integration_dependency_resolution
   test_integration_dependency_dedup
   test_integration_dependency_skip_when_selectable
