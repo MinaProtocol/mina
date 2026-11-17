@@ -95,7 +95,7 @@ val scalars_env :
   -> ( 't
      , 't
      , 'b )
-     Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+     Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
@@ -107,7 +107,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> ( 't
        , 't
        , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't array
     -> 't
@@ -120,7 +120,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> ( 't
        , 't
        , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> ( 't
        , 't
