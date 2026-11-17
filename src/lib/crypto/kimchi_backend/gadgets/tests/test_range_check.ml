@@ -11,8 +11,8 @@ open Kimchi_gadgets_test_runner
 let () =
   try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
 
-(** Test range_check64 gadget. Returns constraint system if satisfied. *)
-let test_range_check64 ?cs base10 =
+(** Test range_check64 gadget. Returns the prover keypair if satisfied. *)
+let test_range_check64 ?proof_keypair base10 =
   let open Runner.Impl in
   let value = Common.field_of_base10 base10 in
 
@@ -22,13 +22,14 @@ let test_range_check64 ?cs base10 =
     Boolean.Assert.is_true (Field.equal value value)
   in
 
-  let cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ?cs (fun () -> make_circuit value)
+  let _cs, proof_keypair, _proof =
+    Runner.generate_and_verify_proof ?proof_keypair (fun () ->
+        make_circuit value )
   in
-  cs
+  proof_keypair
 
-(** Test multi_range_check gadget. Returns constraint system if satisfied. *)
-let test_multi_range_check ?cs v0 v1 v2 =
+(** Test multi_range_check gadget. Returns the prover keypair if satisfied. *)
+let test_multi_range_check ?proof_keypair v0 v1 v2 =
   let open Runner.Impl in
   let v0 = Common.field_of_base10 v0 in
   let v1 = Common.field_of_base10 v1 in
@@ -42,10 +43,11 @@ let test_multi_range_check ?cs v0 v1 v2 =
     Range_check.multi values.(0) values.(1) values.(2)
   in
 
-  let cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ?cs (fun () -> make_circuit v0 v1 v2)
+  let _cs, proof_keypair, _proof =
+    Runner.generate_and_verify_proof ?proof_keypair (fun () ->
+        make_circuit v0 v1 v2 )
   in
-  cs
+  proof_keypair
 
 (** Test compact_multi_range_check gadget. *)
 let test_compact_multi_range_check v01 v2 : unit =
@@ -60,7 +62,7 @@ let test_compact_multi_range_check v01 v2 : unit =
     Range_check.compact_multi v01 v2
   in
 
-  let cs, _proof_keypair, _proof =
+  let _cs, proof_keypair, _proof =
     Runner.generate_and_verify_proof (fun () -> make_circuit v01 v2)
   in
 
@@ -71,79 +73,88 @@ let test_compact_multi_range_check v01 v2 : unit =
   let v2 = mutate_witness v2 in
 
   let _cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ~cs (fun () -> make_circuit v01 v2)
+    Runner.generate_and_verify_proof ~proof_keypair (fun () ->
+        make_circuit v01 v2 )
   in
   ()
 
 (* range_check64 tests *)
 let test_range_check64_positive () =
-  let cs = test_range_check64 "0" in
-  let _cs = test_range_check64 ~cs "4294967" in
-  let _cs = test_range_check64 ~cs "18446744073709551615" in
+  let proof_keypair = test_range_check64 "0" in
+  let _proof_keypair = test_range_check64 ~proof_keypair "4294967" in
+  let _proof_keypair =
+    test_range_check64 ~proof_keypair "18446744073709551615"
+  in
   (* 2^64 - 1 *)
   ()
 
 let test_range_check64_negative () =
-  let cs = test_range_check64 "0" in
+  let proof_keypair = test_range_check64 "0" in
   Alcotest.(check bool)
     "2^64 should fail" true
     (Common.is_error (fun () ->
-         test_range_check64 ~cs "18446744073709551616" (* 2^64 *) ) ) ;
+         test_range_check64 ~proof_keypair "18446744073709551616" (* 2^64 *) )
+    ) ;
   Alcotest.(check bool)
     "2^127 should fail" true
     (Common.is_error (fun () ->
-         test_range_check64 ~cs "170141183460469231731687303715884105728"
+         test_range_check64 ~proof_keypair
+           "170141183460469231731687303715884105728"
          (* 2^127 *) ) )
 
 (* multi_range_check tests *)
 let test_multi_range_check_positive () =
-  let cs = test_multi_range_check "0" "4294967" "309485009821345068724781055" in
-  let _cs =
-    test_multi_range_check ~cs "267475740839011166017999907"
+  let proof_keypair =
+    test_multi_range_check "0" "4294967" "309485009821345068724781055"
+  in
+  let _proof_keypair =
+    test_multi_range_check ~proof_keypair "267475740839011166017999907"
       "120402749546803056196583080" "1159834292458813579124542"
   in
-  let _cs =
-    test_multi_range_check ~cs "309485009821345068724781055"
+  let _proof_keypair =
+    test_multi_range_check ~proof_keypair "309485009821345068724781055"
       "309485009821345068724781055" "309485009821345068724781055"
   in
-  let _cs = test_multi_range_check ~cs "0" "0" "0" in
+  let _proof_keypair = test_multi_range_check ~proof_keypair "0" "0" "0" in
   ()
 
 let test_multi_range_check_negative () =
-  let cs = test_multi_range_check "0" "4294967" "309485009821345068724781055" in
+  let proof_keypair =
+    test_multi_range_check "0" "4294967" "309485009821345068724781055"
+  in
   Alcotest.(check bool)
     "v2 out of range should fail" true
     (Common.is_error (fun () ->
-         test_multi_range_check ~cs "0" "4294967" "309485009821345068724781056" )
-    ) ;
+         test_multi_range_check ~proof_keypair "0" "4294967"
+           "309485009821345068724781056" ) ) ;
   Alcotest.(check bool)
     "v1 out of range should fail" true
     (Common.is_error (fun () ->
-         test_multi_range_check ~cs "0" "309485009821345068724781056"
+         test_multi_range_check ~proof_keypair "0" "309485009821345068724781056"
            "309485009821345068724781055" ) ) ;
   Alcotest.(check bool)
     "v0 out of range should fail" true
     (Common.is_error (fun () ->
-         test_multi_range_check ~cs "309485009821345068724781056" "4294967"
-           "309485009821345068724781055" ) ) ;
+         test_multi_range_check ~proof_keypair "309485009821345068724781056"
+           "4294967" "309485009821345068724781055" ) ) ;
   Alcotest.(check bool)
     "very large values should fail" true
     (Common.is_error (fun () ->
-         test_multi_range_check ~cs
+         test_multi_range_check ~proof_keypair
            "28948022309329048855892746252171976963317496166410141009864396001978282409984"
            "0170141183460469231731687303715884105728"
            "170141183460469231731687303715884105728" ) ) ;
   Alcotest.(check bool)
     "v2 very large should fail" true
     (Common.is_error (fun () ->
-         test_multi_range_check ~cs "0" "0"
+         test_multi_range_check ~proof_keypair "0" "0"
            "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
     ) ;
   Alcotest.(check bool)
     "v0 very large should fail" true
     (Common.is_error (fun () ->
-         test_multi_range_check ~cs "0170141183460469231731687303715884105728"
-           "0"
+         test_multi_range_check ~proof_keypair
+           "0170141183460469231731687303715884105728" "0"
            "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
     )
 
