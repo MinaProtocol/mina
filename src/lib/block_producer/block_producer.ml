@@ -244,6 +244,56 @@ let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
           | _ ->
               diff_result )
 
+type applied_staged_ledger_diff =
+  { staged_ledger_hash : Staged_ledger_hash.t
+  ; ledger_proof : Ledger_proof.Cached.t option
+  ; is_new_stack : bool
+  ; pending_coinbase_update : Pending_coinbase.Update.t
+  }
+
+let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
+    ~global_slot ~previous_state_view ~state_and_body_hash ~coinbase_receiver
+    ~supercharge_coinbase ~zkapp_cmd_limit_hardcap ~signature_kind diff =
+  match%map
+    Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
+      ~global_slot diff ~logger ~current_state_view:previous_state_view
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+      ~zkapp_cmd_limit_hardcap ~signature_kind
+  with
+  | Ok
+      ( `Ledger_proof ledger_proof_opt
+      , `Staged_ledger transitioned_staged_ledger
+      , `Accounts_created _
+      , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) ->
+      [%log internal] "Hash_new_staged_ledger" ;
+      let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
+      [%log internal] "Hash_new_staged_ledger_done" ;
+      (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+      ignore
+      @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
+           (Staged_ledger.ledger transitioned_staged_ledger) ;
+      Some
+        { staged_ledger_hash
+        ; ledger_proof = ledger_proof_opt
+        ; is_new_stack
+        ; pending_coinbase_update
+        }
+  | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
+      [%log error] "Failed to apply the diff: $error"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      None
+  | Error e ->
+      [%log error]
+        ~metadata:
+          [ ("error", `String (Staged_ledger.Staged_ledger_error.to_string e))
+          ; ( "diff"
+            , Staged_ledger_diff.Stable.Latest.to_yojson
+              @@ Staged_ledger_diff.read_all_proofs_from_disk
+              @@ Staged_ledger_diff.forget diff )
+          ]
+        "Error applying the diff $diff: $error" ;
+      None
+
 let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
@@ -306,55 +356,17 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     , `String (Staged_ledger.Staged_ledger_error.to_string e) )
                   ] ;
               return None
-          | Ok diff -> (
-              match%map
-                Staged_ledger.apply_diff_unchecked staged_ledger
-                  ~constraint_constants ~global_slot diff ~logger
-                  ~current_state_view:previous_state_view
+          | Ok diff ->
+              let%map applied =
+                apply_staged_ledger_diff ~logger ~constraint_constants
+                  ~staged_ledger ~global_slot ~previous_state_view
                   ~state_and_body_hash:
                     ( previous_protocol_state_hash
                     , previous_protocol_state_body_hash )
                   ~coinbase_receiver ~supercharge_coinbase
-                  ~zkapp_cmd_limit_hardcap ~signature_kind
-              with
-              | Ok
-                  ( `Ledger_proof ledger_proof_opt
-                  , `Staged_ledger transitioned_staged_ledger
-                  , `Accounts_created _
-                  , `Pending_coinbase_update
-                      (is_new_stack, pending_coinbase_update) ) ->
-                  [%log internal] "Hash_new_staged_ledger" ;
-                  let staged_ledger_hash =
-                    Staged_ledger.hash transitioned_staged_ledger
-                  in
-                  [%log internal] "Hash_new_staged_ledger_done" ;
-                  (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-                  ignore
-                  @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
-                       (Staged_ledger.ledger transitioned_staged_ledger) ;
-                  Some
-                    ( diff
-                    , staged_ledger_hash
-                    , ledger_proof_opt
-                    , is_new_stack
-                    , pending_coinbase_update )
-              | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                  [%log error] "Failed to apply the diff: $error"
-                    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-                  None
-              | Error e ->
-                  [%log error]
-                    ~metadata:
-                      [ ( "error"
-                        , `String
-                            (Staged_ledger.Staged_ledger_error.to_string e) )
-                      ; ( "diff"
-                        , Staged_ledger_diff.Stable.Latest.to_yojson
-                          @@ Staged_ledger_diff.read_all_proofs_from_disk
-                          @@ Staged_ledger_diff.forget diff )
-                      ]
-                    "Error applying the diff $diff: $error" ;
-                  None ))
+                  ~zkapp_cmd_limit_hardcap ~signature_kind diff
+              in
+              Option.map applied ~f:(fun applied -> (diff, applied)))
       in
       [%log internal] "Apply_staged_ledger_diff_done" ;
       match res with
@@ -362,10 +374,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           Interruptible.return None
       | Some
           ( diff
-          , next_staged_ledger_hash
-          , ledger_proof_opt
-          , is_new_stack
-          , pending_coinbase_update ) ->
+          , { staged_ledger_hash = next_staged_ledger_hash
+            ; ledger_proof = ledger_proof_opt
+            ; is_new_stack
+            ; pending_coinbase_update
+            } ) ->
           let diff_unwrapped =
             Staged_ledger_diff.read_all_proofs_from_disk
             @@ Staged_ledger_diff.forget diff
