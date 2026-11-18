@@ -266,6 +266,22 @@ let get_account ~logger node_uri ~account_id =
   exec_graphql_request ~logger ~node_uri ~query_name:"get_account_graphql"
     get_account_obj
 
+(* The exact bytes of the token symbol and the zkApp URI. Needs a daemon that has
+   these fields: [get_account] does not. *)
+let get_account_bytes ~logger node_uri ~account_id =
+  let pk = Mina_base.Account_id.public_key account_id in
+  let token = Mina_base.Account_id.token_id account_id in
+  let query =
+    Queries.Account_bytes.(
+      make
+      @@ makeVariables
+           ~public_key:(Graphql_lib.Encoders.public_key pk)
+           ~token:(Graphql_lib.Encoders.token token)
+           ())
+  in
+  exec_graphql_request ~logger ~node_uri ~query_name:"get_account_bytes_graphql"
+    query
+
 let get_account_data ~logger node_uri ~account_id =
   let open Deferred.Or_error.Let_syntax in
   let public_key = Mina_base.Account_id.public_key account_id in
@@ -355,8 +371,9 @@ let get_account_update ~logger t ~account_id =
   let open Deferred.Or_error in
   let open Let_syntax in
   let%bind account_obj = get_account ~logger t ~account_id in
-  match account_obj.account with
-  | Some account ->
+  let%bind bytes_obj = get_account_bytes ~logger t ~account_id in
+  match (account_obj.account, bytes_obj.account) with
+  | Some account, Some exact ->
       let open Mina_base.Zkapp_basic.Set_or_keep in
       let%bind app_state =
         match account.zkappState with
@@ -403,16 +420,16 @@ let get_account_update ~logger t ~account_id =
             fail (Error.of_string "Expected permissions in account")
       in
       let%bind zkapp_uri =
-        match account.zkappUri with
-        | Some s ->
-            return @@ Set s
+        match exact.zkappUriBytes with
+        | Some uri ->
+            return @@ Set (Graphql_lib.Arbitrary_bytes.of_hex uri.hex)
         | None ->
             fail (Error.of_string "Expected zkApp URI in account")
       in
       let%bind token_symbol =
-        match account.tokenSymbol with
-        | Some s ->
-            return @@ Set s
+        match exact.tokenSymbolBytes with
+        | Some symbol ->
+            return @@ Set (Graphql_lib.Arbitrary_bytes.of_hex symbol.hex)
         | None ->
             fail (Error.of_string "Expected token symbol in account")
       in
@@ -484,7 +501,7 @@ let get_account_update ~logger t ~account_id =
           ; voting_for
           }
           : Mina_base.Account_update.Update.t )
-  | None ->
+  | None, _ | _, None ->
       fail (Error.of_string "Could not get account from ledger")
 
 let transaction_id_to_string id =
@@ -875,6 +892,32 @@ let get_metrics ~logger node_uri =
       ; transaction_pool_size
       }
 
+let get_transaction_pool_status ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  let query_obj = Queries.Query_transaction_pool_status.make () in
+  let%bind query_result_obj =
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"query_transaction_pool_status" query_obj
+  in
+  let status = query_result_obj.transactionPoolStatus in
+  let%map minimum_fee_per_weight_unit =
+    Option.value_map status.minimumFeePerWeightUnit ~default:(return None)
+      ~f:(fun fee_rate ->
+        Deferred.return
+          (let open Or_error.Let_syntax in
+          let%bind q = Or_error.try_with (fun () -> Q.of_string fee_rate) in
+          Currency.Fee_rate.of_q q
+          |> Result.of_option
+               ~error:
+                 (Error.createf "Invalid minimumFeePerWeightUnit %s" fee_rate)
+          >>| Option.some) )
+  in
+  Types.
+    { size = status.size
+    ; max_size = status.maxSize
+    ; minimum_fee_per_weight_unit
+    }
+
 let start_filtered_log node_uri ~logger ~log_filter ~retry_delay_sec =
   let open Deferred.Let_syntax in
   let query_obj =
@@ -1032,6 +1075,82 @@ let get_daemon_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri =
     ; peer_count = List.length peers
     ; peers
     }
+
+(** Get what the node is doing to reach the network's chain. *)
+let get_bootstrap_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri
+    =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting bootstrap status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Bootstrap_status.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ?num_tries ?retry_delay_sec ?deadline ~logger ~node_uri
+      ~query_name:"bootstrap_status" query_obj
+  in
+  let bs = result.bootstrapStatus in
+  let phase : Bootstrap_status.Phase.t =
+    match bs.phase with
+    | `STARTING ->
+        Starting
+    | `WAITING_FOR_GENESIS ->
+        Waiting_for_genesis
+    | `WAITING_FOR_PEERS ->
+        Waiting_for_peers
+    | `FETCHING_BEST_TIP ->
+        Fetching_best_tip
+    | `SYNCING_ROOT_LEDGER ->
+        Syncing_root_ledger
+    | `DOWNLOADING_SCAN_STATE ->
+        Downloading_scan_state
+    | `BUILDING_STAGED_LEDGER ->
+        Building_staged_ledger
+    | `SYNCING_EPOCH_LEDGERS ->
+        Syncing_epoch_ledgers
+    | `LOADING_FRONTIER ->
+        Loading_frontier
+    | `PARTICIPATING ->
+        Participating
+  in
+  let ledger_syncs =
+    bs.ledgerSyncs |> Array.to_list
+    |> List.map
+         ~f:(fun (s : Queries.Bootstrap_status.t_bootstrapStatus_ledgerSyncs) ->
+           let ledger : Bootstrap_status.Ledger.t =
+             match s.ledger with
+             | `ROOT_SNARKED ->
+                 Root_snarked
+             | `STAKING_EPOCH ->
+                 Staking_epoch
+             | `NEXT_EPOCH ->
+                 Next_epoch
+           in
+           let p = s.progress in
+           { Bootstrap_status.Snapshot.ledger
+           ; target = s.target
+           ; active = s.active
+           ; progress =
+               { targets = p.targets
+               ; target_set_at = p.targetSetAt
+               ; pending_child_hashes = p.pendingChildHashes
+               ; pending_contents = p.pendingContents
+               ; synced = p.synced
+               ; answers_accepted = p.answersAccepted
+               ; answers_ignored = p.answersIgnored
+               ; answers_rejected = p.answersRejected
+               ; last_accepted_answer_at = p.lastAcceptedAnswerAt
+               ; num_accounts = p.numAccounts
+               ; accounts_settled = p.accountsSettled
+               ; accounts_received = p.accountsReceived
+               }
+           } )
+  in
+  { Bootstrap_status.Snapshot.phase
+  ; phase_started_at = bs.phaseStartedAt
+  ; bootstrap_started_at = bs.bootstrapStartedAt
+  ; bootstrap_attempts = bs.bootstrapAttempts
+  ; last_attempt_failure = bs.lastAttemptFailure
+  ; ledger_syncs
+  }
 
 (** Check readiness: synced, peer count above threshold, chain caught up. *)
 let get_readiness ?num_tries ?retry_delay_sec ?deadline ~logger node_uri

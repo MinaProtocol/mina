@@ -22,10 +22,11 @@ type t =
   { protocol : string
   ; id : Libp2p_ipc.stream_id
   ; mutable state : state
+  ; mutable lost : bool
   ; peer : Peer.t
   ; incoming_r : string Pipe.Reader.t
   ; incoming_w : string Pipe.Writer.t
-  ; outgoing_w : string Pipe.Writer.t
+  ; outgoing_w : Bigstring.t Pipe.Writer.t
   }
 
 let id { id; _ } = id
@@ -41,14 +42,18 @@ let pipes { incoming_r; outgoing_w; _ } = (incoming_r, outgoing_w)
 let data_received { incoming_w; _ } data =
   don't_wait_for (Pipe.write_if_open incoming_w data)
 
-let reset ~helper { id; _ } =
+let mark_lost t = t.lost <- true
+
+let reset ~helper { id; lost; _ } =
   (* NOTE: do not close the pipes here. Reset_stream should end up
       notifying us that streamReadComplete. We can reset the stream (telling
       the remote peer to stop writing) and still be sending data ourselves. *)
-  Libp2p_helper.do_rpc helper
-    (module Libp2p_ipc.Rpcs.ResetStream)
-    (Libp2p_ipc.Rpcs.ResetStream.create_request ~stream_id:id)
-  |> Deferred.Or_error.ignore_m
+  if lost then Deferred.Or_error.return ()
+  else
+    Libp2p_helper.do_rpc helper
+      (module Libp2p_ipc.Rpcs.ResetStream)
+      (Libp2p_ipc.Rpcs.ResetStream.create_request ~stream_id:id)
+    |> Deferred.Or_error.ignore_m
 
 let stream_state_invariant ~logger t =
   let us_closed = Pipe.is_closed t.outgoing_w in
@@ -130,15 +135,15 @@ let stream_closed ~logger ~who_closed t =
 
 let max_chunk_size = 16777216 (* 16 MiB *)
 
-let split_string ~every b =
-  let blen = String.length b in
+let split_bigstring ~every b =
+  let blen = Bigstring.length b in
   let num_chunks = (blen + every - 1) / every in
-  List.init num_chunks ~f:(fun i ->
+  Sequence.init num_chunks ~f:(fun i ->
       let pos = i * every in
       let len = if i + 1 = num_chunks then blen - pos else every in
-      String.sub ~pos ~len b )
+      Bigstring.To_string.sub ~pos ~len b )
 
-let%test_unit "split_string" =
+let%test_unit "split_bigstring" =
   let gen =
     let module Gen = Quickcheck.Generator in
     let%bind.Gen every = Gen.small_positive_int in
@@ -156,8 +161,10 @@ let%test_unit "split_string" =
     (every, List.append rest last)
   in
   Quickcheck.test gen ~f:(fun (every, expected) ->
-      let s = String.concat expected in
-      assert (List.equal String.equal expected @@ split_string ~every s) )
+      let s = Bigstring.of_string (String.concat expected) in
+      assert (
+        List.equal String.equal expected
+        @@ Sequence.to_list (split_bigstring ~every s) ) )
 
 let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     ~release_stream =
@@ -167,6 +174,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     { id = stream_id
     ; protocol
     ; state = FullyOpen
+    ; lost = false
     ; peer
     ; incoming_r
     ; incoming_w
@@ -179,14 +187,21 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
           (* The stream has already failed, no need to process this message. *)
           Deferred.return encountered_error
         else
-          let parts = split_string msg ~every:max_chunk_size in
-          match%map
-            Deferred.Or_error.List.iter parts ~f:(fun data ->
-                Deferred.Or_error.ignore_m
-                @@ Libp2p_helper.do_rpc helper
-                     (module Libp2p_ipc.Rpcs.SendStream)
-                     (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
-          with
+          let rec send_parts parts =
+            match Sequence.next parts with
+            | None ->
+                Deferred.Or_error.return ()
+            | Some (data, parts) ->
+                let%bind.Deferred.Or_error () =
+                  Deferred.Or_error.ignore_m
+                  @@ Libp2p_helper.do_rpc helper
+                       (module Libp2p_ipc.Rpcs.SendStream)
+                       (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id
+                          ~data )
+                in
+                send_parts parts
+          in
+          match%map send_parts (split_bigstring msg ~every:max_chunk_size) with
           | Ok _ ->
               false
           | Error e ->

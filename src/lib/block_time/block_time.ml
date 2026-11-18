@@ -95,6 +95,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
             offset
 
       let get_time_offset ~logger = basic ~logger ()
+
+      module For_tests = struct
+        let manual ~start =
+          let current = ref start in
+          ( (fun () -> Time.diff (Time.now ()) !current)
+          , fun span -> current := Time.add !current span )
+      end
     end
 
     module B = Bits

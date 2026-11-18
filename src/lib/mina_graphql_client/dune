@@ -20,11 +20,13 @@
   uri
   integers
   result
+  zarith
   cohttp
   cohttp-async
   yojson
   ppx_deriving_yojson.runtime
   ;; local libraries
+  bootstrap_status
   graphql_lib
   generated_graphql_queries
   mina_graphql

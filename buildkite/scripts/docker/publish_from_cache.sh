@@ -11,6 +11,15 @@
 #   MINA_READ_CACHE_ROOT (else BUILDKITE_BUILD_ID)  the packaging build
 #   MINA_GENERIC_CACHE_ROOT                         the generic stage, if separate
 #
+# Only the release images are pushed, as select_release_packages.sh keeps only
+# the release packages. An archive is <service>/<tag>.tar.zst, and it is
+# published when its service is in MINA_RELEASE_DOCKERS (comma separated, by
+# default the daemon, the archive and rosetta) and its tag matches one of the
+# patterns in MINA_RELEASE_DOCKER_TAGS (comma separated globs, by default every
+# tag). The rest is listed and left in the cache: the auto-hardfork image, the
+# delegation verifier, or with MINA_RELEASE_DOCKER_TAGS="*-noble-devnet" every
+# other codename and variant.
+#
 # One archive at a time: load, check its tags against the registry, push, then
 # drop it from the local store. A tag already in the registry is skipped when it
 # holds this very image (a retried step), and refused otherwise unless
@@ -23,6 +32,27 @@
 # hour, and the first push then failed with "An image does not exist locally".
 # Holding one image for the minutes it takes to push it keeps that window small,
 # and the store small for the other jobs on the agent.
+#
+# Where they go is decided here, not at packaging time. With
+# MINA_PUBLISH_TARGET_REGISTRY set, each image is given the same name and tags
+# in that registry and those are pushed (same name, same tag, other registry).
+# The registry in the archive's tags is where packaging was told the images
+# would go; when it is the target, they are pushed as tagged, and when it is
+# not, the publish env wins and says so in the log. A release packaged for
+# docker.io and published with the variable unset therefore goes to the
+# internal registry, the publish job's default, not to docker.io. Unset, the
+# images are pushed as tagged.
+#
+# MINA_PUBLISH_HASH_TAG=0 pushes the version tag only: the public registry
+# gets no hash tag (DockerRepo.hashTag), whatever the archive holds.
+#
+# MINA_PUBLISH_MIRROR=1 marks the second target of a release. Its selection
+# comes from MINA_RELEASE_DOCKER_MIRROR_TAGS when that is set, else from
+# MINA_RELEASE_DOCKER_TAGS as above, so a release can push every image to
+# docker.io and only "*-noble-mainnet" to the internal registry.
+#
+# Jobs/Release/PublishDockers.dhall renders one run per target, from
+# MINA_RELEASE_DOCKER_REPO and MINA_RELEASE_DOCKER_MIRROR.
 #
 # DRY_RUN=1 lists what would be pushed.
 
@@ -49,6 +79,67 @@ if [[ ${#ARCHIVES[@]} -eq 0 ]]; then
   echo "❌ No images to publish under ${ROOTS[*]}: did the packaging stage run?" >&2
   exit 1
 fi
+
+TARGET_REGISTRY="${MINA_PUBLISH_TARGET_REGISTRY:-}"
+KEEP_HASH_TAG="${MINA_PUBLISH_HASH_TAG:-1}"
+if [[ "${MINA_PUBLISH_MIRROR:-0}" == "1" ]]; then
+  TAG_SELECTION="${MINA_RELEASE_DOCKER_MIRROR_TAGS:-${MINA_RELEASE_DOCKER_TAGS:-*}}"
+else
+  TAG_SELECTION="${MINA_RELEASE_DOCKER_TAGS:-*}"
+fi
+IFS=',' read -ra SERVICES <<< "${MINA_RELEASE_DOCKERS:-mina-daemon,mina-archive,mina-rosetta}"
+IFS=',' read -ra TAG_PATTERNS <<< "$TAG_SELECTION"
+
+# is_release_image <service> <tag>
+is_release_image () {
+  local service="$1" tag="$2" s p
+  for s in "${SERVICES[@]}"; do
+    [[ "$service" == "${s// /}" ]] || continue
+    for p in "${TAG_PATTERNS[@]}"; do
+      # shellcheck disable=SC2053 # the pattern is meant to glob
+      [[ "$tag" == ${p// /} ]] && return 0
+    done
+  done
+  return 1
+}
+
+SELECTED=()
+SKIPPED=()
+for archive in "${ARCHIVES[@]}"; do
+  service="$(basename "$(dirname "$archive")")"
+  tag="$(basename "$archive" .tar.zst)"
+  if is_release_image "$service" "$tag"; then
+    SELECTED+=("$archive")
+  else
+    SKIPPED+=("${service}/${tag}")
+  fi
+done
+
+if [[ ${#SKIPPED[@]} -gt 0 ]]; then
+  echo "--- Not release images (MINA_RELEASE_DOCKERS=${SERVICES[*]}, tags ${TAG_PATTERNS[*]}), left in the cache:"
+  printf '  - %s\n' "${SKIPPED[@]}"
+fi
+
+if [[ ${#SELECTED[@]} -eq 0 ]]; then
+  echo "❌ None of the ${#ARCHIVES[@]} image(s) under ${ROOTS[*]} is a release image." >&2
+  exit 1
+fi
+
+# retag_for_registry <tag>: the same image name and tag in the target registry.
+retag_for_registry () {
+  echo "${TARGET_REGISTRY}/${1##*/}"
+}
+
+# registry_of <tag>: the registry part of a tag, in full. docker load prints a
+# docker.io tag without its host ("minaprotocol/mina-daemon:1.0"), so a
+# registry with no host is docker.io.
+registry_of () {
+  local registry="${1%/*}"
+  if [[ "$registry" != */* && "$registry" != *.* && "$registry" != *:* ]]; then
+    registry="docker.io/${registry}"
+  fi
+  echo "$registry"
+}
 
 publish_tag () {
   # publish_tag <tag> <primary> <image id>: push, or alias registry-side.
@@ -80,12 +171,51 @@ publish_tag () {
 }
 
 PUSHED=0
-for archive in "${ARCHIVES[@]}"; do
+for archive in "${SELECTED[@]}"; do
   echo "--- Loading ${archive}"
   mapfile -t tags < <(zstd -dc "$archive" | docker load | sed -n 's/^Loaded image: //p')
   if [[ ${#tags[@]} -eq 0 ]]; then
     echo "❌ ${archive} holds no tagged image" >&2
     exit 1
+  fi
+  loaded=("${tags[@]}")
+  if [[ "$KEEP_HASH_TAG" != "1" ]]; then
+    # build.sh names the archive after the version tag. Keep that one, in
+    # whatever order docker load prints the tags.
+    version="$(basename "$archive" .tar.zst)"
+    kept=()
+    dropped=()
+    for tag in "${tags[@]}"; do
+      if [[ "${tag##*:}" == "$version" ]]; then
+        kept+=("$tag")
+      else
+        dropped+=("$tag")
+      fi
+    done
+    if [[ ${#kept[@]} -eq 0 ]]; then
+      echo "❌ ${archive} holds no ${version} tag: ${tags[*]}" >&2
+      exit 1
+    fi
+    if [[ ${#dropped[@]} -gt 0 ]]; then
+      echo "    not for this registry: ${dropped[*]}"
+    fi
+    tags=("${kept[@]}")
+  fi
+  if [[ -n "$TARGET_REGISTRY" ]]; then
+    # The archive holds the tags of the registry packaging was told about.
+    # Give the image the same tags in the target registry and publish those.
+    retagged=()
+    for tag in "${tags[@]}"; do
+      target="$(retag_for_registry "$tag")"
+      if [[ "$target" != "$tag" ]]; then
+        docker tag "$tag" "$target"
+      fi
+      retagged+=("$target")
+    done
+    if [[ "$(registry_of "${retagged[0]}")" != "$(registry_of "${tags[0]}")" ]]; then
+      echo "    tagged for $(registry_of "${tags[0]}"), publishing to ${TARGET_REGISTRY}"
+    fi
+    tags=("${retagged[@]}")
   fi
   primary="${tags[0]}"
   id="$(docker image inspect --format '{{.Id}}' "$primary")"
@@ -93,8 +223,12 @@ for archive in "${ARCHIVES[@]}"; do
     publish_tag "$tag" "$primary" "$id"
   done
   # Done with it: free the store for the next archive and for the other jobs.
-  # Best effort, and only an image this run loaded.
-  docker image rm --no-prune "${tags[@]}" > /dev/null 2>&1 || true
+  # Best effort, and only an image this run loaded or tagged.
+  remove=("${loaded[@]}")
+  if [[ "${tags[*]}" != "${loaded[*]}" ]]; then
+    remove+=("${tags[@]}")
+  fi
+  docker image rm --no-prune "${remove[@]}" > /dev/null 2>&1 || true
 done
 
-echo "✅ ${PUSHED} tag(s) $([[ "$DRY_RUN" == "1" ]] && echo "would be " )published from ${#ARCHIVES[@]} image(s)."
+echo "✅ ${PUSHED} tag(s) $([[ "$DRY_RUN" == "1" ]] && echo "would be " )published from ${#SELECTED[@]} image(s), ${#SKIPPED[@]} left in the cache."

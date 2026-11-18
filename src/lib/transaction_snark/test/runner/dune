@@ -1,0 +1,25 @@
+(test
+ (name main)
+ (libraries
+  ;; opam libraries
+  alcotest
+  ;; local libraries
+  account_timing_tests
+  account_update_network_id
+  account_update_precondition_tests
+  app_state_tests
+  delegate_tests
+  fee_payer_tests
+  multisig_tests
+  permissions_tests
+  ring_sig_tests
+  token_symbol_tests
+  transaction_union_tests
+  transaction_snark_tests_access_permission
+  verification_key_permission_tests
+  verification_key_tests
+  voting_for_tests
+  zkapp_deploy_tests
+  zkapp_payments_tests
+  zkapp_tokens_tests
+  zkapp_uri_tests))

@@ -1,0 +1,17 @@
+(library
+ (name bootstrap_status)
+ (public_name bootstrap_status)
+ (libraries
+  ;; opam libraries
+  async_kernel
+  core
+  core_kernel
+  sexplib0
+  ;; local libraries
+  mina_base
+  syncable_ledger)
+ (preprocess
+  (pps mina_ppx))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "What a node is doing to reach the network's chain"))

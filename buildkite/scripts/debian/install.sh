@@ -41,6 +41,19 @@ fi
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
 
+# The packaging jobs write to debians/<codename>[/<variant>]/ (see
+# debian/write_to_cache.sh). Read the folder of the build this job depends on.
+# The variant comes from APPS_BUILD_FLAG and APPS_ARCH, as in
+# apps/restore_app.sh, so a job that restores instrumented binaries and falls
+# back to the .deb reads the instrumented packages. DEB_VARIANT overrides it.
+if [[ ! -v DEB_VARIANT ]]; then
+  segments=()
+  [[ "${APPS_BUILD_FLAG:-}" == "instrumented" ]] && segments+=("instrumented")
+  [[ "${APPS_ARCH:-amd64}" == "arm64" ]] && segments+=("arm64")
+  DEB_VARIANT=$(IFS=-; echo "${segments[*]}")
+fi
+DEB_DIR="debians/${MINA_DEB_CODENAME}${DEB_VARIANT:+/${DEB_VARIANT}}"
+
 # fetch_deb honours LOCAL_DEB_SOURCE_DIR, so a caller that packaged the debs
 # itself in this job installs those instead of the packaging job's cached ones.
 # shellcheck source=buildkite/scripts/debian/fetch_debs.sh
@@ -77,31 +90,47 @@ else
     esac
   done
   if [ "$generic_profile_needed" == "1" ] && [ "$concrete_profile_present" == "0" ]; then
-    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*"
+    fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-devnet-profile_*"
   fi
   for i in "${debs[@]}"; do
     case $i in
       mina-generic*)
         # Download mina-logproc too
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-logproc*"
       ;;
       mina-devnet|mina-mainnet)
-        # Download mina-logproc and sub debians (apps and config) too
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
+        # mina-<network> is an empty tent. Its dependency chain is
+        #   mina-<network> -> mina-<network>-config
+        #                  -> mina-<network>-generic -> mina-<network>-profile
+        #                                            -> mina-generic (binaries)
+        # apt resolves only from local files here, so every link of the chain
+        # has to be downloaded, plus mina-logproc.
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/${i}-config*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/${i}-generic_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/${i}-profile_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-generic_${VERSION}_*"
+      ;;
+      mina-devnet-generic|mina-mainnet-generic)
+        # The profile tent: mina-<network>-profile plus mina-generic.
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/${i%-generic}-profile_${VERSION}_*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-generic_${VERSION}_*"
       ;;
       mina-devnet-instrumented|mina-mainnet-instrumented)
         # Instrumented daemon depends on mina-logproc and the non-instrumented
         # network-config deb (config files are the same for both flavors).
           network_pkg=${i%-instrumented}
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${network_pkg}-config*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/${network_pkg}-config*"
       ;;
       mina-*-prefork*)
-        # Download mina-logproc legacy too
-        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}*"
+        # The legacy cache keeps several versions. Fetch only the pinned one:
+        # every .deb fetched here goes to apt-get, which installs one of them,
+        # and the file order decides which.
+        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${FORCE_VERSION:-*}_*"
     esac
-    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*"
+    fetch_deb $LOCAL_DEB_FOLDER "${DEB_DIR}/${i}_${VERSION}_*"
   done
 fi
 
@@ -129,6 +158,15 @@ done < <(find "$ABS_DEB_FOLDER" -maxdepth 1 \( -name "*_${DEB_ARCH}.deb" -o -nam
 if [ "${#deb_files[@]}" -eq 0 ]; then
   echo "No ${DEB_ARCH} .deb files were downloaded into '$LOCAL_DEB_FOLDER'. Nothing to install."
   ls -la "$LOCAL_DEB_FOLDER"
+  exit 1
+fi
+
+# Several versions of one package means the caller did not pin it, and apt would
+# install one of them by file order. Refuse rather than guess.
+duplicate_packages=$(printf '%s\n' "${deb_files[@]##*/}" | cut -d_ -f1 | sort | uniq -d)
+if [ -n "$duplicate_packages" ]; then
+  echo "Several versions staged for: ${duplicate_packages//$'\n'/ }. Set FORCE_VERSION to the one to install." >&2
+  printf '  %s\n' "${deb_files[@]}" >&2
   exit 1
 fi
 
