@@ -3220,9 +3220,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ] )
         ]
 
-    let rule ~signature_kind ~constraint_constants : _ Pickles.Inductive_rule.t
-        =
-      { identifier = "transaction"
+    let rule ~signature_kind ~constraint_constants ~identifier :
+        _ Pickles.Inductive_rule.t =
+      { identifier
       ; prevs = []
       ; main =
           (fun { public_input = x } ->
@@ -3455,6 +3455,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
         in
         [ Base.rule ~signature_kind ~constraint_constants
+            ~identifier:"transaction"
         ; Merge.rule ~proof_level self
         ; zkapp_command ~signature_kind Opt_signed_opt_signed
         ; zkapp_command ~signature_kind Opt_signed
