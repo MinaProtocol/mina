@@ -215,7 +215,7 @@ The effective names come from generated Buildkite YAML under `buildkite/src/gen/
 
 Previously observed examples include:
 
-- Test: `HardForkTestMixed`, `HardForkTestLegacy`, `TestnetIntegrationTests`, `TestnetIntegrationTestsLocalApps`, `TestnetIntegrationTestsLong`, `SingleNodeTest`, `RosettaIntegrationTests`, `ArchiveNodeTest`, `DaemonUnitTest`, `Libp2pUnitTest`, `ZkappsExamplesTest`, `MonorepoTest`, `NixBuildTest`, `VersionLint`.
+- Test: `HardForkTestMixed`, `HardForkTestLegacy`, `TestnetIntegrationTests`, `TestnetIntegrationTestsLocalApps`, `TestnetIntegrationTestsLong`, `SingleNodeTest`, `RosettaIntegrationTests`, `ArchiveNodeTest`, `DaemonUnitTest`, `Libp2pUnitTest`, `ZkappsExamplesTest`, `MonorepoTest`, `VersionLint`.
 - Lint: `OCaml`, `Rust`, `Dhall`, `Docker`, `Bash`, `Changelog`, `Fast`, `Merge`, `Xrefcheck`, `ArchiveUpgrade`.
 - Bench: `ArchiveStable`, `ArchiveUnstable`, `HeapUsageStable`, `HeapUsageUnstable`, `LedgerApplyStable`, `LedgerApplyUnstable`, `MinaBaseStable`, `MinaBaseUnstable`, `SnarkProfilerStable`, `SnarkProfilerUnstable`, `ZkappLimitsStable`, `ZkappLimitsUnstable`.
 - Release: `MinaArtifactBookworm`, `MinaArtifactBookwormArm64`, `MinaArtifactBullseye`, `MinaArtifactBullseyeApps`, `MinaArtifactBullseyeInstrumented`, `MinaArtifactMainnetBullseye`, `MinaArtifactNoble`, `MinaToolchainArtifactBookworm`, `MinaToolchainArtifactNoble`, `TraceTool`.

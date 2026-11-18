@@ -124,4 +124,46 @@ slot_2=$(echo "$OUTPUT_2" | jq -r '.proof.fork.global_slot_since_genesis')
 [[ "$slot_2" == "$FORK_SLOT" ]] ||
   fail "fork slot must be independent of SECONDS_PER_SLOT, got $slot_2 with SECONDS_PER_SLOT=90"
 
+# 6. Without a daemon section in the prefork config, the output has none.
+[[ "$(echo "$OUTPUT" | jq 'has("daemon")')" == "false" ]] ||
+  fail "a prefork config without a daemon section must give no daemon section"
+
+# 7. Only network_id and peer_list_url carry over. The stop slots of the old
+#    network must not reach the new one.
+PEER_LIST_URL="https://bootnodes.example.org/networks/mainnet.txt"
+cat > "$WORK_DIR/prefork_with_daemon.json" <<EOF
+{
+  "daemon": {
+    "network_id": "mainnet",
+    "peer_list_url": "$PEER_LIST_URL",
+    "slot_tx_end": 393800,
+    "slot_chain_end": 393900,
+    "hard_fork_genesis_slot_delta": 60
+  }
+}
+EOF
+
+run_with_prefork() {
+  FORK_CONFIG_JSON="$WORK_DIR/fork_config.json" \
+    LEDGER_HASHES_JSON="$WORK_DIR/hashes.json" \
+    FORKING_FROM_CONFIG_JSON="$1" \
+    GENESIS_TIMESTAMP="$POSTFORK_TIMESTAMP" \
+    bash "$CREATE_RUNTIME_CONFIG"
+}
+
+OUTPUT_3=$(run_with_prefork "$WORK_DIR/prefork_with_daemon.json")
+EXPECTED_DAEMON=$(jq -cn --arg url "$PEER_LIST_URL" '{network_id: "mainnet", peer_list_url: $url}')
+[[ "$(echo "$OUTPUT_3" | jq -cS .daemon)" == "$(echo "$EXPECTED_DAEMON" | jq -cS .)" ]] ||
+  fail "daemon section should be exactly network_id and peer_list_url, got $(echo "$OUTPUT_3" | jq -c .daemon)"
+
+# 8. A key the prefork config does not have is left out, not written as null.
+echo '{"daemon": {"network_id": "mainnet"}}' > "$WORK_DIR/prefork_partial.json"
+[[ "$(run_with_prefork "$WORK_DIR/prefork_partial.json" | jq -c .daemon)" == '{"network_id":"mainnet"}' ]] ||
+  fail "a missing daemon key must be left out"
+
+# 9. Without a prefork config (the verifier passes it empty), no daemon section.
+[[ "$(run_with_prefork "" | jq 'has("daemon")')" == "false" ]] ||
+  fail "an empty FORKING_FROM_CONFIG_JSON must give no daemon section"
+
 echo "PASSED: fork slot is carried over verbatim and is independent of the slot-time constant"
+echo "PASSED: only network_id and peer_list_url carry over from the prefork config"
