@@ -302,7 +302,10 @@ let release_block t (node : Node.t) =
   | To_verify c ->
       t.release.release c
   | To_build_breadcrumb (_parent, c) ->
-      t.release.release c
+      (* Once the breadcrumb built from [c] has been handed to the transition
+         processor, the processor finishes it. Releasing [c] then would
+         finalize the breadcrumb under the processor. *)
+      if not (Cached.was_consumed c) then t.release.release c
 
 let remove_node' t (node : Node.t) =
   Hashtbl.remove t.nodes node.state_hash ;

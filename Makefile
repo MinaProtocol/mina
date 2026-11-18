@@ -241,6 +241,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/archive_blocks/archive_blocks.exe \
 		src/app/extract_blocks/extract_blocks.exe \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
 		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
 		src/app/dump_slot_ledger/dump_slot_ledger.exe \
 		src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
@@ -366,6 +367,15 @@ build-missing-blocks-auditor: ocaml_checks ## Build missing blocks auditor tool
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		--profile=$(DUNE_PROFILE) \
+		&& echo "✅ Build complete"
+
+.PHONY: build-missing-blocks-guardian
+build-missing-blocks-guardian: ocaml_checks ## Build missing blocks guardian tool
+	$(info 🏗️  Building missing blocks guardian tool with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -726,15 +736,6 @@ debian-download-create-legacy-hardfork: ## Download and create legacy hardfork D
 	$(call check_env_var,NETWORK_NAME)
 
 	@buildkite-cache-manager read --root legacy/debians/$(CODENAME) "mina-create-$(NETWORK_NAME)-prefork-genesis_*_amd64.deb" _build
-
-.PHONY: debian-reversion
-debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
-	$(call check_env_var,DEB)
-	$(call check_env_var,NEW_VERSION)
-	@./scripts/debian/reversion.sh "$(DEB)" "$(NEW_VERSION)" \
-		$(if $(NEW_SUITE),--suite "$(NEW_SUITE)") \
-		$(if $(NEW_NAME),--name "$(NEW_NAME)") \
-		$(if $(OUTPUT),--output "$(OUTPUT)")
 
 ########################################
 # Release management
