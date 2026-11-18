@@ -3,7 +3,13 @@
  (libraries
   ;;opam libraries
   core
-  yojson)
+  yojson
+  ;;local libraries
+  currency
+  ledger_proof
+  mina_base
+  mina_state
+  signature_lib)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

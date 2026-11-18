@@ -39,8 +39,12 @@
   #   `nix flake update opam-repository`).
   # - scripts/update-opam-switch.sh
   inputs.opam-repository.url =
-    "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
+    "github:ocaml/opam-repository/4cf5fbf0d0f7cf87a5896ea8e5da94f7ef678d2b";
   inputs.opam-repository.flake = false;
+
+  inputs.opam-repository-archive.url =
+    "github:ocaml/opam-repository-archive/f5b3f8867e235645eb04f5ddf94ac85bb34d9c23";
+  inputs.opam-repository-archive.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
   inputs.nixpkgs-mozilla.flake = false;

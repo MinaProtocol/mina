@@ -58,3 +58,23 @@ let account_update_body conn account_update_id =
   in
   ok ~ctx:"account update body"
     (P.Zkapp_account_update_body.load conn update.body_id)
+
+(* the token symbol and zkApp URI an account update sets, if any *)
+let token_symbol_and_zkapp_uri conn account_update_id =
+  let%bind body = account_update_body conn account_update_id in
+  let%bind update =
+    ok ~ctx:"zkapp update" (P.Zkapp_updates.load conn body.update_id)
+  in
+  let load ~ctx f = function
+    | None ->
+        return None
+    | Some id ->
+        ok ~ctx (f conn id) >>| Option.some
+  in
+  let%bind token_symbol =
+    load ~ctx:"token symbol" P.Token_symbols.load update.token_symbol_id
+  in
+  let%map zkapp_uri =
+    load ~ctx:"zkapp uri" P.Zkapp_uri.load update.zkapp_uri_id
+  in
+  (token_symbol, zkapp_uri)
