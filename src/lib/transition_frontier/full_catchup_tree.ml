@@ -335,11 +335,15 @@ let remove_node' t (node : Node.t) =
         ( Cached.invalidate_with_failure c
           : Mina_block.initial_valid_block Envelope.Incoming.t )
   | To_build_breadcrumb (_parent, c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      ignore
-        ( Cached.invalidate_with_failure c
-          : Mina_block.almost_valid_block Envelope.Incoming.t )
+      (* Once the breadcrumb built from [c] has been handed to the transition
+         processor, the processor finalizes it and fires [vc]. Invalidating
+         [c] then would finalize the breadcrumb under the processor. *)
+      if not (Cached.was_consumed c) then (
+        Option.value_map ~default:ignore
+          ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
+        ignore
+          ( Cached.invalidate_with_failure c
+            : Mina_block.almost_valid_block Envelope.Incoming.t ) )
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with
@@ -374,7 +378,7 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
         breadcrumb_added t b
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
+        let h = (Root_data.Limited.hashes new_root).state_hash in
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h
         else (
           [%log' debug t.logger]

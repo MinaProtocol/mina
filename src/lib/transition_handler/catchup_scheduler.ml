@@ -74,6 +74,33 @@ let release_unbuilt block_registry (cached_transition, _vc) =
      see https://github.com/MinaProtocol/mina/issues/11087 *)
   Block_registry.finish block_registry cached_transition `Ignored
 
+(** Release every block the scheduler holds, cancel its timeouts, and forget
+    them, so that nothing later reaches a released block. Stop building
+    breadcrumbs: blocks waiting to be built are released, and breadcrumbs
+    finished from now on are released rather than handed on. *)
+let clean_up
+    { collected_transitions
+    ; validation_callbacks
+    ; parent_root_timeouts
+    ; time_controller
+    ; breadcrumb_builder_supervisor
+    ; building_stopped
+    ; block_registry
+    ; _
+    } =
+  building_stopped := true ;
+  Capped_supervisor.stop breadcrumb_builder_supervisor
+    ~release:(fun (_initial_hash, transition_branches) ->
+      List.iter transition_branches ~f:(fun subtree ->
+          Mina_stdlib.Rose_tree.iter subtree ~f:(release_unbuilt block_registry) ) ) ;
+  Hashtbl.iter collected_transitions
+    ~f:(List.iter ~f:(fun b -> Block_registry.finish block_registry b `Ignored)) ;
+  Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
+      Block_time.Timeout.cancel time_controller timeout () ) ;
+  Hashtbl.clear collected_transitions ;
+  Hashtbl.clear parent_root_timeouts ;
+  Hashtbl.clear validation_callbacks
+
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~block_registry ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
@@ -130,33 +157,6 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   ; building_stopped
   ; block_registry
   }
-
-(** Release every block the scheduler holds, cancel its timeouts, and forget
-    them, so that nothing later reaches a released block. Stop building
-    breadcrumbs: blocks waiting to be built are released, and breadcrumbs
-    finished from now on are released rather than handed on. *)
-let clean_up
-    { collected_transitions
-    ; validation_callbacks
-    ; parent_root_timeouts
-    ; time_controller
-    ; breadcrumb_builder_supervisor
-    ; building_stopped
-    ; block_registry
-    ; _
-    } =
-  building_stopped := true ;
-  Capped_supervisor.stop breadcrumb_builder_supervisor
-    ~release:(fun (_initial_hash, transition_branches) ->
-      List.iter transition_branches ~f:(fun subtree ->
-          Mina_stdlib.Rose_tree.iter subtree ~f:(release_unbuilt block_registry) ) ) ;
-  Hashtbl.iter collected_transitions
-    ~f:(List.iter ~f:(fun b -> Block_registry.finish block_registry b `Ignored)) ;
-  Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
-      Block_time.Timeout.cancel time_controller timeout () ) ;
-  Hashtbl.clear collected_transitions ;
-  Hashtbl.clear parent_root_timeouts ;
-  Hashtbl.clear validation_callbacks
 
 let mem t transition =
   Hashtbl.mem t.collected_transitions
