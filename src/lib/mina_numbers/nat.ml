@@ -328,6 +328,19 @@ let%test_module "div_mod" =
             and r = witness r in
             C.assert_div_mod ~x ~y ~q ~r ) )
 
+    module N64 = Unsigned_extended.UInt64
+    module C64 = Make_checked (N64) (Bits.UInt64)
+
+    let accepts64 ~x ~y ~q ~r =
+      let witness n = exists C64.typ ~compute:(As_prover.return n) in
+      Or_error.is_ok
+        (check
+           (let%bind x = witness x
+            and y = witness y
+            and q = witness q
+            and r = witness r in
+            C64.assert_div_mod ~x ~y ~q ~r ) )
+
     let%test_unit "div_mod computes the quotient and remainder" =
       Quickcheck.test
         Quickcheck.Generator.(
@@ -385,4 +398,22 @@ let%test_module "div_mod" =
 
     let%test "accepts x = q = max, y = 1" =
       accepts ~x:N.max_int ~y:N.one ~q:N.max_int ~r:N.zero
+
+    let%test "64-bit: accepts the canonical witness for x = max" =
+      let x = N64.max_int and y = N64.of_int 7 in
+      accepts64 ~x ~y ~q:(N64.div x y) ~r:(N64.rem x y)
+
+    let%test "64-bit: rejects a remainder equal to the divisor" =
+      not
+        (accepts64 ~x:(N64.of_int 15) ~y:(N64.of_int 5) ~q:(N64.of_int 2)
+           ~r:(N64.of_int 5) )
+
+    let%test "64-bit: rejects the trivial witness q = 0, r = x" =
+      not
+        (accepts64 ~x:N64.max_int ~y:(N64.of_int 5) ~q:N64.zero ~r:N64.max_int)
+
+    let%test "64-bit: rejects a zero divisor" =
+      not
+        (accepts64 ~x:(N64.of_int 17) ~y:N64.zero ~q:(N64.of_int 42)
+           ~r:(N64.of_int 17) )
   end )
