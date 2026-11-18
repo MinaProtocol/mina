@@ -141,8 +141,17 @@ func (bs *BitswapCtx) NewSession(downloadTimeout time.Duration) (BlockRequester,
 }
 func (bs *BitswapCtx) RegisterDeadlineTracker(root_ root, downloadTimeout time.Duration) {
 	go func() {
-		<-time.After(downloadTimeout)
-		bs.deadlineChan <- root_
+		timer := time.NewTimer(downloadTimeout)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-bs.ctx.Done():
+			return
+		}
+		select {
+		case bs.deadlineChan <- root_:
+		case <-bs.ctx.Done():
+		}
 	}()
 }
 func (bs *BitswapCtx) GetStatus(key [32]byte) (codanet.RootBlockStatus, error) {

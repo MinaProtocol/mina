@@ -361,10 +361,7 @@ let%test_module "Transition_handler.Validator tests" =
               ~on_valid:(fun x -> valid := x :: !valid)
               ~unprocessed_transition_cache
           in
-          let vc =
-            Mina_net2.Validation_callback.create
-              (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
-          in
+          let vc = Mina_net2.Validation_callback.create_without_expiration () in
           let resolved = ref None in
           Mina_net2.Validation_callback.set_on_resolve vc (fun outcome ->
               resolved := Some outcome ) ;

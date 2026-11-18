@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -ex -o pipefail
 
 usage() {
   echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --logproc LOGPROC --output-dir OUTPUT_DIR"
@@ -84,11 +84,11 @@ echo "[INFO] Log Processor: $LOGPROC"
 
 # Clean up any existing config files
 echo "--- Clean up any existing config files"
-rm -f config.json config.json.gz
+rm -f config.json config.json.gz hashes.json new_config.json
 rm -rf "$OUTPUT_DIR"
 
-# Set the base network config for ./scripts/hardfork/create_runtime_config.sh
-export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
+# Check that the network is a known one.
+FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
 if [ ! -f "${FORKING_FROM_CONFIG_JSON}" ]; then
   echo "[ERROR] ${NETWORK_NAME} is not a known network name; check for existing network configs in 'genesis_ledgers/'"
   exit 1
@@ -97,19 +97,26 @@ fi
 echo "--- Download and extract previous network config"
 curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > "$TMP/config.json"
 
-# make sure files does not have genesis key
-jq 'del(.genesis)' "$TMP/config.json" > "$TMP/fork_config_no_genesis.json"
-
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
 
-jq 'del(.genesis)' "$FORKING_FROM_CONFIG_JSON" > "$TMP/config_no_genesis.json"
+# The fork is Mesa -> Mesa: the slot duration does not change, so the accounts
+# are loaded verbatim (--identity-conversion), as the daemon's own hardfork
+# migration does. Without the flag the tool applies the Berkeley -> Mesa
+# slot_reduction_update, which doubles the vesting period of every account
+# still vesting at the fork slot and gives a genesis ledger root that differs
+# from the one automode nodes compute. --identity-conversion ignores
+# --prefork-genesis-config, so none is passed. The config is passed as
+# downloaded: token symbols and zkApp URIs are arbitrary bytes, so the file must
+# stay byte for byte.
+"$RUNTIME_GENESIS_LEDGER" --identity-conversion --pad-app-state --config-file "$TMP/config.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
-"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --prefork-genesis-config "$TMP/config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+# create_runtime_config.sh takes network_id and peer_list_url from it.
+export FORKING_FROM_CONFIG_JSON
 
 echo "--- Create hardfork config"
-FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
+FORK_CONFIG_JSON="$TMP/config.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 echo "--- New genesis config"
 cat new_config.json

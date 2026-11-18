@@ -19,9 +19,9 @@ let () = Tick.Keypair.set_urs_info []
    Note that this adds more than 1 constraint, because there is an assertion in
    kimchi that there is more than 1 gate (which is probably an error).
 *)
-let example ?cs ~valid_witness () =
-  let cs, _proof_keypair, _proof =
-    generate_and_verify_proof ?cs (fun () ->
+let example ?proof_keypair ~valid_witness () =
+  let _cs, proof_keypair, _proof =
+    generate_and_verify_proof ?proof_keypair (fun () ->
         let open Impl in
         (* Create a fresh snarky variable. *)
         let a =
@@ -44,17 +44,17 @@ let example ?cs ~valid_witness () =
         (* Assert equality directly via the permutation argument. *)
         Field.Assert.equal a_squared a_plus_b )
   in
-  cs
+  proof_keypair
 
 let test_proof_with_valid_witness () =
-  let _cs = example ~valid_witness:true () in
+  let _proof_keypair = example ~valid_witness:true () in
   ()
 
 let test_proof_with_invalid_witness_fails () =
   Alcotest.check_raises "Proof with invalid witness should fail"
     (Failure "Proof verification failed") (fun () ->
       try
-        let _cs = example ~valid_witness:false () in
+        let _proof_keypair = example ~valid_witness:false () in
         ()
       with _ -> raise (Failure "Proof verification failed") )
 
