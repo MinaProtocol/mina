@@ -226,7 +226,11 @@ let serialize ~ledger_depth path =
   Bigstring.of_string @@ string_of_bitstring
   @@ concat [ path; zeroes_bitstring required_padding ]
 
-let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
+let is_parent_of parent ~maybe_child =
+  (* Not [Bitstring.is_prefix], which is false when either bitstring is empty,
+     and compares bitstrings at different bit offsets as zero-padded bytes. *)
+  Int.(depth maybe_child >= depth parent)
+  && equal (slice maybe_child 0 (depth parent)) parent
 
 let same_height_ancestors x y =
   let depth_x = depth x in
@@ -323,6 +327,48 @@ struct
       ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
+
+  let%test_unit "is_parent_of(addr, extension of addr)" =
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list * int]
+      (let open Quickcheck.Generator.Let_syntax in
+      let%bind directions = Mina_stdlib.Direction.gen_list Input.depth in
+      let%map prefix_length = Int.gen_incl 0 Input.depth in
+      (directions, prefix_length))
+      ~f:(fun (directions, prefix_length) ->
+        assert (
+          is_parent_of
+            (of_directions (List.take directions prefix_length))
+            ~maybe_child:(of_directions directions) ) )
+
+  let%test_unit "is_parent_of(addr, extension of addr) at any bit offsets" =
+    Quickcheck.test
+      ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list * int * int]
+      (let open Quickcheck.Generator.Let_syntax in
+      let%bind directions =
+        Mina_stdlib.Direction.gen_var_length_list ~start:1 (Input.depth + 1)
+      in
+      let%bind prefix_length = Int.gen_incl 0 (List.length directions - 1) in
+      let%map child_length =
+        Int.gen_incl prefix_length (List.length directions - 1)
+      in
+      (directions, prefix_length, child_length))
+      ~f:(fun (directions, prefix_length, child_length) ->
+        (* Both start one bit into [directions], so that [parent] is at bit
+           offset 1 and its copy [child] at 0. *)
+        let address = of_directions directions in
+        let parent = slice address 1 prefix_length in
+        let child = copy (slice address 1 child_length) in
+        assert (is_parent_of parent ~maybe_child:child) ;
+        assert (
+          is_parent_of (copy parent) ~maybe_child:(slice address 1 child_length) )
+        )
+
+  let%test_unit "nonempty(addr): not (is_parent_of(addr, sibling(addr)))" =
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_var_length_list ~start:1 Input.depth)
+      ~f:(fun directions ->
+        let address = of_directions directions in
+        assert (not (is_parent_of address ~maybe_child:(sibling address))) )
 
   let%test_unit "prev(next(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]

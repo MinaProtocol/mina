@@ -7109,9 +7109,9 @@
               "deprecationReason": null
             },
             {
-              "name": "feeExcess",
+              "name": "sourceFeeExcess",
               "description":
-                "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
+                "Unsettled transaction fees at the source ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7126,8 +7126,25 @@
               "deprecationReason": null
             },
             {
-              "name": "supplyIncrease",
-              "description": "Increase in total supply",
+              "name": "targetFeeExcess",
+              "description":
+                "Unsettled transaction fees at the target ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sourceTotalCurrency",
+              "description": "Total currency at the source ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7138,19 +7155,19 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": true,
-              "deprecationReason": "Use supplyChange"
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
-              "name": "supplyChange",
-              "description": "Increase/Decrease in total supply",
+              "name": "targetTotalCurrency",
+              "description": "Total currency at the target ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedAmount",
+                  "kind": "SCALAR",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -7372,6 +7389,53 @@
           "fields": null,
           "inputFields": null,
           "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ProtocolVersion",
+          "description": null,
+          "fields": [
+            {
+              "name": "transaction",
+              "description": "Transaction version, changed by hard forks",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "network",
+              "description": "Network version",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "patch",
+              "description": "Patch version",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
         },
@@ -11565,6 +11629,71 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "feeExcess",
+              "description": "Transaction fees collected but not yet settled",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": "Total currency in the ledger at this point",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "ledgerAfterCoinbase",
+              "description":
+                "Second-pass ledger hash as of the most recent coinbase",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalSupplyAfterCoinbase",
+              "description": "Total currency as of the most recent coinbase",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -11635,38 +11764,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "LedgerHash",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "supplyIncrease",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedAmount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeExcess",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedFee",
                   "ofType": null
                 }
               },
@@ -12131,6 +12228,36 @@
                     }
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "currentProtocolVersion",
+              "description":
+                "Protocol version that the block was produced under",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ProtocolVersion",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "proposedProtocolVersion",
+              "description":
+                "Protocol version signalled by the block producer, if any. This is carried in the block header outside of the protocol state, so it is not covered by the state hash or the proof",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProtocolVersion",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -12777,6 +12904,43 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "ArbitraryBytes",
+          "description":
+            "A value that is arbitrary bytes on chain, such as a token symbol or a zkApp URI",
+          "fields": [
+            {
+              "name": "hex",
+              "description": "The exact bytes, hex-encoded",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "utf8",
+              "description":
+                "The bytes as text when they are valid UTF-8, null when they are not",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "ChainHash",
           "description": "Base58Check-encoded chain hash",
@@ -13283,9 +13447,21 @@
             {
               "name": "zkappUri",
               "description":
-                "The URI associated with this account, usually pointing to the zkApp source code",
+                "The URI associated with this account, usually pointing to the zkApp source code. A byte that is not valid UTF-8 is returned as the character U+00XX; zkappUriBytes has the exact bytes",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "zkappUriBytes",
+              "description": "The exact bytes of the zkApp URI",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "ArbitraryBytes",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -13335,9 +13511,21 @@
             {
               "name": "tokenSymbol",
               "description":
-                "The symbol for the token owned by this account, if there is one",
+                "The symbol for the token owned by this account, if there is one. A byte that is not valid UTF-8 is returned as the character U+00XX; tokenSymbolBytes has the exact bytes",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "tokenSymbolBytes",
+              "description": "The exact bytes of the token symbol",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "ArbitraryBytes",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },

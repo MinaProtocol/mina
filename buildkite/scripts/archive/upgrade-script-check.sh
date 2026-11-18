@@ -212,11 +212,6 @@ main() {
     # If schema files changed, verify upgrade script exists
     if [[ "$schema_changed" == "true" ]]; then
 
-        if ./buildkite/scripts/git/check-bypass.sh "!ci-bypass-upgrade-script-check"; then
-            echo "⏭️  Skipping upgrade script check as PR is bypassed"
-            exit 0
-        fi
-
         # Determine if this is a PR build
         local is_pr_build=false
         if [[ -n "${BUILDKITE_PULL_REQUEST:-}" && "${BUILDKITE_PULL_REQUEST:-}" != "false" ]]; then
