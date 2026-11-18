@@ -31,21 +31,48 @@ module Db = struct
     Mina_automation.Psql.run_script_or_error
       ~connection:(on_server db.uri db.name) path
 
-  let create ?(upgrade = false) ~server_uri ~name () =
+  let quote_literal s =
+    "'" ^ String.substr_replace_all s ~pattern:"'" ~with_:"''" ^ "'"
+
+  let create ?(upgrade = false) ?encoding ~server_uri ~name () =
     let open Deferred.Or_error.Let_syntax in
     let%bind () = Deferred.return (check_name name) in
     let db = { name; uri = Uri.with_path server_uri ("/" ^ name) } in
     let%bind () = drop db in
+    let connection = on_server server_uri "postgres" in
     let%bind (_ : string) =
-      Mina_automation.Psql.create_empty_db
-        ~connection:(on_server server_uri "postgres")
-        ~db:name
+      match encoding with
+      | None ->
+          Mina_automation.Psql.create_empty_db ~connection ~db:name
+      | Some encoding ->
+          (* template0, because template1 has the server's encoding; the C
+             locale, because a locale is valid for some encodings only *)
+          Mina_automation.Psql.run_command ~connection
+            (sprintf
+               "CREATE DATABASE %s ENCODING %s TEMPLATE template0 LC_COLLATE \
+                'C' LC_CTYPE 'C';"
+               (Mina_automation.Psql.quote_ident name)
+               (quote_literal encoding) )
     in
     let%bind () = load_script db `CreateSchema in
     let%map () = if upgrade then load_script db `Upgrade else return () in
     db
 
   let run_script = load_script
+
+  let copy db ~name =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind () = Deferred.return (check_name name) in
+    let copy = { name; uri = Uri.with_path db.uri ("/" ^ name) } in
+    let%bind () = drop copy in
+    let%map (_ : string) =
+      Mina_automation.Psql.run_command
+        ~connection:(on_server db.uri "postgres")
+        (sprintf "CREATE DATABASE %s TEMPLATE %s;"
+           (Mina_automation.Psql.quote_ident name)
+           (Mina_automation.Psql.quote_ident db.name) )
+    in
+    copy
 
   let test_server_env = "MINA_TEST_POSTGRES"
 
@@ -70,9 +97,9 @@ module Db = struct
     let (module Conn : Mina_caqti.CONNECTION) = conn in
     Monitor.protect ~finally:Conn.disconnect (fun () -> f conn)
 
-  let with_fresh ?upgrade ?(keep = false) ~server_uri ~name f =
+  let with_fresh ?upgrade ?encoding ?(keep = false) ~server_uri ~name f =
     let open Deferred.Or_error.Let_syntax in
-    let%bind db = create ?upgrade ~server_uri ~name () in
+    let%bind db = create ?upgrade ?encoding ~server_uri ~name () in
     (* f raising -- a failed check, an ok_exn -- still drops the database *)
     let%bind.Deferred result =
       Deferred.map ~f:Or_error.join (Monitor.try_with_or_error (fun () -> f db))

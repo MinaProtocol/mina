@@ -133,32 +133,45 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true ) ) ;
-  Transition_handler.Validator.run
-    ~context:(module Context)
-    ~trust_system ~time_controller ~frontier
-    ~transition_reader:network_transition_reader ~valid_transition_writer
-    ~unprocessed_transition_cache ;
+  let validate_transition =
+    Transition_handler.Validator.create_handler
+      ~context:(module Context)
+      ~trust_system ~time_controller ~frontier ~valid_transition_writer
+      ~unprocessed_transition_cache
+  in
+  O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
+      Pipe_lib.Choosable_synchronous_pipe.iter network_transition_reader
+        ~f:validate_transition ) ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
+  let catchup_scheduler =
+    Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
+      ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
+  in
   let process_message =
     Transition_handler.Processor.create_handler
       ~context:(module Context)
       ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
-      ~clean_up_catchup_scheduler ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~processed_transition_writer
-      ?transaction_pool_proxy ()
+      ~catchup_scheduler ~processed_transition_writer ?transaction_pool_proxy ()
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Strict_pipe.Reader.Merge.iter
         (Transition_handler.Processor.inputs ~primary_transition_reader
            ~producer_transition_reader ~catchup_breadcrumbs_reader )
         ~f:process_message ) ;
-  Ledger_catchup.run
-    ~context:(module Context)
-    ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
+  O1trace.background_thread "perform_super_catchup" (fun () ->
+      Deferred.bind
+        (Ledger_catchup.create_job_handler
+           ~context:(module Context)
+           ~trust_system ~verifier ~network ~frontier
+           ~catchup_breadcrumbs_writer ~unprocessed_transition_cache )
+        ~f:(fun process_catchup_job ->
+          O1trace.thread "handle_super_catchup_jobs" (fun () ->
+              Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+                ~f:process_catchup_job ) ) ) ;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
