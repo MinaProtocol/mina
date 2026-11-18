@@ -116,7 +116,7 @@ type t =
   ; phase : phase ref
   ; verified_transition_writer :
       ( [ `Transition of Mina_block.Validated.t ]
-        * [ `Source of Block_outcome_log.source ]
+        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
         * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
       , Strict_pipe.drop_head Strict_pipe.buffered
       , unit )
@@ -133,7 +133,6 @@ type t =
   ; persistent_root : Transition_frontier.Persistent_root.t
   ; persistent_frontier : Transition_frontier.Persistent_frontier.t
   ; cache_exceptions : bool
-  ; catchup_mode : [ `Super ]
   ; bootstrap_status : Bootstrap_status.t
   }
 
@@ -196,7 +195,6 @@ let start_bootstrap_controller t ~initial_root_transition ~best_seen_transition
       ; frontier_w
       ; persistent_root
       ; persistent_frontier
-      ; catchup_mode
       ; bootstrap_status
       ; _
       } =
@@ -225,7 +223,7 @@ let start_bootstrap_controller t ~initial_root_transition ~best_seen_transition
        ~context:(module Context)
        ~trust_system ~verifier ~network ~consensus_local_state
        ~network_transition_pipe ~persistent_frontier ~persistent_root
-       ~initial_root_transition ~preferred_peers ~catchup_mode ~bootstrap_status )
+       ~initial_root_transition ~preferred_peers ~bootstrap_status )
     (fun (new_frontier, collected_transitions) ->
       start_transition_frontier_controller t ~collected_transitions new_frontier
       )
@@ -355,13 +353,12 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
            data ) )
 
 let load_frontier ~context:(module Context : CONTEXT) ~verifier
-    ~persistent_frontier ~persistent_root ~consensus_local_state ~catchup_mode =
+    ~persistent_frontier ~persistent_root ~consensus_local_state =
   let open Context in
   match%map
     Transition_frontier.load
       ~context:(module Context)
-      ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-      ~catchup_mode ()
+      ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier ()
   with
   | Ok frontier ->
       [%log info] "Successfully loaded frontier" ;
@@ -425,7 +422,6 @@ let initialize t ~transaction_pool_proxy ~sync_local_state ~is_seed
       ; persistent_root
       ; persistent_frontier
       ; consensus_local_state
-      ; catchup_mode
       ; bootstrap_status
       ; _
       } =
@@ -451,8 +447,7 @@ let initialize t ~transaction_pool_proxy ~sync_local_state ~is_seed
          ~most_recent_valid_block_writer ~genesis_constants )
       (load_frontier
          ~context:(module Context)
-         ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state
-         ~catchup_mode )
+         ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state )
   with
   | best_seen_transition, None ->
       [%log info] "Unable to load frontier; starting bootstrap" ;
@@ -653,8 +648,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~persistent_frontier_location ~get_current_frontier
     ~frontier_broadcast_writer:frontier_w ~network_transition_reader
     ~producer_transition_reader ~get_most_recent_valid_block
-    ~most_recent_valid_block_writer ~get_completed_work ~catchup_mode
-    ~notify_online ~ledger_backing ~bootstrap_status () =
+    ~most_recent_valid_block_writer ~get_completed_work ~notify_online
+    ~ledger_backing ~bootstrap_status () =
   (* signature_kind is passed through to various callees *)
   let open Context in
   [%log info] "Starting transition router" ;
@@ -758,7 +753,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         ; persistent_root
         ; persistent_frontier
         ; cache_exceptions
-        ; catchup_mode
         ; bootstrap_status
         }
       in

@@ -29,5 +29,9 @@
   (:orig %{profile}_transaction_snark_vk.json)
   (:computed %{profile}_transaction_snark_vk.json.computed))
  (alias runtest)
+ (enabled_if
+  (=
+   %{read:../../../../../MINA_CODEBASE_NETWORK}
+   %{read:../../../../../MINA_MAINNET_NETWORK}))
  (action
   (diff %{orig} %{computed})))

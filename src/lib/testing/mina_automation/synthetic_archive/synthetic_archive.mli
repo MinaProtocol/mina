@@ -23,9 +23,12 @@ module Db : sig
       [server_uri] points at (its path, if any, is ignored) and loads
       [create_schema.sql] and, with [~upgrade:true], [upgrade.sql]. A database
       of the same name left by an earlier run is dropped first, so [name] must
-      start with [test_]; any other name is refused. *)
+      start with [test_]; any other name is refused. [encoding], e.g.
+      ["SQL_ASCII"], gives the database that encoding and the C locale; without
+      it the database takes the server's defaults. *)
   val create :
        ?upgrade:bool
+    -> ?encoding:string
     -> server_uri:Uri.t
     -> name:string
     -> unit
@@ -41,6 +44,11 @@ module Db : sig
     -> [ `CreateSchema | `DropTables | `Upgrade | `Rollback ]
     -> unit Deferred.Or_error.t
 
+  (** [copy db ~name] makes database [name] as a copy of [db] (CREATE DATABASE
+      ... TEMPLATE), dropping a database of that name first. [name] must start
+      with [test_], and nothing may be connected to [db]. *)
+  val copy : t -> name:string -> t Deferred.Or_error.t
+
   (** The server [MINA_TEST_POSTGRES] names, as CI sets it. A test that needs
       a database calls this first: without the variable it exits with status
       2 and a message, so a missing server is never a silent pass. *)
@@ -55,6 +63,7 @@ module Db : sig
       {!create} and drops it again unless [~keep:true]. *)
   val with_fresh :
        ?upgrade:bool
+    -> ?encoding:string
     -> ?keep:bool
     -> server_uri:Uri.t
     -> name:string
@@ -145,10 +154,14 @@ val coinbase :
 
 (** A zkApp account update on [account]. Equal account updates share one
     archive row, as the archive stores them, so listing the same one twice in
-    a command repeats its id in [zkapp_account_updates_ids]. *)
+    a command repeats its id in [zkapp_account_updates_ids]. [token_symbol]
+    and [zkapp_uri] set the update's token symbol and zkApp URI; they are
+    bytes, not necessarily UTF-8, as the archive stores them. *)
 val account_update :
      ?balance_change:int
   -> ?implicit_account_creation_fee:bool
+  -> ?token_symbol:string
+  -> ?zkapp_uri:string
   -> account
   -> account_update
 

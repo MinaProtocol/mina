@@ -73,13 +73,15 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
+type t =
   { creator : Public_key.Compressed.t
   ; winner : Public_key.Compressed.t
   ; protocol_state : Protocol_state.t
   ; transactions : Transactions.Stable.Latest.t
   ; snark_jobs : Transaction_snark_work.Info.t list
   ; proof : Proof.t
+  ; current_protocol_version : Protocol_version.t
+  ; proposed_protocol_version_opt : Protocol_version.t option
   }
 
 let participants
@@ -235,4 +237,18 @@ let of_transition block tracked_participants
   let creator = Consensus_state.block_creator consensus_state in
   let winner = Consensus_state.block_stake_winner consensus_state in
   let proof = Mina_block.Header.protocol_state_proof header in
-  { creator; winner; protocol_state; transactions; snark_jobs; proof }
+  let current_protocol_version =
+    Mina_block.Header.current_protocol_version header
+  in
+  let proposed_protocol_version_opt =
+    Mina_block.Header.proposed_protocol_version_opt header
+  in
+  { creator
+  ; winner
+  ; protocol_state
+  ; transactions
+  ; snark_jobs
+  ; proof
+  ; current_protocol_version
+  ; proposed_protocol_version_opt
+  }
