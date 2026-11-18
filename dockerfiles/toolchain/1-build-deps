@@ -196,8 +196,8 @@ RUN git fetch origin "${OPAM_REPOSITORY_COMMIT}" \
 RUN opam init --disable-sandboxing \
     -k git \
     -a /home/opam/opam-repository \
-    --bare
-RUN opam repository add --yes \
+    --bare \
+  && opam repository add --yes \
     --all \
     --set-default \
     --rank=-1 archive \
