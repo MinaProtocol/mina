@@ -319,7 +319,7 @@ let%test_module "div_mod" =
     module C = Make_checked (N) (Bits.UInt32)
 
     let accepts ~x ~y ~q ~r =
-      let witness n = exists C.typ ~compute:(As_prover.return (N.of_int n)) in
+      let witness n = exists C.typ ~compute:(As_prover.return n) in
       Or_error.is_ok
         (check
            (let%bind x = witness x
@@ -348,16 +348,26 @@ let%test_module "div_mod" =
           in
           [%test_eq: int * int] (q, r) (x / y, x % y) )
 
-    let%test "accepts the canonical witness" = accepts ~x:17 ~y:5 ~q:3 ~r:2
+    let%test "accepts the canonical witness" =
+      accepts ~x:(N.of_int 17) ~y:(N.of_int 5) ~q:(N.of_int 3) ~r:(N.of_int 2)
 
     let%test "rejects a remainder equal to the divisor" =
-      not (accepts ~x:15 ~y:5 ~q:2 ~r:5)
+      not
+        (accepts ~x:(N.of_int 15) ~y:(N.of_int 5) ~q:(N.of_int 2)
+           ~r:(N.of_int 5) )
 
     let%test "rejects a remainder larger than the divisor" =
-      not (accepts ~x:17 ~y:5 ~q:1 ~r:12)
+      not
+        (accepts ~x:(N.of_int 17) ~y:(N.of_int 5) ~q:(N.of_int 1)
+           ~r:(N.of_int 12) )
 
     let%test "rejects the trivial witness q = 0, r = x" =
-      not (accepts ~x:17 ~y:5 ~q:0 ~r:17)
+      not
+        (accepts ~x:(N.of_int 17) ~y:(N.of_int 5) ~q:(N.of_int 0)
+           ~r:(N.of_int 17) )
 
-    let%test "rejects a zero divisor" = not (accepts ~x:17 ~y:0 ~q:42 ~r:17)
+    let%test "rejects a zero divisor" =
+      not
+        (accepts ~x:(N.of_int 17) ~y:(N.of_int 0) ~q:(N.of_int 42)
+           ~r:(N.of_int 17) )
   end )
