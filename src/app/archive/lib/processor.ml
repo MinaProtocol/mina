@@ -2839,7 +2839,6 @@ module Zkapp_account = struct
       let open Deferred.Result.Let_syntax in
       let ({ app_state
            ; verification_key
-           ; zkapp_version
            ; action_state
            ; last_action_slot
            ; proved_state
@@ -2858,7 +2857,6 @@ module Zkapp_account = struct
             in
             Some id )
       in
-      let zkapp_version = zkapp_version |> Unsigned.UInt32.to_int64 in
       let%bind action_state_id =
         Zkapp_action_states.add_if_doesn't_exist (module Conn) action_state
       in
@@ -2873,7 +2871,8 @@ module Zkapp_account = struct
         (module Conn)
         { app_state_id
         ; verification_key_id
-        ; zkapp_version
+        ; (* The field is gone from accounts, but the column stays. *)
+          zkapp_version = 0L
         ; action_state_id
         ; last_action_slot
         ; proved_state
