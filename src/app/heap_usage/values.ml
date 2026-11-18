@@ -68,6 +68,16 @@ let verification_key =
 
 let applied = Mina_base.Transaction_status.Applied
 
+(* How full a ledger the witnesses are taken from. A witness's accounts sit at
+   unrelated indices among all the others, so their Merkle paths share only the
+   levels above the occupied range; taking a subset of a ledger holding nothing
+   but the accessed accounts would place them at adjacent indices — Mina
+   appends accounts in order of first appearance — and collapse those paths
+   onto each other. Measured at ledger depth 35, a witness grows by roughly
+   1.3KB for each further account it covers, so this matters for every
+   transaction that touches more than one. *)
+let accounts_in_ledger = 1 lsl 14
+
 let mk_scan_state_base_node
     (varying : Mina_transaction_logic.Transaction_applied.Varying.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
@@ -100,25 +110,49 @@ let mk_scan_state_base_node
             let coinbase = cb.coinbase.data in
             Mina_base.Coinbase.account_access_statuses coinbase applied
       in
-      let num_accounts_accessed =
-        List.count account_access_statuses ~f:(fun (_acct_id, accessed) ->
-            match accessed with `Accessed -> true | `Not_accessed -> false )
+      let accessed =
+        (* an account can be listed more than once, e.g. as both the fee payer
+           and the source of a payment; a witness holds it once *)
+        List.filter_map account_access_statuses ~f:(fun (acct_id, accessed) ->
+            match accessed with
+            | `Accessed ->
+                Some acct_id
+            | `Not_accessed ->
+                None )
+        |> List.dedup_and_sort ~compare:Mina_base.Account_id.compare
+      in
+      let ledger = Mina_ledger.Ledger.create_ephemeral ~depth () in
+      (* [Quickcheck.random_value] reseeds from a fixed default and so returns
+         the same key every time; draw from one state to get distinct accounts *)
+      let random = Splittable_random.State.create (Random.State.make [| 7 |]) in
+      let add_filler n =
+        for _ = 1 to n do
+          let acct_id =
+            Mina_base.Account_id.create
+              (Quickcheck.Generator.generate ~size:1 ~random
+                 Signature_lib.Public_key.Compressed.gen )
+              Mina_base.Token_id.default
+          in
+          Mina_ledger.Ledger.create_new_account_exn ledger acct_id
+            (Mina_base.Account.create acct_id Currency.Balance.zero)
+        done
+      in
+      let stride =
+        Int.max 1 (accounts_in_ledger / (List.length accessed + 1))
       in
       (* for zkApps, some or all of the accounts will be zkApp accounts, so this
          understates mem usage
       *)
-      let ledger = Mina_ledger.Sparse_ledger.L.empty ~depth () in
-      let accounts =
-        Quickcheck.random_value
-        @@ Quickcheck.Generator.list_with_length num_accounts_accessed
-             Mina_base.Account.gen
-      in
-      List.iter accounts ~f:(fun acct ->
-          ignore
-            (Mina_ledger.Sparse_ledger.L.get_or_create_account ledger
-               (Mina_base.Account.identifier acct)
-               acct ) ) ;
-      !ledger
+      List.iter accessed ~f:(fun acct_id ->
+          add_filler stride ;
+          let account =
+            { (Quickcheck.random_value Mina_base.Account.gen) with
+              public_key = Mina_base.Account_id.public_key acct_id
+            ; token_id = Mina_base.Account_id.token_id acct_id
+            }
+          in
+          Mina_ledger.Ledger.create_new_account_exn ledger acct_id account ) ;
+      Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger accessed
     in
     let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
       let previous_hash = get Mina_base.Ledger_hash.gen in
