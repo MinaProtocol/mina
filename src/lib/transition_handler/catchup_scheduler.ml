@@ -74,6 +74,29 @@ let release_unbuilt (cached_transition, vc) =
     ( Cached.invalidate_with_failure cached_transition
       : Mina_block.initial_valid_block Envelope.Incoming.t )
 
+(** Release every block the scheduler holds, and cancel its timeouts. *)
+let clean_up
+    { collected_transitions
+    ; validation_callbacks
+    ; parent_root_timeouts
+    ; time_controller
+    ; _
+    } =
+  Hashtbl.iter collected_transitions
+    ~f:
+      (List.iter ~f:(fun b ->
+           let hash =
+             Cached.peek b |> Envelope.Incoming.data
+             |> Validation.block_with_hash
+             |> State_hash.With_state_hashes.state_hash
+           in
+           let vc = Hashtbl.find validation_callbacks hash in
+           Option.value_map ~default:ignore
+             ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
+           ignore @@ Cached.invalidate_with_failure b ) ) ;
+  Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
+      Block_time.Timeout.cancel time_controller timeout () )
+
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
@@ -88,21 +111,6 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   let collected_transitions = State_hash.Table.create () in
   let parent_root_timeouts = State_hash.Table.create () in
   let validation_callbacks = State_hash.Table.create () in
-  upon (Ivar.read clean_up_signal) (fun () ->
-      Hashtbl.iter collected_transitions
-        ~f:
-          (List.iter ~f:(fun b ->
-               let hash =
-                 Cached.peek b |> Envelope.Incoming.data
-                 |> Validation.block_with_hash
-                 |> State_hash.With_state_hashes.state_hash
-               in
-               let vc = Hashtbl.find validation_callbacks hash in
-               Option.value_map ~default:ignore
-                 ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
-               ignore @@ Cached.invalidate_with_failure b ) ) ;
-      Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
-          Block_time.Timeout.cancel time_controller timeout () ) ) ;
   let breadcrumb_builder_supervisor =
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
@@ -126,14 +134,18 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
             List.iter transition_branches ~f:(fun subtree ->
                 Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) )
   in
-  { logger
-  ; collected_transitions
-  ; time_controller
-  ; catchup_job_writer
-  ; parent_root_timeouts
-  ; breadcrumb_builder_supervisor
-  ; validation_callbacks
-  }
+  let t =
+    { logger
+    ; collected_transitions
+    ; time_controller
+    ; catchup_job_writer
+    ; parent_root_timeouts
+    ; breadcrumb_builder_supervisor
+    ; validation_callbacks
+    }
+  in
+  upon (Ivar.read clean_up_signal) (fun () -> clean_up t) ;
+  t
 
 let mem t transition =
   Hashtbl.mem t.collected_transitions
