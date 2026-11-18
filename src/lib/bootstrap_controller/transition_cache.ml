@@ -49,32 +49,35 @@ let merge (old_env, old_vc) (new_env, new_vc) =
         match new_b with `Block _ -> new_b | _ -> old_b )
   , vc )
 
+(** [children] with [new_child] merged into the child [equal] to it, or added
+    if there is none. *)
+let add_child ~equal ~merge children new_child =
+  let children', b =
+    List.fold children ~init:([], false) ~f:(fun (acc, b) child ->
+        (* If state hash was already among children, existing child is
+           merged with the new transition.
+           It's needed to maintain consistency about transitions that may
+           come from gossip or other ways; we want to preserve some
+           validation callback (and we don't expect two gossips for the
+           same).
+           Also, if we received a block after receiving a header
+           (possible when we'll simultaneously support both old and new
+           gossip topics), we want to preserve a block because it's more
+           than a header. *)
+        if (not b) && equal child new_child then
+          (merge child new_child :: acc, true)
+        else (child :: acc, b) )
+  in
+  if b then children' else new_child :: children
+
 let add (t : t) ~parent new_child =
-  State_hash.Table.update t parent ~f:(function
-    | None ->
-        [ new_child ]
-    | Some children ->
-        let children', b =
-          List.fold children ~init:([], false) ~f:(fun (acc, b) child ->
-              (* If state hash was already among children, existing child is
-                 merged with the new transition.
-                 It's needed to maintain consistency about transitions that may
-                 come from gossip or other ways; we want to preserve some
-                 validation callback (and we don't expect two gossips for the
-                 same).
-                 Also, if we received a block after receiving a header
-                 (possible when we'll simultaneously support both old and new
-                 gossip topics), we want to preserve a block because it's more
-                 than a header. *)
-              if
-                (not b)
-                && State_hash.equal
-                     (state_hash @@ fst child)
-                     (state_hash @@ fst new_child)
-              then (merge child new_child :: acc, true)
-              else (acc, b) )
-        in
-        if b then children' else new_child :: children )
+  State_hash.Table.update t parent ~f:(fun children ->
+      add_child
+        ~equal:(fun x y ->
+          State_hash.equal (state_hash @@ fst x) (state_hash @@ fst y) )
+        ~merge
+        (Option.value children ~default:[])
+        new_child )
 
 let data t =
   let collected_transitions = State_hash.Table.data t |> List.concat in
@@ -84,3 +87,23 @@ let data t =
     = 0 )
   (* TODO: make this assertion more efficient *) ;
   collected_transitions
+
+let%test_module "Adding to the transition cache" =
+  ( module struct
+    let add_child =
+      add_child
+        ~equal:(fun (x, _) (y, _) -> Int.equal x y)
+        ~merge:(fun (x, old) (_, new_) -> (x, old ^ new_))
+
+    let sorted = List.sort ~compare:[%compare: int * string]
+
+    let%test_unit "A child already present is merged, and its siblings kept" =
+      [%test_eq: (int * string) list]
+        (sorted (add_child [ (1, "a"); (2, "b"); (3, "c") ] (2, "d")))
+        [ (1, "a"); (2, "bd"); (3, "c") ]
+
+    let%test_unit "A new child is added" =
+      [%test_eq: (int * string) list]
+        (sorted (add_child [ (1, "a") ] (2, "b")))
+        [ (1, "a"); (2, "b") ]
+  end )

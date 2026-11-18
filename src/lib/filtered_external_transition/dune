@@ -28,6 +28,7 @@
   mina_wire_types
   pickles
   pickles.backend
+  protocol_version
   ppx_version.runtime
   sgn
   sgn_type

@@ -84,7 +84,11 @@ For each `<filename{i}>` parameter one line of output is printed to
     ```
 
 The stateless verification would check the protocol_state_proof in the
-block and the transaction_snark_proof in the snark_work.
+block and the transaction_snark_proof in the snark_work. For the snark
+work it also checks that the proof's sok message is the submitter's
+(fee and public key) and that the proof's target ledger is the staged
+ledger of the submitted block, so a proof cannot be reused for a later
+submission.
 
 Stdin mode
 ----------
