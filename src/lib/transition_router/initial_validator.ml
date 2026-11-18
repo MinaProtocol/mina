@@ -388,62 +388,162 @@ let%test_module "Initial validation of block bodies" =
             ~constraint_constants:precomputed_values.constraint_constants
             ~logger ~proof_level:precomputed_values.proof_level () )
 
-    (* A chain of two blocks, with the second's body. *)
-    let gen_chain =
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = precomputed_values.constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
+
+    (* A frontier holding just a root, and a chain of two blocks on it. *)
+    let gen_frontier_and_chain =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values
         ~verifier ~max_length:3 ~frontier_size:1 ~branch_size:2 ()
 
-    (* Validate each block in [blocks] as received from the network, in
-       order, returning how each one's validation callback was answered. *)
-    let answers_for blocks =
+    let peer =
+      Peer.create
+        (Core.Unix.Inet_addr.of_string "1.2.3.4")
+        ~libp2p_port:8302
+        ~peer_id:(Peer.Id.unsafe_of_string "test-peer")
+
+    type answer = [ `Accept | `Reject | `Ignore ] option
+    [@@deriving compare, sexp]
+
+    type result =
+      { answers : answer list
+      ; passed_on : State_hash.t list
+      ; penalised : Peer.t list
+      ; rejected_for_body : (State_hash.t * Envelope.Sender.t) list
+      }
+    [@@deriving compare, sexp]
+
+    (* Validate each block in [blocks] as gossiped by [peer], in order, handing
+       each one that passes to the transition handler's validator over
+       [frontier]. *)
+    let process frontier blocks =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          Queue.clear Transition_frontier.rejected_blocks ;
+          let trust_system = Trust_system.null () in
+          Pipe_lib.Strict_pipe.Reader.iter_without_pushback
+            (Trust_system.upcall_pipe trust_system)
+            ~f:ignore
+          |> don't_wait_for ;
+          let actions = Trust_system.For_tests.get_action_pipe trust_system in
           let initialization_finish_signal = Ivar.create () in
           Ivar.fill initialization_finish_signal () ;
           let validate =
             unstage
               (validate ~signature_kind:Mina_signature_kind.Testnet
                  ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
-                 ~logger ~trust_system:(Trust_system.null ()) ~verifier
-                 ~initialization_finish_signal ~precomputed_values )
+                 ~logger ~trust_system ~verifier ~initialization_finish_signal
+                 ~precomputed_values )
           in
-          Deferred.List.map blocks ~how:`Sequential ~f:(fun block ->
-              let valid_cb =
-                Mina_net2.Validation_callback.create
-                  (Time_ns.add (Time_ns.now ()) (Time_ns.Span.of_min 1.))
-              in
-              (* The start of the block's slot. *)
-              let time_received =
-                Mina_block.Stable.Latest.header block
-                |> Header.protocol_state |> Protocol_state.consensus_state
-                |> Consensus.Data.Consensus_state.consensus_time
-                |> Consensus.Data.Consensus_time.start_time
-                     ~constants:precomputed_values.consensus_constants
-              in
-              let%bind result =
-                validate
-                  ~b_or_h:
-                    (`Block
-                      (Envelope.Incoming.wrap ~data:block
-                         ~sender:Envelope.Sender.Local ) )
-                  ~time_received ~valid_cb
-              in
-              let%map answer =
-                Async.Clock_ns.with_timeout (Time_ns.Span.of_sec 1.)
-                  (Mina_net2.Validation_callback.await valid_cb)
-              in
-              let answer =
-                match answer with `Result answer -> answer | `Timeout -> None
-              in
-              (Result.is_ok result, answer) ) )
+          let valid_transition_reader, valid_transition_writer =
+            Pipe_lib.Strict_pipe.create (Buffered (`Capacity 2, `Overflow Crash))
+          in
+          let handle =
+            Transition_handler.Validator.create_handler
+              ~context:(module Context)
+              ~trust_system
+              ~time_controller:(Block_time.Controller.basic ~logger)
+              ~frontier ~valid_transition_writer
+              ~unprocessed_transition_cache:
+                (Transition_handler.Unprocessed_transition_cache.create ~logger
+                   ~cache_exceptions:false )
+          in
+          let%bind answers =
+            Deferred.List.map blocks ~how:`Sequential ~f:(fun block ->
+                let valid_cb =
+                  Mina_net2.Validation_callback.create_without_expiration ()
+                in
+                let answer = ref None in
+                upon (Mina_net2.Validation_callback.await valid_cb) (fun a ->
+                    answer := a ) ;
+                (* The start of the block's slot. *)
+                let time_received =
+                  Mina_block.Stable.Latest.header block
+                  |> Header.protocol_state |> Protocol_state.consensus_state
+                  |> Consensus.Data.Consensus_state.consensus_time
+                  |> Consensus.Data.Consensus_time.start_time
+                       ~constants:precomputed_values.consensus_constants
+                in
+                let%bind () =
+                  match%bind
+                    validate
+                      ~b_or_h:
+                        (`Block
+                          (Envelope.Incoming.wrap ~data:block
+                             ~sender:(Envelope.Sender.Remote peer) ) )
+                      ~time_received ~valid_cb
+                  with
+                  | Ok (b_or_h, `Valid_cb vc) ->
+                      handle (b_or_h, `Valid_cb (Some vc))
+                  | Error () ->
+                      Deferred.unit
+                in
+                let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+                !answer )
+          in
+          Pipe_lib.Strict_pipe.Writer.close valid_transition_writer ;
+          let passed_on = ref [] in
+          let%map () =
+            Pipe_lib.Strict_pipe.Reader.iter valid_transition_reader
+              ~f:(fun (b_or_h, `Valid_cb _) ->
+                let state_hash =
+                  match b_or_h with
+                  | `Block cached ->
+                      Cache_lib.Cached.invalidate_with_failure cached
+                      |> Envelope.Incoming.data
+                      |> Mina_block.Validation.block_with_hash
+                      |> State_hash.With_state_hashes.state_hash
+                  | `Header h ->
+                      State_hash.With_state_hashes.state_hash
+                        (fst (Envelope.Incoming.data h))
+                in
+                passed_on := state_hash :: !passed_on ;
+                Deferred.unit )
+          in
+          let penalised =
+            match Pipe.read_now' actions with
+            | `Ok actions ->
+                Queue.to_list actions
+                |> List.filter_map ~f:(function
+                     | (Trust_system.Actions.Gossiped_invalid_transition, _), p
+                       ->
+                         Some p
+                     | _ ->
+                         None )
+            | `Eof | `Nothing_available ->
+                []
+          in
+          let rejected_for_body =
+            Queue.to_list Transition_frontier.rejected_blocks
+            |> List.map ~f:(fun (state_hash, sender, _, reason) ->
+                   match reason with
+                   | `Invalid_body_reference ->
+                       (state_hash, sender)
+                   | _ ->
+                       failwith "Block rejected for another reason" )
+          in
+          { answers
+          ; passed_on = List.rev !passed_on
+          ; penalised
+          ; rejected_for_body
+          } )
 
-    type answer = [ `Accept | `Reject | `Ignore ] option
-    [@@deriving compare, sexp]
-
-    let%test_unit "A block whose body does not match its header is rejected, \
-                   whichever copy arrives first" =
-      Quickcheck.test ~trials:1 gen_chain ~f:(fun (_frontier, chain) ->
+    let%test_unit "A block is passed on after a copy whose body does not match \
+                   its header" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
           let[@warning "-8"] [ first; second ] =
             List.map chain ~f:Transition_frontier.Breadcrumb.block
+          in
+          let state_hash =
+            Mina_block.(header first |> Header.protocol_state)
+            |> Protocol_state.hashes |> State_hash.State_hashes.state_hash
           in
           let real = Mina_block.read_all_proofs_from_disk first in
           (* The first block's header, carrying the second block's body. *)
@@ -452,10 +552,11 @@ let%test_module "Initial validation of block bodies" =
               ~body:(Mina_block.body second)
             |> Mina_block.read_all_proofs_from_disk
           in
-          [%test_eq: (bool * answer) list]
-            (answers_for [ fake; real ])
-            [ (false, Some `Reject); (true, None) ] ;
-          [%test_eq: (bool * answer) list]
-            (answers_for [ real; fake ])
-            [ (true, None); (false, Some `Reject) ] )
+          [%test_eq: result]
+            (process frontier [ fake; real ])
+            { answers = [ Some `Reject; None ]
+            ; passed_on = [ state_hash ]
+            ; penalised = [ peer ]
+            ; rejected_for_body = [ (state_hash, Remote peer) ]
+            } )
   end )
