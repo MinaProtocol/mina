@@ -1219,6 +1219,64 @@ let won_slot_timing ~current_global_slot winning_global_slot =
     | Some slot_diff ->
         `In slot_diff
 
+let%test_module "won_slot_timing" =
+  ( module struct
+    module Quickcheck = Core.Quickcheck
+    module Slot = Mina_numbers.Global_slot_since_hard_fork
+    module Span = Mina_numbers.Global_slot_span
+
+    let classify ~current won = won_slot_timing ~current_global_slot:current won
+
+    let earlier_and_later =
+      let open Quickcheck.Let_syntax in
+      let%bind earlier =
+        Slot.gen_incl Slot.zero (Slot.of_int (Slot.to_int Slot.max_value - 1))
+      in
+      let%map later =
+        Slot.gen_incl (Slot.add earlier (Span.of_int 1)) Slot.max_value
+      in
+      (earlier, later)
+
+    let%test_unit "the current slot is produced now" =
+      Quickcheck.test Slot.gen ~sexp_of:Slot.sexp_of_t ~f:(fun slot ->
+          match classify ~current:slot slot with
+          | `Now ->
+              ()
+          | `Passed | `In _ ->
+              failwith "expected `Now" )
+
+    let%test_unit "an earlier slot has passed" =
+      Quickcheck.test earlier_and_later ~sexp_of:[%sexp_of: Slot.t * Slot.t]
+        ~f:(fun (won, current) ->
+          match classify ~current won with
+          | `Passed ->
+              ()
+          | `Now | `In _ ->
+              failwith "expected `Passed" )
+
+    let%test_unit "a later slot is the slot difference away" =
+      Quickcheck.test earlier_and_later ~sexp_of:[%sexp_of: Slot.t * Slot.t]
+        ~f:(fun (current, won) ->
+          match classify ~current won with
+          | `In slots ->
+              [%test_eq: Slot.t] (Slot.add current slots) won
+          | `Now | `Passed ->
+              failwith "expected `In" )
+
+    let%test_unit "adjacent slots" =
+      let current = Slot.of_int 100 in
+      ( match classify ~current (Slot.of_int 99) with
+      | `Passed ->
+          ()
+      | `Now | `In _ ->
+          failwith "expected `Passed for the previous slot" ) ;
+      match classify ~current (Slot.of_int 101) with
+      | `In slots ->
+          [%test_eq: int] (Span.to_int slots) 1
+      | `Now | `Passed ->
+          failwith "expected `In for the next slot"
+  end )
+
 module Next_step = struct
   type production =
     Block_time.t
