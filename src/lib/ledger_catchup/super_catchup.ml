@@ -1335,6 +1335,16 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               [%log debug] "Succeeded in using cache." ;
               Deferred.Result.return res
         in
+        let release_forest () =
+          List.iter forest ~f:(fun subtree ->
+              Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
+                  (* TODO consider rejecting the callback in some cases,
+                     see https://github.com/MinaProtocol/mina/issues/11087 *)
+                  Option.value_map vc ~default:ignore
+                    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                    `Ignore ;
+                  ignore @@ Cached.invalidate_with_failure node ) )
+        in
         match%map state_hashes with
         | Error errors ->
             [%log debug]
@@ -1385,14 +1395,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                   Mina_metrics.(
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
-            List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
-                    (* TODO consider rejecting the callback in some cases,
-                       see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore @@ Cached.invalidate_with_failure node ) )
+            release_forest ()
         | Ok (root, state_hashes) ->
             [%log' debug t.logger]
               ~metadata:
