@@ -1235,15 +1235,31 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
           in
           Float.of_int (List.length hs) *. sec_per_block
         in
-        Mina_networking.get_transition_chain
-          ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
-        |> Deferred.Or_error.map
+        let%bind.Deferred.Or_error blocks =
+          Mina_networking.get_transition_chain
+            ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
+            ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
+        in
+        let%map blocks =
+          Deferred.List.filter blocks ~f:(fun block ->
+              if
+                Mina_block.Validation.body_matches_reference
+                  ~header:(Mina_block.Stable.Latest.header block)
+                  (Mina_block.Stable.Latest.body block)
+              then return true
+              else
+                let%map () =
+                  Trust_system.record trust_system logger peer
+                    ( Trust_system.Actions.Gossiped_invalid_transition
+                    , Some ("invalid body reference", []) )
+                in
+                false )
+        in
+        Ok
+          (List.map blocks
              ~f:
-               (List.map
-                  ~f:
-                    (Mina_block.write_all_proofs_to_disk ~signature_kind
-                       ~proof_cache_db ) ) )
+               (Mina_block.write_all_proofs_to_disk ~signature_kind
+                  ~proof_cache_db ) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
