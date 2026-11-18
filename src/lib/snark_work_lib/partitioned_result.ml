@@ -4,6 +4,21 @@ open Core_kernel
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  module V2 = struct
+    type t =
+      { id : Id.Any.Stable.V1.t
+      ; data :
+          (* NOTE: the time here correspond to time elapsed for creating the
+             proof by a worker *)
+          ( Mina_stdlib.Time.Span.Stable.V1.t
+          , Ledger_proof.Stable.V3.t )
+          Proof_carrying_data.Stable.V1.t
+      }
+    [@@deriving to_yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       { id : Id.Any.Stable.V1.t
@@ -16,7 +31,10 @@ module Stable = struct
       }
     [@@deriving to_yojson]
 
-    let to_latest = Fn.id
+    let to_latest ({ id; data } : t) : Latest.t =
+      { id
+      ; data = { data with proof = Ledger_proof.Stable.V2.to_latest data.proof }
+      }
   end
 end]
 

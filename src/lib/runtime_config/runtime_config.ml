@@ -300,19 +300,9 @@ module Json_layout = struct
                    Zkapp_account.verification_key, expected string"
         end
 
-        module Zkapp_version = struct
-          type t = Mina_numbers.Zkapp_version.Stable.Latest.t
-          [@@deriving bin_io_unversioned]
-
-          include (
-            Mina_numbers.Zkapp_version :
-              module type of Mina_numbers.Zkapp_version with type t := t )
-        end
-
         type t =
           { app_state : Field.t list
           ; verification_key : Verification_key.t option [@default None]
-          ; zkapp_version : Zkapp_version.t
           ; action_state : Field.t list
           ; last_action_slot : int
           ; proved_state : bool
@@ -329,7 +319,6 @@ module Json_layout = struct
           { app_state = Mina_base.Zkapp_state.V.to_list zkapp.app_state
           ; verification_key =
               Option.map zkapp.verification_key ~f:With_hash.data
-          ; zkapp_version = zkapp.zkapp_version
           ; action_state =
               Pickles_types.Vector.Vector_5.to_list zkapp.action_state
           ; last_action_slot =
@@ -744,7 +733,6 @@ module Accounts = struct
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
-          , Zkapp_account.Zkapp_version.t
           , Zkapp_account.Field.t
           , Mina_numbers.Global_slot_since_genesis.t
           , bool
@@ -757,7 +745,6 @@ module Accounts = struct
               @@ pad_app_state_do app.app_state
           ; verification_key =
               Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
-          ; zkapp_version = app.zkapp_version
           ; action_state =
               Pickles_types.Vector.Vector_5.of_list_exn app.action_state
           ; last_action_slot =

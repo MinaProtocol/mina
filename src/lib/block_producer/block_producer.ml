@@ -308,10 +308,14 @@ let next_ledger_proof_statement ~previous_protocol_state ledger_proof_opt =
       let state = previous_protocol_state |> Protocol_state.blockchain_state in
       Blockchain_state.ledger_proof_statement state
 
-let supply_increase_of_ledger_proof ledger_proof_opt =
+(* The total currency only moves when a proof is emitted;
+   otherwise it stays where consensus already has it. *)
+let total_currency_of_ledger_proof ~previous_protocol_state ledger_proof_opt =
   Option.value_map ledger_proof_opt
-    ~f:(fun proof -> (Ledger_proof.Cached.statement proof).supply_increase)
-    ~default:Currency.Amount.Signed.zero
+    ~f:(fun proof -> (Ledger_proof.Cached.statement proof).target.total_currency)
+    ~default:
+      (Consensus.Data.Consensus_state.total_currency
+         (Protocol_state.consensus_state previous_protocol_state) )
 
 let create_internal_transition ~(block_data : Consensus.Data.Block_data.t)
     ~protocol_state ~consensus_transition_data ~pending_coinbase_update ~diff
@@ -434,8 +438,9 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   previous_protocol_state |> Protocol_state.blockchain_state
                   |> Blockchain_state.genesis_ledger_hash
                 in
-                let supply_increase =
-                  supply_increase_of_ledger_proof ledger_proof_opt
+                let total_currency =
+                  total_currency_of_ledger_proof ~previous_protocol_state
+                    ledger_proof_opt
                 in
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
@@ -465,7 +470,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~previous_protocol_state ~blockchain_state ~current_time
                       ~block_data ~supercharge_coinbase
                       ~snarked_ledger_hash:previous_ledger_hash
-                      ~genesis_ledger_hash ~supply_increase ~logger
+                      ~genesis_ledger_hash ~total_currency ~logger
                       ~constraint_constants ) )
           in
           lift_sync (fun () ->

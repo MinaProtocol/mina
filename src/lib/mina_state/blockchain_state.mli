@@ -6,6 +6,43 @@ open Currency
 module Poly : sig
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type ( 'staged_ledger_hash
+           , 'snarked_ledger_hash
+           , 'local_state
+           , 'time
+           , 'body_reference
+           , 'signed_amount
+           , 'pending_coinbase_stack
+           , 'fee_excess
+           , 'sok_digest )
+           t =
+            ( 'staged_ledger_hash
+            , 'snarked_ledger_hash
+            , 'local_state
+            , 'time
+            , 'body_reference
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest )
+            Mina_wire_types.Mina_state.Blockchain_state.Poly.V3.t =
+        { staged_ledger_hash : 'staged_ledger_hash
+        ; genesis_ledger_hash : 'snarked_ledger_hash
+        ; ledger_proof_statement :
+            ( 'snarked_ledger_hash
+            , 'signed_amount
+            , 'pending_coinbase_stack
+            , 'fee_excess
+            , 'sok_digest
+            , 'local_state )
+            Snarked_ledger_state.Poly.Stable.V3.t
+        ; timestamp : 'time
+        ; body_reference : 'body_reference
+        }
+      [@@deriving sexp, fields, equal, compare, hash, yojson, hlist]
+    end
+
     module V2 : sig
       type ( 'staged_ledger_hash
            , 'snarked_ledger_hash
@@ -48,6 +85,23 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
+    module V3 : sig
+      type t =
+        ( Staged_ledger_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Local_state.Stable.V1.t
+        , Block_time.Stable.V1.t
+        , Consensus.Body_reference.Stable.V1.t
+        , Amount.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V2.t
+        , unit )
+        Poly.Stable.V3.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      val to_latest : t -> t
+    end
+
     module V2 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
@@ -62,7 +116,9 @@ module Value : sig
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
-      val to_latest : t -> t
+      val to_latest : t -> V3.t
+
+      val to_input : t -> Field.t Random_oracle.Input.Chunked.t
     end
   end]
 end
@@ -75,7 +131,7 @@ include
       , Local_state.Checked.t
       , Block_time.Checked.t
       , Consensus.Body_reference.var
-      , Currency.Amount.Signed.var
+      , Currency.Amount.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , unit )
@@ -129,6 +185,7 @@ val negative_one :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger_hash:Ledger_hash.t
+  -> genesis_total_currency:Currency.Amount.t
   -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 
@@ -136,6 +193,7 @@ val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger_hash:Ledger_hash.t
+  -> genesis_total_currency:Currency.Amount.t
   -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 

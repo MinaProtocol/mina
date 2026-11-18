@@ -6,13 +6,25 @@ module Common = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V4 = struct
+      type t =
+        { scan_state : Staged_ledger.Scan_state.Stable.V4.t
+        ; pending_coinbase : Pending_coinbase.Stable.V2.t
+        }
+
+      let to_latest = Fn.id
+    end
+
     module V3 = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V3.t
         ; pending_coinbase : Pending_coinbase.Stable.V2.t
         }
 
-      let to_latest = Fn.id
+      let to_latest ({ scan_state; pending_coinbase } : t) : Latest.t =
+        { scan_state = Staged_ledger.Scan_state.Stable.V3.to_latest scan_state
+        ; pending_coinbase
+        }
     end
   end]
 
@@ -74,6 +86,26 @@ module Limited = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V5 = struct
+      type t =
+        { transition : Mina_block.Validated.Stable.V4.t
+        ; protocol_states :
+            Mina_state.Protocol_state.Value.Stable.V4.t
+            Mina_base.State_hash.With_state_hashes.Stable.V1.t
+            list
+        ; common : Common.Stable.V4.t
+        }
+      [@@deriving fields]
+
+      let to_latest = Fn.id
+
+      let hashes t = Mina_block.Validated.Stable.Latest.hashes t.transition
+
+      let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
+        let common = { Common.Stable.V4.scan_state; pending_coinbase } in
+        { transition; common; protocol_states }
+    end
+
     module V4 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V3.t
@@ -85,13 +117,15 @@ module Limited = struct
         }
       [@@deriving fields]
 
-      let to_latest = Fn.id
-
-      let hashes t = Mina_block.Validated.Stable.Latest.hashes t.transition
-
-      let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
-        let common = { Common.Stable.V3.scan_state; pending_coinbase } in
-        { transition; common; protocol_states }
+      let to_latest ({ transition; protocol_states; common } : t) : Latest.t =
+        { transition = Mina_block.Validated.Stable.V3.to_latest transition
+        ; protocol_states =
+            List.map protocol_states
+              ~f:
+                (With_hash.map
+                   ~f:Mina_state.Protocol_state.Value.Stable.V3.to_latest )
+        ; common = Common.Stable.V3.to_latest common
+        }
     end
   end]
 
@@ -128,8 +162,8 @@ module Minimal = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
-      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
+    module V4 = struct
+      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V4.t }
       [@@deriving fields]
 
       let of_limited ~common hash = { hash; common }
@@ -141,6 +175,18 @@ module Minimal = struct
       let scan_state t = t.common.Common.Stable.Latest.scan_state
 
       let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
+    end
+
+    module V3 = struct
+      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
+      [@@deriving fields]
+
+      let of_limited ~common hash = { hash; common }
+
+      let to_latest ({ hash; common } : t) : Latest.t =
+        { hash; common = Common.Stable.V3.to_latest common }
+
+      let common t = t.common
     end
   end]
 

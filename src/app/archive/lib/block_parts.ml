@@ -72,14 +72,15 @@ let transaction_of_latest ~command_hash : Transaction.t -> transaction =
                    |> Transaction_hash.hash_fee_transfer )
         }
 
-(** The parts of a block whose staged ledger diff is of the latest version,
-    with the hashes of its commands given by [command_hash]. *)
-let of_diff ~command_hash ~constraint_constants ~state_hash
-    ~(protocol_state : Protocol_state.Value.t)
-    ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
-    ~proposed_protocol_version =
+(** The parts of a block, from its protocol state, of whatever version, and
+    [get_transactions], which gives its transactions from its coinbase
+    receiver and whether its coinbase is supercharged, with the hashes of its
+    commands given by [command_hash]. The blockchain state differs in shape
+    between versions, so the parts taken from it are given separately. *)
+let of_protocol_state ~command_hash ~state_hash ~protocol_state
+    ~snarked_ledger_hash ~staged_ledger_hash ~timestamp ~get_transactions
+    ~protocol_version ~proposed_protocol_version =
   let consensus_state = Protocol_state.consensus_state protocol_state in
-  let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let transactions =
     lazy
       (let coinbase_receiver =
@@ -88,10 +89,7 @@ let of_diff ~command_hash ~constraint_constants ~state_hash
        let supercharge_coinbase =
          Consensus.Data.Consensus_state.supercharge_coinbase consensus_state
        in
-       match
-         Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
-           ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff
-       with
+       match get_transactions ~coinbase_receiver ~supercharge_coinbase with
        | Ok transactions ->
            List.map transactions
              ~f:(With_status.map ~f:(transaction_of_latest ~command_hash))
@@ -105,7 +103,7 @@ let of_diff ~command_hash ~constraint_constants ~state_hash
       Consensus.Data.Consensus_state.block_stake_winner consensus_state
   ; last_vrf_output =
       Consensus.Data.Consensus_state.last_vrf_output consensus_state
-  ; snarked_ledger_hash = Blockchain_state.snarked_ledger_hash blockchain_state
+  ; snarked_ledger_hash
   ; staking_epoch_data =
       Consensus.Data.Consensus_state.staking_epoch_data consensus_state
   ; next_epoch_data =
@@ -116,28 +114,53 @@ let of_diff ~command_hash ~constraint_constants ~state_hash
       Consensus.Data.Consensus_state.sub_window_densities consensus_state
   ; total_currency =
       Consensus.Data.Consensus_state.total_currency consensus_state
-  ; ledger_hash =
-      Blockchain_state.staged_ledger_hash blockchain_state
-      |> Staged_ledger_hash.ledger_hash
+  ; ledger_hash = Staged_ledger_hash.ledger_hash staged_ledger_hash
   ; height = Consensus.Data.Consensus_state.blockchain_length consensus_state
   ; global_slot_since_hard_fork =
       Consensus.Data.Consensus_state.curr_global_slot consensus_state
   ; global_slot_since_genesis =
       Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
-  ; timestamp = Blockchain_state.timestamp blockchain_state
+  ; timestamp
   ; protocol_version
   ; proposed_protocol_version
   ; transactions
   }
 
 (** The parts of a block of the latest version. *)
-let of_latest = of_diff ~command_hash:Transaction_hash.hash_command_with_hashes
+let of_latest ~constraint_constants ~state_hash
+    ~(protocol_state : Protocol_state.Value.t)
+    ~(staged_ledger_diff : Staged_ledger_diff.t) ~protocol_version
+    ~proposed_protocol_version =
+  let blockchain_state = Protocol_state.blockchain_state protocol_state in
+  of_protocol_state ~command_hash:Transaction_hash.hash_command_with_hashes
+    ~state_hash ~protocol_state
+    ~snarked_ledger_hash:(Blockchain_state.snarked_ledger_hash blockchain_state)
+    ~staged_ledger_hash:(Blockchain_state.staged_ledger_hash blockchain_state)
+    ~timestamp:(Blockchain_state.timestamp blockchain_state)
+    ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
+      Staged_ledger.Pre_diff_info.get_transactions ~constraint_constants
+        ~coinbase_receiver ~supercharge_coinbase staged_ledger_diff )
+    ~protocol_version ~proposed_protocol_version
 
-(* A V4 block is read through the latest version's code, which only
-   type-checks while V4 is the latest version. Once it is not, this needs
-   V4's own hashing and transaction derivation in its place. *)
-let of_precomputed_v4 ~constraint_constants ~proof_cache_db
-    (t : Mina_block.Precomputed.Stable.V4.t) =
+(** The parts of a block whose protocol state is at the version V4 and V3
+    blocks carry, given as for [of_protocol_state]. *)
+let of_protocol_state_v3 ~command_hash ~state_hash
+    ~(protocol_state : Protocol_state.Value.Stable.V3.t) =
+  let { Blockchain_state.Poly.Stable.V2.staged_ledger_hash
+      ; ledger_proof_statement
+      ; timestamp
+      ; _
+      } =
+    Protocol_state.blockchain_state protocol_state
+  in
+  of_protocol_state ~command_hash ~state_hash ~protocol_state
+    ~snarked_ledger_hash:
+      ledger_proof_statement.Snarked_ledger_state.Poly.Stable.V2.target
+        .first_pass_ledger
+    ~staged_ledger_hash ~timestamp
+
+let of_precomputed_v5 ~constraint_constants ~proof_cache_db
+    (t : Mina_block.Precomputed.Stable.V5.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let staged_ledger_diff =
     Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
@@ -145,8 +168,33 @@ let of_precomputed_v4 ~constraint_constants ~proof_cache_db
   in
   of_latest ~constraint_constants
     ~state_hash:
-      (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
+      (Mina_block.Precomputed.Versioned.state_hashes (V5 t)).state_hash
     ~protocol_state:t.protocol_state ~staged_ledger_diff
+    ~protocol_version:t.protocol_version
+    ~proposed_protocol_version:t.proposed_protocol_version
+
+(* The protocol state and staged ledger diff are read at the versions a V4
+   block carries, so that a later change to either stops this compiling,
+   rather than letting a V4 block be read by the rules of a newer version. *)
+let of_precomputed_v4 ~constraint_constants ~proof_cache_db
+    (t : Mina_block.Precomputed.Stable.V4.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  of_protocol_state_v3 ~command_hash:Transaction_hash.hash_command_with_hashes
+    ~state_hash:
+      (Mina_block.Precomputed.Versioned.state_hashes (V4 t)).state_hash
+    ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
+    ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
+      Staged_ledger.Pre_diff_info.get_transactions_stable_v3
+        ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
+        (t.staged_ledger_diff : Staged_ledger_diff.Stable.V3.t)
+      |> Result.map
+           ~f:
+             (List.map
+                ~f:
+                  (With_status.map
+                     ~f:
+                       (Transaction.write_all_proofs_to_disk ~signature_kind
+                          ~proof_cache_db ) ) ) )
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
@@ -156,9 +204,9 @@ let of_precomputed_v4 ~constraint_constants ~proof_cache_db
 let berkeley_coinbase_amount = Currency.Amount.of_mina_int_exn 720
 
 (* A V3 block's transactions are derived as a V4 block's are, from its diff
-   converted to the latest version, which only extends zkApp states. Each
-   command takes the Berkeley hash of the command it was converted from,
-   found by the latest hash of the converted command. *)
+   converted to the version a V4 block carries, which only extends zkApp
+   states. Each command takes the Berkeley hash of the command it was
+   converted from, found by the latest hash of the converted command. *)
 let of_precomputed_v3 ~constraint_constants ~proof_cache_db
     (t : Mina_block.Precomputed.V3.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
@@ -179,26 +227,38 @@ let of_precomputed_v3 ~constraint_constants ~proof_cache_db
            , hash ) )
        |> Transaction_hash.Map.of_alist_exn )
   in
-  let staged_ledger_diff =
-    Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
-      (Berkeley_types.Diff.to_mesa t.staged_ledger_diff)
-  in
-  of_diff
+  of_protocol_state_v3
     ~command_hash:(fun command ->
       Map.find_exn
         (Lazy.force berkeley_hashes)
         (Transaction_hash.hash_command_with_hashes command) )
-    ~constraint_constants:
-      { constraint_constants with coinbase_amount = berkeley_coinbase_amount }
     ~state_hash:
       (Mina_block.Precomputed.Versioned.state_hashes (V3 t)).state_hash
-    ~protocol_state:t.protocol_state ~staged_ledger_diff
+    ~protocol_state:(t.protocol_state : Protocol_state.Value.Stable.V3.t)
+    ~get_transactions:(fun ~coinbase_receiver ~supercharge_coinbase ->
+      Staged_ledger.Pre_diff_info.get_transactions_stable_v3
+        ~constraint_constants:
+          { constraint_constants with
+            coinbase_amount = berkeley_coinbase_amount
+          }
+        ~coinbase_receiver ~supercharge_coinbase
+        (Berkeley_types.Diff.to_mesa t.staged_ledger_diff)
+      |> Result.map
+           ~f:
+             (List.map
+                ~f:
+                  (With_status.map
+                     ~f:
+                       (Transaction.write_all_proofs_to_disk ~signature_kind
+                          ~proof_cache_db ) ) ) )
     ~protocol_version:t.protocol_version
     ~proposed_protocol_version:t.proposed_protocol_version
 
 let of_precomputed ~constraint_constants ~proof_cache_db :
     Mina_block.Precomputed.Versioned.t -> t = function
-  | V3 t ->
-      of_precomputed_v3 ~constraint_constants ~proof_cache_db t
+  | V5 t ->
+      of_precomputed_v5 ~constraint_constants ~proof_cache_db t
   | V4 t ->
       of_precomputed_v4 ~constraint_constants ~proof_cache_db t
+  | V3 t ->
+      of_precomputed_v3 ~constraint_constants ~proof_cache_db t

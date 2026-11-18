@@ -8,6 +8,17 @@ module Zkapp_command_inputs = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t =
+        ( Zkapp_command_segment.Witness.Stable.V3.t
+        * Zkapp_command_segment.Basic.Stable.V1.t
+        * Statement.With_sok.Stable.V3.t )
+        Nonempty_list.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Zkapp_command_segment.Witness.Stable.V2.t
@@ -16,7 +27,11 @@ module Zkapp_command_inputs = struct
         Nonempty_list.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest : t -> Latest.t =
+        Nonempty_list.map ~f:(fun (witness, spec, statement) ->
+            ( Zkapp_command_segment.Witness.Stable.V2.to_latest witness
+            , spec
+            , Statement.With_sok.Stable.V2.to_latest statement ) )
     end
   end]
 
@@ -56,7 +71,12 @@ let extract_zkapp_segment_works ~signature_kind ~constraint_constants
         Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
           ~constraint_constants ~global_slot:witness.block_global_slot
           ~state_body:witness.protocol_state_body
-          ~fee_excess:Currency.Amount.Signed.zero
+            (*The segment statements have to chain from the excess that the
+              transaction's own statement starts at, not from zero.*)
+          ~fee_excess:(Currency.Amount.Signed.of_fee input.source.fee_excess)
+          ~total_currency:input.source.total_currency
+          ~ledger_after_coinbase:input.source.ledger_after_coinbase
+          ~total_supply_after_coinbase:input.source.total_supply_after_coinbase
           [ ( `Pending_coinbase_init_stack witness.init_stack
             , `Pending_coinbase_of_statement
                 { Transaction_snark.Pending_coinbase_stack_state.source =
