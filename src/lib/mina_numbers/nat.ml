@@ -370,4 +370,19 @@ let%test_module "div_mod" =
       not
         (accepts ~x:(N.of_int 17) ~y:(N.of_int 0) ~q:(N.of_int 42)
            ~r:(N.of_int 17) )
+
+    let%test "accepts a remainder one less than the divisor" =
+      accepts ~x:(N.of_int 9) ~y:(N.of_int 5) ~q:N.one ~r:(N.of_int 4)
+
+    let%test "accepts x = y = max" =
+      accepts ~x:N.max_int ~y:N.max_int ~q:N.one ~r:N.zero
+
+    let%test "accepts x = max - 1, y = max" =
+      accepts ~x:(N.pred N.max_int) ~y:N.max_int ~q:N.zero ~r:(N.pred N.max_int)
+
+    let%test "rejects r = x = y = max" =
+      not (accepts ~x:N.max_int ~y:N.max_int ~q:N.zero ~r:N.max_int)
+
+    let%test "accepts x = q = max, y = 1" =
+      accepts ~x:N.max_int ~y:N.one ~q:N.max_int ~r:N.zero
   end )
