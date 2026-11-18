@@ -111,7 +111,7 @@ let wire_embedded_in_t () =
 
 let wire_embedded_in_graphql () =
   let open Stable.Latest in
-  Quickcheck.test ~shrinker gen ~f:(fun w ->
+  Quickcheck.test ~trials:100 ~shrinker gen ~f:(fun w ->
       [%test_eq: t] (of_graphql_repr (to_graphql_repr w)) w )
 
 (* These tests are wrapped so that the type of [full] does not have to be

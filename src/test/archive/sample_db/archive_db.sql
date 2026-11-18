@@ -506,7 +506,7 @@ ALTER SEQUENCE public.timing_info_id_seq OWNED BY public.timing_info.id;
 
 CREATE TABLE public.token_symbols (
     id integer NOT NULL,
-    value text NOT NULL
+    value bytea NOT NULL
 );
 
 
@@ -1645,7 +1645,7 @@ ALTER SEQUENCE public.zkapp_updates_id_seq OWNED BY public.zkapp_updates.id;
 
 CREATE TABLE public.zkapp_uris (
     id integer NOT NULL,
-    value text NOT NULL
+    value bytea NOT NULL
 );
 
 

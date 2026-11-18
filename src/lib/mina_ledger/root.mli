@@ -133,8 +133,11 @@ val get_inner_hash_at_addr_exn : t -> addr -> hash
 (** Replace the accounts at the leaves underneath [addr] in the ledger: the
       given accounts fill the leftmost leaves, and any accounts in the leaves
       after them are removed. Throws an exception if the [addr] is not in the
-      ledger, or if there are more accounts than leaves. *)
-val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
+      ledger, or if there are more accounts than leaves. [subtree_hashes] are
+      hashes that nodes in the subtree will have, stored without being checked;
+      see [Merkle_ledger.Intf.SYNC_RECIPIENT.set_all_accounts_rooted_at_exn]. *)
+val set_all_accounts_rooted_at_exn :
+  ?subtree_hashes:(addr * hash) list -> t -> addr -> account list -> unit
 
 (** For each addr-account pair, replace the account in the root with the given
       account. This is done as a single batch write. *)

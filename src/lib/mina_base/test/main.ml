@@ -20,6 +20,10 @@ let () =
               (checked_pop_reverses_push (module Zkapp_account.Events))
           ; test_case "Actions pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Actions))
+          ; test_case "Checked and unchecked digests agree." `Quick
+              checked_digest_matches_unchecked
+          ; test_case "The upgrade drops only the zkApp version." `Quick
+              upgrade_drops_only_the_zkapp_version
           ] )
     ; Account_test.
         ( "accounts"
@@ -232,4 +236,11 @@ let () =
           ] )
     ; Valid_size.tests
     ; Nonce_related.tests
+    ; Byte_value_test.
+        ( "any-byte values"
+        , [ test_case "Token symbol JSON and bin_prot round trips." `Quick
+              token_symbol_round_trips
+          ; test_case "zkApp URI JSON and bin_prot round trips." `Quick
+              zkapp_uri_round_trips
+          ] )
     ]

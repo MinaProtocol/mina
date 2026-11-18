@@ -11,6 +11,29 @@ These tests are run on CI for any PR that changes the daemon OCaml code. As
 such, the tests added here should add value for the time they take, and should
 not take too long.
 
+#### One runner
+
+Every suite needs the transaction snark keys, which take ~17s to generate. The
+suites therefore run as Alcotest suites in a single runner, `runner/main.exe`,
+so that the keys are generated once. To add a suite:
+* in its library, define
+  ```ocaml
+  let suite () =
+    Transaction_snark_test_suite.make ~name:"<directory name>"
+    @@ fun ~test ->
+    let module _ = struct
+      (* setup *)
+
+      let () = test "description" @@ fun () -> (* test body *)
+    end in
+    ()
+  ```
+  depending on `transaction_snark_test_suite` (see `suite/`);
+* add the library to `runner/dune`, and its `suite ()` to `runner/main.ml`.
+
+Run a single suite with `./main.exe test <name>` from
+`_build/default/src/lib/transaction_snark/test/runner`.
+
 #### Caching proofs
 
 The largest performance impact of these tests is the time spent generating
@@ -19,47 +42,39 @@ well as the transaction proofs. In order to mitigate this, pickles provides a
 mode where it will generate the circuit witness, but skips the expensive proving
 step, using a cache.
 
-The recommended way to enable this cache is:
-* add the lines
-  ```ocaml
-    let proof_cache =
-      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-      @@ Yojson.Safe.from_file "proof_cache.json"
+Each suite keeps its own cache in its directory's `proof_cache.json`. To give a
+suite a cache:
+* add an empty cache, `[]`, as `proof_cache.json` in its directory;
+* build it into the library, by adding to its `dune` file
+  ```
+  (rule
+   (target proof_cache_json.ml)
+   (deps proof_cache.json)
+   (action
+    (with-stdout-to
+     %{target}
+     (progn
+      (echo "let contents = {json|")
+      (cat proof_cache.json)
+      (echo "|json}\n")))))
+  ```
+* pass it to the suite, with
+  `Transaction_snark_test_suite.make ~proof_cache_json:Proof_cache_json.contents`;
+* compile any circuits the suite defines itself with
+  `~proof_cache:Transaction_snark_test_suite.proof_cache`.
 
-    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
-  ```
-  to the top of the first `%test_module` in the file, to load a proof cache from
-  the `proof_cache.json` file in the directory;
-* add the lines
-  ```ocaml
-    let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
-  ```
-  to the bottom of the last `%test_module` in the file, to output the updated
-  proof cache to the path given in the `PROOF_CACHE_OUT` environment variable,
-  when provided;
-* update the `dune` file in the test directory to include the libraries
-  ```
-   ppx_deriving_yojson.runtime
-   result
-  ```
-* update the same `dune` file's `inline_tests` stanza to include `(deps
-  proof_cache.json)`, for example
-  ```diff
-  - (inline_tests (flags -verbose -show-counts))
-  + (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
-  ```
+The runner swaps each suite's proofs into the cache around each of its tests.
+A suite without a cache always generates its proofs, even when `ERROR_ON_PROOF`
+is set.
 
-For a concrete example, see commit
-[61afcaee844d5966331ddaee11fd8820f6dc1c8a](https://github.com/MinaProtocol/mina/commit/61afcaee844d5966331ddaee11fd8820f6dc1c8a).
+To regenerate the caches, run `./scripts/regenerate-proof-cache.sh dev`. When
+`PROOF_CACHE_OUT` names a directory, the runner writes each suite's updated cache
+to `PROOF_CACHE_OUT/<name>.json`, and the script moves them into place.
 
-Then, to update the cache for a set of tests, we can run the tests to update
-their contents. For example, to update the tests in all of the directories
-containing a `proof_cache.json` file, we can run: `./scripts/regenerate-proof-cache.sh dev`
+The witnesses of a cached suite's tests, and so its cached proofs, must not
+depend on which tests ran before them, in that suite or in others: each test
+starts from the random state that `ppx_inline_test` would give it, but any other
+state shared between tests can make the cache miss.
 
 **In case an error *is* generated, you should not commit the cache before making
 the test deterministic.**

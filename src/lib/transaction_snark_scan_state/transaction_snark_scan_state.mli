@@ -8,10 +8,16 @@ module Ledger = Mina_ledger.Ledger
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V3 : sig
+  module V4 : sig
     type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
+  end
+
+  module V3 : sig
+    type t
+
+    val to_latest : t -> V4.t
   end
 end]
 
@@ -103,6 +109,11 @@ val fill_work_and_enqueue_transactions :
   -> (Ledger_proof.Cached.t option * t) Or_error.t
 
 val latest_ledger_proof : t -> Ledger_proof.Cached.t option
+
+(** The registers the scan state currently ends at; new base statements chain
+    from these. [None] when the scan state is empty and no proof has been
+    emitted. *)
+val latest_target_registers : t -> Mina_state.Registers.Value.t option
 
 (** Apply transactions coorresponding to the last emitted proof based on the
     two-pass system- first pass includes legacy transactions and zkapp payments

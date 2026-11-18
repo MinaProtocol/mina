@@ -4,10 +4,18 @@ open Mina_base
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V3 : sig
+  module V4 : sig
     type t [@@deriving equal]
 
     val hashes : t -> State_hash.State_hashes.t
+  end
+
+  module V3 : sig
+    type t
+
+    val hashes : t -> State_hash.State_hashes.t
+
+    val to_latest : t -> V4.t
   end
 end]
 

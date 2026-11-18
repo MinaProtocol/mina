@@ -63,6 +63,17 @@ type t =
       Capped_supervisor.t
   }
 
+(* Release a block that won't be built, along with its validation
+   callback. *)
+let release_unbuilt (cached_transition, vc) =
+  (* TODO consider rejecting the callback in some cases,
+     see https://github.com/MinaProtocol/mina/issues/11087 *)
+  Option.value_map vc ~default:ignore
+    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
+  ignore
+    ( Cached.invalidate_with_failure cached_transition
+      : Mina_block.initial_valid_block Envelope.Incoming.t )
+
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
@@ -113,16 +124,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree
-                  ~f:(fun (cached_transition, vc) ->
-                    (* TODO consider rejecting the callback in some cases,
-                       see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore
-                      ( Cached.invalidate_with_failure cached_transition
-                        : Mina_block.initial_valid_block Envelope.Incoming.t ) ) ) )
+                Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) )
   in
   { logger
   ; collected_transitions

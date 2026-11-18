@@ -4,6 +4,17 @@ open Snark_params.Tick
 
 [%%versioned
 module Stable = struct
+  module V4 = struct
+    type t =
+      ( Ledger_hash.Stable.V1.t
+      , Account_id.Stable.V2.t
+      , Account.Stable.V4.t )
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
+    [@@deriving yojson, sexp]
+
+    let to_latest = Fn.id
+  end
+
   module V3 = struct
     type t =
       ( Ledger_hash.Stable.V1.t
@@ -12,7 +23,9 @@ module Stable = struct
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
     [@@deriving yojson, sexp]
 
-    let to_latest = Fn.id
+    let to_latest : t -> Latest.t =
+      Sparse_ledger_lib.Sparse_ledger.T.map_accounts
+        ~f:Account.Stable.V3.to_latest
   end
 end]
 

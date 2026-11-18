@@ -16,6 +16,8 @@ include Wire_types.Make (Make_sig) (Make_str)
 
 let current = of_int @@ Protocol_version.(transaction current)
 
+let mesa = of_int 4
+
 let equal_to_current t = t = current
 
 let older_than_current t = t < current

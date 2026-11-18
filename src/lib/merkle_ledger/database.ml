@@ -440,7 +440,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let tokens = Tokens.get
 
-  include Util.Make (struct
+  include Util.Make_reindexing (struct
     module Key = Key
     module Token_id = Token_id
     module Account_id = Account_id
@@ -494,15 +494,18 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes
 
-    let set_raw_account_batch mdb
+    let set_raw_account_batch ~reindex mdb
         (addresses_and_accounts : (location * Account.t) list) =
       set_bin_batch mdb Account.bin_size_t Account.bin_write_t
         addresses_and_accounts ;
       let token_owner_changes =
-        List.map addresses_and_accounts ~f:(fun (_, account) ->
-            let aid = Account.identifier account in
-            Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-              (Account_id.derive_token_id ~owner:aid, aid) )
+        List.filter_map addresses_and_accounts ~f:(fun (location, account) ->
+            if reindex (location, account) then
+              let aid = Account.identifier account in
+              Some
+                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+                   (Account_id.derive_token_id ~owner:aid, aid) )
+            else None )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes
@@ -615,8 +618,14 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       its leftmost leaves, and any accounts in the leaves after them are
       removed. An account overwritten by one with a different identifier is
       removed first, so that it keeps no location or token entries for the
-      overwritten leaf. *)
-  let set_all_accounts_rooted_at_exn mdb address accounts =
+      overwritten leaf. An account overwritten by one with the same identifier
+      keeps its location and token entries, which are already right, if its
+      location entry points at the overwritten leaf; otherwise the leaf held a
+      stale copy, and the entries are written again.
+
+      [subtree_hashes] are stored as the hashes of their nodes rather than
+      computed; each must be in the subtree. *)
+  let set_all_accounts_rooted_at_exn ?subtree_hashes mdb address accounts =
     let ledger_depth = mdb.depth in
     let first, last = Addr.Range.subtree_range ~ledger_depth address in
     let first = Addr.to_int first in
@@ -627,28 +636,57 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         "set_all_accounts_rooted_at_exn: %d accounts do not fit in a subtree \
          of %d leaves"
         num_accounts capacity () ;
+    let hash_cache =
+      Option.map subtree_hashes ~f:(fun subtree_hashes ->
+          List.iter subtree_hashes ~f:(fun (addr, _) ->
+              if not (Addr.is_parent_of address ~maybe_child:addr) then
+                failwithf
+                  !"set_all_accounts_rooted_at_exn: given the hash of %{sexp: \
+                    Addr.t}, outside the subtree at %{sexp: Addr.t}"
+                  addr address () ) ;
+          Addr.Map.of_alist_exn subtree_hashes )
+    in
     let addresses_and_accounts =
       List.mapi accounts ~f:(fun i account ->
           (Addr.of_int_exn ~ledger_depth (first + i), account) )
     in
+    let occupants =
+      List.zip_exn
+        (get_batch mdb
+           (List.map addresses_and_accounts ~f:(fun (addr, _) ->
+                Location.Account addr ) ) )
+        accounts
+    in
+    let has_occupant_identifier ((_, occupant), account) =
+      Option.value_map occupant ~default:false ~f:(fun occupant ->
+          Account_id.equal
+            (Account.identifier occupant)
+            (Account.identifier account) )
+    in
     let displaced =
-      List.filter_map
-        (List.zip_exn
-           (get_batch mdb
-              (List.map addresses_and_accounts ~f:(fun (addr, _) ->
-                   Location.Account addr ) ) )
-           accounts )
-        ~f:(fun ((location, occupant), account) ->
-          Option.bind occupant ~f:(fun occupant ->
-              Option.some_if
-                (not
-                   (Account_id.equal
-                      (Account.identifier occupant)
-                      (Account.identifier account) ) )
-                location ) )
+      List.filter_map occupants ~f:(fun (((location, occupant), _) as entry) ->
+          Option.some_if
+            (Option.is_some occupant && not (has_occupant_identifier entry))
+            location )
+    in
+    let recorded_locations =
+      Account_location.get_batch mdb (List.map accounts ~f:Account.identifier)
+    in
+    let already_indexed =
+      List.fold2_exn occupants recorded_locations ~init:Location.Set.empty
+        ~f:(fun set (((location, _), _) as entry) recorded ->
+          if
+            has_occupant_identifier entry
+            && Option.equal Location.equal recorded (Some location)
+          then Set.add set location
+          else set )
     in
     remove_accounts_at_locations mdb displaced ;
-    set_batch_accounts mdb addresses_and_accounts ;
+    set_batch_reindexing ?hash_cache
+      ~reindex:(fun (location, _) -> not (Set.mem already_indexed location))
+      mdb
+      (List.map addresses_and_accounts ~f:(fun (addr, account) ->
+           (Location.Account addr, account) ) ) ;
     let clear_from = first + num_accounts in
     let clear_to =
       Option.value_map (Account_location.last_location_address mdb)

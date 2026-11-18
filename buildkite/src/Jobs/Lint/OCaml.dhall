@@ -40,11 +40,13 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInDefaultToolchain
-                  ([] : List Text)
-                  (     "./buildkite/scripts/lint-check-format.sh && "
-                    ++  "./scripts/require-ppxs.py"
-                  )
+                RunInToolchain.runInToolchain
+                  RunInToolchain.Config::{
+                  , submodules = True
+                  , innerScript =
+                          "./buildkite/scripts/lint-check-format.sh && "
+                      ++  "./scripts/require-ppxs.py"
+                  }
             , label = "OCaml Lints; Check-format, Require-ppx-version"
             , key = "check"
             , target = Size.Large

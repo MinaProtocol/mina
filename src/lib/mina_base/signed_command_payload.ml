@@ -285,8 +285,6 @@ let create ~fee ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
 
 let fee (t : t) = t.common.fee
 
-let fee_token (_ : t) = Token_id.default
-
 let fee_payer_pk (t : t) = t.common.fee_payer_pk
 
 let fee_payer (t : t) = Account_id.create t.common.fee_payer_pk Token_id.default
@@ -314,8 +312,7 @@ let amount (t : t) =
   | Stake_delegation _ ->
       None
 
-let fee_excess (t : t) =
-  Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
+let fee_excess (t : t) = Currency.Fee.Signed.of_unsigned (fee t)
 
 let account_access_statuses (t : t) (status : Transaction_status.t) =
   match status with

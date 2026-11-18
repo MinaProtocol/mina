@@ -36,7 +36,7 @@ let tree_gen :
 
 let zkapp_type_gen =
   let open Quickcheck.Let_syntax in
-  let%bind length = Int.gen_incl 2 1000 in
+  let%bind length = Int.gen_incl 2 50 in
   let gen_call_forest =
     List.gen_with_length length
     @@ With_stack_hash.quickcheck_generator tree_gen

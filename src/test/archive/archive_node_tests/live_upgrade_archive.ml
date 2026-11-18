@@ -52,7 +52,9 @@ let test_case (test_data : t) =
   let%bind () =
     Daemon.archive_blocks_from_files daemon.executor
       ~archive_address:test_data.archive.config.server_port ~format:`Precomputed
-      ~sleep:5 precomputed_blocks
+      ~sleep:5
+      ( Network_data.genesis_block_path test_data.network_data
+      :: precomputed_blocks )
   in
   [%log info] "Loaded all precomputed blocks" ;
 

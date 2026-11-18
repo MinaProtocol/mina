@@ -61,9 +61,9 @@ module type Blockchain_state = sig
       , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t
       , Block_time.t
       , Body_reference.t
-      , Amount.Signed.t
+      , Amount.t
       , Pending_coinbase.Stack_versioned.Stable.V1.t
-      , Fee_excess.Stable.V1.t
+      , Fee_excess.Stable.V2.t
       , unit )
       Poly.t
     [@@deriving sexp]
@@ -75,7 +75,7 @@ module type Blockchain_state = sig
     , Mina_transaction_logic.Zkapp_command_logic.Local_state.Checked.t
     , Block_time.Checked.t
     , Body_reference.var
-    , Currency.Amount.Signed.var
+    , Currency.Amount.var
     , Pending_coinbase.Stack.var
     , Fee_excess.var
     , unit )
@@ -223,10 +223,31 @@ module type State_hooks = sig
     -> supercharge_coinbase:bool
     -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
-    -> supply_increase:Currency.Amount.Signed.t
+    -> total_currency:Currency.Amount.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> protocol_state * consensus_transition
+
+  (**
+   * Recompute the protocol state that [generate_transition] would produce
+   * for [candidate], a block extending [previous_protocol_state] whose
+   * blockchain state should be [blockchain_state].
+   *
+   * Inputs known only to the block producer are taken from [candidate]: the
+   * global slot, the truncated VRF output, the block stake winner, block
+   * creator and coinbase receiver, whether the coinbase is supercharged, and
+   * the next epoch seed while it absorbs the VRF output (in the seed update
+   * range). Every other field is derived locally.
+  *)
+  val expected_protocol_state :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> previous_protocol_state:protocol_state
+    -> previous_protocol_state_hash:Mina_base.State_hash.t
+    -> blockchain_state:blockchain_state
+    -> total_currency:Currency.Amount.t
+    -> candidate:protocol_state
+    -> logger:Logger.t
+    -> protocol_state Or_error.t
 
   (**
    * Create a constrained, checked var for the next consensus state of
@@ -237,7 +258,7 @@ module type State_hooks = sig
     -> prev_state:protocol_state_var
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
-    -> Currency.Amount.Signed.var
+    -> Currency.Amount.var
     -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
        Snark_params.Tick.Checked.t
 
@@ -247,14 +268,14 @@ module type State_hooks = sig
 
   module For_tests : sig
     val gen_consensus_state :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> constants:Constants.t
+         constants:Constants.t
       -> slot_advancement:int
       -> (   previous_protocol_state:
                protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
+          -> total_currency:Currency.Amount.t
           -> consensus_state )
          Quickcheck.Generator.t
   end
@@ -296,6 +317,9 @@ module type S = sig
   end
 
   module Genesis_data : sig
+    val genesis_ledger_total_currency :
+      ledger:Mina_ledger.Ledger.t Lazy.t -> Currency.Amount.t
+
     module Hashed : sig
       type t =
         { total_currency : Currency.Amount.t
@@ -431,10 +455,16 @@ module type S = sig
       module Stable : sig
         [@@@no_toplevel_latest_type]
 
-        module V3 : sig
+        module V4 : sig
           type t
 
           val to_latest : t -> t
+        end
+
+        module V3 : sig
+          type t
+
+          val to_latest : t -> V4.t
         end
       end]
 
@@ -645,7 +675,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V3 : sig
+        module V4 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -654,7 +684,7 @@ module type S = sig
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V3.t
+                Mina_base.Account.Stable.V4.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }
@@ -820,6 +850,7 @@ module type S = sig
                  Network_peer.Envelope.Incoming.t )
                Pipe.Writer.t
             -> unit )
+      -> bootstrap_status:Bootstrap_status.t
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

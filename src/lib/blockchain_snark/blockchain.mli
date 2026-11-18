@@ -5,8 +5,14 @@ open Mina_state
 
 [%%versioned:
 module Stable : sig
+  module V4 : sig
+    type t [@@deriving sexp, yojson]
+  end
+
   module V3 : sig
     type t [@@deriving sexp, yojson]
+
+    val to_latest : t -> V4.t
   end
 end]
 

@@ -21,6 +21,17 @@ end
 module Value = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        ( Blockchain_state.Value.Stable.V3.t
+        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
+        , Pending_coinbase.Update.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Blockchain_state.Value.Stable.V2.t
@@ -29,7 +40,11 @@ module Value = struct
         Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : Latest.t =
+        { t with
+          blockchain_state =
+            Blockchain_state.Value.Stable.V2.to_latest t.blockchain_state
+        }
     end
   end]
 end
@@ -56,11 +71,14 @@ let create_value ~blockchain_state ~consensus_transition
 
 let genesis ~constraint_constants ~consensus_constants ~genesis_ledger
     ~genesis_body_reference : value =
+  let genesis_total_currency =
+    Consensus.Genesis_data.genesis_ledger_total_currency ~ledger:genesis_ledger
+  in
   let genesis_ledger = Lazy.force genesis_ledger in
   { Poly.blockchain_state =
       Blockchain_state.genesis ~constraint_constants ~consensus_constants
         ~genesis_ledger_hash:(Mina_ledger.Ledger.merkle_root genesis_ledger)
-        ~genesis_body_reference
+        ~genesis_total_currency ~genesis_body_reference
   ; consensus_transition = Consensus.Data.Consensus_transition.genesis
   ; pending_coinbase_update = Pending_coinbase.Update.genesis
   }

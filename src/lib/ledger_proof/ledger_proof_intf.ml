@@ -8,10 +8,16 @@ module type S = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, yojson, hash]
 
       val to_latest : t -> t
+    end
+
+    module V2 : sig
+      type t [@@deriving compare, equal, sexp, yojson, hash]
+
+      val to_latest : t -> V3.t
     end
   end]
 
@@ -25,7 +31,9 @@ module type S = sig
        Mina_state.Snarked_ledger_state.t
     -> ( Frozen_ledger_hash.t
        , Pending_coinbase.Stack_versioned.t
-       , Mina_state.Local_state.t )
+       , Mina_state.Local_state.t
+       , Mina_base.Fee_excess.t
+       , Currency.Amount.t )
        Mina_state.Registers.t
 
   val statement : t -> Mina_state.Snarked_ledger_state.t
@@ -38,7 +46,9 @@ module type S = sig
        Mina_state.Snarked_ledger_state.With_sok.t
     -> ( Frozen_ledger_hash.t
        , Pending_coinbase.Stack_versioned.t
-       , Mina_state.Local_state.t )
+       , Mina_state.Local_state.t
+       , Mina_base.Fee_excess.t
+       , Currency.Amount.t )
        Mina_state.Registers.t
 
   val underlying_proof : t -> Proof.t

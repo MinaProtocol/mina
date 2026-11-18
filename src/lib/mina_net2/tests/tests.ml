@@ -144,7 +144,9 @@ let%test_module "Mina network tests" =
         let r, w = Libp2p_stream.pipes stream in
         let rec go2 i =
           if i = 0 then return ()
-          else Pipe.write w (Printf.sprintf "%d" i) >>= fun () -> go2 (i - 1)
+          else
+            Pipe.write w (Bigstring.of_string (Printf.sprintf "%d" i))
+            >>= fun () -> go2 (i - 1)
         in
         let%bind () = go2 1000 in
         Pipe.close w ;
@@ -169,7 +171,7 @@ let%test_module "Mina network tests" =
           open_protocol bob ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Libp2p_stream.pipes stream in
-              let%map () = Pipe.transfer r w ~f:Fn.id in
+              let%map () = Pipe.transfer r w ~f:Bigstring.of_string in
               Pipe.close w ;
               Ivar.fill_if_empty handler_finished () )
           |> Deferred.Or_error.ok_exn
@@ -188,7 +190,7 @@ let%test_module "Mina network tests" =
         in
         (* Send test message from Carol to Bob and close the Carol's writing
             edge of the stream *)
-        let%bind () = Pipe.write w testmsg in
+        let%bind () = Pipe.write w (Bigstring.of_string testmsg) in
         Pipe.close w ;
         let handle_read tmsg = function
           | `Ok chunks ->
@@ -216,6 +218,61 @@ let%test_module "Mina network tests" =
         let%bind () = reset_stream carol stream >>| Or_error.ok_exn in
         (* Ensure Bob's stream handler gracefully finished *)
         let%bind () = Ivar.read handler_finished in
+        let%bind () = close_protocol bob ~protocol:"echo" in
+        shutdown ()
+      in
+      Async.Thread_safe.block_on_async_exn test_def
+
+    let%test_unit "resetting streams releases them at the peer" =
+      let () = Core.Backtrace.elide := false in
+      let test_def () =
+        let open Deferred.Let_syntax in
+        let%bind bob, carol, shutdown = setup_two_nodes "test_stream_reset" in
+        let%bind bob_peerid = me bob >>| Keypair.to_peer_id in
+        (* Far more streams than a peer accepts at once for a single protocol
+           from a single peer *)
+        let num_streams = 300 in
+        let handlers_finished = ref 0 in
+        let all_handlers_finished = Ivar.create () in
+        let%bind () =
+          open_protocol bob ~on_handler_error:`Raise ~protocol:"echo"
+            (fun stream ->
+              let r, w = Libp2p_stream.pipes stream in
+              let%map () = Pipe.transfer r w ~f:Bigstring.of_string in
+              Pipe.close w ;
+              incr handlers_finished ;
+              if !handlers_finished = num_streams then
+                Ivar.fill all_handlers_finished () )
+          |> Deferred.Or_error.ok_exn
+        in
+        let%bind () =
+          Deferred.List.iter (List.range 0 num_streams) ~f:(fun i ->
+              let%bind stream =
+                open_stream carol ~protocol:"echo" ~peer:bob_peerid
+                >>| Or_error.ok_exn
+              in
+              let r, w = Libp2p_stream.pipes stream in
+              let%bind () = Pipe.write w (Bigstring.of_string "ping") in
+              let%bind () =
+                match%map Pipe.read r with
+                | `Ok _ ->
+                    ()
+                | `Eof ->
+                    failwithf "Stream %d closed before it was answered" i ()
+              in
+              reset_stream carol stream >>| Or_error.ok_exn )
+        in
+        let%bind () =
+          match%map
+            Clock.with_timeout (Time.Span.of_sec 30.)
+              (Ivar.read all_handlers_finished)
+          with
+          | `Result () ->
+              ()
+          | `Timeout ->
+              failwithf "Only %d of %d streams were released at the peer"
+                !handlers_finished num_streams ()
+        in
         let%bind () = close_protocol bob ~protocol:"echo" in
         shutdown ()
       in

@@ -18,8 +18,10 @@ let ledger_depth = U.ledger_depth
 
 let state_body_hash = U.genesis_state_body_hash
 
-let%test_module "Transaction union tests" =
-  ( module struct
+let suite () =
+  Transaction_snark_test_suite.make ~name:"transaction_union"
+  @@ fun ~test ->
+  let module _ = struct
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
      * ledger_hashes. The nominal type is just so we don't mix this up in our
      * real code. *)
@@ -42,7 +44,11 @@ let%test_module "Transaction union tests" =
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
     end
 
-    let of_user_command' (sok_digest : Sok_message.Digest.t) ledger
+    let of_user_command' ?(source_fee_excess = Fee_excess.zero)
+        ?(source_total_currency = Currency.Amount.zero)
+        ?source_ledger_after_coinbase
+        ?(source_total_supply_after_coinbase = Currency.Amount.zero)
+        (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
       let module T = (val Lazy.force U.snark_module) in
@@ -62,6 +68,21 @@ let%test_module "Transaction union tests" =
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
+      (*These fixtures only build signed-command statements, never coinbases,
+        so the post-coinbase state passes straight through.*)
+      let source_ledger_after_coinbase =
+        Option.value source_ledger_after_coinbase ~default:source
+      in
+      let target_total_currency =
+        match
+          Currency.Amount.add_signed_flagged source_total_currency
+            user_command_supply_increase
+        with
+        | total, `Overflow false ->
+            total
+        | _, `Overflow true ->
+            failwith "total currency out of range"
+      in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let statement =
             let txn =
@@ -73,10 +94,17 @@ let%test_module "Transaction union tests" =
               ~source_first_pass_ledger:source ~target_first_pass_ledger:target
               ~source_second_pass_ledger:target
               ~target_second_pass_ledger:target ~connecting_ledger_left:target
-              ~connecting_ledger_right:target ~sok_digest
-              ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
-              ~supply_increase:user_command_supply_increase
-              ~pending_coinbase_stack_state
+              ~connecting_ledger_right:target ~sok_digest ~source_fee_excess
+              ~target_fee_excess:
+                (Or_error.ok_exn
+                   (Fee_excess.combine source_fee_excess
+                      (Or_error.ok_exn (Transaction.fee_excess txn)) ) )
+              ~source_total_currency ~target_total_currency
+              ~source_ledger_after_coinbase
+              ~target_ledger_after_coinbase:source_ledger_after_coinbase
+              ~source_total_supply_after_coinbase
+              ~target_total_supply_after_coinbase:
+                source_total_supply_after_coinbase ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )
 
@@ -163,15 +191,21 @@ let%test_module "Transaction union tests" =
               { source = source_stack; target = pending_coinbase_stack_target }
             ~supply_increase )
 
-    let%test_unit "coinbase with new state body hash" =
+    let () =
+      test "coinbase with new state body hash"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           coinbase_test state_body ~carryforward:false )
 
-    let%test_unit "coinbase with carry-forward state body hash" =
+    let () =
+      test "coinbase with carry-forward state body hash"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           coinbase_test state_body ~carryforward:true )
 
-    let%test_unit "new_account" =
+    let () =
+      test "new_account"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -243,7 +277,9 @@ let%test_module "Transaction union tests" =
     let account_fee =
       Fee.to_nanomina_int constraint_constants.account_creation_fee
 
-    let%test_unit "account creation fee - user commands" =
+    let () =
+      test "account creation fee - user commands"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let wallets =
             Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
@@ -297,7 +333,9 @@ let%test_module "Transaction union tests" =
                 )
                 ledger ) )
 
-    let%test_unit "account creation fee - fee transfers" =
+    let () =
+      test "account creation fee - fee transfers"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let receivers =
             Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
@@ -335,7 +373,9 @@ let%test_module "Transaction union tests" =
                     ((fee * txns_per_receiver) - account_fee)
                     ledger ) ) )
 
-    let%test_unit "account creation fee - coinbase" =
+    let () =
+      test "account creation fee - coinbase"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let wallets =
             Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
@@ -527,8 +567,14 @@ let%test_module "Transaction union tests" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
-                of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_state2.init_stack
+                let stmt12 = Transaction_snark.statement proof12 in
+                of_user_command' ~source_fee_excess:stmt12.target.fee_excess
+                  ~source_total_currency:stmt12.target.total_currency
+                  ~source_ledger_after_coinbase:
+                    stmt12.target.ledger_after_coinbase
+                  ~source_total_supply_after_coinbase:
+                    stmt12.target.total_supply_after_coinbase sok_digest ledger
+                  t2 pending_coinbase_stack_state2.init_stack
                   pending_coinbase_stack_state2.pc state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
@@ -560,9 +606,11 @@ let%test_module "Transaction union tests" =
                   T.verify_against_digest proof13 )
               |> Result.ok_exn |> Or_error.ok_exn ) )
 
-    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
-                   carryforward the state from a previous transaction t0 in b1"
-        =
+    let () =
+      test
+        "base_and_merge: transactions in one block (t1,t2 in b1), carryforward \
+         the state from a previous transaction t0 in b1"
+      @@ fun () ->
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
@@ -570,17 +618,21 @@ let%test_module "Transaction union tests" =
 
     (* No new state body, carryforward the stack from the previous transaction*)
 
-    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
-                   don't carryforward the state from a previous transaction t0 \
-                   in b1" =
+    let () =
+      test
+        "base_and_merge: transactions in one block (t1,t2 in b1), don't \
+         carryforward the state from a previous transaction t0 in b1"
+      @@ fun () ->
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
         ~carryforward2:true
 
-    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
-                   in b1, b2 resp.), carryforward the state from a previous \
-                   transaction t0 in b1" =
+    let () =
+      test
+        "base_and_merge: transactions in two different blocks (t1,t2 in b1, b2 \
+         resp.), carryforward the state from a previous transaction t0 in b1"
+      @@ fun () ->
       let state_hash_and_body1 =
         let open Staged_ledger_diff in
         let state_body0 =
@@ -605,9 +657,12 @@ let%test_module "Transaction union tests" =
 
     (*t2 is in a new state, therefore do not carryforward the previous state*)
 
-    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
-                   in b1, b2 resp.), don't carryforward the state from a \
-                   previous transaction t0 in b1" =
+    let () =
+      test
+        "base_and_merge: transactions in two different blocks (t1,t2 in b1, b2 \
+         resp.), don't carryforward the state from a previous transaction t0 \
+         in b1"
+      @@ fun () ->
       let state_hash_and_body1 =
         let state_body0 =
           let open Staged_ledger_diff in
@@ -887,7 +942,9 @@ let%test_module "Transaction union tests" =
                 assert (Option.is_none source_account) ;
                 assert (Option.is_none receiver_account)))*)
 
-    let%test_unit "delegation delegatee does not exist" =
+    let () =
+      test "delegation delegatee does not exist"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets =
@@ -922,7 +979,9 @@ let%test_module "Transaction union tests" =
                   source_pk ) ;
               assert (Option.is_none receiver_account) ) )
 
-    let%test_unit "delegation delegator does not exist" =
+    let () =
+      test "delegation delegator does not exist"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets =
@@ -955,7 +1014,9 @@ let%test_module "Transaction union tests" =
                   expected_fee_payer_balance ) ;
               assert (Option.is_some receiver_account) ) )
 
-    let%test_unit "Payment to and from same key" =
+    let () =
+      test "Payment to and from same key"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets =
@@ -984,7 +1045,9 @@ let%test_module "Transaction union tests" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ) )
 
-    let%test_unit "Payment with source balance insufficient- untimed" =
+    let () =
+      test "Payment with source balance insufficient- untimed"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets =
@@ -1006,7 +1069,9 @@ let%test_module "Transaction union tests" =
                      [ Transaction_status.Failure.Source_insufficient_balance ]
                    (Payment { receiver_pk; amount }) ) )
 
-    let%test_unit "Payment with insufficient account creation fee- untimed" =
+    let () =
+      test "Payment with insufficient account creation fee- untimed"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let wallets =
@@ -1030,7 +1095,9 @@ let%test_module "Transaction union tests" =
                      ]
                    (Payment { receiver_pk; amount }) ) )
 
-    let%test_unit "timed account - transactions" =
+    let () =
+      test "timed account - transactions"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let wallets =
             Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
@@ -1104,7 +1171,9 @@ let%test_module "Transaction union tests" =
                 )
                 ledger ) )
 
-    let%test_unit "unchanged timings for fee transfers and coinbase" =
+    let () =
+      test "unchanged timings for fee transfers and coinbase"
+      @@ fun () ->
       Test_util.with_randomness 123456789 (fun () ->
           let receivers =
             Array.init 2 ~f:(fun _ ->
@@ -1171,10 +1240,8 @@ let%test_module "Transaction union tests" =
               in
               List.iter transactions ~f:(fun txn ->
                   U.test_transaction_union ~txn_global_slot ledger txn ) ) )
-  end )
-
-let%test_module "legacy transactions using zkApp accounts" =
-  ( module struct
+  end in
+  let module _ = struct
     let memo = Signed_command_memo.create_from_string_exn "zkApp-legacy-txns"
 
     let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
@@ -1234,7 +1301,9 @@ let%test_module "legacy transactions using zkApp accounts" =
         ledger
         (Mina_transaction.Transaction.Command (Signed_command signed_command2))
 
-    let%test_unit "Successful payments from zkapp accounts- Signature, None" =
+    let () =
+      test "Successful payments from zkapp accounts- Signature, None"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1254,7 +1323,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                   test_payments ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Successful payments from zkapp accounts- None,None" =
+    let () =
+      test "Successful payments from zkapp accounts- None,None"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1274,7 +1345,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                   test_payments ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Proof,None" =
+    let () =
+      test "Failed payments from zkapp accounts- Proof,None"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1297,7 +1370,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Signature,Signature" =
+    let () =
+      test "Failed payments from zkapp accounts- Signature,Signature"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1320,7 +1395,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Signature,Proof" =
+    let () =
+      test "Failed payments from zkapp accounts- Signature,Proof"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1343,7 +1420,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Access=Proof" =
+    let () =
+      test "Failed payments from zkapp accounts- Access=Proof"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1365,7 +1444,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Increment_nonce=Proof" =
+    let () =
+      test "Failed payments from zkapp accounts- Increment_nonce=Proof"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1434,8 +1515,9 @@ let%test_module "legacy transactions using zkApp accounts" =
       U.test_transaction_union ledger
         (Mina_transaction.Transaction.Command (Signed_command stake_delegation2))
 
-    let%test_unit "Successful stake delegations from zkapp accounts- Signature"
-        =
+    let () =
+      test "Successful stake delegations from zkapp accounts- Signature"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1454,7 +1536,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                   test_delegations ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Successful stake delegations from zkapp accounts- None" =
+    let () =
+      test "Successful stake delegations from zkapp accounts- None"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1473,7 +1557,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                   test_delegations ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed stake delegation from zkapp accounts- Proof" =
+    let () =
+      test "Failed stake delegation from zkapp accounts- Proof"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1495,8 +1581,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Successful stake delegation from zkapp accounts- \
-                   receive=Proof" =
+    let () =
+      test "Successful stake delegation from zkapp accounts- receive=Proof"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1559,7 +1646,9 @@ let%test_module "legacy transactions using zkApp accounts" =
           (Option.map expected_failure_fee_receiver ~f:(fun f -> [ f; f ]))
         ledger (Mina_transaction.Transaction.Coinbase coinbase3)
 
-    let%test_unit "Successful coinbase to zkapp accounts" =
+    let () =
+      test "Successful coinbase to zkapp accounts"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1578,7 +1667,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                   test_coinbase ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed coinbase to zkapp accounts- with proof auth" =
+    let () =
+      test "Failed coinbase to zkapp accounts- with proof auth"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1600,7 +1691,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed coinbase to zkapp accounts- with signature Auth" =
+    let () =
+      test "Failed coinbase to zkapp accounts- with signature Auth"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1688,7 +1781,9 @@ let%test_module "legacy transactions using zkApp accounts" =
           (Option.map expected_failure_fee_receiver ~f:(fun f -> [ f; f ]))
         ledger (Mina_transaction.Transaction.Fee_transfer ft5)
 
-    let%test_unit "Successful fee transfers to zkapp accounts" =
+    let () =
+      test "Successful fee transfers to zkapp accounts"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1707,7 +1802,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                   test_fee_transfers ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed fee transfers to zkapp accounts- with proof auth" =
+    let () =
+      test "Failed fee transfers to zkapp accounts- with proof auth"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1729,8 +1826,9 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed fee transfers to zkapp accounts- with signature Auth"
-        =
+    let () =
+      test "Failed fee transfers to zkapp accounts- with signature Auth"
+      @@ fun () ->
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -1751,4 +1849,5 @@ let%test_module "legacy transactions using zkApp accounts" =
                       Transaction_status.Failure.Update_not_permitted_balance
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
-  end )
+  end in
+  ()

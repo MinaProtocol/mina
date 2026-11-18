@@ -108,19 +108,16 @@ query pendingSnarkWork {
       target_first_pass_ledger_hash: targetFirstPassLedgerHash
       source_second_pass_ledger_hash: sourceSecondPassLedgerHash
       target_second_pass_ledger_hash: targetSecondPassLedgerHash
-      fee_excess: feeExcess {
-        feeTokenLeft
-        feeExcessLeft {
-          sign
-          feeMagnitude
-        }
-        feeTokenRight
-        feeExcessRight {
-          sign
-          feeMagnitude
-        }
+      source_fee_excess: sourceFeeExcess {
+        sign
+        feeMagnitude
       }
-      supply_increase : supplyIncrease
+      target_fee_excess: targetFeeExcess {
+        sign
+        feeMagnitude
+      }
+      source_total_currency: sourceTotalCurrency
+      target_total_currency: targetTotalCurrency
       work_id: workId
       }
     }
@@ -242,6 +239,18 @@ query get_peers {
     host
     libp2pPort
     peerId
+  }
+}
+|}]
+
+module Protocol_version_signals =
+[%graphql
+{|
+query ($max_length: Int) {
+  bestChain(maxLength: $max_length) {
+    creatorAccount { publicKey }
+    protocolState { consensusState { blockHeight } }
+    proposedProtocolVersion { transaction network patch }
   }
 }
 |}]

@@ -14,6 +14,13 @@ PG_URI="postgresql://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 # Node profile for every mina binary this script runs.
 PROFILE=devnet
 
+# Where the local network keeps its keys, config and logs. This folder is
+# deleted and recreated.
+NETWORK_ROOT=${NETWORK_ROOT:-${HOME}/.mina-network}
+
+PROOF_LEVEL=${PROOF_LEVEL:-full}
+ARCHIVE_SERVER_PORT=${ARCHIVE_SERVER_PORT:-3086}
+
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 
@@ -40,19 +47,27 @@ dune build \
 
 # start mina-local-network
 ./scripts/mina-local-network/mina-local-network.sh --profile "${PROFILE}" \
-    -a -r \
+    --root "${NETWORK_ROOT}" \
+    --config reset \
+    --proof-level "${PROOF_LEVEL}" \
+    --archive-server-port "${ARCHIVE_SERVER_PORT}" \
+    -ph "${PG_HOST}" \
+    -pp "${PG_PORT}" \
     -pu "${PG_USER}" \
     -pd "${PG_DB}" \
     -ppw "${PG_PW}" \
-    -tf 1 \
+    --transaction-interval 1 \
     --override-slot-time 30000 \
     -zt \
     -vt \
     -lp &
+NETWORK_PID=$!
 
-LOCAL_NETWORK_DATA_FOLDER="${HOME}"/.mina-network/mina-local-network-2-1-1
+stop_network() {
+  kill "${NETWORK_PID}" 2>/dev/null || true
+}
 
-trap "pkill -f mina-local-network" EXIT
+trap stop_network EXIT
 
 # stop mina-local-network once enough blocks have been produced
 while true; do
@@ -66,7 +81,8 @@ while true; do
   ))"
   echo "Generated ${BLOCKS}/${TOTAL_BLOCKS} blocks"
   if [ "${BLOCKS}" -ge "${TOTAL_BLOCKS}" ] ; then
-    pkill -f mina-local-network
+    stop_network
+    wait "${NETWORK_PID}" || true
     break
   fi
 done
@@ -77,7 +93,7 @@ source ./src/test/archive/sample_db/convert_chain_to_canonical.sh "$PG_URI"
 echo "Regenerating precomputed_blocks.tar.xz"
 rm -rf precomputed_blocks || true
 mkdir precomputed_blocks
-find ~/.mina-network -name 'precomputed_blocks.log' -exec ./scripts/mina-local-network/split_precomputed_log.sh {} precomputed_blocks \;
+find "${NETWORK_ROOT}" -name 'precomputed_blocks.log' -exec ./scripts/mina-local-network/split_precomputed_log.sh {} precomputed_blocks \;
 rm ./src/test/archive/sample_db/precomputed_blocks.tar.xz || true
 tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.tar.xz .
 rm -rf precomputed_blocks
@@ -97,10 +113,10 @@ echo '{ "genesis_ledger": { "accounts": '"$(cat _tmp.json | jq '.accounts')"', "
 rm _tmp.json
 
 echo "Regenerating genesis_ledger"
-cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat $LOCAL_NETWORK_DATA_FOLDER/genesis_ledger.json | jq -c)"  > _tmp.json
+cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat ${NETWORK_ROOT}/genesis_ledger.json | jq -c)"  > _tmp.json
 #update genesis_state_timestamp to the one from daemon.json
 jq --arg timestamp \
-   "$(cat $LOCAL_NETWORK_DATA_FOLDER/daemon.json | jq -r '.genesis.genesis_state_timestamp')" \
+   "$(cat ${NETWORK_ROOT}/daemon.json | jq -r '.genesis.genesis_state_timestamp')" \
    '.genesis.genesis_state_timestamp = $timestamp' \
    _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
 

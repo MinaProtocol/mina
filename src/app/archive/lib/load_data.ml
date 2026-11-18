@@ -751,7 +751,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ~f:(fun
            { app_state_id
            ; verification_key_id
-           ; zkapp_version
+           ; zkapp_version = _
            ; action_state_id
            ; last_action_slot
            ; proved_state
@@ -796,10 +796,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
               in
               Some ({ data; hash } : _ With_hash.t) )
         in
-        let zkapp_version =
-          zkapp_version |> Unsigned.UInt32.of_int64
-          |> Mina_numbers.Zkapp_version.of_uint32
-        in
         let%bind elements =
           query_db ~f:(fun db ->
               Processor.Zkapp_action_states.load db action_state_id )
@@ -823,7 +819,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         Some
           ( { app_state
             ; verification_key
-            ; zkapp_version
             ; action_state
             ; last_action_slot
             ; proved_state

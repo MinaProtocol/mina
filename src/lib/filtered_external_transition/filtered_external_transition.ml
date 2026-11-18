@@ -43,6 +43,16 @@ end
 module Protocol_state = struct
   [%%versioned
   module Stable = struct
+    module V4 = struct
+      type t =
+        { previous_state_hash : State_hash.Stable.V1.t
+        ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V3.t
+        ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V3.t
+        }
+
+      let to_latest = Fn.id
+    end
+
     module V3 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
@@ -50,7 +60,15 @@ module Protocol_state = struct
         ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V3.t
         }
 
-      let to_latest = Fn.id
+      let to_latest
+          ({ previous_state_hash; blockchain_state; consensus_state } : t) :
+          Latest.t =
+        { previous_state_hash
+        ; blockchain_state =
+            Mina_state.Blockchain_state.Value.Stable.V2.to_latest
+              blockchain_state
+        ; consensus_state
+        }
     end
   end]
 end
@@ -58,6 +76,19 @@ end
 [%%versioned
 module Stable = struct
   [@@@no_toplevel_latest_type]
+
+  module V4 = struct
+    type t =
+      { creator : Public_key.Compressed.Stable.V1.t
+      ; winner : Public_key.Compressed.Stable.V1.t
+      ; protocol_state : Protocol_state.Stable.V4.t
+      ; transactions : Transactions.Stable.V3.t
+      ; snark_jobs : Transaction_snark_work.Info.Stable.V3.t list
+      ; proof : Proof.Stable.V2.t
+      }
+
+    let to_latest = Fn.id
+  end
 
   module V3 = struct
     type t =
@@ -69,17 +100,29 @@ module Stable = struct
       ; proof : Proof.Stable.V2.t
       }
 
-    let to_latest = Fn.id
+    let to_latest
+        ({ creator; winner; protocol_state; transactions; snark_jobs; proof } :
+          t ) : Latest.t =
+      { creator
+      ; winner
+      ; protocol_state = Protocol_state.Stable.V3.to_latest protocol_state
+      ; transactions
+      ; snark_jobs =
+          List.map snark_jobs ~f:Transaction_snark_work.Info.Stable.V2.to_latest
+      ; proof
+      }
   end
 end]
 
-type t = Stable.Latest.t =
+type t =
   { creator : Public_key.Compressed.t
   ; winner : Public_key.Compressed.t
   ; protocol_state : Protocol_state.t
   ; transactions : Transactions.Stable.Latest.t
   ; snark_jobs : Transaction_snark_work.Info.t list
   ; proof : Proof.t
+  ; current_protocol_version : Protocol_version.t
+  ; proposed_protocol_version_opt : Protocol_version.t option
   }
 
 let participants
@@ -235,4 +278,18 @@ let of_transition block tracked_participants
   let creator = Consensus_state.block_creator consensus_state in
   let winner = Consensus_state.block_stake_winner consensus_state in
   let proof = Mina_block.Header.protocol_state_proof header in
-  { creator; winner; protocol_state; transactions; snark_jobs; proof }
+  let current_protocol_version =
+    Mina_block.Header.current_protocol_version header
+  in
+  let proposed_protocol_version_opt =
+    Mina_block.Header.proposed_protocol_version_opt header
+  in
+  { creator
+  ; winner
+  ; protocol_state
+  ; transactions
+  ; snark_jobs
+  ; proof
+  ; current_protocol_version
+  ; proposed_protocol_version_opt
+  }
