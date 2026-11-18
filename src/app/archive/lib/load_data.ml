@@ -207,7 +207,9 @@ let update_of_id pool update_id =
               }
               : Permissions.t ) )
     in
-    Set_or_keep.of_option perms_opt
+    Set_or_keep.map
+      (Set_or_keep.of_option perms_opt)
+      ~f:Permissions.Update.of_account
   in
   let%bind zkapp_uri =
     Mina_caqti.get_zkapp_set_or_keep zkapp_uri_id

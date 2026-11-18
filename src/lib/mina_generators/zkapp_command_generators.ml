@@ -1257,12 +1257,15 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 if is_proof then Control.Tag.Proof else Control.Tag.Signature
               in
               let%map perm = Permissions.gen ~auth_tag in
+              let set_perm perm =
+                Set_or_keep.Set (Permissions.Update.of_account perm)
+              in
               let update =
                 match update_type with
                 | `Delegate ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with
                             set_delegate = Auth_required.from ~auth_tag
                           }
@@ -1270,7 +1273,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 | `App_state ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with
                             edit_state = Auth_required.from ~auth_tag
                           }
@@ -1278,7 +1281,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 | `Verification_key ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with
                             set_verification_key =
                               ( Auth_required.from ~auth_tag
@@ -1288,7 +1291,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 | `Zkapp_uri ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with
                             set_zkapp_uri = Auth_required.from ~auth_tag
                           }
@@ -1296,7 +1299,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 | `Token_symbol ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with
                             set_token_symbol = Auth_required.from ~auth_tag
                           }
@@ -1304,7 +1307,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 | `Voting_for ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with
                             set_voting_for = Auth_required.from ~auth_tag
                           }
@@ -1312,13 +1315,13 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 | `Send ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with send = Auth_required.from ~auth_tag }
                     }
                 | `Receive ->
                     { Account_update.Update.dummy with
                       permissions =
-                        Set_or_keep.Set
+                        set_perm
                           { perm with receive = Auth_required.from ~auth_tag }
                     }
               in
@@ -1409,7 +1412,11 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                   Permissions.gen ~auth_tag:Control.Tag.Signature
                 in
                 ( auth
-                , Some { update with permissions = Set_or_keep.Set new_perm } )
+                , Some
+                    { update with
+                      permissions =
+                        Set_or_keep.Set (Permissions.Update.of_account new_perm)
+                    } )
             | _ ->
                 return (Control.dummy_of_tag permissions_auth, None)
           in

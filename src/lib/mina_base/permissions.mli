@@ -153,3 +153,53 @@ val deriver :
       as
       'a )
   -> 'a
+
+(** The permissions that an account update can set on an account. *)
+module Update : sig
+  type account := t
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Mina_wire_types.Mina_base.Permissions.Update.V1.t =
+        { edit_state : Auth_required.Stable.V2.t
+        ; access : Auth_required.Stable.V2.t
+        ; send : Auth_required.Stable.V2.t
+        ; receive : Auth_required.Stable.V2.t
+        ; set_delegate : Auth_required.Stable.V2.t
+        ; set_permissions : Auth_required.Stable.V2.t
+        ; set_verification_key :
+            Auth_required.Stable.V2.t * Mina_numbers.Txn_version.Stable.V1.t
+        ; set_zkapp_uri : Auth_required.Stable.V2.t
+        ; edit_action_state : Auth_required.Stable.V2.t
+        ; set_token_symbol : Auth_required.Stable.V2.t
+        ; increment_nonce : Auth_required.Stable.V2.t
+        ; set_voting_for : Auth_required.Stable.V2.t
+        ; set_timing : Auth_required.Stable.V2.t
+        }
+      [@@deriving sexp, equal, compare, hash, yojson]
+    end
+  end]
+
+  val of_account : account -> t
+
+  val to_account : t -> account
+
+  val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
+
+  val to_input : t -> Field.t Random_oracle_input.Chunked.t
+
+  module Checked : sig
+    type account := Checked.t
+
+    type t
+
+    val to_account : t -> account
+
+    val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
+  end
+
+  val typ : (Checked.t, t) Typ.t
+
+  val dummy_value_for_set_or_keep_placeholder_only : t
+end

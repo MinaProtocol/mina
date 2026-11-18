@@ -13,12 +13,13 @@ struct
     { Account_update.Update.dummy with
       permissions =
         Zkapp_basic.Set_or_keep.Set
-          { Permissions.user_default with
-            set_permissions = Permissions.Auth_required.Proof
-          ; set_zkapp_uri = Proof
-          ; set_token_symbol = Proof
-          ; set_voting_for = Proof
-          }
+          (Permissions.Update.of_account
+             { Permissions.user_default with
+               set_permissions = Permissions.Auth_required.Proof
+             ; set_zkapp_uri = Proof
+             ; set_token_symbol = Proof
+             ; set_voting_for = Proof
+             } )
     }
 
   let is_non_zkapp_update = true
