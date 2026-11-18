@@ -13,11 +13,11 @@ let () =
 
 (** Test generic add gate gadget.
     Inputs: left_input + right_input = sum.
-    Returns constraint system if satisfied, raises otherwise. *)
-let test_generic_add ?cs left_input right_input sum =
+    Returns the prover keypair if satisfied, raises otherwise. *)
+let test_generic_add ?proof_keypair left_input right_input sum =
   (* Generate and verify proof *)
-  let cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ?cs (fun () ->
+  let _cs, proof_keypair, _proof =
+    Runner.generate_and_verify_proof ?proof_keypair (fun () ->
         let open Runner.Impl in
         (* Set up snarky variables for inputs and outputs *)
         let left_input =
@@ -36,15 +36,15 @@ let test_generic_add ?cs left_input right_input sum =
         (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
         Boolean.Assert.is_true (Field.equal sum sum) )
   in
-  cs
+  proof_keypair
 
 (** Test generic sub gate gadget.
     Inputs: left_input - right_input = difference.
-    Returns constraint system if satisfied, raises otherwise. *)
-let test_generic_sub ?cs left_input right_input difference =
+    Returns the prover keypair if satisfied, raises otherwise. *)
+let test_generic_sub ?proof_keypair left_input right_input difference =
   (* Generate and verify proof *)
-  let cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ?cs (fun () ->
+  let _cs, proof_keypair, _proof =
+    Runner.generate_and_verify_proof ?proof_keypair (fun () ->
         let open Runner.Impl in
         (* Set up snarky variables for inputs and outputs *)
         let left_input =
@@ -63,15 +63,15 @@ let test_generic_sub ?cs left_input right_input difference =
         (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
         Boolean.Assert.is_true (Field.equal difference difference) )
   in
-  cs
+  proof_keypair
 
 (** Test generic multiplication gate gadget.
     Inputs: left_input * right_input = prod.
-    Returns constraint system if satisfied, raises otherwise. *)
-let test_generic_mul ?cs left_input right_input prod =
+    Returns the prover keypair if satisfied, raises otherwise. *)
+let test_generic_mul ?proof_keypair left_input right_input prod =
   (* Generate and verify proof *)
-  let cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ?cs (fun () ->
+  let _cs, proof_keypair, _proof =
+    Runner.generate_and_verify_proof ?proof_keypair (fun () ->
         let open Runner.Impl in
         (* Set up snarky variables for inputs and outputs *)
         let left_input =
@@ -90,73 +90,73 @@ let test_generic_mul ?cs left_input right_input prod =
         (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
         Boolean.Assert.is_true (Field.equal prod prod) )
   in
-  cs
+  proof_keypair
 
 (* TEST generic add gadget *)
 let test_add_zero_plus_zero () =
-  let _cs = test_generic_add 0 0 0 in
+  let _proof_keypair = test_generic_add 0 0 0 in
   ()
 
 let test_add_one_plus_two () =
-  let cs = test_generic_add 0 0 0 in
-  let _cs = test_generic_add ~cs 1 2 3 in
+  let proof_keypair = test_generic_add 0 0 0 in
+  let _proof_keypair = test_generic_add ~proof_keypair 1 2 3 in
   ()
 
 let test_add_negative_wrong_result () =
-  let cs = test_generic_add 0 0 0 in
+  let proof_keypair = test_generic_add 0 0 0 in
   Alcotest.(check bool)
     "1 + 0 = 0 should fail" true
-    (Common.is_error (fun () -> test_generic_add ~cs 1 0 0))
+    (Common.is_error (fun () -> test_generic_add ~proof_keypair 1 0 0))
 
 let test_add_negative_wrong_sum () =
-  let cs = test_generic_add 0 0 0 in
+  let proof_keypair = test_generic_add 0 0 0 in
   Alcotest.(check bool)
     "2 + 4 = 7 should fail" true
-    (Common.is_error (fun () -> test_generic_add ~cs 2 4 7))
+    (Common.is_error (fun () -> test_generic_add ~proof_keypair 2 4 7))
 
 (* TEST generic sub gadget *)
 let test_sub_zero_minus_zero () =
-  let _cs = test_generic_sub 0 0 0 in
+  let _proof_keypair = test_generic_sub 0 0 0 in
   ()
 
 let test_sub_two_minus_one () =
-  let cs = test_generic_sub 0 0 0 in
-  let _cs = test_generic_sub ~cs 2 1 1 in
+  let proof_keypair = test_generic_sub 0 0 0 in
+  let _proof_keypair = test_generic_sub ~proof_keypair 2 1 1 in
   ()
 
 let test_sub_negative_wrong_result () =
-  let cs = test_generic_sub 0 0 0 in
+  let proof_keypair = test_generic_sub 0 0 0 in
   Alcotest.(check bool)
     "4 - 2 = 1 should fail" true
-    (Common.is_error (fun () -> test_generic_sub ~cs 4 2 1))
+    (Common.is_error (fun () -> test_generic_sub ~proof_keypair 4 2 1))
 
 let test_sub_negative_wrong_difference () =
-  let cs = test_generic_sub 0 0 0 in
+  let proof_keypair = test_generic_sub 0 0 0 in
   Alcotest.(check bool)
     "13 - 4 = 10 should fail" true
-    (Common.is_error (fun () -> test_generic_sub ~cs 13 4 10))
+    (Common.is_error (fun () -> test_generic_sub ~proof_keypair 13 4 10))
 
 (* TEST generic mul gadget *)
 let test_mul_zero_times_zero () =
-  let _cs = test_generic_mul 0 0 0 in
+  let _proof_keypair = test_generic_mul 0 0 0 in
   ()
 
 let test_mul_one_times_two () =
-  let cs = test_generic_mul 0 0 0 in
-  let _cs = test_generic_mul ~cs 1 2 2 in
+  let proof_keypair = test_generic_mul 0 0 0 in
+  let _proof_keypair = test_generic_mul ~proof_keypair 1 2 2 in
   ()
 
 let test_mul_negative_wrong_result () =
-  let cs = test_generic_mul 0 0 0 in
+  let proof_keypair = test_generic_mul 0 0 0 in
   Alcotest.(check bool)
     "1 * 0 = 1 should fail" true
-    (Common.is_error (fun () -> test_generic_mul ~cs 1 0 1))
+    (Common.is_error (fun () -> test_generic_mul ~proof_keypair 1 0 1))
 
 let test_mul_negative_wrong_product () =
-  let cs = test_generic_mul 0 0 0 in
+  let proof_keypair = test_generic_mul 0 0 0 in
   Alcotest.(check bool)
     "2 * 4 = 7 should fail" true
-    (Common.is_error (fun () -> test_generic_mul ~cs 2 4 7))
+    (Common.is_error (fun () -> test_generic_mul ~proof_keypair 2 4 7))
 
 let () =
   let open Alcotest in

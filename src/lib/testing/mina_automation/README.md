@@ -107,7 +107,6 @@ Example of usage:
 ```
   let%bind missing_blocks_auditor_path = Missing_blocks_auditor.standalone_path_exn 
 
-  let%bind archive_blocks_path =  Archive_blocks.standalone_path_exn in
 
   let config =
     { Missing_blocks_guardian.Config.archive_uri = Uri.of_string target_db
@@ -115,7 +114,6 @@ Example of usage:
     ; network = network_name
     ; run_mode = Run
     ; missing_blocks_auditor = missing_blocks_auditor_path
-    ; archive_blocks = archive_blocks_path
     ; block_format = Extensional
     } in
 
