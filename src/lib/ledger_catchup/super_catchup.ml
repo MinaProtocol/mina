@@ -1102,17 +1102,19 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             resume ~finished:node.result (fun () ->
                 on_yielded node c breadcrumb ) )
   and on_yielded node c breadcrumb =
-    let finished = Ivar.create () in
-    let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
-    Strict_pipe.Writer.write catchup_breadcrumbs_writer
-      ( [ Mina_stdlib.Rose_tree.of_non_empty_list
-            (Mina_stdlib.Nonempty_list.singleton c)
-        ]
-      , `Ledger_catchup finished ) ;
-    (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
-    step node
-      (Deferred.map (Ivar.read finished) ~f:Result.return)
-      ~f:(fun () -> on_handed_off node)
+    if Cached.was_consumed c then ()
+    else
+      let finished = Ivar.create () in
+      let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
+      Strict_pipe.Writer.write catchup_breadcrumbs_writer
+        ( [ Mina_stdlib.Rose_tree.of_non_empty_list
+              (Mina_stdlib.Nonempty_list.singleton c)
+          ]
+        , `Ledger_catchup finished ) ;
+      (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
+      step node
+        (Deferred.map (Ivar.read finished) ~f:Result.return)
+        ~f:(fun () -> on_handed_off node)
   and on_handed_off node =
     Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
     set_state t node Finished

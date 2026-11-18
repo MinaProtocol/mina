@@ -105,6 +105,25 @@ test("every axis reaches its own variable", () => {
 // What is refused
 // ---------------------------------------------------------------------------
 
+test("skip_branch reaches the variable that the version script reads", () => {
+  const env = envOf(
+    "!ci-artifacts-me docker set=delegation-verifier skip_branch=1"
+  );
+  assert.strictEqual(env.SKIP_GITBRANCH, "1");
+});
+
+test("the branch stays in the version unless skip_branch asks otherwise", () => {
+  const env = envOf("!ci-artifacts-me docker set=delegation-verifier");
+  assert.ok(!("SKIP_GITBRANCH" in env));
+});
+
+test("skip_branch takes only 0 or 1", () => {
+  assert.match(
+    errorOf("!ci-artifacts-me docker skip_branch=true"),
+    /skip_branch=true is not one of 0, 1/
+  );
+});
+
 test("a missing layer is refused, and the answer says the choices", () => {
   const error = errorOf("!ci-artifacts-me set=daemon");
   assert.ok(error.includes("docker, debian, apps"));

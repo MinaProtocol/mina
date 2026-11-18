@@ -2235,7 +2235,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~persistent_frontier_location:config.persistent_frontier_location
               ~get_current_frontier
               ~frontier_broadcast_writer:frontier_broadcast_pipe_w
-              ~catchup_mode:`Super ~network_transition_reader:block_reader
+              ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_most_recent_valid_block
               ~most_recent_valid_block_writer
               ~get_completed_work:
