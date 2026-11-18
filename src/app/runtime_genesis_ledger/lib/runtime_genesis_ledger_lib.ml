@@ -10,6 +10,66 @@ let convert_account ~identity_conversion ~hardfork_slot (account : Account.t) :
     | Some hardfork_slot ->
         Account.slot_reduction_update ~hardfork_slot account
 
+let logger = Logger.create ()
+
+let ledger_of_accounts ~depth accounts =
+  let packed =
+    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
+      ~depth ~genesis_backing_type:Stable_db
+      (lazy (Core_kernel.List.map accounts ~f:(fun account -> (None, account))))
+  in
+  Lazy.force (Genesis_ledger.Packed.t packed)
+
+(* [expected_hash] is the [hash] the config gives for [accounts]: the root of
+   the accounts as listed, before padding. Token symbols and zkApp URIs are
+   arbitrary bytes, so a tool that handled the config as text on the way can
+   have changed an account; then the two roots disagree, and a mismatch is
+   fatal. Only an identity (Mesa -> Mesa) fork lists
+   accounts in this binary's account format; the root of a Berkeley ledger
+   cannot be recomputed here, so that case is not checked. *)
+let load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
+    ~hardfork_slot ~depth ~name ?expected_hash
+    (accounts : Runtime_config.Accounts.t) =
+  let open Core_kernel in
+  let to_account ~pad_app_state =
+    Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
+      ~pad_app_state
+  in
+  let converted =
+    List.map accounts ~f:(fun account ->
+        to_account ~pad_app_state account
+        |> convert_account ~identity_conversion ~hardfork_slot )
+  in
+  let ledger = ledger_of_accounts ~depth converted in
+  match expected_hash with
+  | Some expected_hash when identity_conversion ->
+      let open Or_error.Let_syntax in
+      let%bind expected =
+        Or_error.try_with (fun () ->
+            Ledger_hash.of_base58_check_exn expected_hash )
+        |> Or_error.tag ~tag:(sprintf "%s: invalid hash %s" name expected_hash)
+      in
+      let%bind actual =
+        let%map source =
+          Or_error.try_with (fun () ->
+              List.map accounts ~f:(to_account ~pad_app_state:false) )
+          |> Or_error.tag
+               ~tag:(sprintf "%s: accounts are not in the target format" name)
+        in
+        Mina_ledger.Ledger.merkle_root
+          ( if List.equal Account.equal source converted then ledger
+          else ledger_of_accounts ~depth source )
+      in
+      if Ledger_hash.equal expected actual then Ok ledger
+      else
+        Or_error.errorf
+          "%s: the config gives hash %s, but its accounts hash to %s; the \
+           account data is not the source ledger"
+          name expected_hash
+          (Ledger_hash.to_base58_check actual)
+  | Some _ | None ->
+      Ok ledger
+
 let%test_module "vesting conversion" =
   ( module struct
     let hardfork_slot = Mina_numbers.Global_slot_since_genesis.of_int 10
@@ -65,4 +125,66 @@ let%test_module "vesting conversion" =
       Account.equal timed_account
         (convert_account ~identity_conversion:false ~hardfork_slot:None
            timed_account )
+  end )
+
+let%test_module "source ledger hash" =
+  ( module struct
+    open Core_kernel
+
+    let depth = 10
+
+    let pk () =
+      Signature_lib.Public_key.compress
+        (Signature_lib.Keypair.create ()).public_key
+
+    let account_with_symbol token_symbol =
+      let account =
+        Account.create
+          (Account_id.create (pk ()) Token_id.default)
+          (Currency.Balance.of_nanomina_int_exn 1_000)
+      in
+      { account with token_symbol }
+
+    let accounts = [ account_with_symbol "\xff"; account_with_symbol "" ]
+
+    let root accounts =
+      Ledger_hash.to_base58_check
+        (Mina_ledger.Ledger.merkle_root (ledger_of_accounts ~depth accounts))
+
+    let config accounts =
+      List.map accounts ~f:(fun a ->
+          Runtime_config.Accounts.Single.of_account a |> Or_error.ok_exn )
+
+    let load ?expected_hash ?(identity_conversion = true) ?hardfork_slot
+        accounts =
+      load_ledger ~ignore_missing_fields:false ~pad_app_state:false
+        ~identity_conversion ~hardfork_slot ~depth ~name:"ledger" ?expected_hash
+        accounts
+
+    let%test "correct ledger hash on a non-UTF-8 token symbol" =
+      Or_error.is_ok (load ~expected_hash:(root accounts) (config accounts))
+
+    let%test "a token symbol with changed bytes is rejected" =
+      let changed =
+        List.map accounts ~f:(fun a ->
+            if String.equal a.token_symbol "\xff" then
+              { a with token_symbol = "\xef\xbf\xbd" }
+            else a )
+      in
+      Or_error.is_error (load ~expected_hash:(root accounts) (config changed))
+
+    let%test "without a hash nothing is checked" =
+      Or_error.is_ok (load (config accounts))
+
+    let%test "an invalid hash is rejected" =
+      Or_error.is_error (load ~expected_hash:"not-a-hash" (config accounts))
+
+    (* A Berkeley ledger's root cannot be recomputed by this binary. *)
+    let%test "a Berkeley -> Mesa conversion is not checked" =
+      Or_error.is_ok
+        (load
+           ~expected_hash:(root [ account_with_symbol "" ])
+           ~identity_conversion:false
+           ~hardfork_slot:(Mina_numbers.Global_slot_since_genesis.of_int 10)
+           (config accounts) )
   end )

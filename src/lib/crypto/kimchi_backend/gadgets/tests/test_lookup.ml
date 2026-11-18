@@ -12,9 +12,9 @@ let () =
   try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
 
 (** Test lookup less_than_bits gadget for both variables and constants. *)
-let test_lookup ?cs ~bits value =
-  let cs, _proof_keypair, _proof =
-    Runner.generate_and_verify_proof ?cs (fun () ->
+let test_lookup ?proof_keypair ~bits value =
+  let _cs, proof_keypair, _proof =
+    Runner.generate_and_verify_proof ?proof_keypair (fun () ->
         let open Runner.Impl in
         let const = Field.constant @@ Field.Constant.of_int value in
         let value =
@@ -26,31 +26,35 @@ let test_lookup ?cs ~bits value =
         Range_check.bits64 Field.zero ;
         () )
   in
-  cs
+  proof_keypair
 
 let test_lookup_positive () =
-  let cs12 = test_lookup ~bits:12 4095 in
-  let _cs8 = test_lookup ~bits:8 255 in
-  let cs1 = test_lookup ~bits:1 0 in
-  let _cs = test_lookup ~cs:cs1 ~bits:1 1 in
-  ignore cs12 ; ()
+  let proof_keypair12 = test_lookup ~bits:12 4095 in
+  let _proof_keypair8 = test_lookup ~bits:8 255 in
+  let proof_keypair1 = test_lookup ~bits:1 0 in
+  let _proof_keypair = test_lookup ~proof_keypair:proof_keypair1 ~bits:1 1 in
+  ignore proof_keypair12 ; ()
 
 let test_lookup_negative () =
-  let cs12 = test_lookup ~bits:12 4095 in
-  let cs8 = test_lookup ~bits:8 255 in
-  let cs1 = test_lookup ~bits:1 0 in
+  let proof_keypair12 = test_lookup ~bits:12 4095 in
+  let proof_keypair8 = test_lookup ~bits:8 255 in
+  let proof_keypair1 = test_lookup ~bits:1 0 in
   Alcotest.(check bool)
     "4096 with 12 bits should fail" true
-    (Common.is_error (fun () -> test_lookup ~cs:cs12 ~bits:12 4096)) ;
+    (Common.is_error (fun () ->
+         test_lookup ~proof_keypair:proof_keypair12 ~bits:12 4096 ) ) ;
   Alcotest.(check bool)
     "-1 with 12 bits should fail" true
-    (Common.is_error (fun () -> test_lookup ~cs:cs12 ~bits:12 (-1))) ;
+    (Common.is_error (fun () ->
+         test_lookup ~proof_keypair:proof_keypair12 ~bits:12 (-1) ) ) ;
   Alcotest.(check bool)
     "256 with 8 bits should fail" true
-    (Common.is_error (fun () -> test_lookup ~cs:cs8 ~bits:8 256)) ;
+    (Common.is_error (fun () ->
+         test_lookup ~proof_keypair:proof_keypair8 ~bits:8 256 ) ) ;
   Alcotest.(check bool)
     "2 with 1 bit should fail" true
-    (Common.is_error (fun () -> test_lookup ~cs:cs1 ~bits:1 2))
+    (Common.is_error (fun () ->
+         test_lookup ~proof_keypair:proof_keypair1 ~bits:1 2 ) )
 
 let () =
   let open Alcotest in

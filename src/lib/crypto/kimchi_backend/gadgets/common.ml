@@ -90,14 +90,14 @@ let field_bits_le_to_field field_element (start : int) (stop : int) =
   if stop <> -1 && stop <= start then
     invalid_arg "stop offset must be greater than start offset" ;
 
-  (* Create field element *)
-  let bits = Field.Constant.unpack field_element in
-  if stop > List.length bits then
+  if stop > Field.size_in_bits then
     invalid_arg "stop must be less than bit-length" ;
 
-  let stop = if stop = -1 then List.length bits else stop in
-  (* Convert bits range (boolean list) to field element *)
-  Field.Constant.project @@ List.slice bits start stop
+  let stop = if stop = -1 then Field.size_in_bits else stop in
+  (* Convert bits range to field element *)
+  let bigint = Bigint.of_field field_element in
+  Field.Constant.project
+  @@ List.init (stop - start) ~f:(fun i -> Bigint.test_bit bigint (start + i))
 
 (** Creates cvar field element from contiguous bits of another. See
     [field_bits_le_to_field] for more information. *)

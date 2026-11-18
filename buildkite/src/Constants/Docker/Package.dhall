@@ -159,7 +159,7 @@ let pinnedByHashTag =
             , TxTools = False
             , DelegationVerifier = False
             , Toolchain = True
-            , Base = False
+            , Base = True
             }
             package
 
