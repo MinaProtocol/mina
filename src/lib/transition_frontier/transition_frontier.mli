@@ -15,7 +15,6 @@ module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
 module Full_catchup_tree = Full_catchup_tree
-module Catchup_hash_tree = Catchup_hash_tree
 module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
@@ -78,7 +77,6 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:[ `Super ]
   -> unit
   -> ( t
      , [ `Failure of string
@@ -87,6 +85,8 @@ val load :
        | `Snarked_ledger_mismatch ] )
      Deferred.Result.t
 
+(** Close the frontier. Closing a frontier that is already closing, or closed,
+    does nothing more, and is determined when the first close is. *)
 val close : loc:string -> t -> unit Deferred.t
 
 val closed : t -> unit Deferred.t
