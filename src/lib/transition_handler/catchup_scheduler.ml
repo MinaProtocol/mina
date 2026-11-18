@@ -77,6 +77,42 @@ let release_unbuilt (cached_transition, vc) =
     ( Cached.invalidate_with_failure cached_transition
       : Mina_block.initial_valid_block Envelope.Incoming.t )
 
+(** Release every block the scheduler holds, cancel its timeouts, and forget
+    them, so that nothing later reaches a released block. Stop building
+    breadcrumbs: blocks waiting to be built are released, and breadcrumbs
+    finished from now on are released rather than handed on. *)
+let clean_up
+    { collected_transitions
+    ; validation_callbacks
+    ; parent_root_timeouts
+    ; time_controller
+    ; breadcrumb_builder_supervisor
+    ; building_stopped
+    ; _
+    } =
+  building_stopped := true ;
+  Capped_supervisor.stop breadcrumb_builder_supervisor
+    ~release:(fun (_initial_hash, transition_branches) ->
+      List.iter transition_branches ~f:(fun subtree ->
+          Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) ) ;
+  Hashtbl.iter collected_transitions
+    ~f:
+      (List.iter ~f:(fun b ->
+           let hash =
+             Cached.peek b |> Envelope.Incoming.data
+             |> Validation.block_with_hash
+             |> State_hash.With_state_hashes.state_hash
+           in
+           let vc = Hashtbl.find validation_callbacks hash in
+           Option.value_map ~default:ignore
+             ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
+           ignore @@ Cached.invalidate_with_failure b ) ) ;
+  Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
+      Block_time.Timeout.cancel time_controller timeout () ) ;
+  Hashtbl.clear collected_transitions ;
+  Hashtbl.clear parent_root_timeouts ;
+  Hashtbl.clear validation_callbacks
+
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
@@ -136,42 +172,6 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   ; validation_callbacks
   ; building_stopped
   }
-
-(** Release every block the scheduler holds, cancel its timeouts, and forget
-    them, so that nothing later reaches a released block. Stop building
-    breadcrumbs: blocks waiting to be built are released, and breadcrumbs
-    finished from now on are released rather than handed on. *)
-let clean_up
-    { collected_transitions
-    ; validation_callbacks
-    ; parent_root_timeouts
-    ; time_controller
-    ; breadcrumb_builder_supervisor
-    ; building_stopped
-    ; _
-    } =
-  building_stopped := true ;
-  Capped_supervisor.stop breadcrumb_builder_supervisor
-    ~release:(fun (_initial_hash, transition_branches) ->
-      List.iter transition_branches ~f:(fun subtree ->
-          Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) ) ;
-  Hashtbl.iter collected_transitions
-    ~f:
-      (List.iter ~f:(fun b ->
-           let hash =
-             Cached.peek b |> Envelope.Incoming.data
-             |> Validation.block_with_hash
-             |> State_hash.With_state_hashes.state_hash
-           in
-           let vc = Hashtbl.find validation_callbacks hash in
-           Option.value_map ~default:ignore
-             ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
-           ignore @@ Cached.invalidate_with_failure b ) ) ;
-  Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
-      Block_time.Timeout.cancel time_controller timeout () ) ;
-  Hashtbl.clear collected_transitions ;
-  Hashtbl.clear parent_root_timeouts ;
-  Hashtbl.clear validation_callbacks
 
 let mem t transition =
   Hashtbl.mem t.collected_transitions

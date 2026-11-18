@@ -121,9 +121,16 @@ let convert_chain_to_canonical_command =
        ?protocol_version_str ~json ~stop_at_slot ~dry_run )
 
 let fetch_last_filled_block_command =
-  Async.Command.async ~summary:"Select last filled block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
-     fetch_last_filled_block ~postgres_uri )
+  Async.Command.async
+    ~summary:"Select the last filled block of the chain ending at the tip"
+    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+     and latest_state_hash =
+       Command.Param.(flag "--latest-state-hash" (optional string))
+         ~doc:
+           "String Hash of the tip of the chain to search (default: the \
+            highest block in the archive)"
+     in
+     fetch_last_filled_block ~postgres_uri ?latest_state_hash )
 
 let populate_genesis_accounts_command =
   Async.Command.async

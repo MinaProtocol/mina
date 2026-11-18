@@ -38,7 +38,12 @@ type user_command =
   }
 
 type account_update =
-  { update_account : account; balance_change : int; implicit_fee : bool }
+  { update_account : account
+  ; balance_change : int
+  ; implicit_fee : bool
+  ; token_symbol : string option
+  ; zkapp_uri : string option
+  }
 
 type zkapp_command =
   { zkapp_name : string
@@ -229,10 +234,13 @@ let coinbase ?(amount = 720_000_000_000) t ~name ~receiver block =
 let coinbase_hash c = "Ckp" ^ digest ("coinbase:" ^ c.coinbase_name)
 
 let account_update ?(balance_change = 0)
-    ?(implicit_account_creation_fee = false) update_account =
+    ?(implicit_account_creation_fee = false) ?token_symbol ?zkapp_uri
+    update_account =
   { update_account
   ; balance_change
   ; implicit_fee = implicit_account_creation_fee
+  ; token_symbol
+  ; zkapp_uri
   }
 
 let zkapp_command ?(fee = 10_000_000) t ~name ~fee_payer ~account_updates ~in_ =
