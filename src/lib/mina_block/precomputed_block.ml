@@ -84,7 +84,7 @@ module Stable = struct
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
       ; protocol_version : Protocol_version.Stable.V2.t
       ; proposed_protocol_version : Protocol_version.Stable.V2.t option
-      ; accounts_accessed : (int * Account.Stable.V3.t) list
+      ; accounts_accessed : (int * Account.Stable.V4.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :

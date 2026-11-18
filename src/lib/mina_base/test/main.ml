@@ -20,6 +20,10 @@ let () =
               (checked_pop_reverses_push (module Zkapp_account.Events))
           ; test_case "Actions pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Actions))
+          ; test_case "Checked and unchecked digests agree." `Quick
+              checked_digest_matches_unchecked
+          ; test_case "The upgrade drops only the zkApp version." `Quick
+              upgrade_drops_only_the_zkapp_version
           ] )
     ; Account_test.
         ( "accounts"
