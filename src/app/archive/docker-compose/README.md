@@ -108,5 +108,5 @@ See `example.devnet.env` and `example.mainnet.env`. Key differences between netw
 |----------|--------|---------|
 | `MINA_NETWORK` | `devnet` | `mainnet` |
 | `MINA_PEERLIST_URL` | devnet seeds | mainnet bootnodes |
-| `GUARDIAN_PRECOMPUTED_BLOCKS_URL` | devnet bucket | mainnet bucket |
+| `GUARDIAN_PRECOMPUTED_BLOCKS_URL` | same bucket, at its root | same bucket, at its root |
 | Docker image tags | `*-devnet` | `*-mainnet` |

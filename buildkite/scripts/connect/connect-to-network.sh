@@ -60,6 +60,11 @@ export MINA_PROFILE="$MINA_PROFILE_ARG"
 
 # --- Main Script Logic ---
 
+if [[ "$(cat MINA_CODEBASE_NETWORK)" != "$(cat MINA_MAINNET_NETWORK)" ]]; then
+    echo "Skipping: this codebase targets $(cat MINA_CODEBASE_NETWORK), not $(cat MINA_MAINNET_NETWORK)"
+    exit 0
+fi
+
 git config --global --add safe.directory /workdir
 source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/export-git-env-vars.sh

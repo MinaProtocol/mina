@@ -1030,6 +1030,152 @@ let%test_module "Bootstrap_controller tests" =
           | _ ->
               failwith "expected only the root snarked ledger's sync" )
 
+    (* [breadcrumb]'s block as it arrives from [peer_net]. *)
+    let incoming_block ~(peer_net : Fake_network.peer_network) breadcrumb =
+      Envelope.Incoming.wrap
+        ~data:
+          ( breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+          |> Mina_block.Validated.remember
+          |> Mina_block.Validation.reset_frontier_dependencies_validation
+          |> Mina_block.Validation.reset_staged_ledger_diff_validation )
+        ~sender:(Envelope.Sender.Remote peer_net.peer)
+
+    let collected_state_hash ((incoming, _) : Transition_cache.element) =
+      Envelope.Incoming.data incoming
+      |> Transition_cache.header_with_hash
+      |> State_hash.With_state_hashes.state_hash
+
+    let%test_unit "A block that arrives after bootstrap finishes reaches the \
+                   frontier controller" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~ledger_sync_config
+            [ fresh_peer
+            ; peer_with_branch
+                ~frontier_branch_size:((max_frontier_length * 2) + 2)
+            ])
+        ~f:(fun fake_network ->
+          let [ my_net; peer_net ] = fake_network.peer_networks in
+          let block =
+            incoming_block ~peer_net
+              (Transition_frontier.best_tip peer_net.state.frontier)
+          in
+          let network_transition_pipe =
+            Swappable.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+          in
+          Swappable.write network_transition_pipe (`Block block, `Valid_cb None) ;
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let%bind (_
+                         : Transition_frontier.t * Transition_cache.element list
+                         ) =
+                run_bootstrap
+                  ~timeout_duration:(Block_time.Span.of_ms 30_000L)
+                  ~my_net ~network_transition_pipe ()
+              in
+              (* Bootstrap has finished, and the frontier controller hasn't
+                 taken the pipe over yet. *)
+              Swappable.write network_transition_pipe
+                (`Block block, `Valid_cb None) ;
+              let%bind () = Scheduler.yield_until_no_jobs_remain () in
+              let%bind reader = Swappable.swap_reader network_transition_pipe in
+              match%map
+                Clock.with_timeout (Time.Span.of_sec 5.)
+                  (Pipe_lib.Choosable_synchronous_pipe.read reader)
+              with
+              | `Result (`Ok _) ->
+                  ()
+              | `Result `Eof | `Timeout ->
+                  failwith "The block that arrived after bootstrap was lost" )
+          )
+
+    let%test_unit "Blocks collected in a failed bootstrap cycle are passed on" =
+      let network_transition_pipe =
+        Swappable.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+      in
+      let bootstrap_status = Bootstrap_status.create () in
+      (* The peer and the block it sends once the first cycle has failed, known
+         once the network is generated. *)
+      let peer = ref None in
+      let scan_state_requests = ref 0 in
+      let rec second_cycle_started () =
+        let { Bootstrap_status.Snapshot.phase; bootstrap_attempts; _ } =
+          Bootstrap_status.snapshot bootstrap_status
+        in
+        if
+          bootstrap_attempts >= 2
+          && Bootstrap_status.Phase.equal phase Syncing_root_ledger
+        then Deferred.unit
+        else
+          let%bind () = after (Time.Span.of_ms 10.) in
+          second_cycle_started ()
+      in
+      (* Answers as the peer would, except that the first answer is faulty,
+         which fails the first cycle. A new cycle starts with no target, so the
+         peer sends it its best tip once it has started. *)
+      let get_staged_ledger_aux_and_pending_coinbases_at_hash query =
+        incr scan_state_requests ;
+        let peer_net, best_tip = Option.value_exn !peer in
+        let fail = !scan_state_requests = 1 in
+        if fail then
+          don't_wait_for
+            (let%map () = second_cycle_started () in
+             Swappable.write network_transition_pipe
+               (`Block best_tip, `Valid_cb None) ) ;
+        return
+          (Option.map
+             (Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+                ~logger ~frontier:peer_net.Fake_network.state.frontier
+                (Envelope.Incoming.data query) )
+             ~f:(fun ( scan_state
+                     , expected_merkle_root
+                     , pending_coinbases
+                     , protocol_states ) ->
+               ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+               , (if fail then Ledger_hash.empty_hash else expected_merkle_root)
+               , pending_coinbases
+               , protocol_states ) ) )
+      in
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~ledger_sync_config
+            [ fresh_peer
+            ; peer_with_branch_custom_rpc
+                ~frontier_branch_size:((max_frontier_length * 2) + 2)
+                ~get_staged_ledger_aux_and_pending_coinbases_at_hash
+                ?get_some_initial_peers:None ?answer_sync_ledger_query:None
+                ?get_ancestry:None ?get_best_tip:None
+                ?get_transition_knowledge:None ?get_transition_chain_proof:None
+                ?get_transition_chain:None ?get_completed_snarks:None
+            ])
+        ~f:(fun fake_network ->
+          let [ my_net; peer_net ] = fake_network.peer_networks in
+          let peer_frontier = peer_net.state.frontier in
+          let best_tip = Transition_frontier.best_tip peer_frontier in
+          let parent =
+            Transition_frontier.find peer_frontier
+              (Transition_frontier.Breadcrumb.parent_hash best_tip)
+            |> Option.value_exn
+          in
+          peer := Some (peer_net, incoming_block ~peer_net best_tip) ;
+          Swappable.write network_transition_pipe
+            (`Block (incoming_block ~peer_net parent), `Valid_cb None) ;
+          let _, collected =
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                run_bootstrap ~bootstrap_status
+                  ~timeout_duration:(Block_time.Span.of_ms 60_000L)
+                  ~my_net ~network_transition_pipe () )
+          in
+          assert (!scan_state_requests >= 2) ;
+          assert (
+            List.exists collected ~f:(fun element ->
+                State_hash.equal
+                  (collected_state_hash element)
+                  (Transition_frontier.Breadcrumb.state_hash parent) ) ) )
+
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
