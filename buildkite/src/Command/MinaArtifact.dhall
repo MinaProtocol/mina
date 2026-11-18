@@ -44,6 +44,8 @@ let Network = ../Constants/Network.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
 
+let CacheVariant = ../Constants/CacheVariant.dhall
+
 let Docker = ../Constants/Docker/Package.dhall
 
 let DockerCommand = ./Docker/Type.dhall
@@ -396,7 +398,9 @@ let build_artifacts
                         "${spec.buildScript} ${debianTokens} ${tents spec}"
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                            spec.debVersion}"
+                                                                            spec.debVersion} ${CacheVariant.segment
+                                                                                                 spec.buildFlags
+                                                                                                 spec.arch}"
                       , appsCacheWrite
                       ]
                 , label = "Debian: Build ${labelSuffix spec}"
@@ -587,7 +591,9 @@ let build_debian
                   buildDebianFromApps spec "${debianTokens spec} ${tents spec}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                        spec.debVersion}"
+                                                                        spec.debVersion} ${CacheVariant.segment
+                                                                                             spec.buildFlags
+                                                                                             spec.arch}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
