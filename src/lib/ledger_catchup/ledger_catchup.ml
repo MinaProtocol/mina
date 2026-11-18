@@ -18,12 +18,10 @@ end
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~network ~frontier ~catchup_breadcrumbs_writer ~block_registry
     ~schedule =
-  match Transition_frontier.catchup_state frontier with
-  | Full _ ->
-      Super_catchup.create_job_handler
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
-        ~block_registry ~schedule
-        ~build_func:
-          (Transition_frontier.Breadcrumb.build
-             ~get_completed_work:(Core_kernel.Fn.const None) )
+  Super_catchup.create_job_handler
+    ~context:(module Context)
+    ~trust_system ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
+    ~block_registry ~schedule
+    ~build_func:
+      (Transition_frontier.Breadcrumb.build
+         ~get_completed_work:(Core_kernel.Fn.const None) )

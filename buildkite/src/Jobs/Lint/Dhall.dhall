@@ -26,7 +26,7 @@ let dump_pipelines_cmd =
 let dhall_cmd =
       Cmd.runInDocker
         Cmd.Docker::{ image = ContainerImages.toolchainBase }
-        "cd buildkite && make check_syntax check_lint check_format test_monorepo"
+        "cd buildkite && make check_syntax check_lint check_format test_monorepo test_pipeline"
 
 let checker_cmds =
           "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines deps && "
@@ -42,6 +42,7 @@ in  Pipeline.build
           , S.exactly "buildkite/Makefile" ""
           , S.exactly "buildkite/scripts/monorepo" "sh"
           , S.exactly "buildkite/scripts/test_monorepo" "sh"
+          , S.contains "buildkite/scripts/pipeline"
           ]
         , path = "Lint"
         , name = "Dhall"

@@ -1102,17 +1102,19 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             resume ~finished:node.result (fun () ->
                 on_yielded node (c, valid_cb) breadcrumb ) )
   and on_yielded node (c, valid_cb) breadcrumb =
-    let finished = Ivar.create () in
-    let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
-    Strict_pipe.Writer.write catchup_breadcrumbs_writer
-      ( [ Mina_stdlib.Rose_tree.of_non_empty_list
-            (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
-        ]
-      , `Ledger_catchup finished ) ;
-    (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
-    step node
-      (Deferred.map (Ivar.read finished) ~f:Result.return)
-      ~f:(fun () -> on_handed_off node)
+    if Cached.was_consumed c then ()
+    else
+      let finished = Ivar.create () in
+      let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
+      Strict_pipe.Writer.write catchup_breadcrumbs_writer
+        ( [ Mina_stdlib.Rose_tree.of_non_empty_list
+              (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
+          ]
+        , `Ledger_catchup finished ) ;
+      (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
+      step node
+        (Deferred.map (Ivar.read finished) ~f:Result.return)
+        ~f:(fun () -> on_handed_off node)
   and on_handed_off node =
     Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
     set_state t node Finished
@@ -1135,7 +1137,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let (Full t) = Transition_frontier.catchup_state frontier in
+  let t = Transition_frontier.catchup_tree frontier in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
   set_release t
@@ -1914,12 +1916,7 @@ let%test_module "Ledger_catchup tests" =
                       failwith "final state should be at `Failed"
                   | `Failed ->
                       let catchup_state =
-                        match
-                          Transition_frontier.catchup_state
-                            my_net.state.frontier
-                        with
-                        | Full tr ->
-                            tr
+                        Transition_frontier.catchup_tree my_net.state.frontier
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes

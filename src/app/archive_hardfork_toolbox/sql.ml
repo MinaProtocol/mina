@@ -490,17 +490,25 @@ let fetch_latest_migration_history (module Conn : CONNECTION) =
    only from stop transaction slot till stop network slot, where we completely stop the chain.
    Knowing above we can detect last filled block by only looking at internal transactions occurrence.
    Therefore our fork candidate is the block with highest height that has internal transaction included in it.
+
+   Only the chain ending at the tip [$1] counts: the archive also keeps
+   orphaned blocks, and a competing block at (or above) the fork candidate's
+   height has internal commands too.
 *)
 
-let fetch_last_filled_block (module Conn : CONNECTION) =
+let fetch_last_filled_block (module Conn : CONNECTION) ~tip_hash =
   let query =
-    Caqti_type.(unit ->! t3 string int64 int)
+    Caqti_type.(string ->! t3 string int64 int)
       {%string|
-        SELECT b.state_hash, b.global_slot_since_genesis, b.height
-        FROM blocks b
-        INNER JOIN blocks_internal_commands bic ON b.id = bic.block_id
-        ORDER BY b.height DESC
+        %{chain_of_query}
+        SELECT chain.state_hash, chain.global_slot_since_genesis, chain.height
+        FROM chain
+        WHERE EXISTS (
+          SELECT 1 FROM blocks_internal_commands bic
+          WHERE bic.block_id = chain.id
+        )
+        ORDER BY chain.height DESC
         LIMIT 1;
       |}
   in
-  Conn.find query ()
+  Conn.find query tip_hash
