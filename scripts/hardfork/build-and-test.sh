@@ -3,8 +3,11 @@
 # This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
 # 1. Build PREFORK as a prefork build;
-# 2. Build the commit under test as the postfork build, and hardfork_test;
-# 3. Execute hardfork_test on them.
+# 2. Push the prefork build to the nix cache on the storage box. Only it is
+# cached: everything after this point is built from the commit under test, so
+# it changes for each PR.
+# 3. Build the commit under test as the postfork build, and hardfork_test;
+# 4. Execute hardfork_test on them.
 
 # Step 0. Prepare environment if needed
 set -eux -o pipefail
@@ -59,8 +62,14 @@ if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then
   NIX_SECRET_KEY=/tmp/nix-cache-secret
 fi
 
-if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
-  echo "GCP uploading configured (for nix binaries)"
+# Nix binary cache on the Hetzner storage box, mounted into the job container
+# (Cmds.dhall). Read through --extra-substituters; the post-build hook records
+# what this run builds so step 2 can push exactly that back. The public key in
+# flake.nix nixConfig covers the NARs signed with NIX_CACHE_NAR_SECRET.
+NIX_STORAGEBOX_CACHE="${NIX_STORAGEBOX_CACHE:-/var/storagebox/nix-cache}"
+if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" ]]; then
+  echo "Nix cache on the storage box: $NIX_STORAGEBOX_CACHE"
+  NIX_OPTS+=( --extra-substituters "file://${NIX_STORAGEBOX_CACHE}" )
   cat <<'EOF'> /tmp/nix-post-build
 #!/bin/sh
 
@@ -121,7 +130,15 @@ git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Build the commit under test as the postfork build, and hardfork_test.
+# 2. Push what was built to the storage box cache (zstd: xz is far slower).
+# /tmp/nix-paths is absent when everything came from the cache.
+if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" && -s /tmp/nix-paths ]]; then
+  nix "${NIX_OPTS[@]}" copy \
+    --to "file://${NIX_STORAGEBOX_CACHE}?compression=zstd" \
+    --stdin </tmp/nix-paths
+fi
+
+# 3. Build the commit under test as the postfork build, and hardfork_test.
 # The postfork daemon must come from the commit under test, not from a fixed
 # branch: otherwise a PR that changes the postfork daemon -- such as a
 # protocol_version_transaction bump -- is never exercised by this job, and the
