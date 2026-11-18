@@ -11,6 +11,10 @@ check_dependencies() {
     if ! command -v jq >/dev/null 2>&1; then
         missing_deps+=("jq")
     fi
+
+    if ! command -v mina-json-bytes >/dev/null 2>&1; then
+        missing_deps+=("mina-json-bytes")
+    fi
     
     if ! command -v date >/dev/null 2>&1; then
         missing_deps+=("date")
@@ -23,6 +27,7 @@ check_dependencies() {
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         echo "Error: Missing required dependencies: ${missing_deps[*]}" >&2
         echo "Please install the missing dependencies and try again." >&2
+        echo "  - mina-json-bytes: keeps non-UTF-8 ledger bytes exact through jq. The toolchain image has it; elsewhere install the mina-release-toolkit package (https://github.com/MinaProtocol/mina-release-toolkit/releases)." >&2
         exit 1
     fi
 }
@@ -101,7 +106,8 @@ if [[ $EXTRA_KEYS -gt $num_keys ]]; then
 fi
 
 function update_extra_balances(){
-  if ! jq ".[range(-1; -$((EXTRA_KEYS+1)); -1)].balance=\"$EXTRA_KEY_BALANCE\""; then
+  # Token symbols and zkApp URIs are arbitrary bytes and must stay exact.
+  if ! mina-json-bytes jq ".[range(-1; -$((EXTRA_KEYS+1)); -1)].balance=\"$EXTRA_KEY_BALANCE\""; then
     echo "Error: Failed to update balances with jq" >&2
     exit 1
   fi
