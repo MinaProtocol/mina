@@ -3441,7 +3441,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N5.n )
+    , Nat.N8.n )
     Pickles.Tag.t
 
   let system ~signature_kind ~proof_level ~constraint_constants =
@@ -3454,8 +3454,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
         in
-        [ Base.rule ~signature_kind ~constraint_constants
-            ~identifier:"transaction"
+        let base identifier =
+          Base.rule ~signature_kind ~constraint_constants ~identifier
+        in
+        [ base "payment"
+        ; base "stake_delegation"
+        ; base "fee_transfer"
+        ; base "coinbase"
         ; Merge.rule ~proof_level self
         ; zkapp_command ~signature_kind Opt_signed_opt_signed
         ; zkapp_command ~signature_kind Opt_signed
@@ -4201,7 +4206,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         , cache_handle
         , p
         , Pickles.Provers.
-            [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
+            [ payment
+            ; _stake_delegation
+            ; _fee_transfer
+            ; _coinbase
+            ; merge
+            ; opt_signed_opt_signed
+            ; opt_signed
+            ; proved
+            ] ) =
       system ~signature_kind ~proof_level ~constraint_constants
 
     module Proof = (val p)
@@ -4291,7 +4304,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         global_slot handler =
       let open Async in
       let%map (), (), proof =
-        base
+        payment
           ~handler:
             (Base.transaction_union_handler handler transaction state_body
                global_slot init_stack )
