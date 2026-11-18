@@ -8,7 +8,7 @@ let
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
 
-  repos = with inputs; [ o1-opam-repository opam-repository ];
+  repos = with inputs; [ o1-opam-repository opam-repository opam-repository-archive ];
 
   export = opam-nix.importOpam ../opam.export;
 
