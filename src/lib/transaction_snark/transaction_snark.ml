@@ -4207,9 +4207,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         , p
         , Pickles.Provers.
             [ payment
-            ; _stake_delegation
-            ; _fee_transfer
-            ; _coinbase
+            ; stake_delegation
+            ; fee_transfer
+            ; coinbase
             ; merge
             ; opt_signed_opt_signed
             ; opt_signed
@@ -4300,11 +4300,22 @@ module Make_str (A : Wire_types.Concrete) = struct
       Base.Zkapp_command_snark.witness := None ;
       { Proof_carrying_data.proof; data = statement }
 
-    let of_transaction_union ~statement ~init_stack transaction state_body
-        global_slot handler =
+    let of_transaction_union ~statement ~init_stack
+        (transaction : Transaction_union.t) state_body global_slot handler =
       let open Async in
+      let prover =
+        match transaction.payload.body.tag with
+        | Payment ->
+            payment
+        | Stake_delegation ->
+            stake_delegation
+        | Fee_transfer ->
+            fee_transfer
+        | Coinbase ->
+            coinbase
+      in
       let%map (), (), proof =
-        payment
+        prover
           ~handler:
             (Base.transaction_union_handler handler transaction state_body
                global_slot init_stack )
