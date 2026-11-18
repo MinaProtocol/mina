@@ -9,6 +9,8 @@ type t =
   ; created_at : Time_ns.t
   ; signal : validation_result Ivar.t
   ; mutable message_type : [ `Unknown | `Block | `Snark_work | `Transaction ]
+  ; mutable on_resolve : ([ validation_result | `Expired ] -> unit) option
+        (* Called once, with how this callback resolves. *)
   }
 
 let create expiration =
@@ -16,6 +18,7 @@ let create expiration =
   ; created_at = Time_ns.now ()
   ; signal = Ivar.create ()
   ; message_type = `Unknown
+  ; on_resolve = None
   }
 
 let create_without_expiration () =
@@ -23,6 +26,7 @@ let create_without_expiration () =
   ; created_at = Time_ns.now ()
   ; signal = Ivar.create ()
   ; message_type = `Unknown
+  ; on_resolve = None
   }
 
 let is_expired cb =
@@ -132,6 +136,13 @@ let fire_if_not_already_fired cb result =
   if not (is_expired cb) then
     if Ivar.is_full cb.signal then
       [%log' error (Logger.create ())] "Ivar.fill bug is here!"
-    else Ivar.fill cb.signal result
+    else (
+      Option.iter cb.on_resolve ~f:(fun f ->
+          f (result :> [ validation_result | `Expired ]) ) ;
+      Ivar.fill cb.signal result )
 
 let set_message_type t x = t.message_type <- x
+
+let set_on_resolve t f =
+  t.on_resolve <- Some f ;
+  upon (await_timeout t) (fun () -> if Ivar.is_empty t.signal then f `Expired)

@@ -37,3 +37,14 @@ let bin_prot_conv (t : 'a Bin_prot.Type_class.t) =
         res )
       ~deserialise:(fun x -> t.reader.read ~pos_ref:(ref 0) x)
       ())
+
+(** Raw bytes, copied out of the database on read so that they remain valid
+    after the transaction ends. *)
+let bigstring_copy =
+  Lmdb.Conv.make ~flags:Lmdb.Conv.Flags.dup_fixed
+    ~serialise:(fun alloc x ->
+      let len = Bigstring.length x in
+      let res = alloc len in
+      Bigstring.blit ~src:x ~src_pos:0 ~dst:res ~dst_pos:0 ~len ;
+      res )
+    ~deserialise:Bigstring.copy ()

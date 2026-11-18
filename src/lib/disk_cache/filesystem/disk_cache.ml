@@ -26,6 +26,10 @@ struct
         let str = In_channel.input_all chan in
         Binable.of_string (module B) str )
 
+  let get_bin_prot ((root, _) : t) (id : id) : Bigstring.t =
+    In_channel.with_file ~binary:true (path root id.idx) ~f:(fun chan ->
+        In_channel.input_all chan |> Bigstring.of_string )
+
   let put ((root, next_idx) : t) x : id =
     let idx = !next_idx in
     incr next_idx ;

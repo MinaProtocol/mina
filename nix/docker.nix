@@ -132,9 +132,9 @@ in {
   #
   # These are the images the integration tests want: `mina-image-full` pairs
   # dev-profile binaries with a PROFILE hint that says mainnet, which is neither
-  # of the two things a devnet test needs. `devnet` is also what NixBuildTest
-  # already builds on every PR, so these reuse the shared nix cache rather than
-  # pulling a second, otherwise-unused compile of mina.
+  # of the two things a devnet test needs. `devnet` is also what the hardfork
+  # test builds, so these reuse the shared nix cache rather than pulling a
+  # second, otherwise-unused compile of mina.
   #
   # "generic" is meant in the same sense as the mina-${network}-generic Debian
   # package: daemon binaries and the profile hint, with no network config baked

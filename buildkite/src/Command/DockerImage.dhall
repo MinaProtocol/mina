@@ -14,6 +14,8 @@ let Docker = ../Constants/Docker/Package.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
 
+let CacheVariant = ../Constants/CacheVariant.dhall
+
 let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
@@ -136,10 +138,12 @@ let generateStep =
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
+          let debVariant = CacheVariant.segment spec.build_flags spec.arch
+
           let maybeFetchLocalDebs =
                 merge
                   { DownloadOnly =
-                      " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
+                      " && ROOT=${spec.deb_root_folder} DEB_VARIANT=${debVariant} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
                   , NoInstall =
                       " && echo Skipping local debian package download "
                   }

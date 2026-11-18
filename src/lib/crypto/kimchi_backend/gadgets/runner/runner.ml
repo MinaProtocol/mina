@@ -3,19 +3,19 @@ module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
 
 module Impl = Kimchi_pasta_snarky_backend.Step_impl
 
-let generate_and_verify_proof ?cs circuit =
-  (* Generate constraint system for the circuit *)
-  let constraint_system =
-    match cs with
-    | Some cs ->
-        cs
-    | None ->
-        Impl.constraint_system ~input_typ:Impl.Typ.unit
-          ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
-  in
-  (* Generate the indexes from the constraint system *)
+let generate_and_verify_proof ?proof_keypair circuit =
   let proof_keypair =
-    Tick.Keypair.create ~prev_challenges:0 constraint_system
+    match proof_keypair with
+    | Some proof_keypair ->
+        proof_keypair
+    | None ->
+        (* Generate constraint system for the circuit *)
+        let constraint_system =
+          Impl.constraint_system ~input_typ:Impl.Typ.unit
+            ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
+        in
+        (* Generate the indexes from the constraint system *)
+        Tick.Keypair.create ~prev_challenges:0 constraint_system
   in
   let prover_index = Tick.Keypair.pk proof_keypair in
   let proof, (() as _public_output) =
@@ -40,4 +40,4 @@ let generate_and_verify_proof ?cs circuit =
   let public_input = Kimchi_bindings.FieldVectors.Fp.create () in
   (* Assert that the proof verifies. *)
   assert (Tick.Proof.verify ~message:[] proof verifier_index public_input) ;
-  (constraint_system, proof_keypair, proof)
+  (proof_keypair.cs, proof_keypair, proof)

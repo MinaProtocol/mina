@@ -34,6 +34,10 @@ let FixPermissions = ../FixPermissions.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let CacheVariant = ../../Constants/CacheVariant.dhall
+
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
@@ -66,12 +70,16 @@ let debsFolder = "_publish"
 let readFromCache
     : Spec.Type -> List Cmd.Type
     =
-      -- One read per codename, into its own folder.
+      -- One folder per codename, read from the standard and the arm64 builds.
       --
       -- read_all_from_cache.sh puts the packages of ONE codename flat into
       -- LOCAL_DEB_FOLDER, and `release-manager publish` wants a
       -- {codename}/*.deb tree, so the codename is the folder rather than
       -- something the publish step has to reconstruct from file names.
+      --
+      -- The arm64 build also makes the Architecture: all packages, under the
+      -- same file names as the amd64 build, so only its _arm64 files are read.
+      -- A build without arm64 packages has no arm64 folder to read.
           \(spec : Spec.Type)
       ->  List/map
             DebianVersions.DebVersion
@@ -79,10 +87,22 @@ let readFromCache
             (     \(codename : DebianVersions.DebVersion)
               ->  let lower = DebianVersions.lowerName codename
 
+                  let read =
+                            "MINA_DEB_CODENAME=${lower}"
+                        ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
+                        ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
+
                   in  Cmd.run
-                        (     "MINA_DEB_CODENAME=${lower}"
-                          ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
-                          ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
+                        (     read
+                          ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
+                          ++  " && "
+                          ++  read
+                          ++  " DEB_VARIANT=${CacheVariant.segment
+                                                BuildFlags.Type.None
+                                                Arch.Type.Arm64}"
+                          ++  " DEB_PATTERN='*_${Arch.lowerName
+                                                   Arch.Type.Arm64}.deb'"
+                          ++  " DEB_OPTIONAL=1"
                           ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
                           ++  " && ./buildkite/scripts/debian/select_release_packages.sh"
                           ++  " ${debsFolder}/${lower} ${debsFolder}_excluded/${lower}"
