@@ -135,11 +135,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Pipe_lib.Choosable_synchronous_pipe.iter network_transition_reader
         ~f:validate_transition ) ;
-  let clean_up_catchup_scheduler = Ivar.create () in
   let catchup_scheduler =
     Transition_handler.Catchup_scheduler.create ~logger ~precomputed_values
       ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
+      ~catchup_breadcrumbs_writer
   in
   let process_message =
     Transition_handler.Processor.create_handler
@@ -174,7 +173,5 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       kill processed_transition_writer ;
       kill catchup_job_writer ;
       kill catchup_breadcrumbs_writer ;
-      if Ivar.is_full clean_up_catchup_scheduler then
-        [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler () ) ;
+      Transition_handler.Catchup_scheduler.clean_up catchup_scheduler ) ;
   processed_transition_reader
