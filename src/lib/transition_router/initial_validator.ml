@@ -281,17 +281,19 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
               Interruptible.lift Deferred.unit
                 (Mina_net2.Validation_callback.await_timeout valid_cb)
             in
-            let reject error =
-              Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
-                `Reject ;
-              let%map () =
-                Interruptible.uninterruptible
-                @@ handle_validation_error ~logger ~rejected_blocks_logger
-                     ~time_received ~trust_system ~sender
-                     ~header_with_hash:header_hashed
-                     ~delta:genesis_constants.protocol.delta error
+            let validate_body_reference verified_header =
+              let matches =
+                match b_or_h with
+                | `Block b_env ->
+                    let block = Envelope.Incoming.data b_env in
+                    Validation.body_matches_reference
+                      ~header:(Mina_block.Stable.Latest.header block)
+                      (Mina_block.Stable.Latest.body block)
+                | `Header _ ->
+                    true
               in
-              Error ()
+              if matches then Ok verified_header
+              else Error `Invalid_body_reference
             in
             match%bind
               let open Interruptible.Result.Let_syntax in
@@ -303,19 +305,9 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
                 >>= Fn.compose Interruptible.uninterruptible
                       (validate_single_proof ~verifier ~genesis_state_hash)
                 >>= defer validate_delta_block_chain
-                >>= defer validate_protocol_versions)
+                >>= defer validate_protocol_versions
+                >>= defer validate_body_reference)
             with
-            | Ok _
-              when match b_or_h with
-                   | `Block b_env ->
-                       let block = Envelope.Incoming.data b_env in
-                       not
-                         (Validation.body_matches_reference
-                            ~header:(Mina_block.Stable.Latest.header block)
-                            (Mina_block.Stable.Latest.body block) )
-                   | `Header _ ->
-                       false ->
-                reject `Invalid_body_reference
             | Ok verified_header ->
                 [%log internal] "Initial_validation_done" ;
                 let body b =
@@ -346,7 +338,16 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
                   , time_received ) ;
                 return (Ok (b_or_h', `Valid_cb valid_cb))
             | Error error ->
-                reject error
+                Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
+                  `Reject ;
+                let%map () =
+                  Interruptible.uninterruptible
+                  @@ handle_validation_error ~logger ~rejected_blocks_logger
+                       ~time_received ~trust_system ~sender
+                       ~header_with_hash:header_hashed
+                       ~delta:genesis_constants.protocol.delta error
+                in
+                Error ()
           in
           Interruptible.force computation )
         else Deferred.Result.fail () )
