@@ -57,6 +57,4 @@
   internal_tracing
   verifier
   proof_cache_tag
-  mina_signature_kind
-  staged_ledger_diff
-  blake2))
+  mina_signature_kind))

@@ -139,20 +139,6 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         (state_hash, sender, time_received, `Mismatched_protocol_version) ;
       punish Sent_mismatched_protocol_version None
 
-(** Whether [block]'s body is the one its blockchain state commits to. The
-    state hash commits to the body only through this reference, so blocks
-    with the same state hash can otherwise carry different bodies. *)
-let body_matches_reference block =
-  let body_reference =
-    Mina_block.Stable.Latest.header block
-    |> Header.protocol_state |> Protocol_state.blockchain_state
-    |> Blockchain_state.body_reference
-  in
-  Blake2.equal body_reference
-    (Staged_ledger_diff.Body.compute_reference
-       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-       (Mina_block.Stable.Latest.body block) )
-
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
 
@@ -322,8 +308,11 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
             | Ok _
               when match b_or_h with
                    | `Block b_env ->
+                       let block = Envelope.Incoming.data b_env in
                        not
-                         (body_matches_reference (Envelope.Incoming.data b_env))
+                         (Validation.body_matches_reference
+                            ~header:(Mina_block.Stable.Latest.header block)
+                            (Mina_block.Stable.Latest.body block) )
                    | `Header _ ->
                        false ->
                 reject `Invalid_body_reference
