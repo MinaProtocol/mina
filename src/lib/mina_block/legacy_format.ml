@@ -110,6 +110,22 @@ module Staged_ledger_diff = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t = Staged_ledger_diff.Stable.V4.t =
+        { diff :
+            ( Transaction_snark_work.Stable.V3.t
+            , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
+            Staged_ledger_diff.Pre_diff_two.Stable.V2.t
+            * ( Transaction_snark_work.Stable.V3.t
+              , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
+              Staged_ledger_diff.Pre_diff_one.Stable.V2.t
+              option
+        }
+      [@@deriving sexp, yojson]
+
+      let to_latest = ident
+    end
+
     module V2 = struct
       type t = Staged_ledger_diff.Stable.V3.t =
         { diff :
@@ -123,7 +139,7 @@ module Staged_ledger_diff = struct
         }
       [@@deriving sexp, yojson]
 
-      let to_latest = ident
+      let to_latest = Staged_ledger_diff.Stable.V3.to_latest
     end
   end]
 end

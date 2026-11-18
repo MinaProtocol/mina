@@ -503,13 +503,14 @@ let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
   let parent_blockchain_state =
     Protocol_state.blockchain_state parent_protocol_state
   in
-  let ledger_proof_statement, supply_increase =
+  let ledger_proof_statement, total_currency =
     match ledger_proof_statement with
     | Some (statement : Snarked_ledger_state.t) ->
-        (statement, statement.supply_increase)
+        (statement, statement.target.total_currency)
     | None ->
         ( Blockchain_state.ledger_proof_statement parent_blockchain_state
-        , Currency.Amount.Signed.zero )
+        , Consensus_state.total_currency
+            (Protocol_state.consensus_state parent_protocol_state) )
   in
   let blockchain_state =
     Blockchain_state.create_value ~staged_ledger_hash
@@ -524,7 +525,7 @@ let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
     Consensus_state_hooks.expected_protocol_state ~constraint_constants
       ~previous_protocol_state:parent_protocol_state
       ~previous_protocol_state_hash:parent_state_hash ~blockchain_state
-      ~supply_increase ~candidate:protocol_state ~logger
+      ~total_currency ~candidate:protocol_state ~logger
   with
   | Error e ->
       Error (Error.tag e ~tag:"Could not compute the expected protocol state")

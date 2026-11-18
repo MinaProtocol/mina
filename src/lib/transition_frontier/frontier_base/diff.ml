@@ -83,6 +83,16 @@ module Root_transition = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V6 = struct
+        type t =
+          { new_root : Root_data.Limited.Stable.V5.t
+          ; garbage : Node_list.Lite.Stable.V1.t
+          ; just_emitted_a_proof : bool
+          }
+
+        let to_latest = Fn.id
+      end
+
       module V5 = struct
         type t =
           { new_root : Root_data.Limited.Stable.V4.t
@@ -90,7 +100,12 @@ module Root_transition = struct
           ; just_emitted_a_proof : bool
           }
 
-        let to_latest = Fn.id
+        let to_latest ({ new_root; garbage; just_emitted_a_proof } : t) :
+            Latest.t =
+          { new_root = Root_data.Limited.Stable.V4.to_latest new_root
+          ; garbage
+          ; just_emitted_a_proof
+          }
       end
     end]
   end
@@ -98,10 +113,16 @@ module Root_transition = struct
   module Lite = struct
     [%%versioned
     module Stable = struct
+      module V6 = struct
+        type t = Lite_binable.Stable.V6.t
+
+        let to_latest = Fn.id
+      end
+
       module V5 = struct
         type t = Lite_binable.Stable.V5.t
 
-        let to_latest = Fn.id
+        let to_latest = Lite_binable.Stable.V5.to_latest
       end
     end]
   end

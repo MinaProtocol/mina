@@ -61,9 +61,9 @@ module type Blockchain_state = sig
       , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t
       , Block_time.t
       , Body_reference.t
-      , Amount.Signed.t
+      , Amount.t
       , Pending_coinbase.Stack_versioned.Stable.V1.t
-      , Fee_excess.Stable.V1.t
+      , Fee_excess.Stable.V2.t
       , unit )
       Poly.t
     [@@deriving sexp]
@@ -75,7 +75,7 @@ module type Blockchain_state = sig
     , Mina_transaction_logic.Zkapp_command_logic.Local_state.Checked.t
     , Block_time.Checked.t
     , Body_reference.var
-    , Currency.Amount.Signed.var
+    , Currency.Amount.var
     , Pending_coinbase.Stack.var
     , Fee_excess.var
     , unit )
@@ -223,7 +223,7 @@ module type State_hooks = sig
     -> supercharge_coinbase:bool
     -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
-    -> supply_increase:Currency.Amount.Signed.t
+    -> total_currency:Currency.Amount.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> protocol_state * consensus_transition
@@ -244,7 +244,7 @@ module type State_hooks = sig
     -> previous_protocol_state:protocol_state
     -> previous_protocol_state_hash:Mina_base.State_hash.t
     -> blockchain_state:blockchain_state
-    -> supply_increase:Currency.Amount.Signed.t
+    -> total_currency:Currency.Amount.t
     -> candidate:protocol_state
     -> logger:Logger.t
     -> protocol_state Or_error.t
@@ -258,7 +258,7 @@ module type State_hooks = sig
     -> prev_state:protocol_state_var
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
-    -> Currency.Amount.Signed.var
+    -> Currency.Amount.var
     -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
        Snark_params.Tick.Checked.t
 
@@ -275,7 +275,7 @@ module type State_hooks = sig
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
-          -> supply_increase:Currency.Amount.Signed.t
+          -> total_currency:Currency.Amount.t
           -> consensus_state )
          Quickcheck.Generator.t
   end
@@ -317,6 +317,9 @@ module type S = sig
   end
 
   module Genesis_data : sig
+    val genesis_ledger_total_currency :
+      ledger:Mina_ledger.Ledger.t Lazy.t -> Currency.Amount.t
+
     module Hashed : sig
       type t =
         { total_currency : Currency.Amount.t
@@ -452,10 +455,16 @@ module type S = sig
       module Stable : sig
         [@@@no_toplevel_latest_type]
 
-        module V3 : sig
+        module V4 : sig
           type t
 
           val to_latest : t -> t
+        end
+
+        module V3 : sig
+          type t
+
+          val to_latest : t -> V4.t
         end
       end]
 
@@ -666,7 +675,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V3 : sig
+        module V4 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
