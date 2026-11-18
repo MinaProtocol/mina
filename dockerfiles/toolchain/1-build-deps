@@ -29,6 +29,7 @@ ARG OPAM_VERSION=2.3.0
 # - scripts/update_opam_switch.sh
 ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
 ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
+ARG OPAM_REPOSITORY_ARCHIVE_COMMIT=f5b3f8867e235645eb04f5ddf94ac85bb34d9c23
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
@@ -196,6 +197,11 @@ RUN opam init --disable-sandboxing \
     -k git \
     -a /home/opam/opam-repository \
     --bare
+RUN opam repository add --yes \
+    --all \
+    --set-default \
+    --rank=-1 archive \
+    https://github.com/ocaml/opam-repository-archive.git#${OPAM_REPOSITORY_ARCHIVE_COMMIT}
 # We pin the opam-repo SHA so this step gets 
 # cache-busted when we update the opam repo
 RUN opam repository add --yes \
