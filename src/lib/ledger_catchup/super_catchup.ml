@@ -1345,6 +1345,17 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                     `Ignore ;
                   ignore @@ Cached.invalidate_with_failure node ) )
         in
+        let attach_hash = function
+          | `Breadcrumb b ->
+              Breadcrumb.state_hash b
+          | `Node (node : Node.t) ->
+              node.state_hash
+        in
+        let attached root =
+          let h = attach_hash root in
+          Hashtbl.mem t.nodes h
+          || Option.is_some (Transition_frontier.find frontier h)
+        in
         match%map state_hashes with
         | Error errors ->
             [%log debug]
@@ -1395,6 +1406,13 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                   Mina_metrics.(
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
+            release_forest ()
+        | Ok (root, _) when not (attached root) ->
+            [%log debug]
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson (attach_hash root)) ]
+              "Catchup job's attach block $state_hash left the frontier before \
+               its nodes were created" ;
             release_forest ()
         | Ok (root, state_hashes) ->
             [%log' debug t.logger]
