@@ -15,6 +15,6 @@ in  SimpleUnitTestJob.build
         , PipelineTag.Type.Test
         , PipelineTag.Type.Stable
         ]
-      , cmdTarget = Size.Small
+      , cmdTarget = Size.Large
       , submodules = True
       }

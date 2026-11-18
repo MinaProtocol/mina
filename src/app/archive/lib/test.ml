@@ -450,6 +450,29 @@ let%test_module "Archive node unit tests" =
           let%map loaded = load conn id >>| Mina_caqti.ok_exn ~ctx in
           [%test_eq: string] ~message:(ctx ^ ": read back exactly") value loaded )
 
+    let%test_unit "Zkapp_account: write an account" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind id =
+          Processor.Zkapp_account.add_if_doesn't_exist conn
+            Zkapp_account.default
+        in
+        let%bind repeated_id =
+          Processor.Zkapp_account.add_if_doesn't_exist conn
+            Zkapp_account.default
+        in
+        let%map row = Processor.Zkapp_account.load conn id in
+        [%test_eq: int] id repeated_id ;
+        [%test_eq: int64] 0L row.zkapp_version
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     let%test_unit "Token_symbols, Zkapp_uri: any bytes round trip" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn

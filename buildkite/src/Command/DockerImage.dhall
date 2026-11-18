@@ -14,6 +14,8 @@ let Docker = ../Constants/Docker/Package.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
 
+let CacheVariant = ../Constants/CacheVariant.dhall
+
 let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
@@ -29,6 +31,8 @@ let DockerPublish = ../Constants/Docker/Publish.dhall
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
 let Arch = ../Constants/Arch.dhall
+
+let Prefork = ../Constants/Prefork.dhall
 
 let DebianInstallMode
     : Type
@@ -82,7 +86,7 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bookworm
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_legacy_version = "4.0.3-73134bf"
+          , deb_legacy_version = Prefork.version
           , docker_target = None Text
           , base_image = None Text
           , deb_profile = Profiles.Type.Devnet
@@ -134,10 +138,12 @@ let generateStep =
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
+          let debVariant = CacheVariant.segment spec.build_flags spec.arch
+
           let maybeFetchLocalDebs =
                 merge
                   { DownloadOnly =
-                      " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
+                      " && ROOT=${spec.deb_root_folder} DEB_VARIANT=${debVariant} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
                   , NoInstall =
                       " && echo Skipping local debian package download "
                   }
@@ -166,8 +172,7 @@ let generateStep =
               -- Only Daemon/Rosetta ("*-config" images) need an arch marker
               -- baked into the custom suffix build-arg on top of --platform;
               -- --platform alone already derives -arm64 for everyone else
-              -- (scripts/docker/helper.sh get_platform_suffix), which is the
-              -- only arch suffix manager.sh verify's tag ever expects.
+              -- (scripts/docker/helper.sh get_platform_suffix).
                 merge
                   { Base = ""
                   , DaemonGeneric = ""

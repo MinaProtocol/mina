@@ -94,10 +94,6 @@ module Values (S : Sample) = struct
     bin_copy ~bin_class:Mina_numbers.Global_slot_span.Stable.Latest.bin_t
       Mina_numbers.Global_slot_span.zero
 
-  let zkapp_version () : Mina_numbers.Zkapp_version.t =
-    bin_copy ~bin_class:Mina_numbers.Zkapp_version.Stable.Latest.bin_t
-      Mina_numbers.Zkapp_version.zero
-
   let signed_command_memo () : Mina_base.Signed_command_memo.t =
     bin_copy ~bin_class:Mina_base.Signed_command_memo.Stable.Latest.bin_t
       Mina_base.Signed_command_memo.empty
@@ -203,7 +199,8 @@ module Values (S : Sample) = struct
            (Mina_state.Snarked_ledger_state.genesis
               ~genesis_ledger_hash:
                 (Mina_base.Frozen_ledger_hash.of_ledger_hash
-                   Mina_base.Ledger_hash.empty_hash ) )
+                   Mina_base.Ledger_hash.empty_hash )
+              ~genesis_total_currency:Currency.Amount.zero )
          ~fee:(fee ()) ~prover:(public_key ()) )
 
   let one_priced_proof () :
@@ -247,7 +244,6 @@ module Values (S : Sample) = struct
                 ~f:(fun _ -> field ())
           ; verification_key = Some (verification_key ())
           ; zkapp_uri = zkapp_uri ()
-          ; zkapp_version = zkapp_version ()
           ; action_state =
               Pickles_types.Vector.init Pickles_types.Nat.N5.n ~f:(fun _ ->
                   field () )
@@ -380,18 +376,23 @@ module Values (S : Sample) = struct
             ; second_pass_ledger = field ()
             ; pending_coinbase_stack = pending_coinbase_stack ()
             ; local_state = local_state ()
+            ; fee_excess = fee_excess ()
+            ; total_currency = Currency.Amount.zero
+            ; ledger_after_coinbase = field ()
+            ; total_supply_after_coinbase = Currency.Amount.zero
             }
         ; target =
             { first_pass_ledger = field ()
             ; second_pass_ledger = field ()
             ; pending_coinbase_stack = pending_coinbase_stack ()
             ; local_state = local_state ()
+            ; fee_excess = fee_excess ()
+            ; total_currency = Currency.Amount.zero
+            ; ledger_after_coinbase = field ()
+            ; total_supply_after_coinbase = Currency.Amount.zero
             }
         ; connecting_ledger_left = field ()
         ; connecting_ledger_right = field ()
-        ; supply_increase =
-            (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
-        ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }
       ~init_stack:(pending_coinbase_stack ())
