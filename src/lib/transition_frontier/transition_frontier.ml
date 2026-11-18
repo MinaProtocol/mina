@@ -462,8 +462,7 @@ let add_breadcrumb_reporting_root_exn t breadcrumb =
       | Diff.Full.E.E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
           Some
             { previous_root = Breadcrumb.state_hash previous_root
-            ; new_root =
-                (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+            ; new_root = (Root_data.Limited.hashes new_root).state_hash
             ; garbage = Diff.Node_list.to_lite hs
             }
       | _ ->

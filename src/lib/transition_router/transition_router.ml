@@ -167,7 +167,7 @@ type t =
   ; phase : phase ref
   ; verified_transition_writer :
       ( [ `Transition of Mina_block.Validated.t ]
-        * [ `Source of Block_outcome_log.source ]
+        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
         * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
       , Strict_pipe.drop_head Strict_pipe.buffered
       , unit )
