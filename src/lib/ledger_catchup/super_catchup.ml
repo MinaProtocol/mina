@@ -1140,17 +1140,11 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
-    ~network ~frontier ~build_func
-    ~(catchup_job_reader :
-       ( State_hash.t
-       * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-         * Mina_net2.Validation_callback.t option )
-         Mina_stdlib.Rose_tree.t
-         list )
-       Strict_pipe.Reader.t ) ~unprocessed_transition_cache
+
+(** Set up super catchup for [frontier], and return the function that handles
+    one catchup job. *)
+let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
+    ~verifier ~network ~frontier ~build_func ~unprocessed_transition_cache
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
@@ -1455,21 +1449,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                     (h, l) )
                 : State_hash.t * Length.t ) )
   in
-  O1trace.thread "handle_super_catchup_jobs" (fun () ->
-      Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-        ~f:process_catchup_job )
-
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
-  O1trace.background_thread "perform_super_catchup" (fun () ->
-      run_catchup
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
-        ~build_func:
-          (Transition_frontier.Breadcrumb.build
-             ~get_completed_work:(Fn.const None) ) )
+  return process_catchup_job
 
 (* Unit tests *)
 
@@ -1593,10 +1573,18 @@ let%test_module "Ledger_catchup tests" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
           ~cache_exceptions:true
       in
-      run
-        ~context:(module Context)
-        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+      don't_wait_for
+        (let%bind process_catchup_job =
+           create_job_handler
+             ~context:(module Context)
+             ~verifier ~trust_system ~network ~frontier
+             ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+             ~build_func:
+               (Transition_frontier.Breadcrumb.build
+                  ~get_completed_work:(Fn.const None) )
+         in
+         Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+           ~f:process_catchup_job ) ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader
