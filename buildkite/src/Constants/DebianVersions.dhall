@@ -149,7 +149,6 @@ let packageDirtyWhen =
       , S.strictlyStart (S.contains "buildkite/scripts/docker")
       , S.strictlyStart (S.contains "buildkite/scripts/debian")
       , S.exactly "buildkite/scripts/apps/restore_build_tree" "sh"
-      , S.strictlyStart (S.contains "buildkite/scripts/cache")
       ]
 
 let appDependsOn =
