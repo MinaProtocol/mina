@@ -366,8 +366,8 @@ let%test_module "Transition_handler.Validator tests" =
           in
           let vc = Mina_net2.Validation_callback.create_without_expiration () in
           let resolved = ref None in
-          upon (Mina_net2.Validation_callback.await vc) (fun outcome ->
-              resolved := outcome ) ;
+          Mina_net2.Validation_callback.set_on_resolve vc (fun outcome ->
+              resolved := Some outcome ) ;
           let%bind () =
             handle (`Block (incoming_block breadcrumb), `Valid_cb (Some vc))
           in
@@ -393,7 +393,7 @@ let%test_module "Transition_handler.Validator tests" =
                     State_hash.With_state_hashes.state_hash
                       (fst (Envelope.Incoming.data h)) ) ) )
 
-    type resolution = [ `Accept | `Reject | `Ignore ] option
+    type resolution = [ `Accept | `Reject | `Ignore | `Expired ] option
     [@@deriving compare, sexp]
 
     let%test_unit "A block already in the frontier is ignored" =
