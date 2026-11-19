@@ -2,9 +2,14 @@ open Async_kernel
 
 type 'event t = 'event Pipe.Writer.t
 
-let create ~handle =
+let create ?trace_as_name ~handle () =
   let reader, writer = Pipe.create () in
-  don't_wait_for (Pipe.iter_without_pushback reader ~f:handle) ;
+  let run_loop () = Pipe.iter_without_pushback reader ~f:handle in
+  ( match trace_as_name with
+  | None ->
+      don't_wait_for (run_loop ())
+  | Some name ->
+      O1trace.background_thread name run_loop ) ;
   writer
 
 let submit = Pipe.write_without_pushback
@@ -18,7 +23,7 @@ let%test_module "Event_loop" =
           let handled = ref [] in
           let loop_ref = ref None in
           let loop =
-            create ~handle:(fun event ->
+            create () ~handle:(fun event ->
                 handled := event :: !handled ;
                 (* Handling 1 submits 4, which runs after those already
                    queued. *)
