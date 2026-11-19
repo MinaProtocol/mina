@@ -11,6 +11,7 @@
   async_unix
   ppx_inline_test.config
   ;; local libraries
+  o1trace
   pipe_lib)
  (instrumentation
   (backend bisect_ppx))
