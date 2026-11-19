@@ -6,6 +6,12 @@
   core
   ;; local libraries
   block_time
+  consensus
+  currency
+  mina_base
+  mina_numbers
+  signature_lib
+  snark_params
   vrf_evaluator)
  (instrumentation
   (backend bisect_ppx))
