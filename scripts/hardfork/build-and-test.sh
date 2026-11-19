@@ -56,6 +56,11 @@ export MINA_PROFILE="devnet"
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
+# nixpkgs fetchurl passes NIX_CURL_FLAGS to curl. Its default `--retry 3` only
+# covers timeouts and 5xx: a connection reset, which the Hetzner agents get
+# from GitHub now and then, fails the source download and the build at once.
+export NIX_CURL_FLAGS="--retry-all-errors --retry 5 --retry-delay 10"
+
 if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then
   echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
   echo "Configuring the NAR signing secret"
@@ -82,6 +87,22 @@ EOF
   chmod +x /tmp/nix-post-build
   NIX_POST_BUILD_HOOK=/tmp/nix-post-build
 fi
+
+# Push the paths built so far to the storage box cache (zstd: xz is far
+# slower). Also runs when a build step fails, so the sources fetched before the
+# failure are cached and the next attempt does not download them again. Pushes
+# once: outputs built after the explicit push stay out of the cache.
+# /tmp/nix-paths is absent when everything came from the cache.
+CACHE_PUSHED=0
+push_cache() {
+  if [[ "$CACHE_PUSHED" == 0 && -d "${NIX_STORAGEBOX_CACHE%/*}" && -s /tmp/nix-paths ]]; then
+    nix "${NIX_OPTS[@]}" copy \
+      --to "file://${NIX_STORAGEBOX_CACHE}?compression=zstd" \
+      --stdin </tmp/nix-paths
+  fi
+  CACHE_PUSHED=1
+}
+trap push_cache ERR
 
 if [[ -n "${NIX_POST_BUILD_HOOK:-}" ]]; then
   NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
@@ -130,13 +151,8 @@ git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Push what was built to the storage box cache (zstd: xz is far slower).
-# /tmp/nix-paths is absent when everything came from the cache.
-if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" && -s /tmp/nix-paths ]]; then
-  nix "${NIX_OPTS[@]}" copy \
-    --to "file://${NIX_STORAGEBOX_CACHE}?compression=zstd" \
-    --stdin </tmp/nix-paths
-fi
+# 2. Push what was built to the storage box cache.
+push_cache
 
 # 3. Build the commit under test as the postfork build, and hardfork_test.
 # The postfork daemon must come from the commit under test, not from a fixed
