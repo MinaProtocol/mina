@@ -4,8 +4,8 @@
 # 0. Prepare environment if needed
 # 1. Build PREFORK as a prefork build;
 # 2. Build "develop" branch as a postfork build
-# 3. Upload to nix cache, the reason for not uploading cache for following 2 
-# steps is that they change for each PR. 
+# 3. Push what was built to the nix cache on the storage box; the following 2
+# steps are not pushed because they change for each PR.
 # 4. Build hardfork_test on current branch;
 # 5. Execute hardfork_test on them.
 
@@ -56,14 +56,25 @@ export MINA_PROFILE="devnet"
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
+# nixpkgs fetchurl passes NIX_CURL_FLAGS to curl. Its default `--retry 3` only
+# covers timeouts and 5xx: a connection reset, which the Hetzner agents get
+# from GitHub now and then, fails the source download and the build at once.
+export NIX_CURL_FLAGS="--retry-all-errors --retry 5 --retry-delay 10"
+
 if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then
   echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
   echo "Configuring the NAR signing secret"
   NIX_SECRET_KEY=/tmp/nix-cache-secret
 fi
 
-if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
-  echo "GCP uploading configured (for nix binaries)"
+# Nix binary cache on the Hetzner storage box, mounted into the job container
+# (Cmds.dhall). Read through --extra-substituters; the post-build hook records
+# what this run builds so step 3 can push exactly that back. The public key in
+# flake.nix nixConfig covers the NARs signed with NIX_CACHE_NAR_SECRET.
+NIX_STORAGEBOX_CACHE="${NIX_STORAGEBOX_CACHE:-/var/storagebox/nix-cache}"
+if [[ -d "${NIX_STORAGEBOX_CACHE%/*}" ]]; then
+  echo "Nix cache on the storage box: $NIX_STORAGEBOX_CACHE"
+  NIX_OPTS+=( --extra-substituters "file://${NIX_STORAGEBOX_CACHE}" )
   cat <<'EOF'> /tmp/nix-post-build
 #!/bin/sh
 
@@ -76,6 +87,22 @@ EOF
   chmod +x /tmp/nix-post-build
   NIX_POST_BUILD_HOOK=/tmp/nix-post-build
 fi
+
+# Push the paths built so far to the storage box cache (zstd: xz is far
+# slower). Also runs when a build step fails, so the sources fetched before the
+# failure are cached and the next attempt does not download them again. Pushes
+# once: outputs built after the explicit push stay out of the cache.
+# /tmp/nix-paths is absent when everything came from the cache.
+CACHE_PUSHED=0
+push_cache() {
+  if [[ "$CACHE_PUSHED" == 0 && -d "${NIX_STORAGEBOX_CACHE%/*}" && -s /tmp/nix-paths ]]; then
+    nix "${NIX_OPTS[@]}" copy \
+      --to "file://${NIX_STORAGEBOX_CACHE}?compression=zstd" \
+      --stdin </tmp/nix-paths
+  fi
+  CACHE_PUSHED=1
+}
+trap push_cache ERR
 
 if [[ -n "${NIX_POST_BUILD_HOOK:-}" ]]; then
   NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
@@ -129,20 +156,8 @@ git checkout develop
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
-# 3. Upload to nix cache 
-
-if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
-  mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
-[default]
-aws_access_key_id=$NIX_CACHE_GCP_ID
-aws_secret_access_key=$NIX_CACHE_GCP_SECRET
-EOF
-
-  nix "${NIX_OPTS[@]}" copy \
-    --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" \
-    --stdin </tmp/nix-paths
-fi
+# 3. Push what was built to the storage box cache.
+push_cache
 
 # 4. Build hardfork_test on current branch;
 git checkout "$TEST_COMMIT"
