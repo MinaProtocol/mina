@@ -36,18 +36,18 @@
 --       mirror one and repoint the constant if Docker Hub pull limits start to bite
 { toolchainBase = "docker.io/minaprotocol/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:5778e28-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:dd78a94-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:52a8da4-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:dd78a94-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:5778e28-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:dd78a94-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:5778e28-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:dd78a94-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:5778e28-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:dd78a94-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:5778e28-bookworm-devnet"
+    "docker.io/minaprotocol/mina-toolchain:dd78a94-bookworm-devnet"
 , minaBaseBookworm =
     { amd64 = "docker.io/minaprotocol/mina-base:c4b61c7-bookworm-devnet"
     , arm64 = "docker.io/minaprotocol/mina-base:c4b61c7-bookworm-devnet-arm64"

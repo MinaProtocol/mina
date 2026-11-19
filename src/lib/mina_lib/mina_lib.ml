@@ -424,9 +424,9 @@ let get_node_state t =
     | None ->
         None
     | Some tf ->
-        Some
-          (Transition_frontier.Full_catchup_tree.to_node_status_report
-             (Transition_frontier.catchup_tree tf) )
+        Option.map
+          (Transition_frontier.catchup_tree tf)
+          ~f:Transition_frontier.Full_catchup_tree.to_node_status_report
   in
   let block_height_at_best_tip =
     best_tip t
