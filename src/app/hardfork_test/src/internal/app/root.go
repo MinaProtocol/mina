@@ -89,6 +89,22 @@ func init() {
 
 	rootCmd.Flags().Var(&cfg.ForkMethods, "allow-fork-method", "Implementation of fork to use")
 
+	// Archive and Rosetta across the fork (all optional; enabled by --pg-uri)
+	rootCmd.Flags().StringVar(&cfg.PgURI, "pg-uri", "", "PostgreSQL URI of the archive database (postgres://user:password@host:port/db). When set, both networks run an archive node in this database, and the test upgrades and repairs it across the fork and runs rosetta-cli against the fork network")
+	rootCmd.Flags().StringVar(&cfg.MainArchiveExe, "main-archive-exe", "", "Path to the main (pre-fork) archive executable")
+	rootCmd.Flags().StringVar(&cfg.MainArchiveSchema, "main-archive-schema", "", "Path to the create_schema.sql of the main (pre-fork) version")
+	rootCmd.Flags().StringVar(&cfg.ForkArchiveExe, "fork-archive-exe", "", "Path to the fork archive executable")
+	rootCmd.Flags().StringVar(&cfg.ForkArchiveUpgradeScript, "fork-archive-upgrade-script", "", "Path to the upgrade.sql of the fork version")
+	rootCmd.Flags().StringVar(&cfg.ForkArchiveToolboxExe, "fork-archive-toolbox-exe", "", "Path to the fork archive hardfork toolbox executable")
+	rootCmd.Flags().StringVar(&cfg.ForkRosettaExe, "fork-rosetta-exe", "", "Path to the fork Rosetta executable")
+	rootCmd.Flags().StringVar(&cfg.ForkSignerExe, "fork-signer-exe", "", "Path to the fork mina-ocaml-signer executable")
+	rootCmd.Flags().StringVar(&cfg.RosettaCliExe, "rosetta-cli-exe", "", "Path to the rosetta-cli executable")
+	rootCmd.Flags().StringVar(&cfg.RosettaCliConfigDir, "rosetta-cli-config-dir", "", "Directory with the rosetta-cli config.json and mina.ros templates")
+	rootCmd.Flags().IntVar(&cfg.ArchivePort, "archive-port", cfg.ArchivePort, "Archive node server port")
+	rootCmd.Flags().IntVar(&cfg.RosettaPort, "rosetta-port", cfg.RosettaPort, "Rosetta server port of the fork network")
+	rootCmd.Flags().IntVar(&cfg.ArchiveWaitMinutes, "archive-wait", cfg.ArchiveWaitMinutes, "Minutes to wait for the fork genesis block in the archive")
+	rootCmd.Flags().IntVar(&cfg.RosettaCheckTimeoutMinutes, "rosetta-check-timeout", cfg.RosettaCheckTimeoutMinutes, "Timeout in minutes of each rosetta-cli check")
+
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")
 	rootCmd.MarkFlagRequired("fork-mina-exe")

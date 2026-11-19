@@ -374,9 +374,11 @@ let
             src/app/rosetta/rosetta.exe \
             src/app/rosetta/rosetta_testnet_signatures.exe \
             src/app/rosetta/rosetta_mainnet_signatures.exe \
+            src/app/rosetta/ocaml-signer/signer.exe \
             src/app/generate_keypair/generate_keypair.exe \
             src/app/archive/archive.exe \
             src/app/archive_blocks/archive_blocks.exe \
+            src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
             src/app/extract_blocks/extract_blocks.exe \
             src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
             src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
@@ -407,6 +409,7 @@ let
           cp src/app/cli/src/mina.exe $out/bin/mina
           cp src/app/logproc/logproc.exe $out/bin/logproc
           cp src/app/rosetta/rosetta.exe $out/bin/rosetta
+          cp src/app/rosetta/ocaml-signer/signer.exe $out/bin/mina-ocaml-signer
           cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $out/bin/runtime_genesis_ledger
@@ -417,6 +420,7 @@ let
           cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           cp src/app/archive/archive.exe $archive/bin/mina-archive
           cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
+          cp src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe $archive/bin/mina-archive-hardfork-toolbox
           cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
           cp src/app/missing_blocks_guardian/missing_blocks_guardian.exe $archive/bin/mina-missing-blocks-guardian
           cp src/app/replayer/replayer.exe $archive/bin/mina-replayer

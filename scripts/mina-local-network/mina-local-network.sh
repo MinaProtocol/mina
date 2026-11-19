@@ -55,6 +55,8 @@ PG_PASSWD=${PG_PW:-""}
 PG_DB=${PG_DB:-archive}
 PG_HOST=${PG_HOST:-localhost}
 PG_PORT=${PG_PORT:-5432}
+PG_SCHEMA_FILE=./src/app/archive/create_schema.sql
+ARCHIVE_CONFIG_FILE=
 
 DEMO_MODE=false
 SLOT_TX_END=
@@ -135,6 +137,10 @@ help() {
                                          |   Default: <empty_string>
 -pd  |--pg-db <db>                       | PostgreSQL database name
                                          |   Default: ${PG_DB}
+-psf |--pg-schema-file <path>            | SQL file that creates the archive schema when the database is recreated (not in inherit config mode)
+                                         |   Default: ${PG_SCHEMA_FILE}
+-acf |--archive-config-file <path>       | Runtime config file given to the Archive Node (--config-file)
+                                         |   Default: the network daemon.json
 -vt  |--value-transfer-txns              | Whether to execute periodic value transfer transactions (presence of argument)
                                          |   Default: ${VALUE_TRANSFERS}
 -zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)
@@ -256,6 +262,14 @@ on-exit() {
       if [[ -n "${SEED_PID}" ]]; then
         stop-node "seed" "$SEED_START_PORT"
       fi
+
+      # 4. stop the archive node last, so it receives the last blocks.
+      if [[ -n "${ARCHIVE_PID}" ]]; then
+        echo "Stopping archive (pid ${ARCHIVE_PID})"
+        kill "$ARCHIVE_PID"
+        # The archive exits with a non-zero status on SIGTERM; that is expected.
+        wait "$ARCHIVE_PID" || echo "Archive exited with status $?"
+      fi
       ;;
     kill_snark_workers)
       # NOTE: SNARK workers are already killed out of this case-statement. Hence
@@ -362,7 +376,7 @@ exec-snark-worker() {
 exec-archive-node() {
   # shellcheck disable=SC2068
   exec ${ARCHIVE_EXE} run \
-    --config-file "${CONFIG}" \
+    --config-file "${ARCHIVE_CONFIG_FILE:-${CONFIG}}" \
     --log-level "${LOG_LEVEL}" \
     --postgres-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
     --server-port "${ARCHIVE_SERVER_PORT}" \
@@ -373,7 +387,7 @@ exec-rosetta-node() {
   # shellcheck disable=SC2068
   MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE} exec ${ROSETTA_EXE} \
     --archive-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
-    --graphql-uri $((SEED_START_PORT + 1)) \
+    --graphql-uri "http://127.0.0.1:$((SEED_START_PORT + 1))/graphql" \
     --port "${ROSETTA_PORT}" \
     --log-level "${LOG_LEVEL}" \
     $@
@@ -490,8 +504,10 @@ recreate-schema() {
 
   # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
-  pushd ./src/app/archive
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < create_schema.sql
+  local schema_file
+  schema_file="$(realpath "${PG_SCHEMA_FILE}")"
+  pushd "$(dirname "${schema_file}")"
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < "${schema_file}"
   popd
 
   echo "Schema '${PG_DB}' created successfully."
@@ -608,6 +624,14 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -pd | --pg-db)
     PG_DB="${2}"
+    shift
+    ;;
+  -psf | --pg-schema-file)
+    PG_SCHEMA_FILE="${2}"
+    shift
+    ;;
+  -acf | --archive-config-file)
+    ARCHIVE_CONFIG_FILE="${2}"
     shift
     ;;
   -vt | --value-transfer-txns) VALUE_TRANSFERS=true ;;
@@ -1010,23 +1034,6 @@ if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
   ARCHIVE_PID=$!
 fi
 
-if [[ -n "${ROSETTA_PORT}" ]]; then
-  if [[ -z "${ARCHIVE_SERVER_PORT}" ]]; then
-    echo "Rosetta server requires Archive node to be running!"
-    printf "\n"
-
-    exit 1
-  fi
-
-  echo 'Starting the Rosetta server...'
-  printf "\n"
-
-  mkdir -p "${NODES_FOLDER}"/rosetta
-
-  spawn-rosetta-server "${NODES_FOLDER}"/rosetta
-  ROSETTA_PID=$!
-fi
-
 # ----------
 
 SEED_PEER_ID=
@@ -1070,6 +1077,31 @@ case "${SEED}" in
     ;;
 esac
 printf "$SEED_PEER_ID" > "${ROOT}/seed_peer_id.txt"
+
+#---------- Starting Rosetta
+
+# Rosetta reads the GraphQL API of the seed, so it starts after the seed is up.
+if [[ -n "${ROSETTA_PORT}" ]]; then
+  if [[ -z "${ARCHIVE_SERVER_PORT}" ]]; then
+    echo "Rosetta server requires Archive node to be running!"
+    printf "\n"
+
+    exit 1
+  fi
+
+  if [[ -z "${SEED_START_PORT}" ]]; then
+    echo "Rosetta server requires a seed spawned by this script (--seed spawn:PORT)!" >&2
+    exit 1
+  fi
+
+  echo 'Starting the Rosetta server...'
+  printf "\n"
+
+  mkdir -p "${NODES_FOLDER}"/rosetta
+
+  spawn-rosetta-server "${NODES_FOLDER}"/rosetta
+  ROSETTA_PID=$!
+fi
 
 #---------- Starting snark coordinator
 
