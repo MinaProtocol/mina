@@ -697,7 +697,18 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         transition_error_msg_prefix transition_reason_for_failure ;
       return ()
   | Error (`Fatal_error e) ->
-      exn_breadcrumb (Error.tag ~tag:"Fatal error" (Error.of_exn e))
+      let msg : (_, unit, string, unit) format4 =
+        "Unable to build breadcrumb from produced transition: an exception was \
+         raised: $error"
+      in
+      let metadata =
+        [ ("error", Error_json.error_to_yojson (Error.of_exn e)) ]
+      in
+      [%log error] ~metadata msg ;
+      [%log' debug rejected_blocks_logger]
+        ~metadata:([ time_metadata; state_metadata ] @ metadata)
+        msg ;
+      return ()
   | Error (`Invalid_staged_ledger_hash e) ->
       exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
   | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
