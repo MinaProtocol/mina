@@ -249,7 +249,6 @@
             };
         in {
           steps = flakeSteps {
-            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
               agents = [ "nix" ];
