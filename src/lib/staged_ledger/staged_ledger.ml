@@ -2722,6 +2722,12 @@ let%test_module "staged ledger tests" =
                       .state_body_hash |> Option.value_exn )
                 ~signature_kind sl cmds_this_iter stmt_to_work
             in
+            [%test_eq: string]
+              (Bin_prot.Writer.to_string Sl.Scan_state.bin_writer_stable
+                 !sl.scan_state )
+              (Binable.to_string
+                 (module Sl.Scan_state.Stable.Latest)
+                 (Sl.Scan_state.read_all_proofs_from_disk !sl.scan_state) ) ;
             List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
                 match With_status.status c with
                 | Applied ->

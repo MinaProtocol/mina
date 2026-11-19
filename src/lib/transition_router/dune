@@ -9,6 +9,7 @@
   (pps mina_ppx))
  (libraries
   ;; opam libraries
+  ppx_inline_test.config
   integers
   base.caml
   async_kernel
@@ -16,7 +17,6 @@
   core
   async
   sexplib0
-  ppx_inline_test.config
   ;; local libraries
   bootstrap_status
   best_tip_prover
@@ -54,4 +54,7 @@
   ledger_catchup
   data_hash_lib
   mina_wire_types
-  internal_tracing))
+  internal_tracing
+  verifier
+  proof_cache_tag
+  mina_signature_kind))
