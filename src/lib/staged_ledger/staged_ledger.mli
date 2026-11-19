@@ -141,6 +141,9 @@ module Scan_state : sig
     -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+  (** See [Transaction_snark_scan_state.bin_writer_stable]. *)
+  val bin_writer_stable : t Bin_prot.Type_class.writer
 end
 
 module Pre_diff_info : Pre_diff_info.S
