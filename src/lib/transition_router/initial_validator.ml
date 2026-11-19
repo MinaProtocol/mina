@@ -11,6 +11,7 @@ type validation_error =
   | `Invalid_genesis_protocol_state
   | `Invalid_proof of Error.t
   | `Invalid_delta_block_chain_proof
+  | `Invalid_body_reference
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
   | `Invalid_protocol_version ]
@@ -56,6 +57,8 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ]
     | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
+    | `Invalid_body_reference ->
+        [ ("reason", `String "invalid body reference") ]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
         ; ("error", Error_json.error_to_yojson err)
@@ -105,6 +108,10 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         , time_received
         , `Invalid_delta_transition_chain_proof ) ;
       punish Sent_invalid_transition_chain_merkle_proof None
+  | `Invalid_body_reference ->
+      Queue.enqueue Transition_frontier.rejected_blocks
+        (state_hash, sender, time_received, `Invalid_body_reference) ;
+      punish Gossiped_invalid_transition None
   | `Invalid_time_received `Too_early ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_early) ;
       Queue.enqueue Transition_frontier.rejected_blocks
@@ -274,6 +281,20 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
               Interruptible.lift Deferred.unit
                 (Mina_net2.Validation_callback.await_timeout valid_cb)
             in
+            let validate_body_reference verified_header =
+              let matches =
+                match b_or_h with
+                | `Block b_env ->
+                    let block = Envelope.Incoming.data b_env in
+                    Validation.body_matches_reference
+                      ~header:(Mina_block.Stable.Latest.header block)
+                      (Mina_block.Stable.Latest.body block)
+                | `Header _ ->
+                    true
+              in
+              if matches then Ok verified_header
+              else Error `Invalid_body_reference
+            in
             match%bind
               let open Interruptible.Result.Let_syntax in
               Validation.(
@@ -284,7 +305,8 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
                 >>= Fn.compose Interruptible.uninterruptible
                       (validate_single_proof ~verifier ~genesis_state_hash)
                 >>= defer validate_delta_block_chain
-                >>= defer validate_protocol_versions)
+                >>= defer validate_protocol_versions
+                >>= defer validate_body_reference)
             with
             | Ok verified_header ->
                 [%log internal] "Initial_validation_done" ;
@@ -353,3 +375,181 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
       else (
         Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb `Ignore ;
         Deferred.Result.fail () ) )
+
+let%test_module "Initial validation of block bodies" =
+  ( module struct
+    let logger = Logger.null ()
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.For_tests.default
+            ~constraint_constants:precomputed_values.constraint_constants
+            ~logger ~proof_level:precomputed_values.proof_level () )
+
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = precomputed_values.constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
+
+    (* A frontier holding just a root, and a chain of two blocks on it. *)
+    let gen_frontier_and_chain =
+      Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+        ~verifier ~max_length:3 ~frontier_size:1 ~branch_size:2 ()
+
+    let peer =
+      Peer.create
+        (Core.Unix.Inet_addr.of_string "1.2.3.4")
+        ~libp2p_port:8302
+        ~peer_id:(Peer.Id.unsafe_of_string "test-peer")
+
+    type answer = [ `Accept | `Reject | `Ignore ] option
+    [@@deriving compare, sexp]
+
+    type result =
+      { answers : answer list
+      ; passed_on : State_hash.t list
+      ; penalised : Peer.t list
+      ; rejected_for_body : (State_hash.t * Envelope.Sender.t) list
+      }
+    [@@deriving compare, sexp]
+
+    (* Validate each block in [blocks] as gossiped by [peer], in order, handing
+       each one that passes to the transition handler's validator over
+       [frontier]. *)
+    let process frontier blocks =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Queue.clear Transition_frontier.rejected_blocks ;
+          let trust_system = Trust_system.null () in
+          Pipe_lib.Strict_pipe.Reader.iter_without_pushback
+            (Trust_system.upcall_pipe trust_system)
+            ~f:ignore
+          |> don't_wait_for ;
+          let actions = Trust_system.For_tests.get_action_pipe trust_system in
+          let initialization_finish_signal = Ivar.create () in
+          Ivar.fill initialization_finish_signal () ;
+          let validate =
+            unstage
+              (validate ~signature_kind:Mina_signature_kind.Testnet
+                 ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+                 ~logger ~trust_system ~verifier ~initialization_finish_signal
+                 ~precomputed_values )
+          in
+          let passed_on = ref [] in
+          let on_valid (b_or_h, `Valid_cb _) =
+            let state_hash =
+              match b_or_h with
+              | `Block cached ->
+                  Cache_lib.Cached.invalidate_with_failure cached
+                  |> Envelope.Incoming.data
+                  |> Mina_block.Validation.block_with_hash
+                  |> State_hash.With_state_hashes.state_hash
+              | `Header h ->
+                  State_hash.With_state_hashes.state_hash
+                    (fst (Envelope.Incoming.data h))
+            in
+            passed_on := state_hash :: !passed_on
+          in
+          let handle =
+            Transition_handler.Validator.create_handler
+              ~context:(module Context)
+              ~trust_system
+              ~time_controller:(Block_time.Controller.basic ~logger)
+              ~frontier ~on_valid
+              ~block_registry:
+                (Transition_handler.Block_registry.create ~logger
+                   ~cache_exceptions:false )
+          in
+          let%map answers =
+            Deferred.List.map blocks ~how:`Sequential ~f:(fun block ->
+                let valid_cb =
+                  Mina_net2.Validation_callback.create_without_expiration ()
+                in
+                let answer = ref None in
+                upon (Mina_net2.Validation_callback.await valid_cb) (fun a ->
+                    answer := a ) ;
+                (* The start of the block's slot. *)
+                let time_received =
+                  Mina_block.Stable.Latest.header block
+                  |> Header.protocol_state |> Protocol_state.consensus_state
+                  |> Consensus.Data.Consensus_state.consensus_time
+                  |> Consensus.Data.Consensus_time.start_time
+                       ~constants:precomputed_values.consensus_constants
+                in
+                let%bind () =
+                  match%bind
+                    validate
+                      ~b_or_h:
+                        (`Block
+                          (Envelope.Incoming.wrap ~data:block
+                             ~sender:(Envelope.Sender.Remote peer) ) )
+                      ~time_received ~valid_cb
+                  with
+                  | Ok (b_or_h, `Valid_cb vc) ->
+                      handle (b_or_h, `Valid_cb (Some vc))
+                  | Error () ->
+                      Deferred.unit
+                in
+                let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+                !answer )
+          in
+          let penalised =
+            match Pipe.read_now' actions with
+            | `Ok actions ->
+                Queue.to_list actions
+                |> List.filter_map ~f:(function
+                     | (Trust_system.Actions.Gossiped_invalid_transition, _), p
+                       ->
+                         Some p
+                     | _ ->
+                         None )
+            | `Eof | `Nothing_available ->
+                []
+          in
+          let rejected_for_body =
+            Queue.to_list Transition_frontier.rejected_blocks
+            |> List.map ~f:(fun (state_hash, sender, _, reason) ->
+                   match reason with
+                   | `Invalid_body_reference ->
+                       (state_hash, sender)
+                   | _ ->
+                       failwith "Block rejected for another reason" )
+          in
+          { answers
+          ; passed_on = List.rev !passed_on
+          ; penalised
+          ; rejected_for_body
+          } )
+
+    let%test_unit "A block is passed on after a copy whose body does not match \
+                   its header" =
+      Quickcheck.test ~trials:1 gen_frontier_and_chain
+        ~f:(fun (frontier, chain) ->
+          let[@warning "-8"] [ first; second ] =
+            List.map chain ~f:Transition_frontier.Breadcrumb.block
+          in
+          let state_hash =
+            Mina_block.(header first |> Header.protocol_state)
+            |> Protocol_state.hashes |> State_hash.State_hashes.state_hash
+          in
+          let real = Mina_block.read_all_proofs_from_disk first in
+          (* The first block's header, carrying the second block's body. *)
+          let fake =
+            Mina_block.create ~header:(Mina_block.header first)
+              ~body:(Mina_block.body second)
+            |> Mina_block.read_all_proofs_from_disk
+          in
+          [%test_eq: result]
+            (process frontier [ fake; real ])
+            { answers = [ Some `Reject; None ]
+            ; passed_on = [ state_hash ]
+            ; penalised = [ peer ]
+            ; rejected_for_body = [ (state_hash, Remote peer) ]
+            } )
+  end )
