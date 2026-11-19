@@ -45,6 +45,7 @@
   mina_wire_types
   network_pool
   node_error_service
+  one_or_two
   o1trace
   otp_lib
   pasta_bindings
@@ -62,6 +63,7 @@
   staged_ledger_diff
   transaction_snark
   transaction_snark_scan_state
+  transaction_snark_work
   transition_chain_prover
   transition_frontier
   transition_frontier_base

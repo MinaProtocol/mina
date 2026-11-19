@@ -22,3 +22,7 @@ val fire_if_not_already_fired : t -> validation_result -> unit
 
 val set_message_type :
   t -> [ `Unknown | `Block | `Snark_work | `Transaction ] -> unit
+
+(** Call [f] once with how this callback resolves: with its first firing, or
+    with [`Expired] if it expires unfired. *)
+val set_on_resolve : t -> ([ validation_result | `Expired ] -> unit) -> unit

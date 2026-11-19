@@ -70,7 +70,7 @@ module Root_transition = struct
     | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
 
   type 'repr t =
-    { new_root : Root_data.Limited.Stable.Latest.t
+    { new_root : Root_data.Limited.t
     ; garbage : 'repr Node_list.t
     ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
@@ -96,47 +96,10 @@ module Root_transition = struct
   end
 
   module Lite = struct
-    module Binable_arg = struct
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
-
-        module V5 = struct
-          type t = Lite_binable.Stable.V5.t
-
-          let to_latest = Fn.id
-        end
-      end]
-    end
-
-    [%%versioned_binable
+    [%%versioned
     module Stable = struct
       module V5 = struct
-        type t = lite root_transition
-
-        module T_nonbinable = struct
-          type nonrec t = t
-
-          let to_binable
-              ({ new_root
-               ; garbage
-               ; just_emitted_a_proof
-               ; old_root_scan_state = Lite
-               } :
-                t ) : Binable_arg.Stable.V5.t =
-            { new_root; garbage; just_emitted_a_proof }
-
-          let of_binable
-              ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V5.t ) : t =
-            { new_root
-            ; garbage
-            ; old_root_scan_state = Lite
-            ; just_emitted_a_proof
-            }
-        end
-
-        include Binable.Of_binable (Binable_arg.Stable.V5) (T_nonbinable)
+        type t = Lite_binable.Stable.V5.t
 
         let to_latest = Fn.id
       end
@@ -178,7 +141,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
         `Assoc
           [ ( "new_root"
             , State_hash.to_yojson
-                (Root_data.Limited.Stable.Latest.hashes new_root).state_hash )
+                (Root_data.Limited.hashes new_root).state_hash )
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
           ]
