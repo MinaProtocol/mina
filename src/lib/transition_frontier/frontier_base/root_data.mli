@@ -13,6 +13,10 @@ module Common : sig
   type t
 
   val read_all_proofs_from_disk : t -> Stable.V3.t
+
+  (** Writes the same bytes as serializing [read_all_proofs_from_disk t], using
+      [Staged_ledger.Scan_state.bin_writer_stable] for the scan state. *)
+  val bin_writer_stable : t Bin_prot.Type_class.writer
 end
 
 (* Historical root data is similar to Limited root data, except that it also
