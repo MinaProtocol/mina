@@ -135,12 +135,20 @@ let write_graph (_ : t) =
 let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
+  let block = With_hash.data b in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
+  let%bind () =
+    Result.ok_if_true
+      (body_matches_reference ~header:(Mina_block.header block)
+         (Staged_ledger_diff.Body.read_all_proofs_from_disk
+            (Mina_block.body block) ) )
+      ~error:`Invalid_body_reference
+  in
   Mina_block.Validation.skip_time_received_validation
     `This_block_was_not_received_via_gossip h
   |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
-  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+  >>| Fn.flip with_body (Mina_block.body block)
 
 let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   let open Mina_block.Validation in
@@ -252,6 +260,16 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
           , Some ("invalid delta transition chain witness", []) )
       in
       Error (Error.of_string "invalid delta transition chain witness")
+  | Error `Invalid_body_reference ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: invalid body reference" ;
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Gossiped_invalid_transition
+          , Some ("invalid body reference", []) )
+      in
+      Error (Error.of_string "invalid body reference")
   | Error `Invalid_protocol_version ->
       [%log warn]
         ~metadata:[ ("state_hash", state_hash) ]
@@ -1337,6 +1355,25 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               [%log debug] "Succeeded in using cache." ;
               Deferred.Result.return res
         in
+        let release_forest () =
+          List.iter forest ~f:(fun subtree ->
+              Mina_stdlib.Rose_tree.iter subtree ~f:(fun node ->
+                  (* TODO consider rejecting the callback in some cases,
+                     see https://github.com/MinaProtocol/mina/issues/11087 *)
+                  Transition_handler.Block_registry.finish block_registry node
+                    `Ignored ) )
+        in
+        let attach_hash = function
+          | `Breadcrumb b ->
+              Breadcrumb.state_hash b
+          | `Node (node : Node.t) ->
+              node.state_hash
+        in
+        let attached root =
+          let h = attach_hash root in
+          Hashtbl.mem t.nodes h
+          || Option.is_some (Transition_frontier.find frontier h)
+        in
         match%map state_hashes with
         | Error errors ->
             [%log debug]
@@ -1386,12 +1423,14 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                   Mina_metrics.(
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
-            List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun node ->
-                    (* TODO consider rejecting the callback in some cases,
-                       see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Transition_handler.Block_registry.finish block_registry node
-                      `Ignored ) )
+            release_forest ()
+        | Ok (root, _) when not (attached root) ->
+            [%log debug]
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson (attach_hash root)) ]
+              "Catchup job's attach block $state_hash left the frontier before \
+               its nodes were created" ;
+            release_forest ()
         | Ok (root, state_hashes) ->
             [%log' debug t.logger]
               ~metadata:

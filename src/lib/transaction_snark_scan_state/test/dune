@@ -1,0 +1,25 @@
+(library
+ (name test_transaction_snark_scan_state)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  async
+  async_unix
+  core
+  core_kernel
+  ;; local libraries
+  disk_cache.lmdb
+  ledger_proof
+  logger
+  mina_base
+  mina_state
+  mina_stdlib_unix
+  pickles
+  proof_cache_tag
+  transaction_snark_scan_state
+  with_hash)
+ (preprocess
+  (pps mina_ppx))
+ (instrumentation
+  (backend bisect_ppx)))

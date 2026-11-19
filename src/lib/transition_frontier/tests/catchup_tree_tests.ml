@@ -105,4 +105,45 @@ let%test_module "Tracking the blocks the frontier adds" =
                 true
             | Some (Error _) | None ->
                 false ) )
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.For_tests.default
+            ~constraint_constants:precomputed_values.constraint_constants
+            ~logger:(Logger.null ()) ~proof_level:precomputed_values.proof_level
+            () )
+
+    let%test_unit "A node on a frontier block stays until the block leaves" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length:2 ~frontier_size:0 ~branch_size:7 () )
+        ~f:(fun (frontier, chain) ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let open Async_kernel.Deferred.Let_syntax in
+              let held, added = List.split_n chain 2 in
+              let%bind () =
+                Async_kernel.Deferred.List.iter held
+                  ~f:(Transition_frontier.add_breadcrumb_exn frontier)
+              in
+              let t = Tree.create ~logger:(Logger.null ()) ~release in
+              Transition_frontier.attach_catchup_tree frontier t ;
+              let parent =
+                Transition_frontier.Breadcrumb.state_hash (List.last_exn held)
+              in
+              let (_ : Tree.Node.t) =
+                downloading t (hash "catching up") ~parent
+              in
+              let%map () =
+                Async_kernel.Deferred.List.iter added ~f:(fun breadcrumb ->
+                    let%map () =
+                      Transition_frontier.add_breadcrumb_exn frontier breadcrumb
+                    in
+                    [%test_eq: bool]
+                      (Hashtbl.mem t.nodes (hash "catching up"))
+                      (Option.is_some
+                         (Transition_frontier.find frontier parent) ) )
+              in
+              assert (Option.is_none (Transition_frontier.find frontier parent)) ) )
   end )
