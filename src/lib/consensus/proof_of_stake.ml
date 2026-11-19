@@ -3892,6 +3892,62 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Fn.non ([%equal: (string * int) option] all))
           stopped
 
+      let%test_unit "Vrf.check_delegators returns the best win across all \
+                     producers" =
+        let seed = Epoch_seed.of_hash Snark_params.Tick.Field.one in
+        let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int 1 in
+        let total_stake = Amount.of_mina_int_exn 1_000 in
+        let producer_private_keys =
+          Lazy.force Genesis_ledger.accounts
+          |> List.filter_map ~f:fst |> Fn.flip List.take 2
+          |> List.zip_exn [ "first"; "second" ]
+        in
+        let delegators =
+          List.init 10 ~f:(fun delegator ->
+              ( (if delegator < 5 then "first" else "second")
+              , delegator
+              , Account.create
+                  (Account_id.create Public_key.Compressed.empty
+                     Token_id.default )
+                  (Balance.of_mina_int_exn 1_000) ) )
+        in
+        let check delegators =
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Interruptible.force
+                (Vrf.check_delegators
+                   ~context:(module Context)
+                   ~should_stop:(fun () -> false)
+                   ~global_slot ~seed ~total_stake
+                   ~producer_private_key:
+                     (List.Assoc.find_exn producer_private_keys
+                        ~equal:String.equal )
+                   delegators ) )
+          |> Result.ok_exn
+          |> Option.map
+               ~f:(fun
+                    ( `Vrf_eval vrf_eval
+                    , _
+                    , `Delegator (_, delegator)
+                    , `Producer producer )
+                  -> (vrf_eval, producer, delegator) )
+        in
+        let wins =
+          List.filter_map delegators ~f:(fun delegator -> check [ delegator ])
+        in
+        let best =
+          List.max_elt wins ~compare:(fun (vrf_eval1, _, _) (vrf_eval2, _, _) ->
+              String.compare vrf_eval1 vrf_eval2 )
+        in
+        [%test_pred: (string * string * int) list]
+          (List.exists ~f:(fun (_, producer, _) ->
+               String.equal producer "first" ) )
+          wins ;
+        [%test_pred: (string * string * int) option]
+          (Option.exists ~f:(fun (_, producer, _) ->
+               String.equal producer "second" ) )
+          best ;
+        [%test_eq: (string * string * int) option] (check delegators) best
+
       (* Consensus selection tests. *)
 
       let sum_lengths = List.fold ~init:Length.zero ~f:Length.add
