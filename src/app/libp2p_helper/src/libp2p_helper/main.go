@@ -142,6 +142,7 @@ func main() {
 	decoder := capnp.NewDecoder(os.Stdin)
 
 	app := newApp()
+	app.closeHelperOnSignal()
 
 	app.NoMDNS = os.Getenv("LIBP2P_ENABLE_MDNS") != "true"
 	// Configure mDNS (local network peer discovery)
@@ -189,12 +190,14 @@ func main() {
 		rawMsg, err := decoder.Decode()
 		if err != nil {
 			helperLog.Errorf("Error decoding raw message: %s", err)
+			app.closeHelper()
 			os.Exit(2)
 			return
 		}
 		msg, err := ipc.ReadRootLibp2pHelperInterface_Message(rawMsg)
 		if err != nil {
 			helperLog.Errorf("Error decoding capnp message: %s", err)
+			app.closeHelper()
 			os.Exit(3)
 			return
 		}
