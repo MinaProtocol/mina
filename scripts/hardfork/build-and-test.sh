@@ -3,10 +3,8 @@
 # This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
 # 1. Build PREFORK as a prefork build;
-# 2. Upload to nix cache. Only the prefork build is cached: everything after
-# this point is built from the commit under test, so it changes for each PR.
-# 3. Build the commit under test as the postfork build, and hardfork_test;
-# 4. Execute hardfork_test on them.
+# 2. Build the commit under test as the postfork build, and hardfork_test;
+# 3. Execute hardfork_test on them.
 
 # Step 0. Prepare environment if needed
 set -eux -o pipefail
@@ -123,22 +121,7 @@ git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Upload to nix cache
-
-if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
-  mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
-[default]
-aws_access_key_id=$NIX_CACHE_GCP_ID
-aws_secret_access_key=$NIX_CACHE_GCP_SECRET
-EOF
-
-  nix "${NIX_OPTS[@]}" copy \
-    --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" \
-    --stdin </tmp/nix-paths
-fi
-
-# 3. Build the commit under test as the postfork build, and hardfork_test.
+# 2. Build the commit under test as the postfork build, and hardfork_test.
 # The postfork daemon must come from the commit under test, not from a fixed
 # branch: otherwise a PR that changes the postfork daemon -- such as a
 # protocol_version_transaction bump -- is never exercised by this job, and the
@@ -149,7 +132,7 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devne
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#mina-graphql-client" --out-link "mina-graphql-client"
 
-# 4. Execute hardfork_test on them.
+# 3. Execute hardfork_test on them.
 
 SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}      
 # WARN: ensure SLOT_CHAIN_END - SLOT_TX_END > k is always true!
