@@ -4,8 +4,10 @@
 
 type 'event t
 
-(** Start a loop that handles each submitted event with [handle]. *)
-val create : handle:('event -> unit) -> 'event t
+(** Start a loop that handles each submitted event with [handle], traced as
+    the o1trace thread [trace_as_name] if one is given. *)
+val create :
+  ?trace_as_name:string -> handle:('event -> unit) -> unit -> 'event t
 
 (** Queue [event] to be handled after every event already submitted. *)
 val submit : 'event t -> 'event -> unit

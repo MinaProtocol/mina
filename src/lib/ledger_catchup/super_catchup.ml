@@ -1483,7 +1483,7 @@ let%test_module "Resuming catchup nodes" =
     let resumed_by_queue f =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let resumed = ref [] in
-          let loop = Otp_lib.Event_loop.create ~handle:(fun run -> run ()) in
+          let loop = Otp_lib.Event_loop.create () ~handle:(fun run -> run ()) in
           f
             (create_resumption_queue ~schedule:(Otp_lib.Event_loop.submit loop))
             (fun i () -> resumed := i :: !resumed) ;
@@ -1642,7 +1642,7 @@ let%test_module "Ledger_catchup tests" =
                   ~get_completed_work:(Fn.const None) )
              ~schedule:
                (Otp_lib.Event_loop.submit
-                  (Otp_lib.Event_loop.create ~handle:(fun run -> run ())) )
+                  (Otp_lib.Event_loop.create () ~handle:(fun run -> run ())) )
          in
          Strict_pipe.Reader.iter_without_pushback catchup_job_reader
            ~f:process_catchup_job ) ;
