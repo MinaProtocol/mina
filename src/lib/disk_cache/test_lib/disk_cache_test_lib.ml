@@ -73,7 +73,15 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
 
     let proof_from_cache2 = Cache.get cache id2 in
     [%test_eq: string] proof2.proof proof_from_cache2.proof
-      ~message:"invalid proof from cache"
+      ~message:"invalid proof from cache" ;
+
+    List.iter
+      [ (proof1, id1); (proof2, id2) ]
+      ~f:(fun (proof, id) ->
+        [%test_eq: string]
+          (Binable.to_string (module Mock) proof)
+          (Bigstring.to_string (Cache.get_bin_prot cache id))
+          ~message:"invalid bin_prot serialization from cache" )
 
   let simple_write ?additional_checks () =
     Async.Thread_safe.block_on_async_exn
