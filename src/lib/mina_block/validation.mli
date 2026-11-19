@@ -368,6 +368,10 @@ val check_protocol_state :
   -> Protocol_state.Value.t
   -> unit Or_error.t
 
+(** Whether [body] is the body that [header] commits to. *)
+val body_matches_reference :
+  header:Header.t -> Staged_ledger_diff.Body.Stable.Latest.t -> bool
+
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> logger:Logger.t

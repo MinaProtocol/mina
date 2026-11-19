@@ -36,7 +36,11 @@
   yojson
   mina_net2
   libp2p_ipc
-  staged_ledger_diff)
+  staged_ledger_diff
+  cache_lib
+  network_peer
+  downloader
+  mina_numbers)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation
