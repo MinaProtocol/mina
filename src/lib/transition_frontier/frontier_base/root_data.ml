@@ -38,6 +38,19 @@ module Common = struct
     { Stable.Latest.pending_coinbase
     ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
     }
+
+  let bin_writer_stable : t Bin_prot.Type_class.writer =
+    let scan_state = Staged_ledger.Scan_state.bin_writer_stable in
+    let pending_coinbase = Pending_coinbase.Stable.V2.bin_writer_t in
+    { size =
+        (fun t ->
+          scan_state.size t.scan_state
+          + pending_coinbase.size t.pending_coinbase )
+    ; write =
+        (fun buf ~pos t ->
+          let pos = scan_state.write buf ~pos t.scan_state in
+          pending_coinbase.write buf ~pos t.pending_coinbase )
+    }
 end
 
 module Historical = struct
