@@ -23,6 +23,7 @@
   cache_lib
   mina_block
   o1trace
+  otp_lib
   pipe_lib
   mina_base
   transition_handler

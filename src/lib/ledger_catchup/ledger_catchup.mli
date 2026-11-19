@@ -25,7 +25,8 @@ end
 
 (** Set up catchup for [frontier], and return the function that handles one
     catchup job: the parent hash of a forest of blocks whose ancestry is
-    missing, and the forest. *)
+    missing, and the forest. Catchup resumes its waiting work by passing it to
+    [schedule], which must run what it is given one at a time, in order. *)
 val create_job_handler :
      context:(module CONTEXT)
   -> trust_system:Trust_system.t
@@ -43,6 +44,7 @@ val create_job_handler :
        Strict_pipe.Writer.t
   -> unprocessed_transition_cache:
        Transition_handler.Unprocessed_transition_cache.t
+  -> schedule:((unit -> unit) -> unit)
   -> (   State_hash.t
          * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
              , State_hash.t )
