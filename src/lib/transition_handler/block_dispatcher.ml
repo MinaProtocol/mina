@@ -36,7 +36,7 @@ let create ~on_validated =
   let cleared = ref false in
   let loop =
     O1trace.sync_thread "dispatch_blocks" (fun () ->
-        Otp_lib.Event_loop.create ~handle:(function
+        Otp_lib.Event_loop.create () ~handle:(function
           | Validated _ when !cleared ->
               ()
           | Validated transition ->
