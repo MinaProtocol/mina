@@ -1,0 +1,28 @@
+(tests
+ (names main)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  core_kernel
+  ;; local libraries
+  block_producer
+  currency
+  genesis_constants
+  ledger_proof
+  logger
+  mina_base
+  mina_ledger
+  mina_numbers
+  mina_signature_kind
+  mina_state
+  one_or_two
+  signature_lib
+  staged_ledger
+  staged_ledger_diff
+  transaction_snark_work)
+ (preprocess
+  (pps mina_ppx))
+ (instrumentation
+  (backend bisect_ppx)))

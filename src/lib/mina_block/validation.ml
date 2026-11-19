@@ -541,6 +541,14 @@ let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
           (Error.create "Protocol state differs from the expected state at"
              fields [%sexp_of: string list] )
 
+let body_matches_reference ~header body =
+  Blake2.equal
+    ( Header.protocol_state header
+    |> Protocol_state.blockchain_state |> Blockchain_state.body_reference )
+    (Staged_ledger_diff.Body.compute_reference
+       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+       body )
+
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
     ~parent_protocol_state ?transaction_pool_proxy (t, validation) =
@@ -562,16 +570,12 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         Deferred.Result.return
           (Blockchain_state.body_reference blockchain_state)
     | _ ->
-        let body_ref_from_header =
-          Blockchain_state.body_reference blockchain_state
-        in
-        let body_ref_computed =
-          Staged_ledger_diff.Body.compute_reference
-            ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-          @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
-        in
-        if Blake2.equal body_ref_computed body_ref_from_header then
-          Deferred.Result.return body_ref_computed
+        if
+          body_matches_reference ~header
+            (Staged_ledger_diff.Body.read_all_proofs_from_disk body)
+        then
+          Deferred.Result.return
+            (Blockchain_state.body_reference blockchain_state)
         else Deferred.Result.fail `Invalid_body_reference
   in
   let parent_body_hash =
