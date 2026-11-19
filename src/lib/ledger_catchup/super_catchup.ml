@@ -389,7 +389,7 @@ let try_to_connect_hash_chain t hashes ~frontier
       | Some node, None ->
           f (`Node node)
       | Some node, Some _ ->
-          finish t node ~is_error:false ;
+          block_added t node.state_hash ;
           f (`Node node)
       | None, Some b ->
           f (`Breadcrumb b)
@@ -727,24 +727,6 @@ let create_node ~logger ~downloader t x =
   let attempts = Attempt_history.empty in
   let state, h, blockchain_length, parent, result =
     match x with
-    | `Root root ->
-        let blockchain_length =
-          Breadcrumb.block root |> Mina_block.blockchain_length
-        in
-        Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
-        @@ fun () ->
-        [%log internal] "@block_metadata"
-          ~metadata:
-            [ ( "blockchain_length"
-              , Mina_numbers.Length.to_yojson blockchain_length )
-            ] ;
-        [%log internal] "Catchup_job_finished" ;
-        ( Node.State.Finished
-        , Breadcrumb.state_hash root
-        , Breadcrumb.consensus_state root
-          |> Consensus.Data.Consensus_state.blockchain_length
-        , Breadcrumb.parent_hash root
-        , Ivar.create_full (Ok `Added_to_frontier) )
     | `Hash (h, l, parent) ->
         Internal_tracing.with_state_hash h
         @@ fun () ->
@@ -950,22 +932,33 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         step node
-          (let parent = Hashtbl.find_exn t.nodes node.parent in
-           match%map.Async.Deferred Ivar.read parent.result with
-           | Ok `Added_to_frontier ->
-               Ok parent.state_hash
-           | Error _ ->
-               (* TODO consider rejecting the callback in some cases,
-                  see https://github.com/MinaProtocol/mina/issues/11087 *)
-               Option.value_map valid_cb ~default:ignore
-                 ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                 `Ignore ;
-               if not (Cached.was_consumed av) then
-                 ignore
-                   ( Cached.invalidate_with_failure av
-                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-               finish t node ~is_error:true ;
-               Error `Finished )
+          (let parent_failed () =
+             (* TODO consider rejecting the callback in some cases,
+                see https://github.com/MinaProtocol/mina/issues/11087 *)
+             Option.value_map valid_cb ~default:ignore
+               ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+               `Ignore ;
+             if not (Cached.was_consumed av) then
+               ignore
+                 ( Cached.invalidate_with_failure av
+                   : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+             finish t node ~is_error:true ;
+             Error `Finished
+           in
+           match Hashtbl.find t.nodes node.parent with
+           | Some parent -> (
+               match%map.Async.Deferred Ivar.read parent.result with
+               | Ok `Added_to_frontier ->
+                   Ok parent.state_hash
+               | Error _ ->
+                   parent_failed () )
+           | None ->
+               Deferred.return
+                 ( if
+                   Option.is_some
+                     (Transition_frontier.find frontier node.parent)
+                 then Ok node.parent
+                 else parent_failed () ) )
           ~f:(on_parent_added node (av, valid_cb))
     | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) ->
         [%log debug] "To_build_breadcrumb $state_hash %s callback"
@@ -1174,7 +1167,8 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let t = Transition_frontier.catchup_tree frontier in
+  let t = Transition_frontier.Full_catchup_tree.create ~logger in
+  Transition_frontier.attach_catchup_tree frontier t ;
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
@@ -1359,6 +1353,27 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
               [%log debug] "Succeeded in using cache." ;
               Deferred.Result.return res
         in
+        let release_forest () =
+          List.iter forest ~f:(fun subtree ->
+              Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
+                  (* TODO consider rejecting the callback in some cases,
+                     see https://github.com/MinaProtocol/mina/issues/11087 *)
+                  Option.value_map vc ~default:ignore
+                    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                    `Ignore ;
+                  ignore @@ Cached.invalidate_with_failure node ) )
+        in
+        let attach_hash = function
+          | `Breadcrumb b ->
+              Breadcrumb.state_hash b
+          | `Node (node : Node.t) ->
+              node.state_hash
+        in
+        let attached root =
+          let h = attach_hash root in
+          Hashtbl.mem t.nodes h
+          || Option.is_some (Transition_frontier.find frontier h)
+        in
         match%map state_hashes with
         | Error errors ->
             [%log debug]
@@ -1409,14 +1424,14 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                   Mina_metrics.(
                     Counter.inc Rejected_blocks.no_common_ancestor
                       (Float.of_int @@ (1 + List.length children_transitions))) ) ;
-            List.iter forest ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
-                    (* TODO consider rejecting the callback in some cases,
-                       see https://github.com/MinaProtocol/mina/issues/11087 *)
-                    Option.value_map vc ~default:ignore
-                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                      `Ignore ;
-                    ignore @@ Cached.invalidate_with_failure node ) )
+            release_forest ()
+        | Ok (root, _) when not (attached root) ->
+            [%log debug]
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson (attach_hash root)) ]
+              "Catchup job's attach block $state_hash left the frontier before \
+               its nodes were created" ;
+            release_forest ()
         | Ok (root, state_hashes) ->
             [%log' debug t.logger]
               ~metadata:
@@ -1430,16 +1445,15 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                            `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
                 ]
               "before entering state machine.  node_states: $node_states" ;
-            let root =
+            let anchor =
               match root with
               | `Breadcrumb root ->
-                  (* If we hit this case we should probably remove the parent from the
-                      table and prune, although in theory that should be handled by
-                     the frontier calling [Full_catchup_tree.apply_diffs]. *)
-                  create_node ~logger ~downloader t (`Root root)
-              | `Node node ->
+                  ( Breadcrumb.state_hash root
+                  , Breadcrumb.consensus_state root
+                    |> Consensus.Data.Consensus_state.blockchain_length )
+              | `Node (node : Node.t) ->
                   (* TODO: Log what is going on with transition frontier. *)
-                  node
+                  (node.state_hash, node.blockchain_length)
             in
             [%log debug]
               ~metadata:[ ("n", `Int (List.length state_hashes)) ]
@@ -1454,9 +1468,7 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
                      in
                      run_state_machine node ) ) ;
             ignore
-              ( List.fold state_hashes
-                  ~init:(root.state_hash, root.blockchain_length)
-                  ~f:(fun (parent, l) h ->
+              ( List.fold state_hashes ~init:anchor ~f:(fun (parent, l) h ->
                     let l = Length.succ l in
                     ( if not (Hashtbl.mem t.nodes h) then
                       let node =
@@ -1945,7 +1957,9 @@ let%test_module "Ledger_catchup tests" =
                       failwith "final state should be at `Failed"
                   | `Failed ->
                       let catchup_state =
-                        Transition_frontier.catchup_tree my_net.state.frontier
+                        Option.value_exn
+                          (Transition_frontier.catchup_tree
+                             my_net.state.frontier )
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes
