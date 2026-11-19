@@ -23,8 +23,10 @@
   mina_automation
   mina_automation.fixture
   mina_automation.runner
+  mina_base
   mina_graphql_client
   mina_healthcheck_lib
+  mina_runtime_config
   sync_status)
  (instrumentation
   (backend bisect_ppx))

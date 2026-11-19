@@ -195,14 +195,20 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
           Pipe.transfer isn't appropriate because it will close the
           real_r when read_w is closed, precisely what we don't want.
+
+          The end of the stream is still propagated, so that the connection
+          closes as soon as the peer is finished with the stream.
       *)
       let read_r, read_w = Pipe.create () in
       let underlying_r, underlying_w = Mina_net2.Libp2p_stream.pipes stream in
       don't_wait_for
-        (Pipe.iter underlying_r ~f:(fun msg ->
-             Pipe.write_without_pushback_if_open read_w
-               (Bigstring.of_string msg) ;
-             Deferred.unit ) ) ;
+        (let%map () =
+           Pipe.iter underlying_r ~f:(fun msg ->
+               Pipe.write_without_pushback_if_open read_w
+                 (Bigstring.of_string msg) ;
+               Deferred.unit )
+         in
+         Pipe.close read_w ) ;
       let transport =
         Async_rpc_kernel.Pipe_transport.(
           create Kind.bigstring read_r underlying_w)
@@ -893,6 +899,19 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name t
         peer transport Impl.dispatch_multi query
 
+    (* Closing an RPC connection closes only our side of its stream, so the
+       peer would keep the stream until its heartbeat times out, and refuse new
+       streams from us once it holds too many. Reset the stream once the call
+       is over, so that the peer releases it straight away. *)
+    let release_rpc_stream t net2 stream =
+      match%map Mina_net2.reset_stream net2 stream with
+      | Ok () ->
+          ()
+      | Error e ->
+          [%log' debug t.config.logger]
+            "Failed to reset an RPC stream after its call: $error"
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+
     let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
         rpc_input =
       let%bind net2 = !(t.net2) in
@@ -905,6 +924,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
           try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
             rpc_input
           >>| fun data ->
+          don't_wait_for (release_rpc_stream t net2 stream) ;
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
           Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
@@ -929,6 +949,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   Impl.dispatch_multi conn q ) )
             qs
           >>| fun data ->
+          don't_wait_for (release_rpc_stream t net2 stream) ;
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
           Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;

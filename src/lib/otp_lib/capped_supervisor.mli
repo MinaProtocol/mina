@@ -17,3 +17,8 @@ val create :
   -> 'job t
 
 val dispatch : 'job t -> 'job -> unit
+
+(** Stop starting jobs. Each job not yet started, including any dispatched
+    later, is given to [release] instead of being run. Jobs already running
+    carry on. Stopping a stopped supervisor does nothing. *)
+val stop : 'job t -> release:('job -> unit) -> unit

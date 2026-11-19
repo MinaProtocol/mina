@@ -40,6 +40,7 @@ type block =
   ; reason_for_rejection :
       [ `Invalid_proof
       | `Invalid_delta_transition_chain_proof
+      | `Invalid_body_reference
       | `Too_early
       | `Too_late
       | `Invalid_genesis_protocol_state
@@ -199,11 +200,9 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
       Deferred.unit
   | Some tf -> (
       let catchup_job_states =
-        match Transition_frontier.catchup_state tf with
-        | Full catchup_state ->
-            Some
-              (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_state )
+        Option.map
+          (Transition_frontier.catchup_tree tf)
+          ~f:Transition_frontier.Full_catchup_tree.to_node_status_report
       in
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn
