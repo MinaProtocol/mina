@@ -478,9 +478,17 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     | Ok result ->
         Bootstrap_status.set_phase bootstrap_status Building_staged_ledger ;
         let%map res =
-          handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
-            ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind
-            ~proof_cache_db t result
+          match%map
+            Monitor.try_with ~here:[%here] ~extract_exn:true ~rest:`Log
+              (fun () ->
+                handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
+                  ~temp_snarked_ledger ~verifier ~constraint_constants
+                  ~signature_kind ~proof_cache_db t result )
+          with
+          | Ok res ->
+              res
+          | Error exn ->
+              (None, Error (Error.tag ~tag:"exn" (Error.of_exn exn)))
         in
         (staged_ledger_data_download_time, res)
   in
