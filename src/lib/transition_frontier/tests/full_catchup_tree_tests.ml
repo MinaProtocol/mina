@@ -54,25 +54,25 @@ let%test_module "Full_catchup_tree" =
       Hashtbl.set t.nodes ~key:state_hash ~data:node ;
       (t, node)
 
-    let%test_unit "Clearing the tree leaves a handed-off breadcrumb to the \
+    let%test_unit "Removing a node leaves a handed-off breadcrumb to the \
                    transition processor" =
       let cached = cached_block () in
       let t, node = tree_building cached in
       (* As the catchup state machine does once the breadcrumb is built, before
          writing it to the transition processor. *)
       let handed_off = Cached.transform cached ~f:(fun _ -> ()) in
-      Full_catchup_tree.clear t ;
+      Full_catchup_tree.remove_node t state_hash ;
       assert (Ivar.is_full node.result) ;
       assert (not (Ivar.is_full (Cached.final_state handed_off))) ;
       (* As the transition processor does with the breadcrumb. *)
       Cached.peek handed_off ;
       Cached.invalidate_with_success handed_off
 
-    let%test_unit "Clearing the tree invalidates a block whose breadcrumb is \
+    let%test_unit "Removing a node invalidates a block whose breadcrumb is \
                    still being built" =
       let cached = cached_block () in
       let t, node = tree_building cached in
-      Full_catchup_tree.clear t ;
+      Full_catchup_tree.remove_node t state_hash ;
       assert (Ivar.is_full node.result) ;
       match Ivar.peek (Cached.final_state cached) with
       | Some `Failed ->
