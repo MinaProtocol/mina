@@ -55,7 +55,13 @@ type Structured_log_events.t += Persisted_frontier_dropped
 
 val max_catchup_chunk_length : int
 
-val catchup_tree : t -> Full_catchup_tree.t
+(** The catchup tree attached to the frontier, if any. *)
+val catchup_tree : t -> Full_catchup_tree.t option
+
+(** Attach catchup's tree, replacing any attached before. Each breadcrumb the
+    frontier adds from then on, and the root transition it applies with the
+    add, update the tree in the same step. *)
+val attach_catchup_tree : t -> Full_catchup_tree.t -> unit
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
@@ -87,6 +93,20 @@ val closed : t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
+(** A root transition applied while adding a breadcrumb. The previous root
+    leaves the frontier for its root history, and [garbage] holds the blocks on
+    the branches the move discarded. *)
+type root_transition =
+  { previous_root : State_hash.t
+  ; new_root : State_hash.t
+  ; garbage : State_hash.t list
+  }
+
+(** [add_breadcrumb_exn], also returning the root transition the add made due
+    and applied with it, if any. *)
+val add_breadcrumb_reporting_root_exn :
+  t -> Breadcrumb.t -> root_transition option Deferred.t
+
 val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
@@ -103,6 +123,7 @@ val rejected_blocks :
   * Block_time.t
   * [ `Invalid_proof
     | `Invalid_delta_transition_chain_proof
+    | `Invalid_body_reference
     | `Too_early
     | `Too_late
     | `Invalid_genesis_protocol_state
