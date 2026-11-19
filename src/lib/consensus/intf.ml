@@ -427,8 +427,15 @@ module type S = sig
     end
 
     module Vrf : sig
+      (** Evaluate the VRF for each of the producer's delegators, returning the
+          best winning evaluation, if any.
+
+          [should_stop] is consulted before each evaluation; once it returns
+          [true], the remaining delegators are not evaluated and the best win
+          found so far is returned. *)
       val check :
            context:(module CONTEXT)
+        -> should_stop:(unit -> bool)
         -> global_slot:Mina_numbers.Global_slot_since_hard_fork.t
         -> seed:Mina_base.Epoch_seed.t
         -> producer_private_key:Signature_lib.Private_key.t
