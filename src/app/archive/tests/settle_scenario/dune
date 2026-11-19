@@ -1,0 +1,25 @@
+; Settle scenarios: test cases of Settle_pending_blocks as data, shared by
+; archive/tests/settle_pending_blocks and the hardfork toolbox tests.
+
+(library
+ (name settle_scenario)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  uri
+  ;; local libraries
+  archive_lib
+  logger
+  mina_base
+  mina_automation.synthetic_archive
+  mina_caqti
+  precomputed_values)
+ (preprocess
+  (pps mina_ppx)))

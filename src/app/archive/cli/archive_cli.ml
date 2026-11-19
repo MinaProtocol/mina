@@ -45,11 +45,27 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
+     and settle_prefork_pending_blocks =
+       flag "--settle-prefork-pending-blocks"
+         ~aliases:[ "-settle-prefork-pending-blocks" ]
+         no_arg
+         ~doc:
+           " Once at startup, when --config-file is a hard fork's config: make \
+            the chain to its fork block canonical and orphan the other blocks \
+            of the ended chain. Without --config-file nothing is settled: use \
+            archive_hardfork_toolbox convert-chain-to-canonical. Also enabled \
+            when the MINA_ARCHIVE_SETTLE_PREFORK_PENDING_BLOCKS environment \
+            variable is set."
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
            Yojson.Safe.from_file file |> Runtime_config.of_yojson
            |> Result.ok_or_failwith )
+     in
+     let settle_prefork_pending_blocks =
+       settle_prefork_pending_blocks
+       || Option.is_some
+            (Sys.getenv "MINA_ARCHIVE_SETTLE_PREFORK_PENDING_BLOCKS")
      in
      fun () ->
        let logger = Logger.create () in
@@ -67,7 +83,8 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED
+         ~settle_prefork_pending_blocks )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
