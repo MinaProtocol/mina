@@ -112,7 +112,6 @@ in {
     mina-daemon-scripts
 
     mina.out
-    mina.mainnet
     mina.genesis
   ]);
 
@@ -150,9 +149,6 @@ in {
       mina-daemon-scripts
 
       devnet.out
-      # Devnet is a testnet-signature network, so this is the counterpart of
-      # mina.mainnet above, not a different kind of thing.
-      devnet.testnet
       devnet.genesis
     ]);
 
