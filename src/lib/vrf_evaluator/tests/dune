@@ -1,0 +1,13 @@
+(test
+ (name test_vrf_evaluator)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  ;; local libraries
+  block_time
+  vrf_evaluator)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx)))

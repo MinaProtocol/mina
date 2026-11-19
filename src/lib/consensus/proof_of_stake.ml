@@ -3834,6 +3834,64 @@ module Make_str (A : Wire_types.Concrete) = struct
         if not within_tolerance then
           failwithf "actual vs. expected: %d vs %f" actual expected ()
 
+      let%test_unit "Vrf.check returns the best win among the delegators \
+                     checked before should_stop" =
+        let seed = Epoch_seed.of_hash Snark_params.Tick.Field.one in
+        let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int 2 in
+        let maybe_sk, producer_account =
+          Genesis_ledger.largest_account_exn ()
+        in
+        let producer_private_key = Option.value_exn maybe_sk in
+        let producer_public_key = Account.public_key producer_account in
+        let total_stake = Amount.of_mina_int_exn 1_000 in
+        let delegators_table delegators =
+          Some (Account.Index.Table.of_alist_exn delegators)
+        in
+        let all_delegators =
+          delegators_table
+            (List.init 10 ~f:(fun delegator ->
+                 ( delegator
+                 , Account.create
+                     (Account_id.create producer_public_key Token_id.default)
+                     (Balance.of_mina_int_exn 1_000) ) ) )
+          |> Option.value_exn
+        in
+        let check ~should_stop delegators =
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Interruptible.force
+                (Vrf.check
+                   ~context:(module Context)
+                   ~should_stop ~global_slot ~seed ~producer_private_key
+                   ~producer_public_key ~total_stake
+                   ~get_delegators:(fun _ -> delegators) ) )
+          |> Result.ok_exn
+          |> Option.map
+               ~f:(fun (`Vrf_eval vrf_eval, _, `Delegator (_, index)) ->
+                 (vrf_eval, index) )
+        in
+        let checked = 4 in
+        let should_stop_calls = ref 0 in
+        let stopped =
+          check
+            ~should_stop:(fun () ->
+              incr should_stop_calls ;
+              !should_stop_calls > checked )
+            (Some all_delegators)
+        in
+        let first_checked =
+          check
+            ~should_stop:(fun () -> false)
+            (delegators_table
+               (List.take (Hashtbl.to_alist all_delegators) checked) )
+        in
+        let all = check ~should_stop:(fun () -> false) (Some all_delegators) in
+        [%test_eq: int] !should_stop_calls (checked + 1) ;
+        [%test_pred: (string * int) option] Option.is_some first_checked ;
+        [%test_eq: (string * int) option] stopped first_checked ;
+        [%test_pred: (string * int) option]
+          (Fn.non ([%equal: (string * int) option] all))
+          stopped
+
       (* Consensus selection tests. *)
 
       let sum_lengths = List.fold ~init:Length.zero ~f:Length.add

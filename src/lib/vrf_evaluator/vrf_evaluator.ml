@@ -268,6 +268,26 @@ module Worker_state = struct
             ; vrf_result
             }
 
+  (* A win is only useful if it reaches the block producer before its slot
+     starts, so the search for a slot stops [deadline_lead_slots] slots before
+     the slot starts, keeping the best win found by then. A slot too close for
+     that, such as the first slots after new epoch data arrives, is instead
+     searched until its midpoint. A slot past its midpoint is skipped. *)
+  let search_deadline ~current_time ~slot_start ~slot_duration =
+    let slot_duration_ms = Block_time.Span.to_ms slot_duration in
+    let lead_deadline =
+      Block_time.sub slot_start
+        (Block_time.Span.of_ms
+           Int64.(of_int deadline_lead_slots * slot_duration_ms) )
+    in
+    let midpoint =
+      Block_time.add slot_start
+        (Block_time.Span.of_ms Int64.(slot_duration_ms / of_int 2))
+    in
+    if Block_time.(current_time < lead_deadline) then Some lead_deadline
+    else if Block_time.(current_time < midpoint) then Some midpoint
+    else None
+
   let run_loop t =
     let (module Context) = context_of_config t.config in
     let open Context in
@@ -291,35 +311,15 @@ module Worker_state = struct
           sorted_delegators := Some (generation, state_version, delegators) ;
           delegators
     in
-    let slot_duration_ms =
-      Block_time.Span.to_ms consensus_constants.slot_duration_ms
-    in
-    (* A win is only useful if it reaches the block producer before its slot
-       starts, so the search for a slot stops [deadline_lead_slots] slots
-       before the slot starts, keeping the best win found by then. A slot too
-       close for that, such as the first slots after new epoch data arrives,
-       is instead searched until its midpoint. A slot past its midpoint is
-       skipped. *)
-    let search_deadline consensus_time =
-      let current_time = Block_time.now time_controller in
-      let slot_start =
-        Consensus_time.start_time ~constants:consensus_constants consensus_time
-      in
-      let lead_deadline =
-        Block_time.sub slot_start
-          (Block_time.Span.of_ms
-             Int64.(of_int deadline_lead_slots * slot_duration_ms) )
-      in
-      let midpoint =
-        Block_time.add slot_start
-          (Block_time.Span.of_ms Int64.(slot_duration_ms / of_int 2))
-      in
-      if Block_time.(current_time < lead_deadline) then Some lead_deadline
-      else if Block_time.(current_time < midpoint) then Some midpoint
-      else None
-    in
     let rec next_searchable_slot consensus_time =
-      match search_deadline consensus_time with
+      match
+        search_deadline
+          ~current_time:(Block_time.now time_controller)
+          ~slot_start:
+            (Consensus_time.start_time ~constants:consensus_constants
+               consensus_time )
+          ~slot_duration:consensus_constants.slot_duration_ms
+      with
       | Some deadline ->
           (consensus_time, deadline)
       | None ->
