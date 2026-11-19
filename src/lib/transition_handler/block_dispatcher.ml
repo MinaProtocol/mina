@@ -35,26 +35,26 @@ let create ~on_validated =
   let catchup_jobs_before_ready = Core_kernel.Queue.create () in
   let cleared = ref false in
   let loop =
-    O1trace.sync_thread "dispatch_blocks" (fun () ->
-        Otp_lib.Event_loop.create ~handle:(function
-          | Validated _ when !cleared ->
-              ()
-          | Validated transition ->
-              on_validated transition
-          | Resume_catchup resume ->
-              resume ()
-          | Catchup_job _ when !cleared ->
-              ()
-          | Catchup_job job -> (
-              match !process_catchup_job with
-              | Some process ->
-                  process job
-              | None ->
-                  Core_kernel.Queue.enqueue catchup_jobs_before_ready job )
-          | Catchup_ready process ->
-              process_catchup_job := Some process ;
-              Core_kernel.Queue.iter catchup_jobs_before_ready ~f:process ;
-              Core_kernel.Queue.clear catchup_jobs_before_ready ) )
+    Otp_lib.Event_loop.create ~trace_as_name:"dispatch_blocks" ()
+      ~handle:(function
+      | Validated _ when !cleared ->
+          ()
+      | Validated transition ->
+          on_validated transition
+      | Resume_catchup resume ->
+          resume ()
+      | Catchup_job _ when !cleared ->
+          ()
+      | Catchup_job job -> (
+          match !process_catchup_job with
+          | Some process ->
+              process job
+          | None ->
+              Core_kernel.Queue.enqueue catchup_jobs_before_ready job )
+      | Catchup_ready process ->
+          process_catchup_job := Some process ;
+          Core_kernel.Queue.iter catchup_jobs_before_ready ~f:process ;
+          Core_kernel.Queue.clear catchup_jobs_before_ready )
   in
   { loop; catchup_jobs_before_ready; cleared }
 
