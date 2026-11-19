@@ -330,19 +330,10 @@ let%test_module "enforce_block_reward_threshold" =
   end )
 
 let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
-    ~staged_ledger ~(block_data : Consensus.Data.Block_data.t)
+    ~staged_ledger ~global_slot_since_hard_fork ~global_slot ~coinbase_receiver
     ~previous_state_view ~transactions ~get_completed_work ~log_block_creation
     ~supercharge_coinbase ~zkapp_cmd_limit ~block_reward_threshold ~slot_tx_end
     =
-  let global_slot_since_hard_fork =
-    Consensus.Data.Block_data.global_slot block_data
-  in
-  let global_slot =
-    Consensus.Data.Block_data.global_slot_since_genesis block_data
-  in
-  let coinbase_receiver =
-    Consensus.Data.Block_data.coinbase_receiver block_data
-  in
   match slot_tx_end with
   | Some slot_tx_end
     when Mina_numbers.Global_slot_since_hard_fork.(
@@ -512,7 +503,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           in
           let diff =
             select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
-              ~staged_ledger ~block_data ~previous_state_view ~transactions
+              ~staged_ledger ~global_slot_since_hard_fork ~global_slot
+              ~coinbase_receiver ~previous_state_view ~transactions
               ~get_completed_work ~log_block_creation ~supercharge_coinbase
               ~zkapp_cmd_limit ~block_reward_threshold ~slot_tx_end
           in
