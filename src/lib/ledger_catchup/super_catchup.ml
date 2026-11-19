@@ -135,12 +135,20 @@ let write_graph (_ : t) =
 let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
+  let block = With_hash.data b in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
+  let%bind () =
+    Result.ok_if_true
+      (body_matches_reference ~header:(Mina_block.header block)
+         (Staged_ledger_diff.Body.read_all_proofs_from_disk
+            (Mina_block.body block) ) )
+      ~error:`Invalid_body_reference
+  in
   Mina_block.Validation.skip_time_received_validation
     `This_block_was_not_received_via_gossip h
   |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
-  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+  >>| Fn.flip with_body (Mina_block.body block)
 
 let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   let open Mina_block.Validation in
@@ -252,6 +260,16 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
           , Some ("invalid delta transition chain witness", []) )
       in
       Error (Error.of_string "invalid delta transition chain witness")
+  | Error `Invalid_body_reference ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: invalid body reference" ;
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Gossiped_invalid_transition
+          , Some ("invalid body reference", []) )
+      in
+      Error (Error.of_string "invalid body reference")
   | Error `Invalid_protocol_version ->
       [%log warn]
         ~metadata:[ ("state_hash", state_hash) ]
