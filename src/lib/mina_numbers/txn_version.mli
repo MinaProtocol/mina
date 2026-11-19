@@ -4,6 +4,10 @@ include
 
 val current : t
 
+(** The transaction version of the Mesa upgrade. This is frozen, unlike
+    {!current}, which moves with each upgrade. *)
+val mesa : t
+
 val equal_to_current : t -> bool
 
 val older_than_current : t -> bool

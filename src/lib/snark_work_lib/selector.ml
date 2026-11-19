@@ -23,11 +23,19 @@ module Spec = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t = Single.Spec.Stable.V3.t Work.Spec.Stable.V1.t
+      [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
       [@@deriving sexp, yojson]
 
-      let to_latest = Fn.id
+      let to_latest : t -> Latest.t =
+        Work.Spec.Stable.V1.to_latest Single.Spec.Stable.V2.to_latest
     end
   end]
 
@@ -39,15 +47,24 @@ module Result = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        (Spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
+        (Spec.Stable.V3.t, Ledger_proof.Stable.V3.t) Work.Result.Stable.V1.t
 
       let to_latest = Fn.id
 
       let transactions (t : t) =
         One_or_two.map t.spec.instances ~f:(fun i ->
             Single_spec.Stable.Latest.transaction i )
+    end
+
+    module V2 = struct
+      type t =
+        (Spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
+
+      let to_latest : t -> Latest.t =
+        Work.Result.map ~f_spec:Spec.Stable.V2.to_latest
+          ~f_single:Ledger_proof.Stable.V2.to_latest
     end
   end]
 

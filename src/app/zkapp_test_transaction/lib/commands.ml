@@ -144,6 +144,11 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
     Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
       ~constraint_constants ~global_slot ~state_body
       ~fee_excess:Currency.Amount.Signed.zero
+      ~total_currency:Currency.Amount.zero
+      ~ledger_after_coinbase:
+        (Frozen_ledger_hash.of_ledger_hash
+           (Mina_ledger.Ledger.merkle_root ledger) )
+      ~total_supply_after_coinbase:Currency.Amount.zero
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , `Ledger ledger
@@ -234,6 +239,11 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
       ~constraint_constants ~global_slot ~state_body
       ~fee_excess:Currency.Amount.Signed.zero
+      ~total_currency:Currency.Amount.zero
+      ~ledger_after_coinbase:
+        (Frozen_ledger_hash.of_ledger_hash
+           (Mina_ledger.Ledger.merkle_root ledger) )
+      ~total_supply_after_coinbase:Currency.Amount.zero
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , `Ledger ledger

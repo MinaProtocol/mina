@@ -66,6 +66,18 @@ struct
 
   let () = assert (N.length_in_bits * 2 < Field.size_in_bits + 1)
 
+  let assert_div_mod ~(x : var) ~(y : var) ~(q : var) ~(r : var) =
+    (* q * y + r = x
+
+       q * y = x - r
+    *)
+    let%bind () = assert_r1cs q y (Field.Var.sub x r) in
+    (* r < y, i.e. y - r - 1 does not underflow. Since r >= 0, this also
+       forces y <> 0; together these make (q, r) the unique Euclidean
+       quotient and remainder.
+    *)
+    range_check Field.Var.(sub (sub y r) (constant Field.one))
+
   let div_mod (x : var) (y : var) =
     let%bind q, r =
       exists (Typ.tuple2 typ typ)
@@ -74,12 +86,7 @@ struct
             let%map x = read typ x and y = read typ y in
             (N.div x y, N.rem x y))
     in
-
-    (* q * y + r = x
-
-       q * y = x - r
-    *)
-    let%map () = assert_r1cs q y (Field.Var.sub x r) in
+    let%map () = assert_div_mod ~x ~y ~q ~r in
     (q, r)
 
   type t = var
@@ -305,3 +312,108 @@ module Make64 () : UInt64 = struct
 
   let of_uint64 = Unsigned_extended.UInt64.of_uint64
 end
+
+let%test_module "div_mod" =
+  ( module struct
+    module N = Unsigned_extended.UInt32
+    module C = Make_checked (N) (Bits.UInt32)
+
+    let accepts ~x ~y ~q ~r =
+      let witness n = exists C.typ ~compute:(As_prover.return n) in
+      Or_error.is_ok
+        (check
+           (let%bind x = witness x
+            and y = witness y
+            and q = witness q
+            and r = witness r in
+            C.assert_div_mod ~x ~y ~q ~r ) )
+
+    module N64 = Unsigned_extended.UInt64
+    module C64 = Make_checked (N64) (Bits.UInt64)
+
+    let accepts64 ~x ~y ~q ~r =
+      let witness n = exists C64.typ ~compute:(As_prover.return n) in
+      Or_error.is_ok
+        (check
+           (let%bind x = witness x
+            and y = witness y
+            and q = witness q
+            and r = witness r in
+            C64.assert_div_mod ~x ~y ~q ~r ) )
+
+    let%test_unit "div_mod computes the quotient and remainder" =
+      Quickcheck.test
+        Quickcheck.Generator.(
+          both (Int.gen_incl 0 1_000_000) (Int.gen_incl 1 1_000_000))
+        ~f:(fun (x, y) ->
+          let q, r =
+            Or_error.ok_exn
+              (run_and_check
+                 (let%bind x =
+                    exists C.typ ~compute:(As_prover.return (N.of_int x))
+                  and y =
+                    exists C.typ ~compute:(As_prover.return (N.of_int y))
+                  in
+                  let%map q, r = C.div_mod x y in
+                  As_prover.(
+                    let%map q = read C.typ q and r = read C.typ r in
+                    (N.to_int q, N.to_int r)) ) )
+          in
+          [%test_eq: int * int] (q, r) (x / y, x % y) )
+
+    let%test "accepts the canonical witness" =
+      accepts ~x:(N.of_int 17) ~y:(N.of_int 5) ~q:(N.of_int 3) ~r:(N.of_int 2)
+
+    let%test "rejects a remainder equal to the divisor" =
+      not
+        (accepts ~x:(N.of_int 15) ~y:(N.of_int 5) ~q:(N.of_int 2)
+           ~r:(N.of_int 5) )
+
+    let%test "rejects a remainder larger than the divisor" =
+      not
+        (accepts ~x:(N.of_int 17) ~y:(N.of_int 5) ~q:(N.of_int 1)
+           ~r:(N.of_int 12) )
+
+    let%test "rejects the trivial witness q = 0, r = x" =
+      not
+        (accepts ~x:(N.of_int 17) ~y:(N.of_int 5) ~q:(N.of_int 0)
+           ~r:(N.of_int 17) )
+
+    let%test "rejects a zero divisor" =
+      not
+        (accepts ~x:(N.of_int 17) ~y:(N.of_int 0) ~q:(N.of_int 42)
+           ~r:(N.of_int 17) )
+
+    let%test "accepts a remainder one less than the divisor" =
+      accepts ~x:(N.of_int 9) ~y:(N.of_int 5) ~q:N.one ~r:(N.of_int 4)
+
+    let%test "accepts x = y = max" =
+      accepts ~x:N.max_int ~y:N.max_int ~q:N.one ~r:N.zero
+
+    let%test "accepts x = max - 1, y = max" =
+      accepts ~x:(N.pred N.max_int) ~y:N.max_int ~q:N.zero ~r:(N.pred N.max_int)
+
+    let%test "rejects r = x = y = max" =
+      not (accepts ~x:N.max_int ~y:N.max_int ~q:N.zero ~r:N.max_int)
+
+    let%test "accepts x = q = max, y = 1" =
+      accepts ~x:N.max_int ~y:N.one ~q:N.max_int ~r:N.zero
+
+    let%test "64-bit: accepts the canonical witness for x = max" =
+      let x = N64.max_int and y = N64.of_int 7 in
+      accepts64 ~x ~y ~q:(N64.div x y) ~r:(N64.rem x y)
+
+    let%test "64-bit: rejects a remainder equal to the divisor" =
+      not
+        (accepts64 ~x:(N64.of_int 15) ~y:(N64.of_int 5) ~q:(N64.of_int 2)
+           ~r:(N64.of_int 5) )
+
+    let%test "64-bit: rejects the trivial witness q = 0, r = x" =
+      not
+        (accepts64 ~x:N64.max_int ~y:(N64.of_int 5) ~q:N64.zero ~r:N64.max_int)
+
+    let%test "64-bit: rejects a zero divisor" =
+      not
+        (accepts64 ~x:(N64.of_int 17) ~y:N64.zero ~q:(N64.of_int 42)
+           ~r:(N64.of_int 17) )
+  end )

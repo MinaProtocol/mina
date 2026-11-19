@@ -20,11 +20,18 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
+  module V3 : sig
+    type t =
+      (Single_spec.Stable.V3.t, Ledger_proof.Stable.V3.t) Poly.Stable.V1.t
+
+    val to_latest : t -> t
+  end
+
   module V2 : sig
     type t =
       (Single_spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Poly.Stable.V1.t
 
-    val to_latest : t -> t
+    val to_latest : t -> V3.t
   end
 end]
 

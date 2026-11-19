@@ -5,11 +5,18 @@ module type S = Ledger_proof_intf.S
 
 [%%versioned
 module Stable = struct
+  module V3 = struct
+    type t = Transaction_snark.Stable.V3.t
+    [@@deriving compare, equal, sexp, yojson, hash]
+
+    let to_latest = Fn.id
+  end
+
   module V2 = struct
     type t = Transaction_snark.Stable.V2.t
     [@@deriving compare, equal, sexp, yojson, hash]
 
-    let to_latest = Fn.id
+    let to_latest = Transaction_snark.Stable.V2.to_latest
   end
 end]
 
@@ -52,7 +59,7 @@ module Cached = struct
 
   let bin_writer_stable : t Bin_prot.Type_class.writer =
     Proof_carrying_data.Stable.V1.bin_writer_t
-      Mina_state.Snarked_ledger_state.With_sok.Stable.V2.bin_writer_t
+      Mina_state.Snarked_ledger_state.With_sok.Stable.V3.bin_writer_t
       Proof_cache_tag.bin_writer_stored
 
   let statement (t : t) = { t.data with sok_digest = () }

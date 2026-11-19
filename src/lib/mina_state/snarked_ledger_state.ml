@@ -17,6 +17,20 @@ module Make_sig (A : Wire_types.Types.S) = struct
                 , 'fee_excess
                 , 'sok_digest
                 , 'local_state )
+                Poly.Stable.V3.t =
+        ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        A.Poly.V3.t
+       and type ( 'ledger_hash
+                , 'amount
+                , 'pending_coinbase
+                , 'fee_excess
+                , 'sok_digest
+                , 'local_state )
                 Poly.Stable.V2.t =
         ( 'ledger_hash
         , 'amount
@@ -25,8 +39,8 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'sok_digest
         , 'local_state )
         A.Poly.V2.t
-       and type Stable.V2.t = A.V2.t
-       and type With_sok.Stable.V2.t = A.With_sok.V2.t
+       and type Stable.V3.t = A.V3.t
+       and type With_sok.Stable.V3.t = A.With_sok.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -103,6 +117,42 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      module V3 = struct
+        type ( 'ledger_hash
+             , 'amount
+             , 'pending_coinbase
+             , 'fee_excess
+             , 'sok_digest
+             , 'local_state )
+             t =
+              ( 'ledger_hash
+              , 'amount
+              , 'pending_coinbase
+              , 'fee_excess
+              , 'sok_digest
+              , 'local_state )
+              A.Poly.V3.t =
+          { source :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state
+              , 'fee_excess
+              , 'amount )
+              Registers.Stable.V2.t
+          ; target :
+              ( 'ledger_hash
+              , 'pending_coinbase
+              , 'local_state
+              , 'fee_excess
+              , 'amount )
+              Registers.Stable.V2.t
+          ; connecting_ledger_left : 'ledger_hash
+          ; connecting_ledger_right : 'ledger_hash
+          ; sok_digest : 'sok_digest
+          }
+        [@@deriving compare, equal, hash, sexp, yojson, hlist]
+      end
+
       module V2 = struct
         type ( 'ledger_hash
              , 'amount
@@ -138,14 +188,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    let with_empty_local_state ~supply_increase ~fee_excess ~sok_digest
+    let with_empty_local_state ~source_total_currency ~target_total_currency
+        ~source_ledger_after_coinbase ~target_ledger_after_coinbase
+        ~source_total_supply_after_coinbase ~target_total_supply_after_coinbase
+        ~source_fee_excess ~target_fee_excess ~sok_digest
         ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger ~target_second_pass_ledger
         ~connecting_ledger_left ~connecting_ledger_right
         ~pending_coinbase_stack_state : _ t =
-      { supply_increase
-      ; fee_excess
-      ; sok_digest
+      { sok_digest
       ; connecting_ledger_left
       ; connecting_ledger_right
       ; source =
@@ -154,33 +205,43 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; pending_coinbase_stack =
               pending_coinbase_stack_state.Pending_coinbase_stack_state.source
           ; local_state = Local_state.empty ()
+          ; fee_excess = source_fee_excess
+          ; total_currency = source_total_currency
+          ; ledger_after_coinbase = source_ledger_after_coinbase
+          ; total_supply_after_coinbase = source_total_supply_after_coinbase
           }
       ; target =
           { first_pass_ledger = target_first_pass_ledger
           ; second_pass_ledger = target_second_pass_ledger
           ; pending_coinbase_stack = pending_coinbase_stack_state.target
           ; local_state = Local_state.empty ()
+          ; fee_excess = target_fee_excess
+          ; total_currency = target_total_currency
+          ; ledger_after_coinbase = target_ledger_after_coinbase
+          ; total_supply_after_coinbase = target_total_supply_after_coinbase
           }
       }
 
     let typ ledger_hash amount pending_coinbase fee_excess sok_digest
         local_state_typ =
       let registers =
-        let open Registers in
+        (* NB: [Registers]'s field accessors would shadow [fee_excess] here, so
+           the hlist functions are named explicitly rather than opened. *)
         Tick.Typ.of_hlistable
-          [ ledger_hash; ledger_hash; pending_coinbase; local_state_typ ]
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
+          [ ledger_hash
+          ; ledger_hash
+          ; pending_coinbase
+          ; local_state_typ
+          ; fee_excess
+          ; amount
+          ; ledger_hash
+          ; amount
+          ]
+          ~var_to_hlist:Registers.to_hlist ~var_of_hlist:Registers.of_hlist
+          ~value_to_hlist:Registers.to_hlist ~value_of_hlist:Registers.of_hlist
       in
       Tick.Typ.of_hlistable
-        [ registers
-        ; registers
-        ; ledger_hash
-        ; ledger_hash
-        ; amount
-        ; fee_excess
-        ; sok_digest
-        ]
+        [ registers; registers; ledger_hash; ledger_hash; sok_digest ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -189,6 +250,20 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        ( Frozen_ledger_hash.Stable.V1.t
+        , Amount.Stable.V1.t
+        , Pending_coinbase.Stack_versioned.Stable.V1.t
+        , Fee_excess.Stable.V2.t
+        , unit
+        , Local_state.Stable.V1.t )
+        Poly.Stable.V3.t
+      [@@deriving compare, equal, hash, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
@@ -200,13 +275,38 @@ module Make_str (A : Wire_types.Concrete) = struct
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
 
-      let to_latest = Fn.id
+      (* A V2 statement records the fee excess and supply increase as deltas,
+         and has no value for the source and target registers that replace
+         them. *)
+      let to_latest (_ : t) : Latest.t =
+        failwith
+          "Snarked_ledger_state.Stable.V2.to_latest: no source or target \
+           registers for the fee excess and total currency"
+
+      let to_input
+          ({ source
+           ; target
+           ; connecting_ledger_left
+           ; connecting_ledger_right
+           ; supply_increase
+           ; fee_excess
+           ; sok_digest = _
+           } :
+            t ) =
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+          [| Registers.Stable.V1.to_input source
+           ; Registers.Stable.V1.to_input target
+           ; Frozen_ledger_hash.to_input connecting_ledger_left
+           ; Frozen_ledger_hash.to_input connecting_ledger_right
+           ; Amount.Signed.to_input supply_increase
+           ; Fee_excess.Stable.V1.to_input fee_excess
+          |]
     end
   end]
 
   type var =
     ( Frozen_ledger_hash.var
-    , Currency.Amount.Signed.var
+    , Currency.Amount.var
     , Pending_coinbase.Stack.var
     , Fee_excess.var
     , unit
@@ -214,7 +314,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     Poly.t
 
   let typ : (var, t) Tick.Typ.t =
-    Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
+    Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
       Pending_coinbase.Stack.typ Fee_excess.typ Tick.Typ.unit Local_state.typ
 
   type display =
@@ -232,33 +332,38 @@ module Make_str (A : Wire_types.Concrete) = struct
           Pending_coinbase.Stack.to_yojson t.pending_coinbase_stack
           |> Yojson.Safe.to_string
       ; local_state = Local_state.display t.local_state
+      ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
+      ; total_currency =
+          Currency.Amount.to_yojson t.total_currency |> Yojson.Safe.to_string
+      ; ledger_after_coinbase = display_ledger_hash t.ledger_after_coinbase
+      ; total_supply_after_coinbase =
+          Currency.Amount.to_yojson t.total_supply_after_coinbase
+          |> Yojson.Safe.to_string
       }
     in
     { Poly.source = display_register t.source
     ; target = display_register t.target
     ; connecting_ledger_left = display_ledger_hash t.connecting_ledger_left
     ; connecting_ledger_right = display_ledger_hash t.connecting_ledger_right
-    ; supply_increase =
-        Currency.Amount.Signed.to_yojson t.supply_increase
-        |> Yojson.Safe.to_string
-    ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
     ; sok_digest = ()
     }
 
-  let genesis ~genesis_ledger_hash : t =
+  let genesis ~genesis_ledger_hash ~genesis_total_currency : t =
     let registers =
       { Registers.first_pass_ledger = genesis_ledger_hash
       ; second_pass_ledger = genesis_ledger_hash
       ; pending_coinbase_stack = Pending_coinbase.Stack.empty
       ; local_state = Local_state.dummy ()
+      ; fee_excess = Fee_excess.empty
+      ; total_currency = genesis_total_currency
+      ; ledger_after_coinbase = genesis_ledger_hash
+      ; total_supply_after_coinbase = genesis_total_currency
       }
     in
     { source = registers
     ; target = registers
     ; connecting_ledger_left = genesis_ledger_hash
     ; connecting_ledger_right = genesis_ledger_hash
-    ; supply_increase = Currency.Amount.Signed.zero
-    ; fee_excess = Fee_excess.empty
     ; sok_digest = ()
     }
 
@@ -267,8 +372,6 @@ module Make_str (A : Wire_types.Concrete) = struct
        ; target
        ; connecting_ledger_left
        ; connecting_ledger_right
-       ; supply_increase
-       ; fee_excess
        ; sok_digest = _
        } :
         t ) =
@@ -278,8 +381,6 @@ module Make_str (A : Wire_types.Concrete) = struct
          ; Registers.to_input target
          ; Frozen_ledger_hash.to_input connecting_ledger_left
          ; Frozen_ledger_hash.to_input connecting_ledger_right
-         ; Amount.Signed.to_input supply_increase
-         ; Fee_excess.to_input fee_excess
         |]
     in
     if !top_hash_logging_enabled then
@@ -299,27 +400,19 @@ module Make_str (A : Wire_types.Concrete) = struct
          ; target
          ; connecting_ledger_left
          ; connecting_ledger_right
-         ; supply_increase
-         ; fee_excess
          ; sok_digest = _
          } :
           t ) =
       let open Tick in
       let open Checked.Let_syntax in
-      let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-      let source = Registers.Checked.to_input source
-      and target = Registers.Checked.to_input target in
-      let%bind supply_increase =
-        Amount.Signed.Checked.to_input supply_increase
-      in
+      let%bind source = Registers.Checked.to_input source in
+      let%bind target = Registers.Checked.to_input target in
       let input =
         Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
           [| source
            ; target
            ; Frozen_ledger_hash.var_to_input connecting_ledger_left
            ; Frozen_ledger_hash.var_to_input connecting_ledger_right
-           ; supply_increase
-           ; fee_excess
           |]
       in
       let%map () =
@@ -343,6 +436,20 @@ module Make_str (A : Wire_types.Concrete) = struct
   module With_sok = struct
     [%%versioned
     module Stable = struct
+      module V3 = struct
+        type t =
+          ( Frozen_ledger_hash.Stable.V1.t
+          , Amount.Stable.V1.t
+          , Pending_coinbase.Stack_versioned.Stable.V1.t
+          , Fee_excess.Stable.V2.t
+          , Sok_message.Digest.Stable.V1.t
+          , Local_state.Stable.V1.t )
+          Poly.Stable.V3.t
+        [@@deriving compare, equal, hash, sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
       module V2 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
@@ -354,7 +461,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
 
-        let to_latest = Fn.id
+        let to_latest (_ : t) : Latest.t =
+          failwith
+            "Snarked_ledger_state.With_sok.Stable.V2.to_latest: no source or \
+             target registers for the fee excess and total currency"
       end
     end]
 
@@ -368,13 +478,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           Sok_message.Digest.to_yojson t.sok_digest |> Yojson.Safe.to_string
       }
 
-    let genesis ~genesis_ledger_hash : t =
-      let genesis_without_sok = genesis ~genesis_ledger_hash in
+    let genesis ~genesis_ledger_hash ~genesis_total_currency : t =
+      let genesis_without_sok =
+        genesis ~genesis_ledger_hash ~genesis_total_currency
+      in
       { genesis_without_sok with sok_digest = Sok_message.Digest.default }
 
     type var =
       ( Frozen_ledger_hash.var
-      , Currency.Amount.Signed.var
+      , Currency.Amount.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , Sok_message.Digest.Checked.t
@@ -382,7 +494,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       Poly.t
 
     let typ : (var, t) Tick.Typ.t =
-      Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
+      Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
         Local_state.typ
 
@@ -390,9 +502,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let (Typ { value_to_fields; _ }) = typ in
       Fn.compose fst value_to_fields
   end
-
-  let option lab =
-    Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
   module type Ledger_hash_intf = sig
     type t
@@ -622,19 +731,31 @@ module Make_str (A : Wire_types.Concrete) = struct
            { s1.target.local_state with ledger = Ledger_hash.empty_hash }
            { s2.source.local_state with ledger = Ledger_hash.empty_hash } )
     in
+    (*The fee excess is a register: rather than summing the two excesses, the
+       excess that [s1] ends with must be the one that [s2] starts from.*)
+    let%bind () =
+      or_error_of_bool ~error:"Fee excesses are not connected"
+        (Fee_excess.equal s1.target.fee_excess s2.source.fee_excess)
+    in
     let connecting_ledger_left = s1.connecting_ledger_left in
     let connecting_ledger_right = s2.connecting_ledger_right in
-    let%map fee_excess = Fee_excess.combine s1.fee_excess s2.fee_excess
-    and supply_increase =
-      Currency.Amount.Signed.add s1.supply_increase s2.supply_increase
-      |> option "Error adding supply_increase"
+    (*The total currency is a register: [s1] must end where [s2] begins.*)
+    let%bind () =
+      or_error_of_bool ~error:"Total currency is not connected"
+        (Currency.Amount.equal s1.target.total_currency s2.source.total_currency)
+    in
+    (*So are the values recorded as of the most recent coinbase.*)
+    let%map () =
+      or_error_of_bool ~error:"Post-coinbase state is not connected"
+        ( Frozen_ledger_hash.equal s1.target.ledger_after_coinbase
+            s2.source.ledger_after_coinbase
+        && Currency.Amount.equal s1.target.total_supply_after_coinbase
+             s2.source.total_supply_after_coinbase )
     in
     ( { source = s1.source
       ; target = s2.target
       ; connecting_ledger_left
       ; connecting_ledger_right
-      ; fee_excess
-      ; supply_increase
       ; sok_digest = ()
       }
       : t )
@@ -647,15 +768,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%map source = Registers.gen
     and target = Registers.gen
     and connecting_ledger_left = Frozen_ledger_hash.gen
-    and connecting_ledger_right = Frozen_ledger_hash.gen
-    and fee_excess = Fee_excess.gen
-    and supply_increase = Currency.Amount.Signed.gen in
+    and connecting_ledger_right = Frozen_ledger_hash.gen in
     ( { source
       ; target
       ; connecting_ledger_left
       ; connecting_ledger_right
-      ; fee_excess
-      ; supply_increase
       ; sok_digest = ()
       }
       : t )

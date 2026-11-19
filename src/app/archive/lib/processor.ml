@@ -2839,7 +2839,6 @@ module Zkapp_account = struct
       let open Deferred.Result.Let_syntax in
       let ({ app_state
            ; verification_key
-           ; zkapp_version
            ; action_state
            ; last_action_slot
            ; proved_state
@@ -2858,7 +2857,6 @@ module Zkapp_account = struct
             in
             Some id )
       in
-      let zkapp_version = zkapp_version |> Unsigned.UInt32.to_int64 in
       let%bind action_state_id =
         Zkapp_action_states.add_if_doesn't_exist (module Conn) action_state
       in
@@ -2873,7 +2871,8 @@ module Zkapp_account = struct
         (module Conn)
         { app_state_id
         ; verification_key_id
-        ; zkapp_version
+        ; (* The field is gone from accounts, but the column stays. *)
+          zkapp_version = 0L
         ; action_state_id
         ; last_action_slot
         ; proved_state
@@ -4908,13 +4907,20 @@ let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     ?retries ~pool ~delete_older_than (block : Precomputed.Versioned.t) =
   let accounts_accessed, accounts_created, tokens_used =
     match block with
-    | V3 { accounts_accessed; accounts_created; tokens_used; _ } ->
-        ( List.map accounts_accessed ~f:(fun (index, account) ->
-              (index, Berkeley_types.Account.to_mesa account) )
+    | V5 { accounts_accessed; accounts_created; tokens_used; _ } ->
+        (accounts_accessed, accounts_created, tokens_used)
+    | V4 { accounts_accessed; accounts_created; tokens_used; _ } ->
+        ( List.map accounts_accessed
+            ~f:(Tuple2.map_snd ~f:Account.Stable.V3.to_latest)
         , accounts_created
         , tokens_used )
-    | V4 { accounts_accessed; accounts_created; tokens_used; _ } ->
-        (accounts_accessed, accounts_created, tokens_used)
+    | V3 { accounts_accessed; accounts_created; tokens_used; _ } ->
+        ( List.map accounts_accessed ~f:(fun (index, account) ->
+              ( index
+              , Account.Stable.V3.to_latest
+                  (Berkeley_types.Account.to_mesa account) ) )
+        , accounts_created
+        , tokens_used )
   in
   (* Now the function signature of add_block_aux is weird here. We should
      consider further refactor to decouple the logic.*)

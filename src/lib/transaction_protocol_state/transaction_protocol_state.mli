@@ -3,9 +3,16 @@
 module Block_data : sig
   [%%versioned:
   module Stable : sig
+    module V4 : sig
+      type t = Mina_state.Protocol_state.Body.Value.Stable.V4.t
+      [@@deriving sexp]
+    end
+
     module V3 : sig
       type t = Mina_state.Protocol_state.Body.Value.Stable.V3.t
       [@@deriving sexp]
+
+      val to_latest : t -> V4.t
     end
   end]
 
@@ -19,6 +26,15 @@ end
 module Poly : sig
   [%%versioned:
   module Stable : sig
+    module V4 : sig
+      type 'a t =
+        { transaction : 'a
+        ; block_data : Block_data.Stable.V4.t
+        ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp]
+    end
+
     module V3 : sig
       type 'a t =
         { transaction : 'a
@@ -26,14 +42,22 @@ module Poly : sig
         ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp]
+
+      val to_latest : ('a -> 'b) -> 'a t -> 'b V4.t
     end
   end]
 end
 
 [%%versioned:
 module Stable : sig
+  module V4 : sig
+    type 'a t = 'a Poly.Stable.V4.t [@@deriving sexp]
+  end
+
   module V3 : sig
     type 'a t = 'a Poly.Stable.V3.t [@@deriving sexp]
+
+    val to_latest : ('a -> 'b) -> 'a t -> 'b V4.t
   end
 end]
 
