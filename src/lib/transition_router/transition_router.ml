@@ -822,12 +822,31 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         in
         let initially_validate_transition
             (b_or_h, `Time_received time_received, `Valid_cb valid_cb) =
-          match%map initial_validate ~b_or_h ~time_received ~valid_cb with
-          | Ok valid_transition ->
+          match%map
+            Monitor.try_with ~here:[%here] ~extract_exn:true ~rest:`Log
+              (fun () -> initial_validate ~b_or_h ~time_received ~valid_cb)
+          with
+          | Ok (Ok valid_transition) ->
               Pipe_lib.Strict_pipe.Writer.write valid_transition_writer
                 valid_transition
-          | Error () ->
+          | Ok (Error ()) ->
               ()
+          | Error exn ->
+              let sender =
+                match b_or_h with
+                | `Block b ->
+                    Envelope.Incoming.sender b
+                | `Header h ->
+                    Envelope.Incoming.sender h
+              in
+              [%log error]
+                "Exception while initially validating a transition from $sender"
+                ~metadata:
+                  [ ("sender", Envelope.Sender.to_yojson sender)
+                  ; ("exn", Error_json.error_to_yojson (Error.of_exn exn))
+                  ] ;
+              Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
+                `Ignore
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader

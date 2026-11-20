@@ -28,6 +28,8 @@ val create :
   -> accounts_created:Account_id.t list
   -> t
 
+(** Check [transition] against [parent], building the breadcrumb for it. An
+    exception raised while checking it is returned as [`Fatal_error]. *)
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy

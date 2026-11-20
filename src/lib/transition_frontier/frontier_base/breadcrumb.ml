@@ -108,8 +108,8 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
-let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
-    ~precomputed_values ~verifier ~trust_system ~parent
+let build_or_raise ?skip_staged_ledger_verification ?transaction_pool_proxy
+    ~logger ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
@@ -222,6 +222,29 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
             (`Invalid_staged_ledger_diff
               (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)
               ) )
+
+let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
+    ~precomputed_values ~verifier ~trust_system ~parent
+    ~(transition : Mina_block.almost_valid_block) ~get_completed_work ~sender
+    ~transition_receipt_time () =
+  match%map.Deferred
+    Monitor.try_with ~here:[%here] ~extract_exn:true ~rest:`Log (fun () ->
+        build_or_raise ?skip_staged_ledger_verification ?transaction_pool_proxy
+          ~logger ~precomputed_values ~verifier ~trust_system ~parent
+          ~transition ~get_completed_work ~sender ~transition_receipt_time () )
+  with
+  | Ok result ->
+      result
+  | Error exn ->
+      [%log error] "Exception while building the breadcrumb for $state_hash"
+        ~metadata:
+          [ ( "state_hash"
+            , State_hash.to_yojson
+                (State_hash.With_state_hashes.state_hash
+                   (Mina_block.Validation.block_with_hash transition) ) )
+          ; ("exn", Error_json.error_to_yojson (Error.of_exn exn))
+          ] ;
+      Error (`Fatal_error exn)
 
 let block_with_hash =
   Fn.compose Mina_block.Validated.forget validated_transition

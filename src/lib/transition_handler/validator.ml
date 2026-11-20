@@ -138,9 +138,7 @@ let validate_transition_or_header_is_relevant
            ~context:(module Context)
            ~slot_chain_end ~frontier header_with_hash
 
-(** Return the function that validates one incoming block or header against
-    [frontier], passing it to [on_valid] if it is relevant. *)
-let create_handler ~context:(module Context : CONTEXT) ~trust_system
+let create_handler_or_raise ~context:(module Context : CONTEXT) ~trust_system
     ~time_controller ~frontier ~on_valid ~block_registry =
   let open Context in
   let module Lru = Core_extended_cache.Lru in
@@ -300,6 +298,29 @@ let create_handler ~context:(module Context : CONTEXT) ~trust_system
               "Validation error: external transition with state hash \
                $state_hash was rejected for reason $reason" ;
             Deferred.unit )
+
+(** Return the function that validates one incoming block or header against
+    [frontier], passing it to [on_valid] if it is relevant. *)
+let create_handler ~context:(module Context : CONTEXT) ~trust_system
+    ~time_controller ~frontier ~on_valid ~block_registry =
+  let open Context in
+  let handle =
+    create_handler_or_raise
+      ~context:(module Context)
+      ~trust_system ~time_controller ~frontier ~on_valid ~block_registry
+  in
+  fun ((_, `Valid_cb vc) as transition) ->
+    match%map
+      Monitor.try_with ~here:[%here] ~extract_exn:true ~rest:`Log (fun () ->
+          handle transition )
+    with
+    | Ok () ->
+        ()
+    | Error exn ->
+        [%log error] "Exception while validating a transition: $exn"
+          ~metadata:[ ("exn", Error_json.error_to_yojson (Error.of_exn exn)) ] ;
+        Option.iter vc ~f:(fun vc ->
+            Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore )
 
 let%test_module "Transition_handler.Validator tests" =
   ( module struct
