@@ -193,7 +193,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             so the event here must be the frontier loading on the node_c restart
          *)
          let%bind () =
-           wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
+           wait_for t
+           @@ ( Wait_condition.persisted_frontier_loaded node_c
+              |> Wait_condition.with_timeouts
+                   ~soft_timeout:
+                     (Network_time_span.Literal
+                        (Time.Span.of_ms (Float.of_int max_restart_ms)) )
+                   ~hard_timeout:
+                     (Network_time_span.Literal
+                        (Time.Span.of_ms (Float.of_int (2 * max_restart_ms))) )
+              )
          in
          let%bind () = wait_for t @@ Wait_condition.node_to_initialize node_c in
          wait_for t
