@@ -271,7 +271,10 @@ module Dsl = struct
       test_config:Test_config.t -> num_proofs:int -> t
 
     val zkapp_to_be_included_in_frontier :
-      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+         has_failures:bool
+      -> zkapp_command:Mina_base.Zkapp_command.t
+      -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
+      -> t
 
     val persisted_frontier_loaded : Engine.Network.Node.t -> t
 
