@@ -25,16 +25,23 @@ let register_exn t block ~valid_cb =
       let state_hash = Cached.original cached in
       Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ;
       (* A block finalized without [finish] no longer needs its callback
-         kept. The block may have been registered again before this runs, so
-         leave a callback that isn't this registration's. *)
+         kept, and one that failed is ignored. The block may have been
+         registered again before this runs, so leave a callback that isn't
+         this registration's. *)
       upon
         (Ivar.read (Cached.final_state cached))
-        (fun _ ->
-          Hashtbl.change t.callbacks state_hash ~f:(function
-            | Some kept when phys_equal kept valid_cb ->
-                None
-            | kept ->
-                kept ) ) ) ;
+        (fun final_state ->
+          match Hashtbl.find t.callbacks state_hash with
+          | Some kept when phys_equal kept valid_cb -> (
+              Hashtbl.remove t.callbacks state_hash ;
+              match final_state with
+              | `Failed ->
+                  Mina_net2.Validation_callback.fire_if_not_already_fired
+                    valid_cb `Ignore
+              | `Success _ ->
+                  () )
+          | _ ->
+              () ) ) ;
   cached
 
 let answer outcome valid_cb =
@@ -196,6 +203,15 @@ let%test_module "Block_registry" =
         (finishing (fun t cached ->
              finish t (Cached.transform cached ~f:(fun _ -> ())) `Rejected ) )
         (removed `Failure, [ `Reject ])
+
+    let%test_unit "A block that fails without finishing is answered Ignore" =
+      let _events, answers =
+        finishing (fun _t cached ->
+            ignore (Cached.invalidate_with_failure cached : _) ;
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Async_kernel_scheduler.yield_until_no_jobs_remain () ) )
+      in
+      [%test_eq: answer list] answers [ `Ignore ]
 
     let%test_unit "A block registered again keeps its callback" =
       let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
