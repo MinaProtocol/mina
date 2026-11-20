@@ -80,12 +80,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (Currency.Amount.to_string amount)
       (Public_key.Compressed.to_string sender_pk)
       (Public_key.Compressed.to_string receiver_pk) ;
-    let%bind { nonce; _ } =
+    let%bind { nonce; inferred_nonce; _ } =
       Integration_test_lib.Graphql_requests.must_get_account_data ~logger
         (Network.Node.get_ingress_uri node)
         ~account_id:
           (Mina_base.Account_id.create sender_pk Mina_base.Token_id.default)
     in
+    (* Count the sender's commands still in the pool, as a wallet would; the
+       ledger nonce lags behind until their block reaches the best tip. *)
+    let nonce = Option.value inferred_nonce ~default:nonce in
     let payment_payload = { Payment_payload.Poly.receiver_pk; amount } in
     let common =
       { Signed_command_payload.Common.Poly.fee
