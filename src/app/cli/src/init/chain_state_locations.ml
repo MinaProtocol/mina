@@ -94,7 +94,8 @@ let chain_id_of_config ~logger ~signature_kind
   in
   let constraint_constants =
     Genesis_ledger_helper.make_constraint_constants
-      ~default:constraint_constants config
+      ~default:constraint_constants
+      ~protocol_constants:genesis_constants.protocol config
   in
   let%map genesis_ledger, genesis_epoch_data = make_hashed_ledgers config in
   let constraint_system_digests =

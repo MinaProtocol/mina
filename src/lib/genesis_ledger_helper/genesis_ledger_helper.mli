@@ -21,6 +21,7 @@ end
     overrides *)
 val make_constraint_constants :
      default:Genesis_constants.Constraint_constants.t
+  -> protocol_constants:Genesis_constants.Protocol.t
   -> Runtime_config.t
   -> Genesis_constants.Constraint_constants.t
 

@@ -448,7 +448,6 @@ let constraint_constants_of_proof_keys
   ; ledger_depth =
       Option.value ~default:default.ledger_depth config.ledger_depth
   ; work_delay
-  ; block_window_duration_ms
   ; transaction_capacity_log_2
   ; pending_coinbase_depth
   ; coinbase_amount =
@@ -475,18 +474,12 @@ let constraint_constants_of_proof_keys
 
 let make_constraint_constants
     ~(default : Genesis_constants.Constraint_constants.t)
+    ~(protocol_constants : Genesis_constants.Protocol.t)
     (config : Runtime_config.t) : Genesis_constants.Constraint_constants.t =
-  let block_window_duration_ms =
-    Option.value ~default:default.block_window_duration_ms
-      (Option.bind config.genesis ~f:(fun genesis ->
-           genesis.block_window_duration_ms ) )
-  in
-  match config.proof with
-  | None ->
-      { default with block_window_duration_ms }
-  | Some proof ->
-      constraint_constants_of_proof_keys ~default ~block_window_duration_ms
-        proof
+  Option.value_map config.proof ~default
+    ~f:
+      (constraint_constants_of_proof_keys ~default
+         ~block_window_duration_ms:protocol_constants.block_window_duration_ms )
 
 let runtime_config_of_constraint_constants
     ~(proof_level : Genesis_constants.Proof_level.t)

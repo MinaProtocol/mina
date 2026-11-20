@@ -830,19 +830,6 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
       ; Some compiled_proof_level
       ]
   in
-  let constraint_constants =
-    let configured_block_window_duration_ms =
-      Option.bind config.genesis ~f:(fun genesis ->
-          genesis.block_window_duration_ms )
-    in
-    match (config.proof, configured_block_window_duration_ms) with
-    | None, None ->
-        [%log info] "Using the compiled constraint constants" ;
-        constraint_constants
-    | Some _, _ | _, Some _ ->
-        [%log info] "Using the constraint constants from the configuration file" ;
-        make_constraint_constants ~default:constraint_constants config
-  in
   let%bind () =
     match (proof_level, compiled_proof_level) with
     | _, Full | (Check | No_check), _ ->
@@ -863,6 +850,16 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
   let%map genesis_constants =
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
+  in
+  let constraint_constants =
+    match config.proof with
+    | None ->
+        [%log info] "Using the compiled constraint constants" ;
+        constraint_constants
+    | Some _ ->
+        [%log info] "Using the constraint constants from the configuration file" ;
+        make_constraint_constants ~default:constraint_constants
+          ~protocol_constants:genesis_constants.protocol config
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants

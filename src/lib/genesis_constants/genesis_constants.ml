@@ -49,7 +49,6 @@ module Constraint_constants = struct
     { sub_windows_per_window : int
     ; ledger_depth : int
     ; work_delay : int
-    ; block_window_duration_ms : int
     ; transaction_capacity_log_2 : int
     ; pending_coinbase_depth : int
     ; coinbase_amount : Currency.Amount.Stable.Latest.t
@@ -63,7 +62,7 @@ module Constraint_constants = struct
     { sub_windows_per_window = t.sub_windows_per_window
     ; ledger_depth = t.ledger_depth
     ; work_delay = t.work_delay
-    ; block_window_duration_ms = t.block_window_duration_ms
+    ; block_window_duration_ms = 0
     ; transaction_capacity = Log_2 t.transaction_capacity_log_2
     ; pending_coinbase_depth = t.pending_coinbase_depth
     ; coinbase_amount = Currency.Amount.to_uint64 t.coinbase_amount
@@ -398,7 +397,6 @@ module Make (Node_config : Node_config_intf.S) : S = struct
           { sub_windows_per_window = Node_config.sub_windows_per_window
           ; ledger_depth = Node_config.ledger_depth
           ; work_delay = Node_config.scan_state_work_delay
-          ; block_window_duration_ms = Node_config.block_window_duration
           ; transaction_capacity_log_2
           ; pending_coinbase_depth
           ; coinbase_amount =

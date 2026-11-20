@@ -121,14 +121,16 @@ let test_detects_legacy_key () =
 let default_constraint_constants =
   Genesis_constants.For_unit_tests.Constraint_constants.t
 
-let test_constraint_constants_from_legacy_key () =
-  let constraint_constants =
-    Genesis_ledger_helper.make_constraint_constants
-      ~default:default_constraint_constants (parse_exn legacy_layer)
-  in
+let genesis_constants config =
+  Genesis_ledger_helper.make_genesis_constants ~logger:(Logger.null ())
+    ~default:Genesis_constants.For_unit_tests.t config
+  |> Or_error.ok_exn
+
+let test_protocol_constants_from_legacy_key () =
   Alcotest.(check int)
     "block_window_duration_ms" 20000
-    constraint_constants.block_window_duration_ms
+    (genesis_constants (parse_exn legacy_layer)).protocol
+      .block_window_duration_ms
 
 let test_transaction_capacity_from_legacy_key () =
   let legacy =
@@ -142,9 +144,10 @@ let test_transaction_capacity_from_legacy_key () =
       {json| { "genesis": { "block_window_duration_ms": 20000 }
              , "proof": { "transaction_capacity": { "txns_per_second_x10": 10 } } } |json}
   in
-  let make =
+  let make config =
     Genesis_ledger_helper.make_constraint_constants
       ~default:default_constraint_constants
+      ~protocol_constants:(genesis_constants config).protocol config
   in
   Alcotest.(check int)
     "transaction_capacity_log_2"
@@ -178,9 +181,9 @@ let () =
       , [ Alcotest.test_case "written with the new key" `Quick
             test_written_with_new_key
         ] )
-    ; ( "constraint constants"
+    ; ( "constants"
       , [ Alcotest.test_case "slot time from legacy key" `Quick
-            test_constraint_constants_from_legacy_key
+            test_protocol_constants_from_legacy_key
         ; Alcotest.test_case "transaction capacity from legacy key" `Quick
             test_transaction_capacity_from_legacy_key
         ] )
