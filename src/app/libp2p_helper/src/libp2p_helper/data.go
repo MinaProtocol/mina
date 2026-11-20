@@ -9,9 +9,6 @@ import (
 	"sync"
 	"time"
 
-	// importing this automatically registers the pprof api to our metrics server
-	_ "net/http/pprof"
-
 	"codanet"
 
 	capnp "capnproto.org/go/capnp/v3"
@@ -63,6 +60,9 @@ type app struct {
 	NoDHT         bool
 	NoUpcalls     bool
 	metricsServer *codaMetricsServer
+
+	// Serve /debug/pprof/ on the metrics port (LIBP2P_ENABLE_PPROF=true)
+	EnablePprof bool
 
 	// Counter for id generation
 	counter uint64
