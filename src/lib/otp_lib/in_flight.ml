@@ -52,6 +52,20 @@ let%test_module "In_flight" =
           assert (Deferred.is_determined (idle t)) ;
           Deferred.unit )
 
+    let%test_unit "A late exception from work reaches the caller's monitor" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let t = create () in
+          let reached = ref false in
+          let monitor = Monitor.create () in
+          Monitor.detach_and_iter_errors monitor ~f:(fun _ -> reached := true) ;
+          let work () =
+            upon (after (Core.Time.Span.of_ms 10.)) (fun () -> failwith "late") ;
+            Deferred.unit
+          in
+          let%bind () = Scheduler.within' ~monitor (fun () -> run t work) in
+          let%map () = after (Core.Time.Span.of_ms 50.) in
+          assert !reached )
+
     let%test_unit "With nothing in flight, it is idle at once" =
       assert (Deferred.is_determined (idle (create ())))
   end )
