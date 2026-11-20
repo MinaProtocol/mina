@@ -42,6 +42,7 @@ val create_job_handler :
        , unit )
        Strict_pipe.Writer.t
   -> block_registry:Transition_handler.Block_registry.t
+  -> in_flight:Otp_lib.In_flight.t
   -> schedule:((unit -> unit) -> unit)
   -> (   State_hash.t
          * ( Mina_block.initial_valid_block Envelope.Incoming.t
