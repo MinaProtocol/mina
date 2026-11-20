@@ -948,8 +948,8 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
       make @@ makeVariables ~offset:last_log_index_seen ())
   in
   let%bind query_result_obj =
-    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
-      ~node_uri ~query_name:"GetFilteredLogEntries" query_obj
+    exec_graphql_request ~logger:(Logger.null ()) ~num_tries:1 ~node_uri
+      ~query_name:"GetFilteredLogEntries" query_obj
   in
   let res = query_result_obj.getFilteredLogEntries in
   if res.isCapturing then return res.logMessages
@@ -957,15 +957,48 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
     Deferred.Or_error.error_string
       "Node is not currently capturing structured log messages"
 
+(** Whether nothing is listening on [node_uri]'s port, i.e. the daemon is not
+    running, as opposed to running but slow to answer. *)
+let refuses_connections node_uri =
+  let where_to_connect =
+    Tcp.Where_to_connect.of_host_and_port
+      (Host_and_port.create
+         ~host:(Option.value (Uri.host node_uri) ~default:"127.0.0.1")
+         ~port:(Option.value (Uri.port node_uri) ~default:80) )
+  in
+  match%map
+    Monitor.try_with ~here:[%here] (fun () ->
+        Tcp.with_connection where_to_connect (fun _ _ _ -> Deferred.unit) )
+  with
+  | Ok () ->
+      false
+  | Error exn -> (
+      match Monitor.extract_exn exn with
+      | Core_unix.Unix_error (Core_unix.ECONNREFUSED, _, _) ->
+          true
+      | _ ->
+          false )
+
+(** Poll [node_uri] for its filtered log entries every [poll_interval_sec].
+
+    [on_error] is called when the daemon is not running (it refuses
+    connections), and when it has answered nothing for [offline_after_sec]. *)
 let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
-    ?timeout_sec ~on_entries ~on_error node_uri =
+    ?(offline_after_sec = 30.) ?timeout_sec ~on_entries ~on_error node_uri =
   let open Deferred.Let_syntax in
   let%bind () = after (Time.Span.of_sec initial_delay_sec) in
   let deadline =
     Option.map timeout_sec ~f:(fun t ->
         Time.add (Time.now ()) (Time.Span.of_sec t) )
   in
-  let rec loop ~last_log_index_seen =
+  let rec loop ~last_log_index_seen ~last_answered =
+    let report e =
+      match%bind on_error e with
+      | `Continue ->
+          loop ~last_log_index_seen ~last_answered:(Time.now ())
+      | `Stop ->
+          Deferred.Or_error.ok_unit
+    in
     match deadline with
     | Some d when Time.( >= ) (Time.now ()) d ->
         Deferred.Or_error.error_string
@@ -980,21 +1013,22 @@ let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
             let last_log_index_seen =
               Array.length entries + last_log_index_seen
             in
-            let%bind action = on_entries entries in
-            match action with
+            match%bind on_entries entries with
             | `Continue ->
-                loop ~last_log_index_seen
+                loop ~last_log_index_seen ~last_answered:(Time.now ())
             | `Stop ->
                 Deferred.Or_error.ok_unit )
-        | Error e -> (
-            let%bind action = on_error e in
-            match action with
-            | `Continue ->
-                loop ~last_log_index_seen
-            | `Stop ->
-                Deferred.Or_error.ok_unit ) )
+        | Error e ->
+            let%bind refused = refuses_connections node_uri in
+            if
+              refused
+              || Time.Span.( >= )
+                   (Time.diff (Time.now ()) last_answered)
+                   (Time.Span.of_sec offline_after_sec)
+            then report e
+            else loop ~last_log_index_seen ~last_answered )
   in
-  loop ~last_log_index_seen:0
+  loop ~last_log_index_seen:0 ~last_answered:(Time.now ())
 
 let get_detailed_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
