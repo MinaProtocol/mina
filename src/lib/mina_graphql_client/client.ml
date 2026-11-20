@@ -952,7 +952,8 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
       ~query_name:"GetFilteredLogEntries" query_obj
   in
   let res = query_result_obj.getFilteredLogEntries in
-  if res.isCapturing then return res.logMessages
+  if res.isCapturing then
+    return (query_result_obj.daemonStatus.uptimeSecs, res.logMessages)
   else
     Deferred.Or_error.error_string
       "Node is not currently capturing structured log messages"
@@ -982,7 +983,9 @@ let refuses_connections node_uri =
 (** Poll [node_uri] for its filtered log entries every [poll_interval_sec].
 
     [on_error] is called when the daemon is not running (it refuses
-    connections), and when it has answered nothing for [offline_after_sec]. *)
+    connections), when it has answered nothing for [offline_after_sec], and
+    when it has restarted since the last poll; polling then continues from the
+    start of the restarted daemon's log. *)
 let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
     ?(offline_after_sec = 30.) ?timeout_sec ~on_entries ~on_error node_uri =
   let open Deferred.Let_syntax in
@@ -991,11 +994,12 @@ let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
     Option.map timeout_sec ~f:(fun t ->
         Time.add (Time.now ()) (Time.Span.of_sec t) )
   in
-  let rec loop ~last_log_index_seen ~last_answered =
-    let report e =
+  let rec loop ~last_log_index_seen ~last_uptime_secs ~last_answered =
+    let report e ~last_log_index_seen ~last_uptime_secs =
       match%bind on_error e with
       | `Continue ->
-          loop ~last_log_index_seen ~last_answered:(Time.now ())
+          loop ~last_log_index_seen ~last_uptime_secs
+            ~last_answered:(Time.now ())
       | `Stop ->
           Deferred.Or_error.ok_unit
     in
@@ -1009,13 +1013,23 @@ let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
           get_filtered_log_entries ~last_log_index_seen node_uri
         in
         match result with
-        | Ok entries -> (
+        | Ok (uptime_secs, _)
+          when Option.exists last_uptime_secs ~f:(fun last ->
+                   uptime_secs < last ) ->
+            report
+              (Error.createf
+                 "Daemon restarted between polls (uptime went from %d to %ds)"
+                 (Option.value_exn last_uptime_secs)
+                 uptime_secs )
+              ~last_log_index_seen:0 ~last_uptime_secs:(Some uptime_secs)
+        | Ok (uptime_secs, entries) -> (
             let last_log_index_seen =
               Array.length entries + last_log_index_seen
             in
             match%bind on_entries entries with
             | `Continue ->
-                loop ~last_log_index_seen ~last_answered:(Time.now ())
+                loop ~last_log_index_seen ~last_uptime_secs:(Some uptime_secs)
+                  ~last_answered:(Time.now ())
             | `Stop ->
                 Deferred.Or_error.ok_unit )
         | Error e ->
@@ -1025,10 +1039,11 @@ let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
               || Time.Span.( >= )
                    (Time.diff (Time.now ()) last_answered)
                    (Time.Span.of_sec offline_after_sec)
-            then report e
-            else loop ~last_log_index_seen ~last_answered )
+            then report e ~last_log_index_seen ~last_uptime_secs
+            else loop ~last_log_index_seen ~last_uptime_secs ~last_answered )
   in
-  loop ~last_log_index_seen:0 ~last_answered:(Time.now ())
+  loop ~last_log_index_seen:0 ~last_uptime_secs:None
+    ~last_answered:(Time.now ())
 
 let get_detailed_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
