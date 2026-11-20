@@ -749,7 +749,7 @@ module For_tests = struct
       Option.value trust_system ~default:(Trust_system.null ())
     in
     let epoch_ledger_location =
-      Filename.temp_dir_name ^/ "epoch_ledger"
+      Lazy.force temp_root_dir ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
     let consensus_local_state =
