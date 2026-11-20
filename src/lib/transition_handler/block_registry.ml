@@ -116,4 +116,21 @@ let%test_module "Block_registry" =
         (finishing (fun t cached ->
              finish t (Cached.transform cached ~f:(fun _ -> ())) `Rejected ) )
         (removed `Failure, [ `Reject ])
+
+    let%test_unit "A block registered again keeps its callback" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let callback () =
+        Mina_net2.Validation_callback.create_without_expiration ()
+      in
+      let second_cb = callback () in
+      let answers = ref [] in
+      Mina_net2.Validation_callback.set_on_resolve second_cb (fun answer ->
+          answers := answer :: !answers ) ;
+      finish t (register_exn t block ~valid_cb:(Some (callback ()))) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:(Some second_cb) in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      finish t second `Rejected ;
+      [%test_eq: answer list] !answers [ `Reject ]
   end )
