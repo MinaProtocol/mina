@@ -104,6 +104,12 @@ module Bootstrap_required : sig
   include Event_type_intf with type t := t
 end
 
+module Bootstrap_started : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
 module Persisted_frontier_dropped : sig
   type t = unit
 
@@ -170,6 +176,7 @@ type 'a t =
   | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
   | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
   | Bootstrap_required : Bootstrap_required.t t
+  | Bootstrap_started : Bootstrap_started.t t
 
 val to_string : 'a t -> string
 

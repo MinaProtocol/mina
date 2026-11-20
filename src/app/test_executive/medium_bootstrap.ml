@@ -19,8 +19,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config ~constants =
     let open Test_config in
+    let block_window_duration_ms =
+      Option.value_exn proof_config_default.block_window_duration_ms
+    in
     { (default ~constants) with
-      k = 2
+      (* Enough that node-c, restarting on its own data, can still catch up
+         with the blocks produced while it restarts *)
+      k =
+        (max_restart_ms + block_window_duration_ms - 1)
+        / block_window_duration_ms
+        + 2
     ; requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -51,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* this test is the medium bootstrap test *)
 
-  let run ~config:_ network t =
+  let run ~config:Test_config.{ k; _ } network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -70,15 +78,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
     let%bind () =
-      section_hard "restart node after 2k+1, ie 5, blocks"
+      section_hard "restart node from genesis once it has to bootstrap"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
-         let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 5) in
+         (* A node starting from genesis bootstraps, rather than catching up,
+            when the network's best tip is more than k + 5 blocks above
+            genesis: see [Transition_handler.Catchup_classifier]. *)
+         let bootstrap_height =
+           let genesis_height = 1 in
+           genesis_height + k + 5 + 1
+         in
+         let%bind () =
+           let height_growth =
+             bootstrap_height - (network_state t).block_height
+           in
+           if height_growth > 0 then
+             wait_for t (Wait_condition.block_height_growth ~height_growth)
+           else return ()
+         in
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
-           "%s started again, will now wait for this node to initialize"
+           "%s started again, will now wait for this node to bootstrap"
            (Node.id node_c) ;
+         let%bind () = wait_for t (Wait_condition.node_to_bootstrap node_c) in
          let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
          wait_for t
            (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
