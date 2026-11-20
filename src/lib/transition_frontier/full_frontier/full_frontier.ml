@@ -1004,6 +1004,17 @@ module For_tests = struct
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
 
+  let temp_root_dir =
+    let open Core in
+    lazy
+      (let dir = Filename.temp_dir "coda_unit_test" "" in
+       at_exit (fun () ->
+           let process_info =
+             Unix.create_process ~prog:"rm" ~args:[ "-rf"; dir ]
+           in
+           ignore (Unix.waitpid process_info.pid : Unix.Exit_or_signal.t) ) ;
+       dir )
+
   let create_frontier ~epoch_ledger_backing_type () =
     let open Core in
     let open Async.Deferred.Let_syntax in
