@@ -393,10 +393,6 @@ module AutoHardforkConfigGeneration = struct
       ; sync_ledger_default_subtree_depth = None
       }
     in
-    let proof =
-      Runtime_config.Proof_keys.make ~block_window_duration_ms:slot_duration_ms
-        ()
-    in
     (* Set genesis timestamp to a few minutes in the future *)
     let now_unix_ts = Unix.time () |> Float.to_int in
     let delay_minutes = 2 in
@@ -413,13 +409,11 @@ module AutoHardforkConfigGeneration = struct
       ; slots_per_epoch = None
       ; slots_per_sub_window = None
       ; grace_period_slots = None
-      ; block_window_duration_ms = None
+      ; block_window_duration_ms = Some slot_duration_ms
       ; genesis_state_timestamp = Some genesis_timestamp
       }
     in
-    let runtime_config =
-      Runtime_config.make ~ledger ~daemon ~proof ~genesis ()
-    in
+    let runtime_config = Runtime_config.make ~ledger ~daemon ~genesis () in
     Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_file output ;
     (block_producer_kp, genesis_timestamp)
 
