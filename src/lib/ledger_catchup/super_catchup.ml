@@ -1364,7 +1364,20 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
           Hashtbl.mem t.nodes h
           || Option.is_some (Transition_frontier.find frontier h)
         in
+        let finalized () =
+          List.exists forest ~f:(fun subtree ->
+              List.exists
+                (Mina_stdlib.Rose_tree.flatten subtree)
+                ~f:Cached.was_finalized )
+        in
         match%map state_hashes with
+        | _ when finalized () ->
+            [%log debug]
+              ~metadata:
+                [ ("target_hash", State_hash.to_yojson target_parent_hash) ]
+              "Catchup job for $target_hash had its blocks finished while it \
+               downloaded state hashes" ;
+            release_forest ()
         | Error errors ->
             [%log debug]
               ~metadata:
