@@ -495,6 +495,33 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           release_unbuilt block_registry (unbuilt, None) ;
           assert (Ivar.is_full (Cached.final_state unbuilt)) )
 
+    let%test_unit "A block whose build fails is answered" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length ~frontier_size:1 ~branch_size:1 () )
+        ~f:(fun (_frontier, branch) ->
+          let block_registry =
+            Block_registry.create ~logger ~cache_exceptions:true
+          in
+          let valid_cb =
+            Mina_net2.Validation_callback.create_without_expiration ()
+          in
+          let answered = ref false in
+          Mina_net2.Validation_callback.set_on_resolve valid_cb (fun _ ->
+              answered := true ) ;
+          let failed =
+            Block_registry.register_exn block_registry
+              (downcast_breadcrumb (List.hd_exn branch))
+              ~valid_cb:(Some valid_cb)
+          in
+          (* As a build that fails does: the block is transformed into the
+             result of building it, which is then invalidated. *)
+          ignore
+            ( Cached.invalidate_with_failure (Cached.transform failed ~f:Fn.id)
+              : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+          release_unbuilt block_registry (failed, Some valid_cb) ;
+          assert !answered )
+
     let%test_unit "Cleaning up releases the blocks waiting for their parents" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 100L in
