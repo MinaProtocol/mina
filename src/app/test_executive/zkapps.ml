@@ -597,7 +597,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%map () =
         wait_for t @@ with_timeout
         @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
-             ~zkapp_command
+             ~zkapp_command ~node_included_in:`Any_node
       in
       [%log info] "ZkApp transaction included in transition frontier"
     in
@@ -973,7 +973,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let replayer_result =
       section_hard "Running replayer"
-        (let%bind logs =
+        (let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind logs =
            Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
              archive_node
          in
