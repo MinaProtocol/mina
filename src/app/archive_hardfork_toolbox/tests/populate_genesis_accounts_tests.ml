@@ -79,6 +79,27 @@ let writes_the_ledger_once server_uri () =
       Alcotest.(check int)
         "rows after a second run" (List.length accounts) again )
 
+(* Another ledger is at the height already (another config's fork genesis
+   ledger, same height): the command fails and overwrites nothing. *)
+let refuses_another_ledger server_uri () =
+  let first, accounts = write_fork_config ~balances:[ 1000; 1001 ] in
+  let other, _ = write_fork_config ~balances:[ 1000; 1001 ] in
+  B.Db.with_fresh ~server_uri ~name:"test_toolbox_populate_another" (fun db ->
+      let open Deferred.Or_error.Let_syntax in
+      let%bind () = Deferred.ok (populate db first) in
+      let%bind () =
+        match%map.Deferred Monitor.try_with (fun () -> populate db other) with
+        | Ok () ->
+            Alcotest.fail "expected a failure for another ledger"
+        | Error exn ->
+            let msg = Exn.to_string exn in
+            if not (String.is_substring msg ~substring:"another genesis ledger")
+            then Alcotest.failf "unexpected failure: %s" msg ;
+            Ok ()
+      in
+      let%map rows = rows_at_height db in
+      Alcotest.(check int) "the first ledger's rows" (List.length accounts) rows )
+
 let fails_without_the_table server_uri () =
   let file, _ = write_fork_config ~balances:[ 1000 ] in
   B.Db.with_fresh ~server_uri ~name:"test_toolbox_populate_no_table" (fun db ->
@@ -110,6 +131,7 @@ let tests ~server_uri =
   in
   [ ( "populate_genesis_accounts"
     , [ ("writes the ledger once", `Quick, run writes_the_ledger_once)
+      ; ("refuses another ledger", `Quick, run refuses_another_ledger)
       ; ("fails without the table", `Quick, run fails_without_the_table)
       ] )
   ]
