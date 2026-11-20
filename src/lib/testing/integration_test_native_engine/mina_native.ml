@@ -334,8 +334,12 @@ module Network_manager = struct
           config_dir ^/ "libp2p_key"
     in
     let base_cmd_args =
-      Native_node_config.Base_node_config.to_cmd_args base_config ~ports
-        ~libp2p_key_path
+      match node_type with
+      | Native_network.Node.Snark_worker ->
+          [ "-log-json" ]
+      | _ ->
+          Native_node_config.Base_node_config.to_cmd_args base_config ~ports
+            ~libp2p_key_path
     in
     let config_dir_args =
       [ "--config-directory"; config_dir ^/ ".mina-config" ]
