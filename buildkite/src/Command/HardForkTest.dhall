@@ -40,6 +40,8 @@ in  { pipeline =
                   , S.exactly ("buildkite/src/Jobs/Test/" ++ name) "dhall"
                   , S.exactly "scripts/hardfork/build-and-test" "sh"
                   , S.strictlyStart (S.contains "scripts/mina-local-network")
+                  , S.strictlyStart (S.contains "src/app/archive")
+                  , S.strictlyStart (S.contains "src/app/rosetta")
                   , S.strictlyStart (S.contains "nix")
                   , S.exactly "flake" "nix"
                   , S.exactly "flake" "lock"

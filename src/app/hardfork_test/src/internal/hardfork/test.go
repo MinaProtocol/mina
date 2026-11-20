@@ -24,6 +24,12 @@ type HardforkTest struct {
 	runningCmdsMux sync.Mutex
 	ctx            context.Context
 	cancel         context.CancelFunc
+
+	// Genesis ledger directory of the fork network, set by
+	// CleanUpNetworkForForkPhase.
+	forkGenesisDir string
+	// Public keys of the main network genesis ledger.
+	preforkGenesisAccounts []string
 }
 
 // NewHardforkTest creates a new instance of the hardfork test
@@ -140,10 +146,29 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
+	if t.Config.ArchiveEnabled() {
+		t.Logger.Info("Phase 3a: Upgrading the archive database for the fork version...")
+		if err := t.EnsureMainArchiveStopped(); err != nil {
+			return err
+		}
+		if err := t.RecordPreforkGenesisAccounts(); err != nil {
+			return err
+		}
+		if err := t.UpgradeArchiveSchema(); err != nil {
+			return err
+		}
+	}
+
 	t.Logger.Info("Phase 3: Cleaning up main config and moving fork config into correct location...")
 
 	if err := t.CleanUpNetworkForForkPhase(); err != nil {
 		return err
+	}
+
+	if t.Config.ArchiveEnabled() {
+		if err := t.WriteArchiveForkConfig(); err != nil {
+			return err
+		}
 	}
 
 	t.Logger.Info("Phase 4: Running fork network...")

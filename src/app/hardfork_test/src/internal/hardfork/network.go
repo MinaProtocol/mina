@@ -12,7 +12,7 @@ import (
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
-func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
+func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string, extraEnv []string) (*exec.Cmd, error) {
 
 	t.Logger.Info("Starting network %s...", profile)
 	cmd := exec.Command(
@@ -39,6 +39,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"MINA_EXE="+minaExecutable,
 		"MINA_GRAPHQL_CLIENT_EXE="+t.Config.MinaGraphqlClientExe,
 	)
+	cmd.Env = append(cmd.Env, extraEnv...)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -70,15 +71,49 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 		"--extra-files-root", extraFilesRoot,
 	}
 
-	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
+	var env []string
+	if t.Config.ArchiveEnabled() {
+		archiveArgs, err := t.archiveNetworkArgs()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, archiveArgs...)
+		args = append(args, "--pg-schema-file", t.Config.MainArchiveSchema)
+		env = append(env, "ARCHIVE_EXE="+t.Config.MainArchiveExe)
+	}
+
+	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args, env)
 }
 
 // RunForkNetwork starts the fork network with hardfork configuration
 func (t *HardforkTest) RunForkNetwork() (*exec.Cmd, error) {
-	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", []string{
+	args := []string{
 		"--config", "inherit",
-		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000)},
-	)
+		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000),
+	}
+
+	var env []string
+	if t.Config.ArchiveEnabled() {
+		archiveArgs, err := t.archiveNetworkArgs()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, archiveArgs...)
+		// In inherit mode mina-local-network.sh keeps the database, so the
+		// fork archive continues in the database of the main network.
+		args = append(args,
+			"--archive-config-file", t.archiveForkConfigFile(),
+			"--rosetta-port", strconv.Itoa(t.Config.RosettaPort),
+		)
+		env = append(env,
+			"ARCHIVE_EXE="+t.Config.ForkArchiveExe,
+			"ROSETTA_EXE="+t.Config.ForkRosettaExe,
+			// The archive loads the fork genesis ledger from this directory.
+			"MINA_KEYS_PATH="+t.forkGenesisDir,
+		)
+	}
+
+	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", args, env)
 }
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
