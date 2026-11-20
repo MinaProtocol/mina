@@ -441,7 +441,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind best_chain =
            Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
              ~max_length:1
-             (Network.Node.get_ingress_uri node_b)
+             (Network.Node.get_ingress_uri node_a)
          in
          let best_tip = List.hd_exn best_chain in
          let global_slot_since_hard_fork =
@@ -646,10 +646,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Check vesting of timed3/timed4 account"
         (let check_balance name key cliff_offset =
-           let%bind global_slot_since_hard_fork =
-             Integration_test_lib.Graphql_requests
-             .must_get_global_slot_since_hard_fork ~logger
-               (Network.Node.get_ingress_uri node_b)
+           let%bind best_chain =
+             Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
+               ~max_length:1
+               (Network.Node.get_ingress_uri node_a)
+           in
+           let global_slot_since_hard_fork =
+             (List.hd_exn best_chain).global_slot_since_hard_fork
            in
            let%bind balance = get_account_balances key in
            Balances.log logger ~name ~global_slot:global_slot_since_hard_fork
