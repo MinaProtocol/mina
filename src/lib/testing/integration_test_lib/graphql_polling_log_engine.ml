@@ -94,13 +94,15 @@ struct
                       ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
             Deferred.return `Continue ) )
         ~on_error:(fun err ->
-          [%log error] "Encountered an error while polling $node for logs: $err"
-            ~metadata:
-              [ ("node", `String (Node.infra_id node))
-              ; ("err", Error_json.error_to_yojson err)
-              ] ;
-          Pipe.write_without_pushback event_writer
-            (node, Event (Node_offline, ())) ;
+          if not (Pipe.is_closed event_writer) then (
+            [%log error]
+              "Encountered an error while polling $node for logs: $err"
+              ~metadata:
+                [ ("node", `String (Node.infra_id node))
+                ; ("err", Error_json.error_to_yojson err)
+                ] ;
+            Pipe.write_without_pushback event_writer
+              (node, Event (Node_offline, ())) ) ;
           Deferred.return `Stop )
         (Node.get_ingress_uri node)
     in
