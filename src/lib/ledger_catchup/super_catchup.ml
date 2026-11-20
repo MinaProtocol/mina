@@ -2012,6 +2012,148 @@ let%test_module "Ledger_catchup tests" =
                         failwith failstring
                       else () ) ) )
 
+    type answer = [ `Accept | `Reject | `Ignore ] [@@deriving compare, sexp]
+
+    (* Catch up to the best tip of a peer, building every block but the best
+       tip with [build_best_tip], and return how the callbacks of the best tip
+       and of its header are answered once [after_started], given the frontier
+       catching up and the best tip's hash, determines. *)
+    let catch_up_answer ~build_best_tip ~after_started =
+      let answer = ref None in
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~ledger_sync_config
+            [ fresh_peer
+            ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2)
+            ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [ my_net; peer_net ] = network.peer_networks in
+          let target = Transition_frontier.best_tip peer_net.state.frontier in
+          let target_hash = Transition_frontier.Breadcrumb.state_hash target in
+          let block_registry =
+            Transition_handler.Block_registry.create ~logger
+              ~cache_exceptions:false
+          in
+          let valid_cb =
+            Mina_net2.Validation_callback.create_without_expiration ()
+          in
+          let header_cb =
+            Mina_net2.Validation_callback.create_without_expiration ()
+          in
+          Transition_handler.Block_registry.register_header block_registry
+            (Envelope.Incoming.map
+               (downcast_breadcrumb target)
+               ~f:Mina_block.Validation.to_header )
+            ~valid_cb:(Some header_cb) ;
+          let build_func ?skip_staged_ledger_verification
+              ?transaction_pool_proxy ~logger ~precomputed_values ~verifier
+              ~trust_system ~parent ~transition ~sender ~transition_receipt_time
+              () =
+            if
+              State_hash.equal target_hash
+                ( Mina_block.Validation.block_with_hash transition
+                |> State_hash.With_state_hashes.state_hash )
+            then build_best_tip ()
+            else
+              Transition_frontier.Breadcrumb.build
+                ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
+                ~precomputed_values ~verifier ~trust_system ~parent ~transition
+                ~sender ~transition_receipt_time
+                ~get_completed_work:(Fn.const None) ()
+          in
+          let breadcrumbs_reader, catchup_breadcrumbs_writer =
+            Strict_pipe.create ~name:__LOC__
+              (Buffered (`Capacity 10, `Overflow Crash))
+          in
+          (* As the transition processor does, add each breadcrumb catchup
+             builds, so that catchup goes on to build its children. *)
+          don't_wait_for
+            (Strict_pipe.Reader.iter breadcrumbs_reader
+               ~f:(fun (trees, origin) ->
+                 let%map () =
+                   Deferred.List.iter trees ~f:(fun tree ->
+                       Deferred.List.iter (Mina_stdlib.Rose_tree.flatten tree)
+                         ~f:(fun cached ->
+                           Transition_frontier.add_breadcrumb_exn
+                             my_net.state.frontier
+                             (Cached.invalidate_with_success cached) ) )
+                 in
+                 match origin with
+                 | `Ledger_catchup ivar ->
+                     Ivar.fill_if_empty ivar ()
+                 | `Catchup_scheduler ->
+                     () ) ) ;
+          Thread_safe.block_on_async_exn (fun () ->
+              let%bind process_catchup_job =
+                create_job_handler
+                  ~context:(module Context)
+                  ~verifier ~trust_system ~network:my_net.network
+                  ~frontier:my_net.state.frontier ~catchup_breadcrumbs_writer
+                  ~block_registry
+                  ~in_flight:(Otp_lib.In_flight.create ())
+                  ~build_func
+                  ~schedule:
+                    (Otp_lib.Event_loop.submit
+                       (Otp_lib.Event_loop.create () ~handle:(fun run -> run ())) )
+              in
+              process_catchup_job
+                ( Transition_frontier.Breadcrumb.parent_hash target
+                , [ Mina_stdlib.Rose_tree.T
+                      ( Transition_handler.Block_registry.register_exn
+                          block_registry
+                          (downcast_breadcrumb target)
+                          ~valid_cb:(Some valid_cb)
+                      , [] )
+                  ] ) ;
+              let%bind () = after_started my_net.state.frontier target_hash in
+              match%map
+                with_timeout (Time.Span.of_sec 60.)
+                  (Deferred.both
+                     (Mina_net2.Validation_callback.await_exn valid_cb)
+                     (Mina_net2.Validation_callback.await_exn header_cb) )
+              with
+              | `Result answers ->
+                  answer := Some answers
+              | `Timeout ->
+                  failwith "the best tip's callbacks were not answered" ) ) ;
+      Option.value_exn !answer
+
+    let%test_unit "A catchup block with an invalid body reference is rejected" =
+      [%test_eq: answer * answer]
+        (`Reject, `Ignore)
+        (catch_up_answer
+           ~build_best_tip:(fun () ->
+             Deferred.Result.fail `Invalid_body_reference )
+           ~after_started:(fun _ _ -> Deferred.unit) )
+
+    let%test_unit "A catchup block with an invalid staged ledger diff is \
+                   ignored" =
+      [%test_eq: answer * answer]
+        (`Ignore, `Ignore)
+        (catch_up_answer
+           ~build_best_tip:(fun () ->
+             Deferred.Result.fail
+               (`Invalid_staged_ledger_diff (Error.of_string "invalid")) )
+           ~after_started:(fun _ _ -> Deferred.unit) )
+
+    let%test_unit "A catchup block whose node is removed while it builds is \
+                   ignored" =
+      let building = Ivar.create () in
+      [%test_eq: answer * answer]
+        (`Ignore, `Ignore)
+        (catch_up_answer
+           ~build_best_tip:(fun () ->
+             Ivar.fill_if_empty building () ;
+             Deferred.never () )
+           ~after_started:(fun frontier target_hash ->
+             let%map () = Ivar.read building in
+             (* As when the root moves past the block. *)
+             Transition_frontier.Full_catchup_tree.remove_node
+               (Option.value_exn (Transition_frontier.catchup_tree frontier))
+               target_hash ) )
+
     let%test_unit "A catchup job that downloads when the controller drains \
                    does not raise" =
       Quickcheck.test ~trials:1

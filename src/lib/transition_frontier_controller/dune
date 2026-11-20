@@ -1,6 +1,8 @@
 (library
  (name transition_frontier_controller)
  (public_name transition_frontier_controller)
+ (inline_tests
+  (flags -verbose -show-counts))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -11,6 +13,8 @@
    -dont-check-underscored-literal))
  (libraries
   ;; opam libraries
+  async
+  async_unix
   base
   async_kernel
   core_kernel
@@ -36,4 +40,13 @@
   genesis_constants
   consensus
   bootstrap_controller
-  staged_ledger))
+  staged_ledger
+  block_time
+  fake_network
+  mina_compile_config
+  mina_net2
+  mina_signature_kind
+  proof_cache_tag
+  syncable_ledger
+  trust_system
+  verifier))
