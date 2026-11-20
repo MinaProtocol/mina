@@ -3,11 +3,15 @@
 This directory bootstraps the CI tooling that lives in
 [`MinaProtocol/mina-build`](https://github.com/MinaProtocol/mina-build).
 
+- `hooks/` — repository hooks Buildkite runs on the agent around every step's
+  command. `pre-command` names the file a step records the docker images it
+  built or loaded in; `pre-exit` removes them when the step ends, so shared
+  agents do not fill with tagged images.
 - `_hooks/post-checkout` — Buildkite agent hook that clones `mina-build` and
   overlays it into the workspace at job start. The directory is intentionally
   prefixed with `_` so Buildkite does not auto-discover and execute it yet —
-  the hook is staged here while the rollout is gated. Rename to `hooks/` (or
-  point `BUILDKITE_HOOKS_PATH` at this directory) to enable.
+  the hook is staged here while the rollout is gated. Move it into `hooks/`
+  to enable.
 - `mina-build.version` — pinned ref of `mina-build` to use for this commit.
 
 ## `mina-build.version` is a lockfile
