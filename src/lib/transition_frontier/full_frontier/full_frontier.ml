@@ -1019,7 +1019,7 @@ module For_tests = struct
     let open Core in
     let open Async.Deferred.Let_syntax in
     let epoch_ledger_location =
-      Filename.temp_dir_name ^/ "epoch_ledger"
+      Lazy.force temp_root_dir ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
     let consensus_local_state =
