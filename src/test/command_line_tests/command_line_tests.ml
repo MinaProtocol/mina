@@ -413,6 +413,7 @@ module AutoHardforkConfigGeneration = struct
       ; slots_per_epoch = None
       ; slots_per_sub_window = None
       ; grace_period_slots = None
+      ; block_window_duration_ms = None
       ; genesis_state_timestamp = Some genesis_timestamp
       }
     in
