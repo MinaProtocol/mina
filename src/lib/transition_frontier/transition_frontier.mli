@@ -145,6 +145,8 @@ module For_tests : sig
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t
 
+  val temp_root_dir : string Lazy.t
+
   val gen_persistence :
        ?logger:Logger.t
     -> verifier:Verifier.t
