@@ -60,7 +60,6 @@ let is_dirty_proof = function
       ; sub_windows_per_window = None
       ; ledger_depth = None
       ; work_delay = None
-      ; block_window_duration_ms = None
       ; transaction_capacity = None
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
@@ -77,7 +76,6 @@ let sanitize_proof (pf : Runtime_config.Proof_keys.t) =
   ; sub_windows_per_window = None
   ; ledger_depth = None
   ; work_delay = None
-  ; block_window_duration_ms = None
   ; transaction_capacity = None
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
@@ -105,9 +103,8 @@ let sanitize_runtime_config (config : Runtime_config.t) : Runtime_config.t =
   if Option.value_map ~default:false ~f:is_dirty_proof config.proof then
     [%log warn]
       "Ignoring field .proof | {level, sub_windows_per_window, ledger_depth, \
-       work_delay, block_window_duration_ms, transaction_capacity, \
-       coinbase_amount, supercharged_coinbase_factor, account_creation_fee} \
-       from runtime config" ;
+       work_delay, transaction_capacity, coinbase_amount, \
+       supercharged_coinbase_factor, account_creation_fee} from runtime config" ;
   { config with
     daemon = None
   ; genesis = None

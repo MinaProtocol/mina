@@ -478,11 +478,8 @@ let make_constraint_constants
     (config : Runtime_config.t) : Genesis_constants.Constraint_constants.t =
   let block_window_duration_ms =
     Option.value ~default:default.block_window_duration_ms
-      (Option.first_some
-         (Option.bind config.genesis ~f:(fun genesis ->
-              genesis.block_window_duration_ms ) )
-         (Option.bind config.proof ~f:(fun proof ->
-              proof.block_window_duration_ms ) ) )
+      (Option.bind config.genesis ~f:(fun genesis ->
+           genesis.block_window_duration_ms ) )
   in
   match config.proof with
   | None ->
@@ -506,8 +503,6 @@ let runtime_config_of_constraint_constants
   ; sub_windows_per_window = Some constraint_constants.sub_windows_per_window
   ; ledger_depth = Some constraint_constants.ledger_depth
   ; work_delay = Some constraint_constants.work_delay
-  ; block_window_duration_ms =
-      Some constraint_constants.block_window_duration_ms
   ; transaction_capacity =
       Some (Log_2 constraint_constants.transaction_capacity_log_2)
   ; coinbase_amount = Some constraint_constants.coinbase_amount

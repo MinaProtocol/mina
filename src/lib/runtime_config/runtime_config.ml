@@ -531,13 +531,12 @@ end
   { "daemon":
       { "txpool_max_size": 1
       , "peer_list_url": "https://www.example.com/peer-list.txt" }
-  , "genesis": { "k": 1, "delta": 1 }
+  , "genesis": { "k": 1, "delta": 1, "block_window_duration_ms": 120000 }
   , "proof":
       { "level": "check"
       , "sub_windows_per_window": 8
       , "ledger_depth": 14
       , "work_delay": 2
-      , "block_window_duration_ms": 120000
       , "transaction_capacity": {"txns_per_second_x10": 2}
       , "coinbase_amount": "200"
       , "supercharged_coinbase_factor": 2
@@ -1052,7 +1051,6 @@ module Proof_keys = struct
     ; sub_windows_per_window : int option
     ; ledger_depth : int option
     ; work_delay : int option
-    ; block_window_duration_ms : int option
     ; transaction_capacity : Transaction_capacity.t option
     ; coinbase_amount : Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor : int option
@@ -1062,13 +1060,12 @@ module Proof_keys = struct
   [@@deriving bin_io_unversioned, yojson]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
-      ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
-      ?supercharged_coinbase_factor ?account_creation_fee ?fork () =
+      ?transaction_capacity ?coinbase_amount ?supercharged_coinbase_factor
+      ?account_creation_fee ?fork () =
     { level
     ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
-    ; block_window_duration_ms
     ; transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
@@ -1081,7 +1078,6 @@ module Proof_keys = struct
       ; sub_windows_per_window
       ; ledger_depth
       ; work_delay
-      ; block_window_duration_ms
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
@@ -1092,7 +1088,7 @@ module Proof_keys = struct
     ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
-    ; block_window_duration_ms
+    ; block_window_duration_ms = None
     ; transaction_capacity =
         Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
     ; coinbase_amount
@@ -1114,6 +1110,17 @@ module Proof_keys = struct
       ; fork
       } =
     let open Result.Let_syntax in
+    let%bind () =
+      match block_window_duration_ms with
+      | None ->
+          Ok ()
+      | Some _ ->
+          Error
+            "Runtime_config.Proof_keys.of_json_layout: \
+             proof.block_window_duration_ms must be read as part of a whole \
+             runtime config, which moves it to \
+             genesis.block_window_duration_ms"
+    in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
       result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
@@ -1122,7 +1129,6 @@ module Proof_keys = struct
     ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
-    ; block_window_duration_ms
     ; transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
@@ -1142,9 +1148,6 @@ module Proof_keys = struct
           t2.sub_windows_per_window
     ; ledger_depth = opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
     ; work_delay = opt_fallthrough ~default:t1.work_delay t2.work_delay
-    ; block_window_duration_ms =
-        opt_fallthrough ~default:t1.block_window_duration_ms
-          t2.block_window_duration_ms
     ; transaction_capacity =
         opt_fallthrough ~default:t1.transaction_capacity t2.transaction_capacity
     ; coinbase_amount =
@@ -1163,7 +1166,6 @@ module Proof_keys = struct
     let%bind sub_windows_per_window = Int.gen_incl 0 1000 in
     let%bind ledger_depth = Int.gen_incl 0 64 in
     let%bind work_delay = Int.gen_incl 0 1000 in
-    let%bind block_window_duration_ms = Int.gen_incl 1_000 360_000 in
     let%bind transaction_capacity = Transaction_capacity.gen in
     let%bind coinbase_amount =
       Currency.Amount.(gen_incl zero (of_mina_int_exn 1))
@@ -1180,7 +1182,6 @@ module Proof_keys = struct
     ; sub_windows_per_window = Some sub_windows_per_window
     ; ledger_depth = Some ledger_depth
     ; work_delay = Some work_delay
-    ; block_window_duration_ms = Some block_window_duration_ms
     ; transaction_capacity = Some transaction_capacity
     ; coinbase_amount = Some coinbase_amount
     ; supercharged_coinbase_factor = Some supercharged_coinbase_factor
@@ -1461,8 +1462,50 @@ let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
   ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
   }
 
-let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
+let move_legacy_block_window_duration_ms (layout : Json_layout.t) :
+    (Json_layout.t, string) Result.t =
+  match
+    Option.bind layout.proof ~f:(fun proof -> proof.block_window_duration_ms)
+  with
+  | None ->
+      Ok layout
+  | Some block_window_duration_ms -> (
+      let genesis =
+        Option.value layout.genesis
+          ~default:
+            { k = None
+            ; delta = None
+            ; slots_per_epoch = None
+            ; slots_per_sub_window = None
+            ; grace_period_slots = None
+            ; block_window_duration_ms = None
+            ; genesis_state_timestamp = None
+            }
+      in
+      match genesis.block_window_duration_ms with
+      | Some _ ->
+          Error
+            "The configuration sets both proof.block_window_duration_ms and \
+             genesis.block_window_duration_ms. proof.block_window_duration_ms \
+             is deprecated; remove it."
+      | None ->
+          Ok
+            { layout with
+              genesis =
+                Some
+                  { genesis with
+                    block_window_duration_ms = Some block_window_duration_ms
+                  }
+            ; proof =
+                Option.map layout.proof ~f:(fun proof ->
+                    { proof with block_window_duration_ms = None } )
+            } )
+
+let of_json_layout layout =
   let open Result.Let_syntax in
+  let%bind { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
+    move_legacy_block_window_duration_ms layout
+  in
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
