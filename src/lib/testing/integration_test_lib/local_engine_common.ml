@@ -18,6 +18,10 @@ let node_env_vars =
   ; ("MINA_LIBP2P_PASS", "")
   ]
 
+(** How far in the future to put the network's genesis, so that every node has
+    started and initialised before slot 0, as on a real network. *)
+let genesis_delay = Time.Span.of_min 4.
+
 (* A private RNG seeded from system entropy on first use. The global [Random]
    state starts from OCaml's fixed default seed and nothing in test_executive
    reseeds it, so drawing from it would give every process the same id

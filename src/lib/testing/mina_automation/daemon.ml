@@ -143,7 +143,7 @@ module Config = struct
       ~(config : Test_config.t) () =
     let genesis_ledger = Genesis_ledger.create config.genesis_ledger in
     let runtime_config =
-      Runtime_config_builder.create ~test_config:config ~genesis_ledger
+      Runtime_config_builder.create ~test_config:config ~genesis_ledger ()
     in
 
     Yojson.Safe.to_file
