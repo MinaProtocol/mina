@@ -63,7 +63,7 @@ struct
     if not (Pipe.is_closed event_writer) then
       match%bind
         Graphql_requests.start_filtered_log ~logger ~log_filter
-          ~retry_delay_sec:10.0
+          ~retry_delay_sec:0.1
           (Node.get_ingress_uri node)
       with
       | Ok () ->
