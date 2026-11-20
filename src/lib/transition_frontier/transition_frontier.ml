@@ -653,10 +653,20 @@ module For_tests = struct
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
           ~transition_receipt_time ~accounts_created:[] )
 
+  let temp_root_dir =
+    lazy
+      (let dir = Filename.temp_dir "coda_unit_test" "" in
+       at_exit (fun () ->
+           let process_info =
+             Unix.create_process ~prog:"rm" ~args:[ "-rf"; dir ]
+           in
+           ignore (Unix.waitpid process_info.pid : Unix.Exit_or_signal.t) ) ;
+       dir )
+
   let gen_persistence ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =
     let open Core in
-    let root_dir = "/tmp/coda_unit_test" in
+    let root_dir = Lazy.force temp_root_dir in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let uuid = Uuid_unix.create () in
         let temp_dir = root_dir ^/ Uuid.to_string uuid in
