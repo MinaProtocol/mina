@@ -2138,6 +2138,22 @@ let%test_module "Ledger_catchup tests" =
                (`Invalid_staged_ledger_diff (Error.of_string "invalid")) )
            ~after_started:(fun _ _ -> Deferred.unit) )
 
+    let%test_unit "A catchup block whose node is removed while it builds is \
+                   ignored" =
+      let building = Ivar.create () in
+      [%test_eq: answer * answer]
+        (`Ignore, `Ignore)
+        (catch_up_answer
+           ~build_best_tip:(fun () ->
+             Ivar.fill_if_empty building () ;
+             Deferred.never () )
+           ~after_started:(fun frontier target_hash ->
+             let%map () = Ivar.read building in
+             (* As when the root moves past the block. *)
+             Transition_frontier.Full_catchup_tree.remove_node
+               (Option.value_exn (Transition_frontier.catchup_tree frontier))
+               target_hash ) )
+
     let%test_unit "A catchup job that downloads when the controller drains \
                    does not raise" =
       Quickcheck.test ~trials:1
