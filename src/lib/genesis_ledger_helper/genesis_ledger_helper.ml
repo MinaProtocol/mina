@@ -835,7 +835,7 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
     | None ->
         [%log info] "Using the compiled constraint constants" ;
         constraint_constants
-    | Some config ->
+    | Some _ ->
         [%log info] "Using the constraint constants from the configuration file" ;
         make_constraint_constants ~default:constraint_constants config
   in

@@ -105,7 +105,7 @@ module Network_config = struct
     in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:constants.constraint_constants test_config.proof_config
+        ~default:constants.constraint_constants runtime_config
     in
     let constants : Test_config.constants =
       { constants with genesis_constants; constraint_constants }

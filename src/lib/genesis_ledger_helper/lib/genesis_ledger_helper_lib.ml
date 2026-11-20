@@ -409,7 +409,7 @@ module Accounts = struct
       with Stop -> accounts
 end
 
-let make_constraint_constants
+let constraint_constants_of_proof_keys
     ~(default : Genesis_constants.Constraint_constants.t)
     (config : Runtime_config.Proof_keys.t) :
     Genesis_constants.Constraint_constants.t =
@@ -476,6 +476,12 @@ let make_constraint_constants
                   global_slot_since_genesis
             } )
   }
+
+let make_constraint_constants
+    ~(default : Genesis_constants.Constraint_constants.t)
+    (config : Runtime_config.t) : Genesis_constants.Constraint_constants.t =
+  Option.value_map config.proof ~default
+    ~f:(constraint_constants_of_proof_keys ~default)
 
 let runtime_config_of_constraint_constants
     ~(proof_level : Genesis_constants.Proof_level.t)
