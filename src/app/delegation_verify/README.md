@@ -90,6 +90,13 @@ work it also checks that the proof's sok message is the submitter's
 ledger of the submitted block, so a proof cannot be reused for a later
 submission.
 
+Before verifying a block, the verifier checks that `block_hash` is the
+hash of the block data, computed the way the uptime service backend
+computes it: the Base58Check encoding of the Blake2b-256 digest of the
+raw block bytes, with the state hash version byte (`0x10`). This is a
+hash of the bytes, not the block's state hash. A submission whose
+`block_hash` does not match its block data is rejected.
+
 Stdin mode
 ----------
 
@@ -104,7 +111,8 @@ to parse a JSON list of objects. Objects don't need to follow any
 specific format; it's sufficient that they provide the essential data:
 
 * `submitted_at` – timestamp of the submission for indentification;
-* `block_hash` – needed to identify the block to verify;
+* `block_hash` – needed to identify the block to verify; it must be the
+  hash of `raw_block` described above;
 * `snark_work` (optional) – a base64-encoded SNARK proof to verify;
 * `submitter` – the submitter's public key;
 * `raw_block` – the block data which `block_hash` refers to.

@@ -117,6 +117,68 @@ module Verification_status = struct
     end )
 end
 
+(** Ties a submission's [block_hash] to the bytes of its block.
+
+    The uptime service does not send a block hash. The uptime service backend
+    computes [block_hash] from the submitted block bytes, as the Base58Check
+    encoding of their Blake2b-256 digest under the state hash version byte
+    ([GetBlockDataHash] in o1-labs/uptime-service-backend), and stores the
+    block under that name. It is a hash of the bytes, not the block's state
+    hash.
+
+    The verifier loads and verifies a block once per [block_hash] and answers
+    every submission naming that hash with it. Without this check, any valid
+    block could be verified under any hash: a submission was reported as
+    verified with the data of a block other than the one it names, and the
+    first submission naming a hash decided the block for all the others. *)
+module Block_hash = struct
+  module Encoding = Base58_check.Make (struct
+    let description = "Block data hash"
+
+    let version_byte = Base58_check.Version_bytes.state_hash
+  end)
+
+  let of_block_data block_data =
+    Blake2.digest_string block_data |> Blake2.to_raw_string |> Encoding.encode
+
+  let check ~block_hash ~block_data =
+    let computed = of_block_data block_data in
+    if String.equal block_hash computed then Ok ()
+    else
+      Or_error.errorf
+        "block_hash %s does not match the hash %s of the block data" block_hash
+        computed
+
+  let%test_module "Block_hash" =
+    ( module struct
+      (* Computed with the backend's own construction: blake2b.Sum256 from
+         golang.org/x/crypto, then base58.CheckEncode from btcsuite/btcutil with
+         version byte 0x10. If these drift, every honest submission fails. *)
+      let%test "matches the uptime service backend" =
+        String.equal (of_block_data "")
+          "YDE9VsNGsd62k6b2Co7KerN54jRoZ6x4bytWu5MxvVW7eyCNdk"
+        && String.equal (of_block_data "mina")
+             "YSPTHkdhCSeVWD3BAKCFqjphEfcHs9bHoP31k17ckrpD5RRwq5"
+
+      let%test "a block is accepted under its own hash" =
+        let block_data = "block A" in
+        check ~block_hash:(of_block_data block_data) ~block_data
+        |> Or_error.is_ok
+
+      (* Block A submitted under block B's hash used to be verified, and the
+         result reported block A's state hash, height and slot for B. *)
+      let%test "a block is rejected under another block's hash" =
+        match
+          check ~block_hash:(of_block_data "block B") ~block_data:"block A"
+        with
+        | Ok () ->
+            false
+        | Error e ->
+            String.is_substring (Error.to_string_hum e)
+              ~substring:"does not match the hash"
+    end )
+end
+
 (** Ties the attached snark work to the submitted block.
 
     The sok message binds a proof to the submitter and the fee only, so a
