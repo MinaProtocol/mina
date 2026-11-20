@@ -38,8 +38,11 @@ let rejected_blocks = Queue.create ()
 
 let validated_blocks = Queue.create ()
 
+module Generation = Unique_id.Int ()
+
 type t =
   { logger : Logger.t
+  ; generation : Generation.t
   ; verifier : Verifier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; mutable catchup_tree : Full_catchup_tree.t option
@@ -53,6 +56,8 @@ type t =
   ; mutable closing : bool
   ; closed : unit Ivar.t
   }
+
+let generation t = t.generation
 
 let catchup_tree t = t.catchup_tree
 
@@ -172,6 +177,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
                  (Persistent_frontier.Database.Error.not_found_message err) ) )
   in
   { logger
+  ; generation = Generation.create ()
   ; catchup_tree = None
   ; verifier
   ; consensus_local_state
@@ -398,6 +404,7 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
  * because their lifecycle is longer than the transition frontier's *)
 let close ~loc
     ( { logger
+      ; generation = _
       ; verifier = _
       ; consensus_local_state = _
       ; catchup_tree = _
