@@ -704,7 +704,12 @@ module Network_manager = struct
       (nodes_to_string (Core.String.Map.data network.snark_workers)) ;
     [%log info] "archive nodes: %s"
       (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
-    Malleable_error.return network
+    let%map.Malleable_error () =
+      Malleable_error.List.iter
+        (Core.String.Map.data archive_nodes)
+        ~f:(Native_network.Node.start ~fresh_state:false)
+    in
+    network
 
   let destroy_deferred t =
     let logger = t.logger in
