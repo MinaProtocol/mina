@@ -81,7 +81,7 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; sub_windows_per_window = None
   ; ledger_depth = None
   ; work_delay = None
-  ; block_window_duration_ms = Some 120000
+  ; block_window_duration_ms = None
   ; transaction_capacity = None
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
@@ -167,7 +167,7 @@ let default ~(constants : constants) =
   ; slot_chain_end = None
   ; hard_fork_genesis_slot_delta = None
   ; network_id = None
-  ; block_window_duration_ms = constraint_constants.block_window_duration_ms
+  ; block_window_duration_ms = 120000
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
   ; signature_kind = Testnet
   }
