@@ -96,7 +96,9 @@ module Network_config = struct
       }
     in
     let runtime_config =
-      Runtime_config_builder.create ~test_config ~genesis_ledger ()
+      Runtime_config_builder.create
+        ~genesis_delay:Local_engine_common.genesis_delay ~test_config
+        ~genesis_ledger ()
     in
     let genesis_constants =
       Or_error.ok_exn
