@@ -831,11 +831,15 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
       ]
   in
   let constraint_constants =
-    match config.proof with
-    | None ->
+    let configured_block_window_duration_ms =
+      Option.bind config.genesis ~f:(fun genesis ->
+          genesis.block_window_duration_ms )
+    in
+    match (config.proof, configured_block_window_duration_ms) with
+    | None, None ->
         [%log info] "Using the compiled constraint constants" ;
         constraint_constants
-    | Some _ ->
+    | Some _, _ | _, Some _ ->
         [%log info] "Using the constraint constants from the configuration file" ;
         make_constraint_constants ~default:constraint_constants config
   in

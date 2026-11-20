@@ -411,13 +411,9 @@ end
 
 let constraint_constants_of_proof_keys
     ~(default : Genesis_constants.Constraint_constants.t)
-    (config : Runtime_config.Proof_keys.t) :
+    ~block_window_duration_ms (config : Runtime_config.Proof_keys.t) :
     Genesis_constants.Constraint_constants.t =
   let work_delay = Option.value ~default:default.work_delay config.work_delay in
-  let block_window_duration_ms =
-    Option.value ~default:default.block_window_duration_ms
-      config.block_window_duration_ms
-  in
   let transaction_capacity_log_2 =
     match config.transaction_capacity with
     | Some (Log_2 i) ->
@@ -480,8 +476,20 @@ let constraint_constants_of_proof_keys
 let make_constraint_constants
     ~(default : Genesis_constants.Constraint_constants.t)
     (config : Runtime_config.t) : Genesis_constants.Constraint_constants.t =
-  Option.value_map config.proof ~default
-    ~f:(constraint_constants_of_proof_keys ~default)
+  let block_window_duration_ms =
+    Option.value ~default:default.block_window_duration_ms
+      (Option.first_some
+         (Option.bind config.genesis ~f:(fun genesis ->
+              genesis.block_window_duration_ms ) )
+         (Option.bind config.proof ~f:(fun proof ->
+              proof.block_window_duration_ms ) ) )
+  in
+  match config.proof with
+  | None ->
+      { default with block_window_duration_ms }
+  | Some proof ->
+      constraint_constants_of_proof_keys ~default ~block_window_duration_ms
+        proof
 
 let runtime_config_of_constraint_constants
     ~(proof_level : Genesis_constants.Proof_level.t)
