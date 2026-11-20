@@ -77,6 +77,12 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let config =
     List.fold ~init:Runtime_config.default config_jsons
       ~f:(fun config (config_file, config_json) ->
+        if Runtime_config.sets_legacy_block_window_duration_ms config_json then
+          [%log warn]
+            "Configuration file $config_file sets the deprecated \
+             proof.block_window_duration_ms; set \
+             genesis.block_window_duration_ms instead"
+            ~metadata:[ ("config_file", `String config_file) ] ;
         match Runtime_config.of_yojson config_json with
         | Ok loaded_config ->
             Runtime_config.combine config loaded_config

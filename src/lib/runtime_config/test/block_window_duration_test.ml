@@ -110,6 +110,14 @@ let test_proof_keys_reject_legacy_key () =
   | Error _ ->
       ()
 
+let test_detects_legacy_key () =
+  let sets_legacy s =
+    Runtime_config.sets_legacy_block_window_duration_ms
+      (Yojson.Safe.from_string s)
+  in
+  Alcotest.(check bool) "legacy key" true (sets_legacy legacy_layer) ;
+  Alcotest.(check bool) "new key" false (sets_legacy new_layer)
+
 let default_constraint_constants =
   Genesis_constants.For_unit_tests.Constraint_constants.t
 
@@ -158,6 +166,7 @@ let () =
         ; Alcotest.test_case "both keys, equal" `Quick test_both_keys_equal
         ; Alcotest.test_case "proof section rejects legacy key" `Quick
             test_proof_keys_reject_legacy_key
+        ; Alcotest.test_case "detects legacy key" `Quick test_detects_legacy_key
         ] )
     ; ( "layering"
       , [ Alcotest.test_case "legacy then new" `Quick

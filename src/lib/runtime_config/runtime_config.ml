@@ -1501,6 +1501,17 @@ let move_legacy_block_window_duration_ms (layout : Json_layout.t) :
                     { proof with block_window_duration_ms = None } )
             } )
 
+let sets_legacy_block_window_duration_ms (json : Yojson.Safe.t) =
+  match json with
+  | `Assoc fields -> (
+      match List.Assoc.find fields ~equal:String.equal "proof" with
+      | Some (`Assoc proof) ->
+          List.Assoc.mem proof ~equal:String.equal "block_window_duration_ms"
+      | _ ->
+          false )
+  | _ ->
+      false
+
 let of_json_layout layout =
   let open Result.Let_syntax in
   let%bind { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
