@@ -330,15 +330,16 @@ module Node = struct
       | _ ->
           ()
     in
-    (* Generate libp2p keypair for non-seed nodes *)
+    (* Generate a libp2p keypair for nodes that don't have one yet *)
     let%bind () =
       match node.config.node_type with
-      | Seed | Archive ->
-          (* Seed nodes use the hardcoded libp2p key; archive nodes run
-             [mina-archive], which has no libp2p identity at all. *)
+      | Archive ->
+          (* Archive nodes run [mina-archive], which has no libp2p identity at
+             all. *)
           Malleable_error.return ()
       | _ -> (
-          (* Non-seed nodes need their own libp2p key generated *)
+          (* The seed's hardcoded key is already written; every other node
+             needs its own *)
           let libp2p_key_path = node.config.libp2p_key_path in
           match%bind.Deferred Sys.file_exists libp2p_key_path with
           | `Yes ->

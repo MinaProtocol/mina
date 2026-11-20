@@ -67,11 +67,13 @@ type t =
   ; block_registry : Block_registry.t
   }
 
-(* Release a block that won't be built, along with its validation
-   callback. *)
-let release_unbuilt block_registry (cached_transition, _vc) =
+(* Release a block that won't be built, along with its validation callback. A
+   failed build may already have released it. *)
+let release_unbuilt block_registry (cached_transition, vc) =
   (* TODO consider rejecting the callback in some cases,
      see https://github.com/MinaProtocol/mina/issues/11087 *)
+  Option.value_map vc ~default:ignore
+    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
   Block_registry.finish block_registry cached_transition `Ignored
 
 (** Release every block the scheduler holds, cancel its timeouts, and forget
