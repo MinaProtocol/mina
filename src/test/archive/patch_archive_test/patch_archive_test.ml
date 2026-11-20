@@ -114,14 +114,11 @@ let main ~db_uri ~network_data_folder () =
       ~archive_uri:target_db ~format:Extensional
   in
 
-  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.path () in
-
   let config =
     { Missing_blocks_guardian.Config.archive_uri = Uri.of_string target_db
     ; precomputed_blocks = Uri.make ~scheme:"file" ~path:output_folder ()
     ; network = network_name
     ; run_mode = Run
-    ; missing_blocks_auditor = missing_blocks_auditor_path
     ; block_format = `Extensional
     }
   in

@@ -103,11 +103,11 @@
       "opam": 60
     },
     "exe:app/missing_blocks_auditor:missing_blocks_auditor": {
-      "libs": 105,
+      "libs": 106,
       "opam": 36
     },
     "exe:app/missing_blocks_guardian:missing_blocks_guardian": {
-      "libs": 189,
+      "libs": 190,
       "opam": 54
     },
     "exe:app/protocol_state_replay:protocol_state_replay": {

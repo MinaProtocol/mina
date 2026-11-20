@@ -23,8 +23,6 @@ module Block_format = struct
 end
 
 module Default = struct
-  let auditor = "mina-missing-blocks-auditor"
-
   let format = Block_format.Precomputed
 
   let interval = 600
@@ -32,9 +30,6 @@ module Default = struct
   (* After a recovery, the daemon waits this many intervals. *)
   let recovery_sleep_factor = 6
 end
-
-(* The archive database and the program that audits it. *)
-type archive = { uri : Uri.t; auditor : string }
 
 (* Where the missing blocks come from. *)
 type blocks = { url : string; network : string; format : Block_format.t }
@@ -114,11 +109,6 @@ let port text =
       Ok n
   | _ ->
       Error "expected a port number from 1 to 65535"
-
-let program text =
-  if String.is_empty (String.strip text) then
-    Error "expected the name or path of a program"
-  else Ok text
 
 (* The network name is the prefix of the block file names. *)
 let network_name text =
@@ -211,18 +201,6 @@ let archive_uri ~(env : env) value : Uri.t result =
                 (String.concat ~sep:", " archive_uri_vars)
                 not_set
             ] )
-
-let archive ~env ~uri ~auditor : archive result =
-  let uri = archive_uri ~env uri in
-  let auditor =
-    setting ~env ~flag:"--missing-blocks-auditor" ~var:"MISSING_BLOCKS_AUDITOR"
-      ~default:Default.auditor ~parse:program auditor
-  in
-  match both uri auditor with
-  | Ok (uri, auditor) ->
-      Ok { uri; auditor }
-  | Error problems ->
-      Error problems
 
 let blocks ~env ~url ~network ~format : blocks result =
   let url =
