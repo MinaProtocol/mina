@@ -242,6 +242,7 @@ module Dsl = struct
       | Block_height_growth
       | Zkapp_to_be_included_in_frontier
       | Persisted_frontier_loaded
+      | Node_to_bootstrap
       | Transition_frontier_loaded_from_persistence
 
     val wait_condition_id : t -> wait_condition_id
@@ -274,6 +275,8 @@ module Dsl = struct
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
 
     val persisted_frontier_loaded : Engine.Network.Node.t -> t
+
+    val node_to_bootstrap : Engine.Network.Node.t -> t
 
     val transition_frontier_loaded_from_persistence :
       fresh_data:bool -> sync_needed:bool -> t

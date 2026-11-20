@@ -39,6 +39,7 @@ struct
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
+    | Node_to_bootstrap
     | Transition_frontier_loaded_from_persistence
 
   type t =
@@ -386,5 +387,17 @@ struct
         Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let node_to_bootstrap node =
+    let check () event_node (() : Event_type.Bootstrap_started.t) =
+      if String.equal (Node.id event_node) (Node.id node) then Predicate_passed
+      else Predicate_continuation ()
+    in
+    { id = Node_to_bootstrap
+    ; description = sprintf "%s to start bootstrapping" (Node.id node)
+    ; predicate = Event_predicate (Event_type.Bootstrap_started, (), check)
+    ; soft_timeout = Literal (Time.Span.of_min 10.0)
+    ; hard_timeout = Literal (Time.Span.of_min 15.0)
     }
 end
