@@ -47,6 +47,10 @@ val finish_added :
   -> (_, State_hash.t) Cache_lib.Cached.t
   -> Mina_net2.Validation_callback.t option
 
+(** Finish every registered block and header that has yet to finish, as
+    ignored. Whatever still holds one of the blocks must not use it again. *)
+val finish_outstanding : t -> unit
+
 (** Register [header], to be answered through [valid_cb] when it finishes. *)
 val register_header :
      t
