@@ -188,6 +188,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
           ~connected_peers )
 
+  (* Wait (for up to 240s) until every node is connected to every other, then
+     for 2 more slots, and check that they are all still connected. *)
+  let assert_peers_stay_completely_connected ~logger ~block_window_duration_ms
+      nodes =
+    let open Malleable_error.Let_syntax in
+    let deadline = Time.add (Time.now ()) (Time.Span.of_sec 240.0) in
+    let rec wait_until_completely_connected () =
+      let%bind.Deferred connected =
+        let%bind connectivity_data = fetch_connectivity_data ~logger nodes in
+        assert_peers_completely_connected connectivity_data
+      in
+      if Malleable_error.is_ok connected || Time.(now () > deadline) then
+        Malleable_error.return ()
+      else
+        let%bind () = Malleable_error.lift (after (Time.Span.of_sec 5.0)) in
+        wait_until_completely_connected ()
+    in
+    let%bind () = wait_until_completely_connected () in
+    let slot = Time.Span.of_ms (Float.of_int block_window_duration_ms) in
+    let%bind () = Malleable_error.lift (after (Time.Span.scale slot 2.0)) in
+    let%bind final_connectivity_data = fetch_connectivity_data ~logger nodes in
+    assert_peers_completely_connected final_connectivity_data
+
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
     (* this check checks that the network does NOT become partitioned into
        isolated subgraphs, even if n nodes are hypothetically removed from the
