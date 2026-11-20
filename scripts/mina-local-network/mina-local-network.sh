@@ -959,8 +959,8 @@ update_genesis_timestamp() {
 update_genesis_timestamp "${UPDATE_GENESIS_TIMESTAMP}"
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
-  echo "Setting proof.block_window_duration_ms to ${OVERRIDE_SLOT_TIME_MS}..."
-  jq-inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
+  echo "Setting genesis.block_window_duration_ms to ${OVERRIDE_SLOT_TIME_MS}..."
+  jq-inplace "del(.proof.block_window_duration_ms) | .genesis.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_TX_END}" ]; then
