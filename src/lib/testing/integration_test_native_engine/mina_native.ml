@@ -318,20 +318,14 @@ module Network_manager = struct
     in
     Malleable_error.return t
 
-  let build_node_config ~working_dir ~service_name ~node_type ~ports
-      ~(base_config : Native_node_config.Base_node_config.t) ~extra_args
-      ~mina_binary ~network_keypair ~postgres_connection_uri =
+  let build_node_config ?libp2p_key_path ~working_dir ~service_name ~node_type
+      ~ports ~(base_config : Native_node_config.Base_node_config.t) ~extra_args
+      ~mina_binary ~network_keypair ~postgres_connection_uri () =
     let config_dir =
       create_node_config_dir ~working_dir ~node_name:service_name
     in
     let libp2p_key_path =
-      match node_type with
-      | Native_network.Node.Seed ->
-          (* Seed nodes use the hardcoded libp2p keypair *)
-          working_dir ^/ "keys" ^/ "libp2p_key"
-      | _ ->
-          (* Non-seed nodes get their own libp2p key, generated at start *)
-          config_dir ^/ "libp2p_key"
+      Option.value libp2p_key_path ~default:(config_dir ^/ "libp2p_key")
     in
     let base_cmd_args =
       match node_type with
@@ -480,6 +474,8 @@ module Network_manager = struct
         ~base_config:seed_base_config ~extra_args:[ "daemon"; "-seed" ]
         ~mina_binary:network_config.local.mina_binary ~network_keypair:None
         ~postgres_connection_uri:None
+        ~libp2p_key_path:(working_dir ^/ "keys" ^/ "libp2p_key")
+        ()
     in
     let seed_peer =
       Native_node_config.Seed_config.create_libp2p_peer
@@ -506,7 +502,7 @@ module Network_manager = struct
               ~extra_args:
                 [ "daemon"; "-seed"; "-archive-address"; archive_address ]
               ~mina_binary:network_config.local.mina_binary
-              ~network_keypair:None ~postgres_connection_uri:None
+              ~network_keypair:None ~postgres_connection_uri:None ()
           in
           (node, archive_server_port) )
     in
@@ -584,7 +580,7 @@ module Network_manager = struct
                 ; "true"
                 ]
               ~mina_binary:network_config.local.mina_binary
-              ~network_keypair:(Some keypair) ~postgres_connection_uri:None
+              ~network_keypair:(Some keypair) ~postgres_connection_uri:None ()
           in
           (bp_info.bp_node_name, node) )
       |> Core.String.Map.of_alist_exn
@@ -627,7 +623,7 @@ module Network_manager = struct
                 ; "seq"
                 ]
               ~mina_binary:network_config.local.mina_binary
-              ~network_keypair:None ~postgres_connection_uri:None
+              ~network_keypair:None ~postgres_connection_uri:None ()
           in
           let coordinator_map =
             Core.String.Map.of_alist_exn
@@ -659,7 +655,7 @@ module Network_manager = struct
                       ; "false"
                       ]
                     ~mina_binary:network_config.local.mina_binary
-                    ~network_keypair:None ~postgres_connection_uri:None
+                    ~network_keypair:None ~postgres_connection_uri:None ()
                 in
                 (name, node) )
             |> Core.String.Map.of_alist_exn
