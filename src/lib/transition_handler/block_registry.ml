@@ -25,42 +25,28 @@ let register_exn t block ~valid_cb =
       let state_hash = Cached.original cached in
       Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ;
       (* A block finalized without [finish] no longer needs its callback
-         kept. The block may have been registered again before this runs, so
-         leave a callback that isn't this registration's. *)
+         kept, and one that failed is ignored. The block may have been
+         registered again before this runs, so leave a callback that isn't
+         this registration's. *)
       upon
         (Ivar.read (Cached.final_state cached))
-        (fun _ ->
-          Hashtbl.change t.callbacks state_hash ~f:(function
-            | Some kept when phys_equal kept valid_cb ->
-                None
-            | kept ->
-                kept ) ) ) ;
+        (fun final_state ->
+          match Hashtbl.find t.callbacks state_hash with
+          | Some kept when phys_equal kept valid_cb -> (
+              Hashtbl.remove t.callbacks state_hash ;
+              match final_state with
+              | `Failed ->
+                  Mina_net2.Validation_callback.fire_if_not_already_fired
+                    valid_cb `Ignore
+              | `Success _ ->
+                  () )
+          | _ ->
+              () ) ) ;
   cached
 
 let answer outcome valid_cb =
   Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
     (match outcome with `Rejected -> `Reject | `Ignored -> `Ignore)
-
-let finish_added t cached =
-  if Ivar.is_full (Cached.final_state cached) then None
-  else
-    let valid_cb =
-      Hashtbl.find_and_remove t.callbacks (Cached.original cached)
-    in
-    ignore (Cached.invalidate_with_success cached : _) ;
-    valid_cb
-
-let finish t cached outcome =
-  if not (Ivar.is_full (Cached.final_state cached)) then
-    match outcome with
-    | `Added ->
-        ignore (finish_added t cached : Mina_net2.Validation_callback.t option)
-    | (`Rejected | `Ignored) as outcome ->
-        let valid_cb =
-          Hashtbl.find_and_remove t.callbacks (Cached.original cached)
-        in
-        ignore (Cached.invalidate_with_failure cached : _) ;
-        Option.iter valid_cb ~f:(answer outcome)
 
 let header_state_hash header =
   State_hash.With_state_hashes.state_hash
@@ -74,6 +60,27 @@ let register_header t header ~valid_cb =
 let finish_header t state_hash outcome =
   Hashtbl.find_and_remove t.header_callbacks state_hash
   |> Option.iter ~f:(List.iter ~f:(answer outcome))
+
+let finish_added t cached =
+  if Ivar.is_full (Cached.final_state cached) then None
+  else
+    let state_hash = Cached.original cached in
+    let valid_cb = Hashtbl.find_and_remove t.callbacks state_hash in
+    ignore (Cached.invalidate_with_success cached : _) ;
+    finish_header t state_hash `Ignored ;
+    valid_cb
+
+let finish t cached outcome =
+  if not (Ivar.is_full (Cached.final_state cached)) then
+    match outcome with
+    | `Added ->
+        ignore (finish_added t cached : Mina_net2.Validation_callback.t option)
+    | (`Rejected | `Ignored) as outcome ->
+        let state_hash = Cached.original cached in
+        let valid_cb = Hashtbl.find_and_remove t.callbacks state_hash in
+        ignore (Cached.invalidate_with_failure cached : _) ;
+        Option.iter valid_cb ~f:(answer outcome) ;
+        finish_header t state_hash `Ignored
 
 let%test_module "Block_registry" =
   ( module struct
@@ -178,11 +185,33 @@ let%test_module "Block_registry" =
         (!first_answers, !second_answers)
         ([ `Reject ], [ `Reject ])
 
+    let%test_unit "A block's headers are answered Ignore when it finishes" =
+      let header_cb, header_answers = callback_answers () in
+      let handed_over = ref false in
+      let _events, block_answers =
+        finishing (fun t cached ->
+            register_header t header ~valid_cb:(Some header_cb) ;
+            handed_over := Option.is_some (finish_added t cached) )
+      in
+      assert !handed_over ;
+      [%test_eq: answer list * answer list]
+        (block_answers, !header_answers)
+        ([], [ `Ignore ])
+
     let%test_unit "Finishing a transformed block finishes it" =
       [%test_eq: Block_outcome_log.event list * answer list]
         (finishing (fun t cached ->
              finish t (Cached.transform cached ~f:(fun _ -> ())) `Rejected ) )
         (removed `Failure, [ `Reject ])
+
+    let%test_unit "A block that fails without finishing is answered Ignore" =
+      let _events, answers =
+        finishing (fun _t cached ->
+            ignore (Cached.invalidate_with_failure cached : _) ;
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Async_kernel_scheduler.yield_until_no_jobs_remain () ) )
+      in
+      [%test_eq: answer list] answers [ `Ignore ]
 
     let%test_unit "A block registered again keeps its callback" =
       let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in

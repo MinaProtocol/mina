@@ -59,7 +59,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
          ( `Capacity primary_transition_pipe_capacity
          , `Overflow
              (Drop_head
-                (fun (head, `Valid_cb _) ->
+                (fun head ->
                   Mina_metrics.(
                     Counter.inc_one
                       Pipe.Drop_on_overflow
@@ -95,7 +95,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
               header ~valid_cb:vc ;
             `Header header
       in
-      Strict_pipe.Writer.write primary_transition_writer (b_or_h, `Valid_cb vc) ) ;
+      Strict_pipe.Writer.write primary_transition_writer b_or_h ) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun (envelope, _) ->
         Network_peer.Envelope.Incoming.data envelope

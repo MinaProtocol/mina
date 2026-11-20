@@ -442,11 +442,11 @@ let%test_module "Initial validation of block bodies" =
                  ~precomputed_values )
           in
           let passed_on = ref [] in
-          let on_valid (b_or_h, `Valid_cb _) =
+          let on_valid b_or_h =
             let state_hash =
               match b_or_h with
               | `Block cached ->
-                  Cache_lib.Cached.invalidate_with_failure cached
+                  Cache_lib.Cached.invalidate_with_success cached
                   |> Envelope.Incoming.data
                   |> Mina_block.Validation.block_with_hash
                   |> State_hash.With_state_hashes.state_hash
