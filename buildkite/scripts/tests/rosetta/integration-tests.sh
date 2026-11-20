@@ -151,8 +151,7 @@ cp ${BLOCK_PRODUCER_KEY} $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PUB_KEY
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF >"$MINA_CONFIG_FILE"
 {
-  "genesis": { "genesis_state_timestamp": "$CURRENT_TIME" },
-  "proof": { "block_window_duration_ms": 20000 },
+  "genesis": { "genesis_state_timestamp": "$CURRENT_TIME", "block_window_duration_ms": 20000 },
   "daemon": { "network_id": "${MINA_NETWORK}" },
   "ledger": {
     "add_genesis_winner": true,

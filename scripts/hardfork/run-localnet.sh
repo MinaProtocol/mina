@@ -130,13 +130,13 @@ jq "$update_config_expr" > $CONF_DIR/base.json << EOF
   "genesis": {
     "slots_per_epoch": 48,
     "k": 10,
-    "grace_period_slots": 3
+    "grace_period_slots": 3,
+    "block_window_duration_ms": ${SLOT}000
   },
   "proof": {
     "work_delay": 1,
     "level": "full",
-    "transaction_capacity": { "2_to_the": 2 },
-    "block_window_duration_ms": ${SLOT}000
+    "transaction_capacity": { "2_to_the": 2 }
   }
 }
 EOF
