@@ -156,7 +156,7 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
                   record trust_system logger peer
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
           in
-          Error (`Invalid_staged_ledger_diff (Error.of_string message))
+          Error `Invalid_body_reference
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -536,6 +536,8 @@ module For_tests = struct
           failwithf !"Invalid staged ledger diff: %{sexp:Error.t}" e ()
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
+      | Error `Invalid_body_reference ->
+          failwith "Invalid body reference"
 
   let gen_non_deferred ?logger ~precomputed_values ~verifier ?trust_system
       ~accounts_with_secret_keys () =

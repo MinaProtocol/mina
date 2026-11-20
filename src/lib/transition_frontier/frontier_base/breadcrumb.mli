@@ -46,6 +46,7 @@ val build :
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
        | `Invalid_staged_ledger_hash of Error.t
+       | `Invalid_body_reference
        | `Fatal_error of exn ] )
      Result.t
      Deferred.t
