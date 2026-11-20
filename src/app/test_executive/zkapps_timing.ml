@@ -48,7 +48,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants = Network.constraint_constants network in
     let block_window_duration_ms =
-      constraint_constants.block_window_duration_ms
+      (Network.genesis_constants network).protocol.block_window_duration_ms
     in
     let%bind fee_payer_pk = pub_key_of_node node in
     let%bind fee_payer_sk = priv_key_of_node node in

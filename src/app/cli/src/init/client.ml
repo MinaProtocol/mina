@@ -2004,7 +2004,7 @@ let compile_time_constants =
                )
              ; ( "block_window_duration_ms"
                , `Int
-                   precomputed_values.constraint_constants
+                   precomputed_values.genesis_constants.protocol
                      .block_window_duration_ms )
              ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
              ; ( "sub_windows_per_window"

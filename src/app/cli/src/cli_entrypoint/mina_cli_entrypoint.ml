@@ -857,7 +857,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~proof_level:G.proof_level config_files ~genesis_constants
               ~constraint_constants ~cli_proof_level ~hardfork_handling
           in
-          constraint_constants.block_window_duration_ms |> Float.of_int
+          genesis_constants.protocol.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
           let rev_daemon_configs =

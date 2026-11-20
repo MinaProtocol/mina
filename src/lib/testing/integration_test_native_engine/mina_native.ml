@@ -236,7 +236,7 @@ module Network_manager = struct
       [ ("k", G.genesis_constants.protocol.k)
       ; ("slots_per_epoch", G.genesis_constants.protocol.slots_per_epoch)
       ; ( "block_window_duration_ms"
-        , G.constraint_constants.block_window_duration_ms )
+        , G.genesis_constants.protocol.block_window_duration_ms )
       ]
     in
     let%bind output =
