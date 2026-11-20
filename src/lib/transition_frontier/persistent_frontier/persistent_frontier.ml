@@ -112,7 +112,7 @@ module Instance = struct
     | Some sync ->
         f sync
 
-  let start_sync ~constraint_constants t ~persistent_root_instance =
+  let start_sync ~protocol_constants t ~persistent_root_instance =
     let open Result.Let_syntax in
     let%map () = assert_no_sync t in
     let dequeue_snarked_ledger () =
@@ -120,7 +120,7 @@ module Instance = struct
     in
     t.sync <-
       Some
-        (Sync.create ~constraint_constants ~logger:t.factory.logger
+        (Sync.create ~protocol_constants ~logger:t.factory.logger
            ~time_controller:t.factory.time_controller ~db:t.db
            ~dequeue_snarked_ledger )
 

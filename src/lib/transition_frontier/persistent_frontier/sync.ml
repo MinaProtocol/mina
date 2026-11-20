@@ -8,7 +8,7 @@ let buffer t = Diff_buffer.Rev_dyn_array.to_list t.buffer.diff_array
 
 (* NB: the persistent frontier must remain open as
  * long as the synchronization is using it *)
-let create ~constraint_constants ~logger ~time_controller ~db
+let create ~protocol_constants ~logger ~time_controller ~db
     ~dequeue_snarked_ledger =
   let worker = Worker.create { db; logger; dequeue_snarked_ledger } in
   let flush_size =
@@ -19,7 +19,7 @@ let create ~constraint_constants ~logger ~time_controller ~db
   [%log debug] "Initializing persistent frontier diff buffer with $capacity"
     ~metadata:[ ("capacity", Diff_buffer.Capacity.to_yojson capacity) ] ;
   let buffer =
-    Diff_buffer.create ~constraint_constants ~time_controller ~worker ~capacity
+    Diff_buffer.create ~protocol_constants ~time_controller ~worker ~capacity
   in
   { worker; buffer }
 

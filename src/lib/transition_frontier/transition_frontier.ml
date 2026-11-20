@@ -162,7 +162,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   let%map () =
     Deferred.return
       ( Persistent_frontier.Instance.start_sync
-          ~constraint_constants:precomputed_values.constraint_constants
+          ~protocol_constants:precomputed_values.genesis_constants.protocol
           ~persistent_root_instance persistent_frontier_instance
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->

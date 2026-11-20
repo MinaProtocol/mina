@@ -1710,7 +1710,8 @@ module Mutations = struct
                 ~metadata:[ ("num_accounts", `Int num_accounts) ] ;
               let poll_span =
                 Time.Span.of_ms
-                  ( Float.of_int constraint_constants.block_window_duration_ms
+                  ( Float.of_int
+                      genesis_constants.protocol.block_window_duration_ms
                   /. 3.0 )
               in
               don't_wait_for

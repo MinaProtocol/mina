@@ -2,8 +2,8 @@ open Async_kernel
 open Core_kernel
 open Frontier_base
 
-let max_latency
-    { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
+let max_latency ({ block_window_duration_ms; _ } : Genesis_constants.Protocol.t)
+    =
   Block_time.Span.(
     (block_window_duration_ms |> Int64.of_int |> Block_time.Span.of_ms)
     * of_ms 5L)
@@ -116,8 +116,8 @@ let flush t =
   if Rev_dyn_array.length t.diff_array > 0 then
     t.flush_job <- Some (flush_job t)
 
-let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~time_controller ~worker ~capacity =
+let create ~(protocol_constants : Genesis_constants.Protocol.t) ~time_controller
+    ~worker ~capacity =
   let t =
     { diff_array = Rev_dyn_array.create ()
     ; capacity
@@ -130,7 +130,7 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   let timer =
     Timer.create ~time_controller
       ~f:(fun () -> if Option.is_none t.flush_job then flush t)
-      (max_latency constraint_constants)
+      (max_latency protocol_constants)
   in
   t.timer <- Some timer ;
   Timer.start timer ;

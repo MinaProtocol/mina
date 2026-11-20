@@ -1287,8 +1287,8 @@ let generate_genesis_proof_if_needed ~genesis_breadcrumb ~frontier_reader () =
       Deferred.return ()
 
 let pregenerate_genesis_proof_one_slot_before
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~time_controller ~genesis_breadcrumb ~frontier_reader slot_start_ms =
+    ~(protocol_constants : Genesis_constants.Protocol.t) ~time_controller
+    ~genesis_breadcrumb ~frontier_reader slot_start_ms =
   (* Attempt to generate a genesis proof in the slot
      immediately before we'll actually need it, so that
      it isn't limiting our block production time in the
@@ -1299,8 +1299,7 @@ let pregenerate_genesis_proof_one_slot_before
   *)
   let scheduled_genesis_time =
     time_of_ms
-      Int64.(
-        slot_start_ms - of_int constraint_constants.block_window_duration_ms)
+      Int64.(slot_start_ms - of_int protocol_constants.block_window_duration_ms)
   in
   let span_till_time =
     Block_time.diff scheduled_genesis_time (Block_time.now time_controller)
@@ -1688,8 +1687,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                   don't_wait_for
                     (pregenerate_genesis_proof_one_slot_before
-                       ~constraint_constants ~time_controller
-                       ~genesis_breadcrumb ~frontier_reader (time_to_ms time) ) ;
+                       ~protocol_constants:
+                         precomputed_values.genesis_constants.protocol
+                       ~time_controller ~genesis_breadcrumb ~frontier_reader
+                       (time_to_ms time) ) ;
                   Singleton_scheduler.schedule scheduler time ~f:(fun () ->
                       produce_block_now production ) ;
                   Deferred.unit

@@ -136,7 +136,11 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
       (* Checking three times per block window to avoid unnecessary waiting after the block is created *)
       Async.after
         (Time.Span.of_ms
-           (Float.of_int constraint_constants.block_window_duration_ms /. 3.0) )
+           ( Float.of_int
+               (Mina_lib.config mina).precomputed_values.genesis_constants
+                 .protocol
+                 .block_window_duration_ms
+           /. 3.0 ) )
     in
     let ledger =
       Utils.get_ledger_and_breadcrumb mina
