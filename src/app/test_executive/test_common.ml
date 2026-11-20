@@ -8,6 +8,9 @@ open Mina_transaction
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
 
+  (* Longest time for a stopped node to start again and load its frontier *)
+  let max_restart_ms = 240_000
+
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
     let open Malleable_error.Let_syntax in

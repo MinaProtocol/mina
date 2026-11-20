@@ -19,8 +19,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config ~constants =
     let open Test_config in
+    let block_window_duration_ms =
+      Option.value_exn proof_config_default.block_window_duration_ms
+    in
     { (default ~constants) with
-      k = 2
+      (* Enough that node-c, restarting on its own data, can still catch up
+         with the blocks produced while it restarts *)
+      k =
+        (max_restart_ms + block_window_duration_ms - 1)
+        / block_window_duration_ms
+        + 2
     ; requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
