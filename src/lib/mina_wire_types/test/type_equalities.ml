@@ -92,6 +92,7 @@ struct end
 (** Tests for small modules *)
 module Misc_tests = struct
   include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
+  include Assert_equal0V1 (Block_time.Span.Stable) (WT.Block_time.Span)
   include
     Assert_equal0V1
       (Data_hash_lib.State_hash.Stable)

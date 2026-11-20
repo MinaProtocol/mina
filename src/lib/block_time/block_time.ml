@@ -8,7 +8,7 @@ open Snark_bits
 module Wire_types = Mina_wire_types.Block_time
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Intf.S with type Time.t = A.V1.t
+  module type S = Intf.S with type Time.t = A.V1.t and type Span.t = A.Span.V1.t
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct
