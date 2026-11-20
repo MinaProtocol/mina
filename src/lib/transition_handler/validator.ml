@@ -106,9 +106,7 @@ let validate_transition_is_relevant ~context:(module Context : CONTEXT)
   [%log' internal Context.logger] "Check_transition_not_in_process" ;
   let%bind () =
     Option.fold
-      (Unprocessed_transition_cache.final_state
-         (Block_registry.cache block_registry)
-         enveloped_transition )
+      (Block_registry.final_state block_registry enveloped_transition)
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
   in
