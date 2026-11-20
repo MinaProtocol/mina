@@ -200,4 +200,16 @@ let%test_module "Block_registry" =
           Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
       finish t second `Rejected ;
       [%test_eq: answer list] !answers [ `Reject ]
+
+    let%test_unit "An added block registered again hands over its callback" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let callback () =
+        Mina_net2.Validation_callback.create_without_expiration ()
+      in
+      finish t (register_exn t block ~valid_cb:(Some (callback ()))) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:(Some (callback ())) in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      assert (Option.is_some (finish_added t second))
   end )
