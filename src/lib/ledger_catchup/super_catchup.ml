@@ -1374,7 +1374,20 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
           Hashtbl.mem t.nodes h
           || Option.is_some (Transition_frontier.find frontier h)
         in
+        let finalized () =
+          List.exists forest ~f:(fun subtree ->
+              List.exists
+                (Mina_stdlib.Rose_tree.flatten subtree)
+                ~f:Cached.was_finalized )
+        in
         match%map state_hashes with
+        | _ when finalized () ->
+            [%log debug]
+              ~metadata:
+                [ ("target_hash", State_hash.to_yojson target_parent_hash) ]
+              "Catchup job for $target_hash had its blocks finished while it \
+               downloaded state hashes" ;
+            release_forest ()
         | Error errors ->
             [%log debug]
               ~metadata:
@@ -1982,4 +1995,54 @@ let%test_module "Ledger_catchup tests" =
                         in
                         failwith failstring
                       else () ) ) )
+
+    let%test_unit "A catchup job that downloads when the controller drains \
+                   does not raise" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~verifier ~max_frontier_length
+            ~ledger_sync_config
+            [ fresh_peer
+            ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2)
+            ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [ my_net; peer_net ] = network.peer_networks in
+          let target = Transition_frontier.best_tip peer_net.state.frontier in
+          let block_registry =
+            Transition_handler.Block_registry.create ~logger
+              ~cache_exceptions:false
+          in
+          Thread_safe.block_on_async_exn (fun () ->
+              let%bind process_catchup_job =
+                create_job_handler
+                  ~context:(module Context)
+                  ~verifier ~trust_system ~network:my_net.network
+                  ~frontier:my_net.state.frontier
+                  ~catchup_breadcrumbs_writer:
+                    (snd
+                       (Strict_pipe.create ~name:__LOC__
+                          (Buffered (`Capacity 10, `Overflow Crash)) ) )
+                  ~block_registry
+                  ~in_flight:(Otp_lib.In_flight.create ())
+                  ~build_func:
+                    (Transition_frontier.Breadcrumb.build
+                       ~get_completed_work:(Fn.const None) )
+                  ~schedule:
+                    (Otp_lib.Event_loop.submit
+                       (Otp_lib.Event_loop.create () ~handle:(fun run -> run ())) )
+              in
+              process_catchup_job
+                ( Transition_frontier.Breadcrumb.parent_hash target
+                , [ Mina_stdlib.Rose_tree.T
+                      ( Transition_handler.Block_registry.register_exn
+                          block_registry
+                          (downcast_breadcrumb target)
+                          ~valid_cb:None
+                      , [] )
+                  ] ) ;
+              (* The last step of the drain of the controller. *)
+              Transition_handler.Block_registry.finish_outstanding
+                block_registry ;
+              Scheduler.yield_until_no_jobs_remain () ) )
   end )

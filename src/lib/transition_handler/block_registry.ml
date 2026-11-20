@@ -32,12 +32,29 @@ let register_exn t block ~valid_cb =
   Option.iter valid_cb ~f:(fun valid_cb ->
       Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ) ;
   (* A block finalized without [finish] no longer needs its entry or its
-     callback kept. *)
+     callback kept, and one that failed is ignored. The block may have been
+     registered again before this runs, so leave an entry or a callback that
+     isn't this registration's. *)
   upon
     (Ivar.read (Cached.final_state cached))
-    (fun _ ->
-      Hashtbl.remove t.entries state_hash ;
-      Hashtbl.remove t.callbacks state_hash ) ;
+    (fun final_state ->
+      Hashtbl.change t.entries state_hash ~f:(function
+        | Some kept when phys_equal kept cached ->
+            None
+        | kept ->
+            kept ) ;
+      Option.iter valid_cb ~f:(fun valid_cb ->
+          match Hashtbl.find t.callbacks state_hash with
+          | Some kept when phys_equal kept valid_cb -> (
+              Hashtbl.remove t.callbacks state_hash ;
+              match final_state with
+              | `Failed ->
+                  Mina_net2.Validation_callback.fire_if_not_already_fired
+                    valid_cb `Ignore
+              | `Success _ ->
+                  () )
+          | _ ->
+              () ) ) ;
   cached
 
 let answer outcome valid_cb =
@@ -227,4 +244,52 @@ let%test_module "Block_registry" =
       register_header t header ~valid_cb:(Some valid_cb) ;
       finish_outstanding t ;
       [%test_eq: answer list] !answers [ `Ignore ]
+
+    let%test_unit "A block that fails without finishing is answered Ignore" =
+      let _events, answers =
+        finishing (fun _t cached ->
+            ignore (Cached.invalidate_with_failure cached : _) ;
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Async_kernel_scheduler.yield_until_no_jobs_remain () ) )
+      in
+      [%test_eq: answer list] answers [ `Ignore ]
+
+    let%test_unit "A block registered again keeps its callback" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let callback () =
+        Mina_net2.Validation_callback.create_without_expiration ()
+      in
+      let second_cb = callback () in
+      let answers = ref [] in
+      Mina_net2.Validation_callback.set_on_resolve second_cb (fun answer ->
+          answers := answer :: !answers ) ;
+      finish t (register_exn t block ~valid_cb:(Some (callback ()))) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:(Some second_cb) in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      finish t second `Rejected ;
+      [%test_eq: answer list] !answers [ `Reject ]
+
+    let%test_unit "A block registered again is still outstanding" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      finish t (register_exn t block ~valid_cb:None) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:None in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      finish_outstanding t ;
+      assert (Ivar.is_full (Cached.final_state second))
+
+    let%test_unit "An added block registered again hands over its callback" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let callback () =
+        Mina_net2.Validation_callback.create_without_expiration ()
+      in
+      finish t (register_exn t block ~valid_cb:(Some (callback ()))) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:(Some (callback ())) in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      assert (Option.is_some (finish_added t second))
   end )

@@ -7,12 +7,12 @@ let create () = { running = 0; idle = Ivar.create () }
 
 let run t f =
   t.running <- t.running + 1 ;
-  Monitor.protect f ~finally:(fun () ->
-      t.running <- t.running - 1 ;
-      if t.running = 0 then (
-        Ivar.fill t.idle () ;
-        t.idle <- Ivar.create () ) ;
-      Deferred.unit )
+  let%map result = Monitor.try_with ~here:[%here] ~run:`Now ~rest:`Raise f in
+  t.running <- t.running - 1 ;
+  if t.running = 0 then (
+    Ivar.fill t.idle () ;
+    t.idle <- Ivar.create () ) ;
+  Result.ok_exn result
 
 let idle t = if t.running = 0 then Deferred.unit else Ivar.read t.idle
 
@@ -51,6 +51,20 @@ let%test_module "In_flight" =
           let%bind () = Scheduler.yield_until_no_jobs_remain () in
           assert (Deferred.is_determined (idle t)) ;
           Deferred.unit )
+
+    let%test_unit "A late exception from work reaches the caller's monitor" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let t = create () in
+          let reached = ref false in
+          let monitor = Monitor.create () in
+          Monitor.detach_and_iter_errors monitor ~f:(fun _ -> reached := true) ;
+          let work () =
+            upon (after (Core.Time.Span.of_ms 10.)) (fun () -> failwith "late") ;
+            Deferred.unit
+          in
+          let%bind () = Scheduler.within' ~monitor (fun () -> run t work) in
+          let%map () = after (Core.Time.Span.of_ms 50.) in
+          assert !reached )
 
     let%test_unit "With nothing in flight, it is idle at once" =
       assert (Deferred.is_determined (idle (create ())))
