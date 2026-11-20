@@ -1,0 +1,65 @@
+; Defined only in the deb context of dune-workspace.packaging. The package has
+; no binaries, so it is the same in every build variant, and one context
+; builds it.
+
+(rule
+ (enabled_if
+  (= %{context_name} deb))
+ (targets mina.service)
+ (deps
+  (:service %{workspace_root}/scripts/mina.service))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run
+    sed
+    "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/devnet_seeds.txt%"
+    %{service}))))
+
+(rule
+ (enabled_if
+  (= %{context_name} deb))
+ (alias debs)
+ (targets
+  mina-devnet-config_%{env:MINA_DEB_VERSION=0.0.0-experimental}_all.deb)
+ (deps
+  (:mkdeb ../mkdeb.sh)
+  (:config %{workspace_root}/genesis_ledgers/devnet.json)
+  (:service mina.service)
+  (:tarballs ../ledger-tarballs.sh)
+  /etc/os-release
+  (env_var GITHASH_CONFIG)
+  (env_var LEDGER_TARBALLS_DIR)
+  (env_var MINA_COMMIT_SHA1)
+  (env_var BUILDKITE_BUILD_URL))
+ (action
+  (progn
+   (system
+    "[ -n \"$GITHASH_CONFIG\" ] || { echo 'GITHASH_CONFIG is not set' >&2; exit 1; }")
+   (run
+    %{tarballs}
+    %{config}
+    %{mkdeb}
+    --output
+    %{targets}
+    --package
+    mina-devnet-config
+    --version
+    %{env:MINA_DEB_VERSION=0.0.0-experimental}
+    --architecture
+    all
+    --description
+    "Mina Protocol Config for daemons running under devnet"
+    --replaces
+    "mina-devnet (<< %{env:MINA_DEB_VERSION=0.0.0-experimental})"
+    --breaks
+    "mina-devnet (<< %{env:MINA_DEB_VERSION=0.0.0-experimental})"
+    --githash
+    %{env:MINA_COMMIT_SHA1=}
+    --buildurl
+    %{env:BUILDKITE_BUILD_URL=}
+    %{config}:/var/lib/coda/config_%{env:GITHASH_CONFIG=}.json
+    %{config}:/var/lib/coda/devnet.json
+    %{service}:/usr/lib/systemd/user/mina.service
+    --into
+    /var/lib/coda))))
