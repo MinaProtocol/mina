@@ -374,8 +374,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (* Without an explicit target the replayer only replays up to the highest
          canonical block, which in a short-lived test network is genesis, so it
-         emits too few logs. Target a recent proof block instead: it is deep in
-         the chain and therefore already persisted in the archive. *)
+         emits too few logs. Target a recent proof block instead, once a later
+         block has been produced: the archive has received the proof block by
+         then. *)
       (let proof_state_hash =
          let ns = network_state t in
          match ns.proof_block_state_hashes with
@@ -386,6 +387,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        in
        [%log info] "Replaying archive up to proof block $state_hash"
          ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
+       let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
        let%bind logs =
          Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
            ( List.hd_exn

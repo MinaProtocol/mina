@@ -973,7 +973,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let replayer_result =
       section_hard "Running replayer"
-        (let%bind logs =
+        (let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind logs =
            Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
              archive_node
          in
