@@ -81,7 +81,7 @@ struct
     [%log info] "$node has started its filtered logs. Beginning polling"
       ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
     let%bind () =
-      Graphql_requests.poll_filtered_log_entries ~poll_interval_sec:10.0
+      Graphql_requests.poll_filtered_log_entries ~poll_interval_sec:0.1
         ~on_entries:(fun log_entries ->
           if Pipe.is_closed event_writer then Deferred.return `Stop
           else (
