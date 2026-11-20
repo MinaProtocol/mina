@@ -116,37 +116,29 @@ module Sql = struct
         (address, requested_block_height, token_id)
   end
 
-  let compute_incremental_balance
-      (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot ~end_slot
-      =
-    let cliff_time =
-      Mina_numbers.Global_slot_since_genesis.of_int
-        (Int.of_int64_exn timing_info.cliff_time)
-    in
-    let cliff_amount = MinaCurrency.Amount.of_string timing_info.cliff_amount in
-    let vesting_period =
-      Mina_numbers.Global_slot_span.of_int
-        (Int.of_int64_exn timing_info.vesting_period)
-    in
-    let vesting_increment =
-      MinaCurrency.Amount.of_string timing_info.vesting_increment
-    in
-    let initial_minimum_balance =
-      MinaCurrency.Balance.of_string timing_info.initial_minimum_balance
-    in
-    Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
-      ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
-      ~initial_minimum_balance
+  (* The balance [timing_info] keeps locked at [slot]. *)
+  let min_balance_at_slot (timing_info : Archive_lib.Processor.Timing_info.t)
+      ~slot =
+    Mina_base.Account.min_balance_at_slot ~global_slot:slot
+      ~cliff_time:
+        (Mina_numbers.Global_slot_since_genesis.of_int
+           (Int.of_int64_exn timing_info.cliff_time) )
+      ~cliff_amount:(MinaCurrency.Amount.of_string timing_info.cliff_amount)
+      ~vesting_period:
+        (Mina_numbers.Global_slot_span.of_int
+           (Int.of_int64_exn timing_info.vesting_period) )
+      ~vesting_increment:
+        (MinaCurrency.Amount.of_string timing_info.vesting_increment)
+      ~initial_minimum_balance:
+        (MinaCurrency.Balance.of_string timing_info.initial_minimum_balance)
+    |> MinaCurrency.Balance.to_uint64
 
   let find_current_balance (module Conn : Mina_caqti.CONNECTION)
       ~requested_block_global_slot_since_genesis ~last_relevant_command_info
       ?timing_id ?timing_info () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
-    let ( _
-        , last_relevant_command_global_slot_since_genesis
-        , last_relevant_command_balance
-        , nonce ) =
+    let _, _, last_relevant_command_balance, nonce =
       last_relevant_command_info
     in
     let%bind timing_info_opt =
@@ -173,23 +165,13 @@ module Sql = struct
           Deferred.Result.return
             (last_relevant_command_balance, UInt64.of_int64 nonce)
       | Some timing_info ->
-          (* This block was in the genesis ledger and has been
-             involved in at least one user or internal command. We need
-             to compute the change in its balance between the most recent
-             command and the start block (if it has vesting it may have
-             changed). *)
-          let incremental_balance_between_slots =
-            compute_incremental_balance timing_info
-              ~start_slot:
-                (Mina_numbers.Global_slot_since_genesis.of_int
-                   (Int.of_int64_exn
-                      last_relevant_command_global_slot_since_genesis ) )
-              ~end_slot
-          in
+          (* What is not locked at the requested slot is liquid. *)
+          let locked = min_balance_at_slot timing_info ~slot:end_slot in
+          let balance = UInt64.of_int64 last_relevant_command_balance in
           Deferred.Result.return
-            ( UInt64.Infix.(
-                UInt64.of_int64 last_relevant_command_balance
-                + incremental_balance_between_slots)
+            ( ( if UInt64.compare balance locked > 0 then
+                UInt64.Infix.(balance - locked)
+              else UInt64.zero )
               |> UInt64.to_int64
             , UInt64.of_int64 nonce )
     in
