@@ -33,12 +33,16 @@ let register_exn t block ~valid_cb =
       Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ) ;
   (* A block finalized without [finish] no longer needs its entry or its
      callback kept, and one that failed is ignored. The block may have been
-     registered again before this runs, so leave a callback that isn't this
-     registration's. *)
+     registered again before this runs, so leave an entry or a callback that
+     isn't this registration's. *)
   upon
     (Ivar.read (Cached.final_state cached))
     (fun final_state ->
-      Hashtbl.remove t.entries state_hash ;
+      Hashtbl.change t.entries state_hash ~f:(function
+        | Some kept when phys_equal kept cached ->
+            None
+        | kept ->
+            kept ) ;
       Option.iter valid_cb ~f:(fun valid_cb ->
           match Hashtbl.find t.callbacks state_hash with
           | Some kept when phys_equal kept valid_cb -> (
