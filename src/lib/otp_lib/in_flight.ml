@@ -7,12 +7,12 @@ let create () = { running = 0; idle = Ivar.create () }
 
 let run t f =
   t.running <- t.running + 1 ;
-  Monitor.protect f ~finally:(fun () ->
-      t.running <- t.running - 1 ;
-      if t.running = 0 then (
-        Ivar.fill t.idle () ;
-        t.idle <- Ivar.create () ) ;
-      Deferred.unit )
+  let%map result = Monitor.try_with ~here:[%here] ~run:`Now ~rest:`Raise f in
+  t.running <- t.running - 1 ;
+  if t.running = 0 then (
+    Ivar.fill t.idle () ;
+    t.idle <- Ivar.create () ) ;
+  Result.ok_exn result
 
 let idle t = if t.running = 0 then Deferred.unit else Ivar.read t.idle
 
