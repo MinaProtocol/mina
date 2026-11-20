@@ -150,7 +150,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri node_c)
              parties_create_accounts
          in
-         wait_for_zkapp parties_create_accounts )
+         let%bind () = wait_for_zkapp parties_create_accounts in
+         wait_for t
+           (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
     let%bind () =
       section "Checking for new zkApp account in node about to be stopped"
