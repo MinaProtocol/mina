@@ -16,12 +16,12 @@ module type CONTEXT = sig
 end
 
 let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache ~schedule =
+    ~verifier ~network ~frontier ~catchup_breadcrumbs_writer ~block_registry
+    ~schedule =
   Super_catchup.create_job_handler
     ~context:(module Context)
     ~trust_system ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache ~schedule
+    ~block_registry ~schedule
     ~build_func:
       (Transition_frontier.Breadcrumb.build
          ~get_completed_work:(Core_kernel.Fn.const None) )

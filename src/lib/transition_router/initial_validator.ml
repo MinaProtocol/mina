@@ -462,8 +462,8 @@ let%test_module "Initial validation of block bodies" =
               ~trust_system
               ~time_controller:(Block_time.Controller.basic ~logger)
               ~frontier ~on_valid
-              ~unprocessed_transition_cache:
-                (Transition_handler.Unprocessed_transition_cache.create ~logger
+              ~block_registry:
+                (Transition_handler.Block_registry.create ~logger
                    ~cache_exceptions:false )
           in
           let%map answers =

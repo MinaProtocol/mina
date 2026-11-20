@@ -64,19 +64,17 @@ type t =
   ; building_stopped : bool ref
         (* Whether breadcrumbs built from now on should be released rather
            than handed to the transition processor. *)
+  ; block_registry : Block_registry.t
   }
 
 (* Release a block that won't be built, along with its validation callback. A
    failed build may already have released it. *)
-let release_unbuilt (cached_transition, vc) =
+let release_unbuilt block_registry (cached_transition, vc) =
   (* TODO consider rejecting the callback in some cases,
      see https://github.com/MinaProtocol/mina/issues/11087 *)
   Option.value_map vc ~default:ignore
     ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
-  if not (Cached.was_finalized cached_transition) then
-    ignore
-      ( Cached.invalidate_with_failure cached_transition
-        : Mina_block.initial_valid_block Envelope.Incoming.t )
+  Block_registry.finish block_registry cached_transition `Ignored
 
 (** Release every block the scheduler holds, cancel its timeouts, and forget
     them, so that nothing later reaches a released block. Stop building
@@ -89,25 +87,16 @@ let clean_up
     ; time_controller
     ; breadcrumb_builder_supervisor
     ; building_stopped
+    ; block_registry
     ; _
     } =
   building_stopped := true ;
   Capped_supervisor.stop breadcrumb_builder_supervisor
     ~release:(fun (_initial_hash, transition_branches) ->
       List.iter transition_branches ~f:(fun subtree ->
-          Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) ) ;
+          Mina_stdlib.Rose_tree.iter subtree ~f:(release_unbuilt block_registry) ) ) ;
   Hashtbl.iter collected_transitions
-    ~f:
-      (List.iter ~f:(fun b ->
-           let hash =
-             Cached.peek b |> Envelope.Incoming.data
-             |> Validation.block_with_hash
-             |> State_hash.With_state_hashes.state_hash
-           in
-           let vc = Hashtbl.find validation_callbacks hash in
-           Option.value_map ~default:ignore
-             ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
-           ignore @@ Cached.invalidate_with_failure b ) ) ;
+    ~f:(List.iter ~f:(fun b -> Block_registry.finish block_registry b `Ignored)) ;
   Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
       Block_time.Timeout.cancel time_controller timeout () ) ;
   Hashtbl.clear collected_transitions ;
@@ -115,7 +104,7 @@ let clean_up
   Hashtbl.clear validation_callbacks
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller ~catchup_job_writer
+    ~time_controller ~block_registry ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
@@ -145,14 +134,9 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
             if !building_stopped then
               List.iter trees_of_breadcrumbs ~f:(fun tree ->
                   Mina_stdlib.Rose_tree.iter tree
-                    ~f:(fun (cached_breadcrumb, vc) ->
-                      Option.value_map vc ~default:ignore
-                        ~f:
-                          Mina_net2.Validation_callback
-                          .fire_if_not_already_fired `Ignore ;
-                      ignore
-                        ( Cached.invalidate_with_failure cached_breadcrumb
-                          : Transition_frontier.Breadcrumb.t ) ) )
+                    ~f:(fun (cached_breadcrumb, _vc) ->
+                      Block_registry.finish block_registry cached_breadcrumb
+                        `Ignored ) )
             else
               Writer.write catchup_breadcrumbs_writer
                 (trees_of_breadcrumbs, `Catchup_scheduler)
@@ -162,7 +146,8 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Mina_stdlib.Rose_tree.iter subtree ~f:release_unbuilt ) )
+                Mina_stdlib.Rose_tree.iter subtree
+                  ~f:(release_unbuilt block_registry) ) )
   in
   { logger
   ; collected_transitions
@@ -172,6 +157,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   ; breadcrumb_builder_supervisor
   ; validation_callbacks
   ; building_stopped
+  ; block_registry
   }
 
 let mem t transition =
@@ -418,7 +404,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let max_length = 10
 
-    let create = create ~logger ~trust_system ~time_controller
+    let create =
+      create ~logger ~trust_system ~time_controller
+        ~block_registry:(Block_registry.create ~logger ~cache_exceptions:true)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -434,28 +422,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         |> Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
-
-    let%test_unit "Blocks from a failed build are released once" =
-      Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
-           ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
-        ~f:(fun (_frontier, branch) ->
-          let cache =
-            Unprocessed_transition_cache.create ~logger ~cache_exceptions:true
-          in
-          let[@warning "-8"] [ failed; unbuilt ] =
-            List.map branch ~f:(fun breadcrumb ->
-                downcast_breadcrumb breadcrumb
-                |> Unprocessed_transition_cache.register_exn cache )
-          in
-          (* As a build that fails does: the block is transformed into the
-             result of building it, which is then invalidated. *)
-          ignore
-            ( Cached.invalidate_with_failure (Cached.transform failed ~f:Fn.id)
-              : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
-          release_unbuilt (failed, None) ;
-          release_unbuilt (unbuilt, None) ;
-          assert (Cached.was_finalized unbuilt) )
 
     let%test_unit "catchup jobs fire after the timeout" =
       let timeout_duration = Block_time.Span.of_ms 200L in
@@ -505,6 +471,56 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                       "catchup scheduler should be empty after job is emitted" ;
                   Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
                   Strict_pipe.Writer.close catchup_job_writer ) )
+
+    let%test_unit "Blocks from a failed build are released once" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length ~frontier_size:1 ~branch_size:2 () )
+        ~f:(fun (_frontier, branch) ->
+          let block_registry =
+            Block_registry.create ~logger ~cache_exceptions:true
+          in
+          let[@warning "-8"] [ failed; unbuilt ] =
+            List.map branch ~f:(fun breadcrumb ->
+                Block_registry.register_exn block_registry
+                  (downcast_breadcrumb breadcrumb)
+                  ~valid_cb:None )
+          in
+          (* As a build that fails does: the block is transformed into the
+             result of building it, which is then invalidated. *)
+          ignore
+            ( Cached.invalidate_with_failure (Cached.transform failed ~f:Fn.id)
+              : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+          release_unbuilt block_registry (failed, None) ;
+          release_unbuilt block_registry (unbuilt, None) ;
+          assert (Ivar.is_full (Cached.final_state unbuilt)) )
+
+    let%test_unit "A block whose build fails is answered" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~verifier ~max_length ~frontier_size:1 ~branch_size:1 () )
+        ~f:(fun (_frontier, branch) ->
+          let block_registry =
+            Block_registry.create ~logger ~cache_exceptions:true
+          in
+          let valid_cb =
+            Mina_net2.Validation_callback.create_without_expiration ()
+          in
+          let answered = ref false in
+          Mina_net2.Validation_callback.set_on_resolve valid_cb (fun _ ->
+              answered := true ) ;
+          let failed =
+            Block_registry.register_exn block_registry
+              (downcast_breadcrumb (List.hd_exn branch))
+              ~valid_cb:(Some valid_cb)
+          in
+          (* As a build that fails does: the block is transformed into the
+             result of building it, which is then invalidated. *)
+          ignore
+            ( Cached.invalidate_with_failure (Cached.transform failed ~f:Fn.id)
+              : Mina_block.initial_valid_block Envelope.Incoming.t ) ;
+          release_unbuilt block_registry (failed, Some valid_cb) ;
+          assert !answered )
 
     let%test_unit "Cleaning up releases the blocks waiting for their parents" =
       let timeout_duration = Block_time.Span.of_ms 200L in
