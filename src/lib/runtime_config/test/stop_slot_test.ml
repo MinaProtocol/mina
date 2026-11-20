@@ -352,6 +352,7 @@ let devnet : Network_constants.t =
           ; slots_per_sub_window = 7
           ; grace_period_slots = 2160
           ; delta = 0
+          ; block_window_duration_ms = 180_000
           }
       }
   }
@@ -395,6 +396,7 @@ let mainnet : Network_constants.t =
           ; slots_per_sub_window = 7
           ; grace_period_slots = 2160
           ; delta = 0
+          ; block_window_duration_ms = 180_000
           }
       }
   }
