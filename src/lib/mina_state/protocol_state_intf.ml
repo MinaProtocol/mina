@@ -37,7 +37,7 @@ module type Full = sig
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V3.t
             , Consensus.Data.Consensus_state.Value.Stable.V3.t
-            , Protocol_constants_checked.Value.Stable.V1.t )
+            , Protocol_constants_checked.Value.Stable.V2.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
         end

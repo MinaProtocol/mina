@@ -208,7 +208,7 @@ let create' (type length global_slot_since_hard_fork time timespan)
        and type timespan = timespan )
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants :
-       (length, length, time) Genesis_constants.Protocol.Poly.t ) :
+       (length, length, time, timespan) Genesis_constants.Protocol.Poly.t ) :
     (length, global_slot_since_hard_fork, time, timespan) Poly.t =
   let open M in
   let block_window_duration_ms =
@@ -316,6 +316,7 @@ let to_protocol_constants
      ; slots_per_sub_window
      ; slots_per_epoch
      ; grace_period_slots
+     ; block_window_duration_ms
      ; _
      } :
       _ Poly.t ) =
@@ -325,6 +326,7 @@ let to_protocol_constants
   ; slots_per_sub_window
   ; slots_per_epoch
   ; grace_period_slots
+  ; block_window_duration_ms
   }
 
 let typ =

@@ -312,7 +312,7 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Epoch_seed.Stable) (W.Epoch_seed)
   include Assert_equal0V1 (O.Staged_ledger_hash.Stable) (W.Staged_ledger_hash)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Protocol_constants_checked.Value.Stable)
       (W.Protocol_constants_checked.Value)
   include Assert_equal0V1 (O.State_hash.Stable) (W.State_hash)
@@ -424,7 +424,7 @@ end
 module Genesis_constants = struct
   module O = Genesis_constants
   module W = WT.Genesis_constants
-  include Assert_equal3V1 (O.Protocol.Poly.Stable) (W.Protocol.Poly)
+  include Assert_equal4V2 (O.Protocol.Poly.Stable) (W.Protocol.Poly)
 end
 
 module Mina_block = struct

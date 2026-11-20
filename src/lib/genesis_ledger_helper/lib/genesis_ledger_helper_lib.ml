@@ -564,6 +564,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       ; genesis_state_timestamp =
           Option.value ~default:default.protocol.genesis_state_timestamp
             genesis_state_timestamp
+      ; block_window_duration_ms =
+          Option.value ~default:default.protocol.block_window_duration_ms
+            (config.genesis >>= fun cfg -> cfg.block_window_duration_ms)
       }
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size

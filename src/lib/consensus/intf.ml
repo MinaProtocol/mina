@@ -120,7 +120,7 @@ module type Protocol_state = sig
         ( State_hash.t
         , blockchain_state
         , consensus_state
-        , Protocol_constants_checked.Value.Stable.V1.t )
+        , Protocol_constants_checked.Value.Stable.V2.t )
         Poly.t
       [@@deriving sexp, to_yojson]
     end

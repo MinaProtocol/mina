@@ -136,6 +136,24 @@ module Protocol = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type ('length, 'delta, 'genesis_state_timestamp, 'timespan) t =
+              ( 'length
+              , 'delta
+              , 'genesis_state_timestamp
+              , 'timespan )
+              Mina_wire_types.Genesis_constants.Protocol.Poly.V2.t =
+          { k : 'length
+          ; slots_per_epoch : 'length
+          ; slots_per_sub_window : 'length
+          ; grace_period_slots : 'length
+          ; delta : 'delta
+          ; genesis_state_timestamp : 'genesis_state_timestamp
+          ; block_window_duration_ms : 'timespan
+          }
+        [@@deriving equal, ord, hash, sexp, yojson, hlist, fields]
+      end
+
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
               ( 'length
@@ -156,8 +174,8 @@ module Protocol = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
+    module V2 = struct
+      type t = (int, int, (Int64.t[@version_asserted]), int) Poly.Stable.V2.t
       [@@deriving equal, ord, hash]
 
       let to_latest = Fn.id
@@ -176,6 +194,7 @@ module Protocol = struct
                       (Time.Span.of_ms
                          (Int64.to_float t.genesis_state_timestamp) ) )
                    ~zone:Time.Zone.utc ) )
+          ; ("block_window_duration_ms", `Int t.block_window_duration_ms)
           ]
 
       let of_yojson = function
@@ -186,6 +205,7 @@ module Protocol = struct
             ; ("grace_period_slots", `Int grace_period_slots)
             ; ("delta", `Int delta)
             ; ("genesis_state_timestamp", `String time_str)
+            ; ("block_window_duration_ms", `Int block_window_duration_ms)
             ] -> (
             match validate_time time_str with
             | Ok genesis_state_timestamp ->
@@ -196,6 +216,7 @@ module Protocol = struct
                   ; grace_period_slots
                   ; delta
                   ; genesis_state_timestamp
+                  ; block_window_duration_ms
                   }
             | Error e ->
                 Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
@@ -206,7 +227,7 @@ module Protocol = struct
 
       let sexp_of_t (t : t) =
         let module T = struct
-          type t = (int, int, string) Poly.Stable.V1.t [@@deriving sexp]
+          type t = (int, int, string, int) Poly.Stable.V2.t [@@deriving sexp]
         end in
         let t' : T.t =
           { k = t.k
@@ -219,9 +240,20 @@ module Protocol = struct
                 (Time.of_span_since_epoch
                    (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)) )
                 ~zone:Time.Zone.utc
+          ; block_window_duration_ms = t.block_window_duration_ms
           }
         in
         T.sexp_of_t t'
+    end
+
+    module V1 = struct
+      type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
+      [@@deriving equal, ord, hash, sexp]
+
+      let to_latest (_ : t) : Latest.t =
+        failwith
+          "Genesis_constants.Protocol.Stable.V1.to_latest: no \
+           block_window_duration_ms"
     end
   end]
 
@@ -411,6 +443,7 @@ module Make (Node_config : Node_config_intf.S) : S = struct
         ; genesis_state_timestamp =
             genesis_timestamp_of_string genesis_state_timestamp_string
             |> of_time
+        ; block_window_duration_ms = Node_config.block_window_duration
         }
     ; txpool_max_size = pool_max_size
     ; num_accounts = None
