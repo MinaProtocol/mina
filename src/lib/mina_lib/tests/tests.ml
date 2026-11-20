@@ -350,7 +350,7 @@ let%test_module "Epoch ledger sync tests" =
       in
       (* create transition frontier *)
       let tr_tm0 = Unix.gettimeofday () in
-      let _valid_transitions, initialization_finish_signal =
+      let _valid_transitions, initialization_finish_signal, _stop =
         let notify_online () = Deferred.unit in
         let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
