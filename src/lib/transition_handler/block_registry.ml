@@ -25,10 +25,16 @@ let register_exn t block ~valid_cb =
       let state_hash = Cached.original cached in
       Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ;
       (* A block finalized without [finish] no longer needs its callback
-         kept. *)
+         kept. The block may have been registered again before this runs, so
+         leave a callback that isn't this registration's. *)
       upon
         (Ivar.read (Cached.final_state cached))
-        (fun _ -> Hashtbl.remove t.callbacks state_hash) ) ;
+        (fun _ ->
+          Hashtbl.change t.callbacks state_hash ~f:(function
+            | Some kept when phys_equal kept valid_cb ->
+                None
+            | kept ->
+                kept ) ) ) ;
   cached
 
 let answer outcome valid_cb =
@@ -177,4 +183,21 @@ let%test_module "Block_registry" =
         (finishing (fun t cached ->
              finish t (Cached.transform cached ~f:(fun _ -> ())) `Rejected ) )
         (removed `Failure, [ `Reject ])
+
+    let%test_unit "A block registered again keeps its callback" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let callback () =
+        Mina_net2.Validation_callback.create_without_expiration ()
+      in
+      let second_cb = callback () in
+      let answers = ref [] in
+      Mina_net2.Validation_callback.set_on_resolve second_cb (fun answer ->
+          answers := answer :: !answers ) ;
+      finish t (register_exn t block ~valid_cb:(Some (callback ()))) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:(Some second_cb) in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      finish t second `Rejected ;
+      [%test_eq: answer list] !answers [ `Reject ]
   end )
