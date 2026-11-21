@@ -74,9 +74,6 @@ module type S = sig
     (** get mask parent *)
     val get_parent : t -> parent
 
-    (** called when parent sets an account; update local state *)
-    val parent_set_notify : t -> account -> unit
-
     (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 
@@ -94,12 +91,6 @@ module type S = sig
     val append_maps : t -> maps_t -> unit
 
     val get_maps : t -> maps_t
-
-    (** Drop accumulated structure, a method used in safeguard against
-        unwanted modification of ancestor's mask *)
-    val drop_accumulated : t -> unit
-
-    val is_committing : t -> bool
 
     (** already have module For_testing from include above *)
     module For_testing : sig
