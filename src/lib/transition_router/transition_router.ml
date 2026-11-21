@@ -156,7 +156,7 @@ let start_transition_frontier_controller ?transaction_pool_proxy t
   don't_wait_for start_and_iterate
 
 let start_bootstrap_controller t ~initial_root_transition ~best_seen_transition
-    =
+    ~best_seen_valid_cb =
   let (module Context : CONTEXT) = t.context in
   let { trust_system
       ; verifier
@@ -177,7 +177,8 @@ let start_bootstrap_controller t ~initial_root_transition ~best_seen_transition
   Bootstrap_status.start_bootstrap bootstrap_status ;
   phase := Bootstrapping ;
   let f b_or_h =
-    Strict_pipe.Swappable.write network_transition_pipe (b_or_h, `Valid_cb None) ;
+    Strict_pipe.Swappable.write network_transition_pipe
+      (b_or_h, `Valid_cb best_seen_valid_cb) ;
     let sender =
       match b_or_h with
       | `Block b ->
@@ -432,6 +433,7 @@ let initialize t ~transaction_pool_proxy ~sync_local_state ~is_seed
       start_bootstrap_controller t ~initial_root_transition
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
+        ~best_seen_valid_cb:None
   | Some best_tip, Some frontier
     when Transition_handler.Catchup_classifier.orphans_anchor
            ~context:(module Context)
@@ -454,6 +456,7 @@ let initialize t ~transaction_pool_proxy ~sync_local_state ~is_seed
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap_controller t ~initial_root_transition
         ~best_seen_transition:(Some (`Block best_tip))
+        ~best_seen_valid_cb:None
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
@@ -569,14 +572,14 @@ let update_most_recent_valid_block ~context:(module Context : CONTEXT)
   else Deferred.unit
 
 (** If a valid block or header shows the frontier is too far behind to catch
-    up, stop the frontier controller and start bootstrapping; either way, pass
-    the transition on to whichever controller is reading. *)
+    up, stop the frontier controller and start bootstrapping with it;
+    otherwise, pass the transition on to whichever controller is reading. *)
 let route_valid_transition t ~get_current_frontier ~clear_writer
     (b_or_h, `Valid_cb vc) =
   let (module Context : CONTEXT) = t.context in
   let { phase; network_transition_pipe; _ } = t in
   don't_wait_for
-  @@ let%map () =
+  @@ let%map passed_to_bootstrap =
        let header_with_hash =
          block_or_header_to_header_hashed_with_validation b_or_h
        in
@@ -600,13 +603,18 @@ let route_valid_transition t ~get_current_frontier ~clear_writer
              let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
              ignore
              @@ start_bootstrap_controller t ~initial_root_transition
-                  ~best_seen_transition:(Some b_or_h) )
-           else Deferred.unit
+                  ~best_seen_transition:(Some b_or_h)
+                  ~best_seen_valid_cb:(Some vc) ;
+             true )
+           else Deferred.return false
        | None ->
-           Deferred.unit
+           Deferred.return false
      in
-     Strict_pipe.Swappable.write network_transition_pipe
-       (b_or_h, `Valid_cb (Some vc))
+     (* Bootstrap is given the block that started it, so it needs passing on
+        only otherwise. *)
+     if not passed_to_bootstrap then
+       Strict_pipe.Swappable.write network_transition_pipe
+         (b_or_h, `Valid_cb (Some vc))
 
 (* [sync_local_state] may be `false` for tests, where we want
    to set local state in the test
