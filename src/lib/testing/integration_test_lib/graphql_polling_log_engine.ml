@@ -63,7 +63,7 @@ struct
     if not (Pipe.is_closed event_writer) then
       match%bind
         Graphql_requests.start_filtered_log ~logger ~log_filter
-          ~retry_delay_sec:10.0
+          ~retry_delay_sec:0.1
           (Node.get_ingress_uri node)
       with
       | Ok () ->
@@ -81,7 +81,7 @@ struct
     [%log info] "$node has started its filtered logs. Beginning polling"
       ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
     let%bind () =
-      Graphql_requests.poll_filtered_log_entries ~poll_interval_sec:10.0
+      Graphql_requests.poll_filtered_log_entries ~poll_interval_sec:0.1
         ~on_entries:(fun log_entries ->
           if Pipe.is_closed event_writer then Deferred.return `Stop
           else (
@@ -94,13 +94,15 @@ struct
                       ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
             Deferred.return `Continue ) )
         ~on_error:(fun err ->
-          [%log error] "Encountered an error while polling $node for logs: $err"
-            ~metadata:
-              [ ("node", `String (Node.infra_id node))
-              ; ("err", Error_json.error_to_yojson err)
-              ] ;
-          Pipe.write_without_pushback event_writer
-            (node, Event (Node_offline, ())) ;
+          if not (Pipe.is_closed event_writer) then (
+            [%log error]
+              "Encountered an error while polling $node for logs: $err"
+              ~metadata:
+                [ ("node", `String (Node.infra_id node))
+                ; ("err", Error_json.error_to_yojson err)
+                ] ;
+            Pipe.write_without_pushback event_writer
+              (node, Event (Node_offline, ())) ) ;
           Deferred.return `Stop )
         (Node.get_ingress_uri node)
     in

@@ -17,6 +17,7 @@
   async_kernel
   core_kernel
   core
+  core_unix
   uri
   integers
   result

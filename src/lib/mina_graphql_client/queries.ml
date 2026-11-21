@@ -247,6 +247,9 @@ module GetFilteredLogEntries =
         logMessages,
         isCapturing,
     }
+    daemonStatus {
+      uptimeSecs
+    }
   }
 |}]
 
