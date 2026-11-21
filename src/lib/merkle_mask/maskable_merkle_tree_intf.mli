@@ -18,7 +18,6 @@ module type S = sig
 
   (* registering a mask makes it an active child of the parent Merkle tree
      - reads to the mask that fail are delegated to the parent
-     - writes to the parent notify the child mask
   *)
 
   val register_mask :

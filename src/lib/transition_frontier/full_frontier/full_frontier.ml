@@ -412,8 +412,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    * the following operations on masks in order:
    *
    *     0) notify consensus that root transitioned
-   *     1) unattach and destroy all the garbage (to avoid unnecessary trickling of
-   *        invalidations from `m0` during the next step)
+   *     1) unattach and destroy all the garbage
    *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
    *        making `m1` into an identity mask (an empty mask on top of `m1'`).
    *     3) safely remove `m1` and reparent all the successors of `m1` onto `m1'`

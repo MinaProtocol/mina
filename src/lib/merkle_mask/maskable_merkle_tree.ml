@@ -26,8 +26,6 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   include Base
 
-  let logger = Logger.create ()
-
   (** Maps parent ledger UUIDs to child masks. *)
   let (registered_masks : Mask.Attached.t list Uuid.Table.t) =
     Uuid.Table.create ()
@@ -196,26 +194,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     unregister_mask_exn_do ~trigger_signal ~loc mask
 
-  (** a set calls the Base implementation set, notifies registered mask childen *)
-  let set t location account =
-    Base.set t location account ;
-    let uuid = get_uuid t in
-    match Uuid.Table.find registered_masks uuid with
-    | None ->
-        ()
-    | Some masks ->
-        List.iter masks ~f:(fun mask ->
-            if not (Mask.Attached.is_committing mask) then (
-              Mask.Attached.parent_set_notify mask account ;
-              let child_uuid = Mask.Attached.get_uuid mask in
-              Mask.Attached.drop_accumulated mask ;
-              iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
-              [%log error]
-                "Update of an account in parent %s conflicted with an account \
-                 in mask %s"
-                (Uuid.to_string_hum uuid)
-                (Uuid.to_string_hum child_uuid) ) )
-
   let remove_and_reparent_exn t t_as_mask =
     let parent = Mask.Attached.get_parent t_as_mask in
     let merkle_root = Mask.Attached.merkle_root t_as_mask in
@@ -232,31 +210,4 @@ module Make (Inputs : Inputs_intf) = struct
     ignore (unregister_mask_exn ~loc:__LOC__ t_as_mask : Mask.unattached) ;
     List.iter dangling_masks ~f:(fun m ->
         ignore (register_mask parent m : Mask.Attached.t) )
-
-  let batch_notify_mask_children t accounts =
-    let uuid = get_uuid t in
-    match Uuid.Table.find registered_masks uuid with
-    | None ->
-        ()
-    | Some masks ->
-        List.iter masks ~f:(fun mask ->
-            if not (Mask.Attached.is_committing mask) then (
-              let child_uuid = Mask.Attached.get_uuid mask in
-              Mask.Attached.drop_accumulated mask ;
-              iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
-              [%log error]
-                "Update of an account in parent %s conflicted with an account \
-                 in mask %s"
-                (Uuid.to_string_hum uuid)
-                (Uuid.to_string_hum child_uuid) ;
-              List.iter accounts ~f:(fun account ->
-                  Mask.Attached.parent_set_notify mask account ) ) )
-
-  let set_batch ?hash_cache t locations_and_accounts =
-    Base.set_batch ?hash_cache t locations_and_accounts ;
-    batch_notify_mask_children t (List.map locations_and_accounts ~f:snd)
-
-  let set_batch_accounts t addresses_and_accounts =
-    Base.set_batch_accounts t addresses_and_accounts ;
-    batch_notify_mask_children t (List.map addresses_and_accounts ~f:snd)
 end
