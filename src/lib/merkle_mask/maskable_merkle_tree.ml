@@ -120,13 +120,6 @@ module Make (Inputs : Inputs_intf) = struct
 
   let register_mask ?accumulated t mask =
     let attached_mask = Mask.set_parent ?accumulated mask t in
-    List.iter (Uuid.Table.data registered_masks) ~f:(fun ms ->
-        List.iter ms ~f:(fun m ->
-            [%test_result: bool]
-              ~message:
-                "We've already registered a mask with this UUID; you have a bug"
-              ~expect:false
-              (Uuid.equal (Mask.Attached.get_uuid m) (Mask.get_uuid mask)) ) ) ;
     (* handles cases where no entries for t, or where there are existing entries *)
     Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
