@@ -91,6 +91,10 @@ module V2 : sig
   type t = (Mina_base_account_update.V2.t, unit, unit) Call_forest.V1.t T.t
 end
 
+module V3 : sig
+  type t = (Mina_base_account_update.V3.t, unit, unit) Call_forest.V1.t V2.T.t
+end
+
 module Valid : sig
   module Verification_key_hash : sig
     module V1 : sig
@@ -100,6 +104,10 @@ module Valid : sig
 
   module V2 : sig
     type t = { zkapp_command : V2.t }
+  end
+
+  module V3 : sig
+    type t = { zkapp_command : V3.t }
   end
 end
 
