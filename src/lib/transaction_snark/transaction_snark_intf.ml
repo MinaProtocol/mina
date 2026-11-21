@@ -71,7 +71,7 @@ module type Full = sig
     ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N5.n )
+    , Nat.N8.n )
     Pickles.Tag.t
 
   val verify :
@@ -260,10 +260,12 @@ module type Full = sig
   (** Return the constraint system for the transaction-merge circuit. *)
   val merge_constraint_system : unit -> Tick.R1CS_constraint_system.t
 
-  (** Return the constraint system for the transaction-base circuit. *)
+  (** Return the constraint system for the transaction-base circuit proving
+      transactions of the given kind. *)
   val base_constraint_system :
        signature_kind:Mina_signature_kind.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> kind:Transaction_union.Tag.t
     -> Tick.R1CS_constraint_system.t
 
   (** Return the constraint system for the zkapp-opt_signed-opt_signed circuit. *)

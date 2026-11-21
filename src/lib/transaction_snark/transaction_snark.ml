@@ -3103,6 +3103,30 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (final_root, fee_excess, supply_increase)
 
+    (** The Pickles rule identifier for the base rule proving transactions of
+        the given kind. *)
+    let kind_identifier : Transaction_union.Tag.t -> string = function
+      | Payment ->
+          "payment"
+      | Stake_delegation ->
+          "stake_delegation"
+      | Fee_transfer ->
+          "fee_transfer"
+      | Coinbase ->
+          "coinbase"
+
+    let is_kind (kind : Transaction_union.Tag.t)
+        (tag : Transaction_union.Tag.Unpacked.var) =
+      match kind with
+      | Payment ->
+          Transaction_union.Tag.Unpacked.is_payment tag
+      | Stake_delegation ->
+          Transaction_union.Tag.Unpacked.is_stake_delegation tag
+      | Fee_transfer ->
+          Transaction_union.Tag.Unpacked.is_fee_transfer tag
+      | Coinbase ->
+          Transaction_union.Tag.Unpacked.is_coinbase tag
+
     (* Someday:
        write the following soundness tests:
        - apply a transaction where the signature is incorrect
@@ -3115,6 +3139,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        constraints pass iff there exists
           t : Tagged_transaction.t
        such that
+       - [t] is a transaction of the given [kind]
        - applying [t] to ledger with merkle hash [l1] results in ledger with
          merkle hash [l2].
        - applying [t] to [pc.source] with results in pending coinbase stack
@@ -3128,12 +3153,16 @@ module Make_str (A : Wire_types.Concrete) = struct
           supply_increase : Amount.Signed.t
           pc: Pending_coinbase_stack_state.t
     *)
-    let%snarkydef_ main ~signature_kind ~constraint_constants
+    let%snarkydef_ main ~signature_kind ~constraint_constants ~kind
         (statement : Statement.With_sok.var) =
       let%bind () = dummy_constraints () in
       let%bind t =
         with_label __LOC__ (fun () ->
             exists Transaction_union.typ ~request:(As_prover.return Transaction) )
+      in
+      let%bind () =
+        [%with_label_ "Transaction kind matches the rule"] (fun () ->
+            Boolean.Assert.is_true (is_kind kind t.payload.body.tag) )
       in
       let%bind pending_coinbase_init =
         exists Pending_coinbase.Stack.typ ~request:(As_prover.return Init_stack)
@@ -3220,13 +3249,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ] )
         ]
 
-    let rule ~signature_kind ~constraint_constants : _ Pickles.Inductive_rule.t
-        =
-      { identifier = "transaction"
+    let rule ~signature_kind ~constraint_constants ~kind :
+        _ Pickles.Inductive_rule.t =
+      { identifier = kind_identifier kind
       ; prevs = []
       ; main =
           (fun { public_input = x } ->
-            Run.run_checked (main ~signature_kind ~constraint_constants x) ;
+            Run.run_checked (main ~signature_kind ~constraint_constants ~kind x) ;
             { previous_proof_statements = []
             ; public_output = ()
             ; auxiliary_output = ()
@@ -3441,7 +3470,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     ( Statement.With_sok.var
     , Statement.With_sok.t
     , Nat.N2.n
-    , Nat.N5.n )
+    , Nat.N8.n )
     Pickles.Tag.t
 
   let system ~signature_kind ~proof_level ~constraint_constants =
@@ -3454,7 +3483,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
         in
-        [ Base.rule ~signature_kind ~constraint_constants
+        let base kind = Base.rule ~signature_kind ~constraint_constants ~kind in
+        [ base Payment
+        ; base Stake_delegation
+        ; base Fee_transfer
+        ; base Coinbase
         ; Merge.rule ~proof_level self
         ; zkapp_command ~signature_kind Opt_signed_opt_signed
         ; zkapp_command ~signature_kind Opt_signed
@@ -3580,7 +3613,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (let open Checked in
                     exists Statement.With_sok.typ
                       ~compute:(As_prover.return statement)
-                    >>= Base.main ~signature_kind ~constraint_constants) )
+                    >>= Base.main ~signature_kind ~constraint_constants
+                          ~kind:transaction.payload.body.tag) )
                 handler ) )
         : unit )
 
@@ -3682,7 +3716,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Tick in
     let main x =
       handle
-        (fun () -> Base.main ~signature_kind ~constraint_constants x)
+        (fun () ->
+          Base.main ~signature_kind ~constraint_constants
+            ~kind:transaction.payload.body.tag x )
         handler
     in
     generate_auxiliary_input ~input_typ:Statement.With_sok.typ
@@ -3729,12 +3765,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           let open Tick in
           Checked.map ~f:ignore @@ main x ))
 
-  (** Return the constraint system for the transaction-base circuit. *)
-  let base_constraint_system ~signature_kind ~constraint_constants =
+  (** Return the constraint system for the transaction-base circuit proving
+      transactions of the given kind. *)
+  let base_constraint_system ~signature_kind ~constraint_constants ~kind =
     Base.(
       Tick.constraint_system ~input_typ:Statement.With_sok.typ
         ~return_typ:Tick.Typ.unit
-        (main ~signature_kind ~constraint_constants))
+        (main ~signature_kind ~constraint_constants ~kind))
 
   (** Return the constraint system for the zkapp-opt_signed-opt_signed circuit. *)
   let zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
@@ -3775,9 +3812,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let constraint_system_digests ~signature_kind ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
+    let base kind =
+      ( "transaction-base-" ^ Base.kind_identifier kind
+      , digest
+          (base_constraint_system ~signature_kind ~constraint_constants ~kind)
+      )
+    in
     [ ("transaction-merge", digest (merge_constraint_system ()))
-    ; ( "transaction-base"
-      , digest (base_constraint_system ~signature_kind ~constraint_constants) )
+    ; base Payment
+    ; base Stake_delegation
+    ; base Fee_transfer
+    ; base Coinbase
     ; ( "zkapp-opt_signed-opt_signed"
       , digest
           (zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
@@ -4200,7 +4245,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         , cache_handle
         , p
         , Pickles.Provers.
-            [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
+            [ payment
+            ; stake_delegation
+            ; fee_transfer
+            ; coinbase
+            ; merge
+            ; opt_signed_opt_signed
+            ; opt_signed
+            ; proved
+            ] ) =
       system ~signature_kind ~proof_level ~constraint_constants
 
     module Proof = (val p)
@@ -4286,11 +4339,22 @@ module Make_str (A : Wire_types.Concrete) = struct
       Base.Zkapp_command_snark.witness := None ;
       { Proof_carrying_data.proof; data = statement }
 
-    let of_transaction_union ~statement ~init_stack transaction state_body
-        global_slot handler =
+    let of_transaction_union ~statement ~init_stack
+        (transaction : Transaction_union.t) state_body global_slot handler =
       let open Async in
+      let prover =
+        match transaction.payload.body.tag with
+        | Payment ->
+            payment
+        | Stake_delegation ->
+            stake_delegation
+        | Fee_transfer ->
+            fee_transfer
+        | Coinbase ->
+            coinbase
+      in
       let%map (), (), proof =
-        base
+        prover
           ~handler:
             (Base.transaction_union_handler handler transaction state_body
                global_slot init_stack )
