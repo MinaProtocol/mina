@@ -85,6 +85,9 @@ module Make (Inputs : Inputs_intf.S) = struct
              and for a few ancestors.
              This is used as a lookup cache. *)
     ; mutable accumulated : accumulated_t option
+    ; mutable level : int
+    ; mutable mutations : Merkle_ledger.Mutations.t
+          (** This mask's place in the log of orphaned masks *)
     }
 
   type unattached = t
@@ -106,6 +109,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; depth
     ; accumulated = None
     ; maps = empty_maps
+    ; level = 0
+    ; mutations = Merkle_ledger.Mutations.current ()
     }
 
   let get_uuid { uuid; _ } = uuid
@@ -130,10 +135,26 @@ module Make (Inputs : Inputs_intf.S) = struct
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
 
+    (** Catch [t] up on the masks orphaned since it last did, raising if one
+        of them is below it. The entries after [t]'s place in the log are first
+        merged, in the log itself, into one at their lowest level, so that
+        [t]'s parent is caught up at most once. *)
+    let rec catch_up t =
+      match t.mutations with
+      | { tail = Some (level1, { tail = Some (level2, mutations) }) } as head ->
+          head.tail <- Some (Int.min level1 level2, mutations) ;
+          catch_up t
+      | { tail = Some (level, ({ tail = None } as last)) } ->
+          if level < t.level then
+            Base.handle_mutations (Result.ok_or_failwith t.parent) ;
+          t.mutations <- last
+      | { tail = None } ->
+          ()
+
     let repr t =
       match t.desc with
       | Ledger t ->
-          t
+          catch_up t ; t
       | Orphaned (uuid, loc) ->
           raise (Dangling_parent_reference (uuid, loc))
 
@@ -145,6 +166,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let unset_parent ~loc attached =
       let t = repr attached in
       attached.desc <- Orphaned (t.uuid, loc) ;
+      Merkle_ledger.Mutations.append t.level ;
       detach ~loc t ;
       t
 
@@ -158,6 +180,10 @@ module Make (Inputs : Inputs_intf.S) = struct
           Async.Deferred.unit
 
     let get_parent t = Result.ok_or_failwith (repr t).parent
+
+    let level t = (repr t).level
+
+    let handle_mutations = assert_is_attached
 
     (** Check whether mask from which we started computing the [next]
         accumulator is detached and [current] can be garbage-collected. *)
@@ -604,6 +630,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let parent_mask = repr parent in
       parent.desc <- Orphaned (parent_mask.uuid, loc) ;
       t.desc <- Ledger parent_mask ;
+      Merkle_ledger.Mutations.append parent_mask.level ;
       detach ~loc mask
 
     (* copy tables in t; use same parent *)
@@ -618,6 +645,8 @@ module Make (Inputs : Inputs_intf.S) = struct
             ; current_location = t.current_location
             ; depth = t.depth
             ; maps = t.maps
+            ; level = t.level
+            ; mutations = t.mutations
             ; accumulated =
                 Option.map t.accumulated ~f:(fun acc ->
                     { base = acc.base
@@ -999,6 +1028,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     assert (Result.is_error t.parent) ;
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
+    Base.handle_mutations parent ;
+    t.level <- Base.level parent + 1 ;
+    t.mutations <- Merkle_ledger.Mutations.current () ;
     t.parent <- Ok parent ;
     let attached = { Attached.desc = Ledger t } in
     t.current_location <- Attached.last_filled attached ;

@@ -90,6 +90,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let detached_signal { detached_parent_signal; _ } =
     Async.Ivar.read detached_parent_signal
 
+  let level _ = 0
+
+  let handle_mutations _ = ()
+
   let with_ledger ~depth ~f =
     let t = create ~depth () in
     try

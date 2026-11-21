@@ -155,6 +155,10 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let detached_signal (T ((module Base), t)) = Base.detached_signal t
 
+    let level (T ((module Base), t)) = Base.level t
+
+    let handle_mutations (T ((module Base), t)) = Base.handle_mutations t
+
     let all_accounts_on_masks (T ((module Base), t)) =
       Base.all_accounts_on_masks t
   end

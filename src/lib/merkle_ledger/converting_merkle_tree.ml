@@ -206,6 +206,10 @@ end)
 
   let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
 
+  let level _ = 0
+
+  let handle_mutations _ = ()
+
   let all_accounts_on_masks _ = Location.Map.empty
 end
 

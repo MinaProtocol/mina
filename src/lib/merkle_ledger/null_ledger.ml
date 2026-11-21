@@ -173,5 +173,9 @@ end = struct
 
   let detached_signal _ = Async_kernel.Deferred.never ()
 
+  let level _ = 0
+
+  let handle_mutations _ = ()
+
   let all_accounts_on_masks _ = Location.Map.empty
 end
