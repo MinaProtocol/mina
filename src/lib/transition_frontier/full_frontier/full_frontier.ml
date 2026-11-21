@@ -1023,7 +1023,10 @@ module For_tests = struct
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
     let staged_ledger =
-      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      Staged_ledger.create_exn ~constraint_constants
+        ~ledger:
+          (Mina_ledger.Ledger.register_mask root_ledger
+             (Mina_ledger.Ledger.Mask.create ~depth:ledger_depth ()) )
     in
     let root_data =
       let open Root_data in
