@@ -144,7 +144,7 @@ module Make (Inputs : Inputs_intf) = struct
       (Uuid.to_string_hum parent_uuid)
       suffix
 
-  let unregister_mask_exn_do ?trigger_signal mask =
+  let unregister_mask_exn_do mask =
     let uuid = Mask.Attached.get_uuid mask in
     let parent_uuid = Mask.Attached.get_parent mask |> get_uuid in
     let error_msg = unregister_mask_error_msg ~uuid ~parent_uuid in
@@ -161,38 +161,31 @@ module Make (Inputs : Inputs_intf) = struct
           (* no other masks for this maskable *)
           Uuid.Table.remove registered_masks parent_uuid
         else Uuid.Table.set registered_masks ~key:parent_uuid ~data:good ;
-        Mask.Attached.unset_parent ?trigger_signal mask
+        Mask.Attached.unset_parent mask
 
   let unregister_mask_exn ?(grandchildren = `Check) ~loc (mask : Mask.Attached.t)
       : Mask.unattached =
     let uuid = Mask.Attached.get_uuid mask in
     let parent_uuid = Mask.Attached.get_parent mask |> get_uuid in
     let error_msg = unregister_mask_error_msg ~uuid ~parent_uuid in
-    let trigger_signal =
-      match grandchildren with
-      | `Check -> (
-          match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
-          | Some children ->
-              failwith @@ error_msg
-              @@ sprintf
-                   !"mask has children that must be unregistered first: \
-                     %{sexp: Uuid.t list}"
-                   (List.map ~f:Mask.Attached.get_uuid children)
-          | None ->
-              true )
-      | `I_promise_I_am_reparenting_this_mask ->
-          false
-      | `Recursive ->
-          (* You must not retain any references to children of the mask we're
-             unregistering if you pass `Recursive, so this is only used in
-             with_ephemeral_ledger. *)
-          iter_descendants uuid ~f:(fun mask ->
-              ignore
-                ( unregister_mask_exn_do ~trigger_signal:true ~loc mask
-                  : Mask.unattached ) ) ;
-          true
-    in
-    unregister_mask_exn_do ~trigger_signal ~loc mask
+    ( match grandchildren with
+    | `Check -> (
+        match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
+        | Some children ->
+            failwith @@ error_msg
+            @@ sprintf
+                 !"mask has children that must be unregistered first: %{sexp: \
+                   Uuid.t list}"
+                 (List.map ~f:Mask.Attached.get_uuid children)
+        | None ->
+            () )
+    | `Recursive ->
+        (* You must not retain any references to children of the mask we're
+           unregistering if you pass `Recursive, so this is only used in
+           with_ephemeral_ledger. *)
+        iter_descendants uuid ~f:(fun mask ->
+            ignore (unregister_mask_exn_do ~loc mask : Mask.unattached) ) ) ;
+    unregister_mask_exn_do ~loc mask
 
   let remove_and_reparent_exn t t_as_mask =
     let parent = Mask.Attached.get_parent t_as_mask in
@@ -200,14 +193,11 @@ module Make (Inputs : Inputs_intf) = struct
     (* we can only reparent if merkle roots are the same *)
     assert (Hash.equal (Base.merkle_root parent) merkle_root) ;
     let children =
-      Hashtbl.find registered_masks (get_uuid t) |> Option.value ~default:[]
-    in
-    let dangling_masks =
-      List.map children ~f:(fun c ->
-          unregister_mask_exn ~loc:__LOC__
-            ~grandchildren:`I_promise_I_am_reparenting_this_mask c )
+      Hashtbl.find_and_remove registered_masks (get_uuid t)
+      |> Option.value ~default:[]
     in
     ignore (unregister_mask_exn ~loc:__LOC__ t_as_mask : Mask.unattached) ;
-    List.iter dangling_masks ~f:(fun m ->
-        ignore (register_mask parent m : Mask.Attached.t) )
+    List.iter children ~f:(fun mask ->
+        Mask.Attached.reparent mask parent ;
+        Uuid.Table.add_multi registered_masks ~key:(get_uuid parent) ~data:mask )
 end

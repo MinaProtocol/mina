@@ -125,12 +125,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
 
-    let unset_parent ?(trigger_signal = true) ~loc t =
+    let unset_parent ~loc t =
       assert (Result.is_ok t.parent) ;
       t.parent <- Error loc ;
-      if trigger_signal then (
-        t.accumulated <- None ;
-        Async.Ivar.fill_if_empty t.detached_parent_signal () ) ;
+      t.accumulated <- None ;
+      Async.Ivar.fill_if_empty t.detached_parent_signal () ;
       t
 
     let assert_is_attached t =
@@ -967,6 +966,12 @@ module Make (Inputs : Inputs_intf.S) = struct
       let base = get_parent t |> Base.all_accounts_on_masks in
       let combine ~key:_ _ v = v in
       Map.merge_skewed ~combine base t.maps.accounts
+
+    let reparent t parent =
+      assert_is_attached t ;
+      assert (Int.equal t.depth (Base.depth parent)) ;
+      t.parent <- Ok parent ;
+      t.current_location <- last_filled t
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =
