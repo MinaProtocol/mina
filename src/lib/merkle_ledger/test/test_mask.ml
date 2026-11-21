@@ -584,50 +584,6 @@ module Make (Test : Test_intf) = struct
               && Int.equal parent_num_accounts mask_num_accounts_after ) ) )
 
   let () =
-    add_test "mask reparenting works" (fun () ->
-        Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
-            let num_accounts = 3 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let T = Account_id.eq in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-            match accounts with
-            | [ a1; a2; a3 ] ->
-                let loc1 = parent_create_new_account_exn base a1 in
-                let m1, m1_base = Lazy.force m1_lazy in
-                let loc2 = create_new_account_exn m1 a2 in
-                let m2 = Lazy.force m2_lazy in
-                let loc3 = create_new_account_exn m2 a3 in
-                let locs = [ (loc1, a1); (loc2, a2); (loc3, a3) ] in
-                (* all accounts are here *)
-                List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                Mask.Attached.commit m1 ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
-                Maskable.remove_and_reparent_exn m1_base m1 ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
-                (* all accounts are still here *)
-                List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) )
-            | _ ->
-                failwith "unexpected" ) )
-
-  let () =
     add_test "all_accounts_on_masks works on a chain" (fun () ->
         Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
             (* Subtract one for a shared account *)

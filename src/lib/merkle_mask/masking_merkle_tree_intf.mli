@@ -73,10 +73,6 @@ module type S = sig
     *)
     val unset_parent : loc:string -> t -> unattached
 
-    (** [reparent t parent] moves [t] onto [parent] without detaching it.
-        [parent]'s merkle root must be the same as [t]'s parent's. *)
-    val reparent : t -> parent -> unit
-
     (** get mask parent *)
     val get_parent : t -> parent
 

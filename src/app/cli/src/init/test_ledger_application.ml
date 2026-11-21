@@ -230,10 +230,9 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       Fn.compose (Ledger.register_mask ledger)
       @@ Ledger.Mask.create ~depth:constraint_constants.ledger_depth
   in
-  let drop_old_ledger ledger =
-    if not no_masks then (
-      Ledger.commit ledger ;
-      Ledger.remove_and_reparent_exn ledger ledger )
+  let drop_old_ledger ~child ledger =
+    if not no_masks then
+      Ledger.commit_and_replace_parent ~loc:__LOC__ child ~parent:ledger
   in
   let stop_tracing =
     if tracing then (fun x -> Mina_tracing.stop () ; x) else ident
@@ -273,8 +272,11 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       let%bind () =
         if tracing && i = 1 then Mina_tracing.start "." else Deferred.unit
       in
-      List.hd (List.drop ledgers (max_depth - 1))
-      |> Option.iter ~f:drop_old_ledger ;
+      ( match List.drop (ledger :: ledgers) (max_depth - 1) with
+      | child :: old_ledger :: _ ->
+          drop_old_ledger ~child old_ledger
+      | _ ->
+          () ) ;
       apply ~transfer_parties_get_actions_events:false ~action_elements:0
         ~event_elements:0 ~num_txs:num_txs_per_round ~i ledger
       >>| save_preparation_times >>| mask_handler ledger

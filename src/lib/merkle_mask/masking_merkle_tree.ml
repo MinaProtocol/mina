@@ -993,12 +993,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       let base = get_parent t |> Base.all_accounts_on_masks in
       let combine ~key:_ _ v = v in
       Map.merge_skewed ~combine base (repr t).maps.accounts
-
-    let reparent attached parent =
-      let t = repr attached in
-      assert (Int.equal t.depth (Base.depth parent)) ;
-      t.parent <- Ok parent ;
-      t.current_location <- last_filled attached
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =
