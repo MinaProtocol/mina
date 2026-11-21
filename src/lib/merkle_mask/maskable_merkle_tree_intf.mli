@@ -52,6 +52,8 @@ module type S = sig
   val remove_and_reparent_exn : t -> attached_mask -> unit
 
   module Debug : sig
-    val visualize : filename:string -> unit
+    (** Write a graph of the given masks, each with its children. *)
+    val visualize :
+      filename:string -> (attached_mask * attached_mask list) list -> unit
   end
 end

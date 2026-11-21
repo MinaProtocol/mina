@@ -174,14 +174,19 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   in
   let frontier_file = conf_dir ^/ "frontier.dot" in
   let mask_file = conf_dir ^/ "registered_masks.dot" in
-  (* ledger visualization *)
-  [%log debug] "%s" (Visualization_message.success "registered masks" mask_file) ;
-  Mina_ledger.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
       [%log warn]
         "Shutdown before Mina instance was created, not saving a visualization"
   | Some t -> (
+      (* ledger visualization *)
+      ( match Mina_lib.visualize_masks ~filename:mask_file t with
+      | `Active () ->
+          [%log debug] "%s"
+            (Visualization_message.success "registered masks" mask_file)
+      | `Bootstrapping ->
+          [%log debug] "%s" (Visualization_message.bootstrap "registered masks")
+      ) ;
       (*Transition frontier visualization*)
       match Mina_lib.visualize_frontier ~filename:frontier_file t with
       | `Active () ->
@@ -415,8 +420,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename mina) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
-        (fun () filename ->
-          return (Mina_ledger.Ledger.Debug.visualize ~filename) )
+        (fun () filename -> return (Mina_lib.visualize_masks ~filename mina))
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
