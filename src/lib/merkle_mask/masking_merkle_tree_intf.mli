@@ -60,6 +60,12 @@ module type S = sig
     (** commit all state to the parent, flush state locally *)
     val commit : t -> unit
 
+    (** [commit_and_replace_parent ~loc t ~parent] commits [t] into its parent
+        [parent], then makes [t] hold [parent]'s ledger and orphans [parent].
+        Holders of [t] keep their ledger; every other holder of [parent],
+        including the masks attached to it, fails on its next use. *)
+    val commit_and_replace_parent : loc:string -> t -> parent:t -> unit
+
     (** [unset_parent ~loc:__LOC__ t] detaches the parent from [t], and
         resolves [detached_signal] for [t]. The [loc] argument is shown in the
         [Dangling_parent_reference] exception, which will be raised if [t] is

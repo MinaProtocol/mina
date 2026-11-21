@@ -248,6 +248,28 @@ module Make (Test : Test_intf) = struct
             assert (Mask.Attached.For_testing.location_in_mask m1 dummy_location) ) )
 
   let () =
+    add_test "commit a mask into its parent and replace the parent" (fun () ->
+        Test.with_chain (fun _base ~mask:m1_lazy ~mask2:_ ->
+            let m1, m1_base = Lazy.force m1_lazy in
+            let m2 =
+              Mask.set_parent
+                ~accumulated:(Mask.Attached.to_accumulated m1)
+                (Mask.create ~depth:Test.depth ())
+                m1_base
+            in
+            let sibling =
+              Maskable.register_mask m1_base (Mask.create ~depth:Test.depth ())
+            in
+            Mask.Attached.set m2 dummy_location dummy_account ;
+            let root = Mask.Attached.merkle_root m2 in
+            Mask.Attached.commit_and_replace_parent ~loc:__LOC__ m2 ~parent:m1 ;
+            assert (Hash.equal root (Mask.Attached.merkle_root m2)) ;
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get m2 dummy_location) ;
+            assert (Exn.does_raise (fun () -> Mask.Attached.merkle_root m1)) ;
+            assert (Exn.does_raise (fun () -> Mask.Attached.merkle_root sibling)) ) )
+
+  let () =
     add_test "register and unregister mask" (fun () ->
         Test.with_instances (fun maskable mask ->
             let (attached_mask : Mask.Attached.t) =
