@@ -25,8 +25,7 @@
 #     4. filter-mode         (any or all)      - Determines if any or all tags must match.
 #     5. jobs                PATH              - Path to the jobs directory containing .yml files.
 #     6. git-diff-file       PATH              - Path to the git diff file for dirty-when checks.
-#     7. mainline-branches   STRING            - Comma-separated list of mainline branches for ancestor detection.
-#     8. debug               FLAG              - Optional flag to enable debug output.
+#     7. debug               FLAG              - Optional flag to enable debug output.
 
 set -euo pipefail
 
@@ -50,7 +49,6 @@ Options:
   --git-diff-file FILE   STRING    File containing git diff output
   --dry-run              BOOL      Dry run mode (True/False)
   --filter-mode MODE     STRING    Filter mode (any or all)
-  --mainline-branches    STRING    Comma-separated list of mainline branches
   --debug                          Enable debug mode
   --h, --help             Show this help message
 EOF
@@ -62,7 +60,6 @@ JOBS=""
 TAGS=""
 SCOPES=""
 GIT_DIFF_FILE=""
-MAINLINE_BRANCHES=()
 DEBUG=false
 DRY_RUN=false
 
@@ -81,9 +78,6 @@ while [[ $# -gt 0 ]]; do
       FILTER_MODE="$2"; shift 2;;
     --git-diff-file)
       GIT_DIFF_FILE="$2"; shift 2;;
-    --mainline-branches)
-      IFS=',' read -r -a MAINLINE_BRANCHES <<< "$2"
-      shift; shift;;
     --debug)
       DEBUG=true; shift;;
     --dry-run)
@@ -101,12 +95,6 @@ if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" || -z "$F
   exit 1
 fi
 
-# Check if mainline branches were provided
-if [[ ${#MAINLINE_BRANCHES[@]} -eq 0 ]]; then
-  echo "Error: --mainline-branches is required."
-  exit 1
-fi
-
 # Debug output
 if [[ "${DEBUG:-false}" == true ]]; then
   echo "Debug: SELECTION_MODE=$SELECTION_MODE"
@@ -119,7 +107,6 @@ if [[ "${DEBUG:-false}" == true ]]; then
     echo "Debug: Contents of GIT_DIFF_FILE ($GIT_DIFF_FILE):"
     cat "$GIT_DIFF_FILE"
   fi
-  echo "Debug: MAINLINE_BRANCHES=${MAINLINE_BRANCHES[*]}"
   echo "Debug: DRY_RUN=$DRY_RUN"
 
 fi
@@ -159,16 +146,8 @@ else
   exit 1
 fi
 
-# Check for forced closest ancestor via environment variable
-# Used only in testing or if git is on fire
-if [[ -n "${FORCE_CLOSEST_ANCESTOR:-}" ]]; then
-  closest_ancestor="$FORCE_CLOSEST_ANCESTOR"
-else
-  closest_ancestor=$(find_closest_ancestor)
-fi
-
-# Phase 1: triage. Collect every job that passes tags, scope, dirty-when and
-# include/exclude filters into the SELECTED_FILES set. Nothing is uploaded yet:
+# Phase 1: triage. Collect every job that passes tags, scope and dirty-when
+# filters into the SELECTED_FILES set. Nothing is uploaded yet:
 # their dependencies must be pulled in first (Phase 2).
 declare -A SELECTED_FILES=()
 
@@ -194,26 +173,6 @@ while IFS= read -r file; do
 
   if [[ $job_selected -ne 1 ]]; then
     echo "🧹🚫 $job_name rejected job as it does not fall into dirty when: $file" >&2
-    continue
-  fi
-
-  # Check if both includeIf and excludeIf are set - this is not allowed
-  has_include_if=$(yq -r '.spec.includeIf | length' "$file")
-  has_exclude_if=$(yq -r '.spec.excludeIf | length' "$file")
-  if [[ "$has_include_if" != "null" && "$has_include_if" -gt 0 && "$has_exclude_if" != "null" && "$has_exclude_if" -gt 0 ]]; then
-    echo "❌ Error: $job_name has both includeIf and excludeIf set. This is not allowed. Please use only one of them." >&2
-    exit 1
-  fi
-
-  is_excluded=$(check_exclude_if "$file" "$job_name" "$closest_ancestor")
-
-  if [[ $is_excluded -eq 1 ]]; then
-    continue
-  fi
-
-  is_included=$(check_include_if "$file" "$job_name" "$closest_ancestor")
-
-  if [[ $is_included -ne 1 ]]; then
     continue
   fi
 

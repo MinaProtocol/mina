@@ -108,7 +108,6 @@ OUT=$(./buildkite/scripts/monorepo.sh \
   --scopes "$SCOPES" \
   --filter-mode "$MODE_LOWER" \
   --jobs "$GEN_DIR" \
-  --mainline-branches "$(dhall text <<< '(./buildkite/src/Pipeline/MainlineBranch.dhall).join (./buildkite/src/Pipeline/MainlineBranch.dhall).Full')" \
   "${DIFF_ARG[@]}" \
   --dry-run 2>&1) || {
     echo "$OUT" >&2
