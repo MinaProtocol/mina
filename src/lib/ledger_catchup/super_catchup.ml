@@ -135,20 +135,12 @@ let write_graph (_ : t) =
 let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
-  let block = With_hash.data b in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
-  let%bind () =
-    Result.ok_if_true
-      (body_matches_reference ~header:(Mina_block.header block)
-         (Staged_ledger_diff.Body.read_all_proofs_from_disk
-            (Mina_block.body block) ) )
-      ~error:`Invalid_body_reference
-  in
   Mina_block.Validation.skip_time_received_validation
     `This_block_was_not_received_via_gossip h
   |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
-  >>| Fn.flip with_body (Mina_block.body block)
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
 
 let validate_proofs_block ~verifier ~genesis_state_hash blocks =
   let open Mina_block.Validation in
@@ -260,16 +252,6 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
           , Some ("invalid delta transition chain witness", []) )
       in
       Error (Error.of_string "invalid delta transition chain witness")
-  | Error `Invalid_body_reference ->
-      [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
-        "initial_validate: invalid body reference" ;
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Gossiped_invalid_transition
-          , Some ("invalid body reference", []) )
-      in
-      Error (Error.of_string "invalid body reference")
   | Error `Invalid_protocol_version ->
       [%log warn]
         ~metadata:[ ("state_hash", state_hash) ]
@@ -1225,15 +1207,31 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
           in
           Float.of_int (List.length hs) *. sec_per_block
         in
-        Mina_networking.get_transition_chain
-          ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
-        |> Deferred.Or_error.map
+        let%bind.Deferred.Or_error blocks =
+          Mina_networking.get_transition_chain
+            ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
+            ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
+        in
+        let%map blocks =
+          Deferred.List.filter blocks ~f:(fun block ->
+              if
+                Mina_block.Validation.body_matches_reference
+                  ~header:(Mina_block.Stable.Latest.header block)
+                  (Mina_block.Stable.Latest.body block)
+              then return true
+              else
+                let%map () =
+                  Trust_system.record trust_system logger peer
+                    ( Trust_system.Actions.Gossiped_invalid_transition
+                    , Some ("invalid body reference", []) )
+                in
+                false )
+        in
+        Ok
+          (List.map blocks
              ~f:
-               (List.map
-                  ~f:
-                    (Mina_block.write_all_proofs_to_disk ~signature_kind
-                       ~proof_cache_db ) ) )
+               (Mina_block.write_all_proofs_to_disk ~signature_kind
+                  ~proof_cache_db ) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
