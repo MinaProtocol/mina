@@ -127,6 +127,10 @@ let find_protocol_state (t : t) hash =
   | Some breadcrumb ->
       Some (Breadcrumb.protocol_state breadcrumb)
 
+let find_ledger_below_root t ledger_hash =
+  List.find t.masks_below_root ~f:(fun mask ->
+      Ledger_hash.equal (Ledger.merkle_root mask) ledger_hash )
+
 let root t = find_exn ~message:"root" t t.root
 
 let protocol_states_for_root_scan_state t =

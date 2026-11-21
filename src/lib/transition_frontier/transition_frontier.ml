@@ -597,6 +597,8 @@ include struct
 
   let find_protocol_state = proxy1 find_protocol_state
 
+  let find_ledger_below_root = proxy1 find_ledger_below_root
+
   (* why can't this one be proxied? *)
   let path_map ?max_length { full_frontier; _ } breadcrumb ~f =
     path_map ?max_length full_frontier breadcrumb ~f
