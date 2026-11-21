@@ -352,7 +352,7 @@ module Test_helpers : sig
     -> no_second_partition:bool
     -> is_new_stack:bool
     -> signature_kind:Mina_signature_kind.t
-    -> Ledger.t
+    -> Mina_ledger.Mutable_ledger.t
     -> Pending_coinbase.t
     -> Transaction.t With_status.t list
     -> Zkapp_precondition.Protocol_state.View.t
@@ -368,6 +368,7 @@ module Test_helpers : sig
              Pending_coinbase.Stack_versioned.t
              * Pending_coinbase.Stack_versioned.t ]
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
+         * Mina_ledger.Immutable_ledger.t
        , Staged_ledger_error.t )
        Deferred.Result.t
 end

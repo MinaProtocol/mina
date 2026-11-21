@@ -5,6 +5,8 @@ open Mina_transaction
 open Currency
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
+module Immutable_ledger = Mina_ledger.Immutable_ledger
+module Mutable_ledger = Mina_ledger.Mutable_ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
 (* TODO: measure these operations and tune accordingly *)
@@ -652,7 +654,7 @@ module T = struct
     let open Deferred.Result.Let_syntax in
     let state_body_hash = snd state_and_body_hash in
     let ts, ts_opt = tss in
-    let apply_first_pass working_stack ts =
+    let apply_first_pass working_stack ts ledger =
       let working_stack_with_state =
         push_state working_stack state_body_hash global_slot
       in
@@ -661,15 +663,18 @@ module T = struct
         ; init_stack = working_stack
         }
       in
-      apply_transactions_first_pass ~constraint_constants ~global_slot ledger
+      apply_transactions_first_pass ~constraint_constants ~global_slot
+        (Mutable_ledger.unsafe_to_ledger ledger)
         init_pending_coinbase_stack_state ts current_state_view
     in
     let yield =
       yield_result_every ~n:transaction_application_scheduler_batch_size
     in
     let%bind pre_stmts1, updated_stack1 =
-      apply_first_pass ~yield ~signature_kind current_stack ts
+      apply_first_pass ~yield ~signature_kind current_stack ts ledger
     in
+    let first = Mutable_ledger.freeze ~loc:__LOC__ ledger in
+    let ledger = Mutable_ledger.create ~parent:first in
     let%bind pre_stmts2, updated_stack2 =
       match ts_opt with
       | None ->
@@ -678,14 +683,21 @@ module T = struct
           let current_stack2 =
             Pending_coinbase.Stack.create_with current_stack
           in
-          apply_first_pass ~yield ~signature_kind current_stack2 ts
+          apply_first_pass ~yield ~signature_kind current_stack2 ts ledger
     in
-    let first_pass_ledger_end = Ledger.merkle_root ledger in
+    let first_pass_ledger_end = Mutable_ledger.merkle_root ledger in
     let%map txns_with_witnesses =
       apply_transactions_second_pass ~constraint_constants ~yield ~global_slot
-        ledger state_and_body_hash (pre_stmts1 @ pre_stmts2)
+        (Mutable_ledger.unsafe_to_ledger ledger)
+        state_and_body_hash (pre_stmts1 @ pre_stmts2)
     in
-    (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
+    let ledger = Mutable_ledger.freeze ~loc:__LOC__ ledger in
+    Immutable_ledger.commit_into_parent ~loc:__LOC__ ledger ~parent:first ;
+    ( txns_with_witnesses
+    , updated_stack1
+    , updated_stack2
+    , first_pass_ledger_end
+    , ledger )
 
   (** Checks if the work has already been verified before by the snark pool logic *)
   let work_already_verified_check ~get_completed_work jobs work =
@@ -837,7 +849,7 @@ module T = struct
       in
       [%log internal] "Update_ledger_and_get_statements"
         ~metadata:[ ("partition", `String "single") ] ;
-      let%map data, updated_stack, _, first_pass_ledger_end =
+      let%map data, updated_stack, _, first_pass_ledger_end, ledger =
         update_ledger_and_get_statements ~constraint_constants ~global_slot
           ~signature_kind ledger working_stack (transactions, None)
           current_state_view state_and_body_hash
@@ -853,7 +865,8 @@ module T = struct
       , data
       , Pending_coinbase.Update.Action.Update_one
       , `Update_one updated_stack
-      , `First_pass_ledger_end first_pass_ledger_end ) )
+      , `First_pass_ledger_end first_pass_ledger_end
+      , ledger ) )
     else
       (*Two partition:
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
@@ -873,7 +886,11 @@ module T = struct
       let txns_for_partition2 = List.drop transactions slots in
       [%log internal] "Update_ledger_and_get_statements"
         ~metadata:[ ("partition", `String "both") ] ;
-      let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
+      let%map ( data
+              , updated_stack1
+              , updated_stack2
+              , first_pass_ledger_end
+              , ledger ) =
         update_ledger_and_get_statements ~constraint_constants ~global_slot
           ~signature_kind ledger working_stack1
           (txns_for_partition1, Some txns_for_partition2)
@@ -916,7 +933,8 @@ module T = struct
       , data
       , pending_coinbase_action
       , stack_update
-      , `First_pass_ledger_end first_pass_ledger_end )
+      , `First_pass_ledger_end first_pass_ledger_end
+      , ledger )
 
   let update_coinbase_stack_and_get_data ~logger ~constraint_constants
       ~global_slot ~signature_kind scan_state ledger pending_coinbase_collection
@@ -933,13 +951,15 @@ module T = struct
         current_state_view state_and_body_hash
     else (
       [%log internal] "Update_coinbase_stack_done" ;
+      let first_pass_ledger_end = Mutable_ledger.merkle_root ledger in
       Deferred.return
         (Ok
            ( false
            , []
            , Pending_coinbase.Update.Action.Update_none
            , `Update_none
-           , `First_pass_ledger_end (Ledger.merkle_root ledger) ) ) )
+           , `First_pass_ledger_end first_pass_ledger_end
+           , Mutable_ledger.freeze ~loc:__LOC__ ledger ) ) )
 
   (* Update the pending_coinbase tree with the updated/new stack and delete the
      oldest stack if a proof was emitted *)
@@ -1018,8 +1038,9 @@ module T = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
-    let new_ledger = Ledger.register_mask t.ledger new_mask in
+    let new_ledger =
+      Mutable_ledger.create ~parent:(Immutable_ledger.unsafe_of_ledger t.ledger)
+    in
     let transactions, works, commands_count, coinbases = pre_diff_info in
     let accounts_accessed =
       List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
@@ -1028,7 +1049,8 @@ module T = struct
               (of_list (Transaction.accounts_referenced txn.With_status.data))) )
       |> Set.to_list
     in
-    Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
+    Mutable_ledger.unsafe_preload_accounts_from_parent new_ledger
+      accounts_accessed ;
     let%bind () =
       (* Check number of zkApps in a block does not exceed hardcap *)
       O1trace.thread "zkapp_hardcap_check" (fun () ->
@@ -1062,7 +1084,8 @@ module T = struct
              , data
              , stack_update_in_snark
              , stack_update
-             , `First_pass_ledger_end first_pass_ledger_end ) =
+             , `First_pass_ledger_end first_pass_ledger_end
+             , new_ledger ) =
       O1trace.thread "update_coinbase_stack_start_time" (fun () ->
           update_coinbase_stack_and_get_data ~logger ~constraint_constants
             ~global_slot ~signature_kind t.scan_state new_ledger
@@ -1158,7 +1181,7 @@ module T = struct
                 ~first_pass_ledger_end
                 ~second_pass_ledger_end:
                   (Frozen_ledger_hash.of_ledger_hash
-                     (Ledger.merkle_root new_ledger) )
+                     (Immutable_ledger.merkle_root new_ledger) )
                 ~pending_coinbase_stack:latest_pending_coinbase_stack
                 scan_state'
               >>| to_staged_ledger_or_error) ) )
@@ -1179,7 +1202,7 @@ module T = struct
        scan-state:$proof_bundles_waiting Work included:$work_count" ;
     let new_staged_ledger =
       { scan_state = scan_state'
-      ; ledger = new_ledger
+      ; ledger = Immutable_ledger.unsafe_to_ledger new_ledger
       ; constraint_constants = t.constraint_constants
       ; pending_coinbase_collection = updated_pending_coinbase_collection'
       }
