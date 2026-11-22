@@ -467,9 +467,6 @@ let constraint_constants_of_proof_keys
   ; account_creation_fee =
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee
-  ; fork =
-      Option.value_map config.fork ~default:default.fork ~f:(fun fork ->
-          Some (fork_constants_of_fork_config fork) )
   }
 
 let make_constraint_constants
@@ -502,16 +499,7 @@ let runtime_config_of_constraint_constants
   ; supercharged_coinbase_factor =
       Some constraint_constants.supercharged_coinbase_factor
   ; account_creation_fee = Some constraint_constants.account_creation_fee
-  ; fork =
-      Option.map constraint_constants.fork
-        ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis } ->
-          { Runtime_config.Fork_config.state_hash =
-              State_hash.to_base58_check state_hash
-          ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
-          ; global_slot_since_genesis =
-              Mina_numbers.Global_slot_since_genesis.to_int
-                global_slot_since_genesis
-          } )
+  ; fork = None
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
