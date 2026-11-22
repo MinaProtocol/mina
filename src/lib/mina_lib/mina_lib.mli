@@ -198,6 +198,8 @@ val bootstrap_status : t -> Bootstrap_status.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
+val visualize_masks : filename:string -> t -> unit Participating_state.t
+
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
 val initial_peers : t -> Mina_net2.Multiaddr.t list

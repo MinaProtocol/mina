@@ -134,8 +134,7 @@ let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   Mina_metrics.Transition_frontier.update_proposed_protocol_versions [] ;
   ignore
-    ( Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
-        (Breadcrumb.mask (root t))
+    ( Ledger.Maskable.unregister_mask_exn ~loc (Breadcrumb.mask (root t))
       : Ledger.unattached_mask )
 
 let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
@@ -309,6 +308,13 @@ let visualize ~filename (t : t) =
       let graph = Visualizor.to_graph t in
       Visualizor.output_graph output_channel graph )
 
+let visualize_masks ~filename t =
+  Ledger.Debug.visualize ~filename
+    (List.map (Hashtbl.data t.table) ~f:(fun (node : Node.t) ->
+         ( Breadcrumb.mask node.breadcrumb
+         , List.filter_map node.successor_hashes ~f:(fun hash ->
+               Option.map (find t hash) ~f:Breadcrumb.mask ) ) ) )
+
 let visualize_to_string t =
   let graph = Visualizor.to_graph t in
   let buf = Buffer.create 0 in
@@ -405,11 +411,10 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    * the following operations on masks in order:
    *
    *     0) notify consensus that root transitioned
-   *     1) unattach and destroy all the garbage (to avoid unnecessary trickling of
-   *        invalidations from `m0` during the next step)
-   *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
-   *        making `m1` into an identity mask (an empty mask on top of `m1'`).
-   *     3) safely remove `m1` and reparent all the successors of `m1` onto `m1'`
+   *     1) unattach and destroy all the garbage
+   *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`)
+   *     3) put `m1'` in `m1`'s place, so that the successors of `m1` are parented off
+   *        of `m1'` without being moved, and orphan `m0`
    *     4) create a new temporary mask `mt` with `s` as it's parent
    *     5) apply any transactions to `mt` that appear in the transition between `s` and `s'`
    *     6) commit `mt` into `s`, turning `s` into `s'`
@@ -449,29 +454,17 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask
             : Ledger.unattached_mask ) ;
         Hashtbl.remove t.table hash ) ;
-    (* STEP 2 *)
+    (* STEPS 2-3 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
     O1trace.sync_thread "commit_frontier_root_snarked_ledger" (fun () ->
-        Ledger.commit m1 ) ;
+        Ledger.commit_and_replace_parent ~loc:__LOC__ m1 ~parent:m0 ) ;
     [%test_result: Ledger_hash.t]
       ~message:
         "Merkle root of new root's staged ledger mask is the same after \
          committing"
       ~expect:m1_hash_pre_commit (Ledger.merkle_root m1) ;
-    [%test_result: Ledger_hash.t]
-      ~message:
-        "Merkle root of old root's staged ledger mask is the same as the new \
-         root's staged ledger mask after committing"
-      ~expect:m1_hash_pre_commit (Ledger.merkle_root m0) ;
-    (* STEP 3 *)
-    (* the staged ledger's mask needs replaced before m1 is made invalid *)
-    let new_staged_ledger =
-      Staged_ledger.replace_ledger_exn
-        (Breadcrumb.staged_ledger new_root_node.breadcrumb)
-        m0
-    in
-    Ledger.remove_and_reparent_exn m1 m1 ;
+    let new_staged_ledger = Breadcrumb.staged_ledger new_root_node.breadcrumb in
     (* STEPS 4-7 *)
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
@@ -961,6 +954,8 @@ module For_tests = struct
              !"Protocol state with hash %s not found"
              (State_body_hash.to_yojson hash |> Yojson.Safe.to_string) )
 
+  let root_ledger_hash t = Ledger.Any_ledger.M.merkle_root t.root_ledger
+
   (* TODO: Don't force here!! *)
 
   let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
@@ -997,9 +992,9 @@ module For_tests = struct
     Breadcrumb.For_tests.gen ~logger ~precomputed_values ~verifier
       ?trust_system:None ~accounts_with_secret_keys
 
-  let gen_breadcrumb_seq ~verifier =
-    Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
-      ?trust_system:None ~accounts_with_secret_keys
+  let gen_breadcrumb_seq ?include_snark_work ~verifier =
+    Breadcrumb.For_tests.gen_seq ~logger ?include_snark_work ~precomputed_values
+      ~verifier ?trust_system:None ~accounts_with_secret_keys
 
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
@@ -1030,7 +1025,10 @@ module For_tests = struct
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
     let staged_ledger =
-      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      Staged_ledger.create_exn ~constraint_constants
+        ~ledger:
+          (Mina_ledger.Ledger.register_mask root_ledger
+             (Mina_ledger.Ledger.Mask.create ~depth:ledger_depth ()) )
     in
     let root_data =
       let open Root_data in

@@ -18,7 +18,6 @@ module type S = sig
 
   (* registering a mask makes it an active child of the parent Merkle tree
      - reads to the mask that fail are delegated to the parent
-     - writes to the parent notify the child mask
   *)
 
   val register_mask :
@@ -27,31 +26,13 @@ module type S = sig
   val unsafe_preload_accounts_from_parent :
     attached_mask -> account_id list -> unit
 
-  (** raises an exception if mask is not registered *)
-  val unregister_mask_exn :
-       ?grandchildren:
-         [ `Check | `Recursive | `I_promise_I_am_reparenting_this_mask ]
-    -> loc:string
-    -> attached_mask
-    -> unattached_mask
-
-  (**
-   *              o
-   *             /
-   *            /
-   *   o --- o -
-   *   ^     ^  \
-   *  parent |   \
-   *        mask  o
-   *            children
-   *
-   * Removes the attached mask from its parent and attaches the children to the
-   * parent instead. Raises an exception if the merkle roots of the mask and the
-   * parent are not the same.
-  *)
-  val remove_and_reparent_exn : t -> attached_mask -> unit
+  (** Detaches the mask from its parent and orphans it, so that every holder
+      of it, including the masks attached to it, fails on its next use. *)
+  val unregister_mask_exn : loc:string -> attached_mask -> unattached_mask
 
   module Debug : sig
-    val visualize : filename:string -> unit
+    (** Write a graph of the given masks, each with its children. *)
+    val visualize :
+      filename:string -> (attached_mask * attached_mask list) list -> unit
   end
 end

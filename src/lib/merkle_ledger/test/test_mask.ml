@@ -213,25 +213,6 @@ module Make (Test : Test_intf) = struct
               compare_maskable_mask_hashes maskable attached_mask dummy_address ) ) )
 
   let () =
-    add_test "mask prune after parent notification" (fun () ->
-        Test.with_instances (fun maskable mask ->
-            let attached_mask = Maskable.register_mask maskable mask in
-            (* set to mask *)
-            Mask.Attached.set attached_mask dummy_location dummy_account ;
-            (* verify account is in mask *)
-            if
-              Mask.Attached.For_testing.location_in_mask attached_mask
-                dummy_location
-            then (
-              Maskable.set maskable dummy_location dummy_account ;
-              (* verify account pruned from mask *)
-              assert (
-                not
-                  (Mask.Attached.For_testing.location_in_mask attached_mask
-                     dummy_location ) ) )
-            else assert false ) )
-
-  let () =
     add_test "commit puts mask contents in parent, flushes mask" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
@@ -265,6 +246,39 @@ module Make (Test : Test_intf) = struct
             assert (Option.is_none @@ Maskable.get base dummy_location) ;
             (* account is present in layer1 *)
             assert (Mask.Attached.For_testing.location_in_mask m1 dummy_location) ) )
+
+  let () =
+    add_test "commit a mask into its parent and replace the parent" (fun () ->
+        Test.with_chain (fun _base ~mask:m1_lazy ~mask2:_ ->
+            let m1, m1_base = Lazy.force m1_lazy in
+            let m2 =
+              Mask.set_parent
+                ~accumulated:(Mask.Attached.to_accumulated m1)
+                (Mask.create ~depth:Test.depth ())
+                m1_base
+            in
+            let sibling =
+              Maskable.register_mask m1_base (Mask.create ~depth:Test.depth ())
+            in
+            Mask.Attached.set m2 dummy_location dummy_account ;
+            let root = Mask.Attached.merkle_root m2 in
+            Mask.Attached.commit_and_replace_parent ~loc:__LOC__ m2 ~parent:m1 ;
+            assert (Hash.equal root (Mask.Attached.merkle_root m2)) ;
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get m2 dummy_location) ;
+            assert (Exn.does_raise (fun () -> Mask.Attached.merkle_root m1)) ;
+            assert (Exn.does_raise (fun () -> Mask.Attached.merkle_root sibling)) ) )
+
+  let () =
+    add_test "a mask fails on its next use once a mask below it is orphaned"
+      (fun () ->
+        Test.with_chain (fun _base ~mask:m1_lazy ~mask2:m2_lazy ->
+            let m1, _ = Lazy.force m1_lazy in
+            let m2 = Lazy.force m2_lazy in
+            Mask.Attached.set m2 dummy_location dummy_account ;
+            ignore (Maskable.unregister_mask_exn ~loc:__LOC__ m1 : Mask.t) ;
+            assert (
+              Exn.does_raise (fun () -> Mask.Attached.get m2 dummy_location) ) ) )
 
   let () =
     add_test "register and unregister mask" (fun () ->
@@ -309,10 +323,6 @@ module Make (Test : Test_intf) = struct
     add_test "mask and parent agree on Merkle root after set" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
-            (* the order of sets matters here; if we set in the mask first,
-                   the set in the maskable notifies the mask, which then removes
-                   the account, changing the Merkle root to what it was before the set
-            *)
             Maskable.set maskable dummy_location dummy_account ;
             Mask.Attached.set attached_mask dummy_location dummy_account ;
             let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
@@ -583,69 +593,6 @@ module Make (Test : Test_intf) = struct
               Mina_stdlib.List.Length.Compare.(accounts = parent_num_accounts)
               && Int.equal parent_num_accounts mask_num_accounts_before
               && Int.equal parent_num_accounts mask_num_accounts_after ) ) )
-
-  let () =
-    add_test "mask reparenting works" (fun () ->
-        Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
-            let num_accounts = 3 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let T = Account_id.eq in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-            match accounts with
-            | [ a1; a2; a3 ] ->
-                let loc1 = parent_create_new_account_exn base a1 in
-                let m1, m1_base = Lazy.force m1_lazy in
-                let loc2 = create_new_account_exn m1 a2 in
-                let m2 = Lazy.force m2_lazy in
-                let loc3 = create_new_account_exn m2 a3 in
-                let locs = [ (loc1, a1); (loc2, a2); (loc3, a3) ] in
-                (* all accounts are here *)
-                List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                Mask.Attached.commit m1 ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
-                Maskable.remove_and_reparent_exn m1_base m1 ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
-                (* all accounts are still here *)
-                List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) )
-            | _ ->
-                failwith "unexpected" ) )
-
-  let () =
-    add_test
-      "setting account in parent doesn't remove masked copy if mask is still \
-       dirty for said account" (fun () ->
-        Test.with_instances (fun maskable mask ->
-            let attached_mask = Maskable.register_mask maskable mask in
-            let k = Account_id.gen_accounts 1 |> List.hd_exn in
-            let T = Account_id.eq in
-            let acct1 = Account.create k (Balance.of_nanomina_int_exn 10) in
-            let loc =
-              Mask.Attached.get_or_create_account attached_mask k acct1
-              |> Or_error.ok_exn |> snd
-            in
-            let acct2 = Account.create k (Balance.of_nanomina_int_exn 5) in
-            Maskable.set maskable loc acct2 ;
-            [%test_result: Account.t]
-              ~message:"account in mask should be unchanged" ~expect:acct1
-              (Mask.Attached.get attached_mask loc |> Option.value_exn) ) )
 
   let () =
     add_test "all_accounts_on_masks works on a chain" (fun () ->

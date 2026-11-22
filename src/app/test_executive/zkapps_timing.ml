@@ -361,8 +361,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_zkapp ~has_failures zkapp_command =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
-             ~zkapp_command
+        @@ Wait_condition.zkapp_to_be_included_in_frontier
+             ~node_included_in:(`Node node) ~has_failures ~zkapp_command
       in
       [%log info] "zkApp transaction included in transition frontier"
     in

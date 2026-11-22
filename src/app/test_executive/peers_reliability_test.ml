@@ -1,5 +1,4 @@
 open Core
-open Async
 open Integration_test_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
@@ -110,7 +109,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let%map () =
           wait_for t
           @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
-               ~zkapp_command
+               ~zkapp_command ~node_included_in:`Any_node
         in
         [%log info] "ZkApp transaction included in transition frontier"
       in
@@ -150,7 +149,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri node_c)
              parties_create_accounts
          in
-         wait_for_zkapp parties_create_accounts )
+         let%bind () = wait_for_zkapp parties_create_accounts in
+         wait_for t
+           (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
     let%bind () =
       section "Checking for new zkApp account in node about to be stopped"
@@ -204,9 +205,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
     in
     section "network is fully connected after one node was restarted"
-      (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
-       let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
-       in
-       assert_peers_completely_connected final_connectivity_data )
+      (assert_peers_stay_completely_connected ~logger
+         ~block_window_duration_ms:
+           (Network.constraint_constants network).block_window_duration_ms
+         (Core.String.Map.data all_mina_nodes) )
 end

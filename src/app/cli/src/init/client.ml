@@ -2589,7 +2589,11 @@ module Visualization = struct
 
     let command =
       create_command ~name Daemon_rpcs.Visualization.Registered_masks.rpc
-        ~f:(fun filename () -> Visualization_message.success name filename)
+        ~f:(fun filename -> function
+        | `Active () ->
+            Visualization_message.success name filename
+        | `Bootstrapping ->
+            Visualization_message.bootstrap name )
   end
 
   let command_group =

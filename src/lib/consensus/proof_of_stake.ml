@@ -837,26 +837,27 @@ module Make_str (A : Wire_types.Concrete) = struct
                   )
       end
 
-      let check ~context:(module Context : CONTEXT)
+      let check_delegators ~context:(module Context : CONTEXT) ~should_stop
           ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
-          ~producer_private_key ~producer_public_key ~total_stake
-          ~(get_delegators :
-                Public_key.Compressed.t
-             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+          ~total_stake
+          ~(producer_private_key : 'producer -> Signature_lib.Private_key.t)
+          (delegators :
+            ('producer * Mina_base.Account.Index.t * Mina_base.Account.t) list
+            ) =
         let open Context in
         let open Message in
         let open Interruptible.Let_syntax in
-        let delegators =
-          get_delegators producer_public_key
-          |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
-        in
         let rec go acc = function
           | [] ->
               Interruptible.return acc
-          | (delegator, (account : Mina_base.Account.t)) :: delegators ->
+          | _ :: _ when should_stop () ->
+              Interruptible.return acc
+          | (producer, delegator, (account : Mina_base.Account.t)) :: delegators
+            ->
               let%bind () = Interruptible.return () in
               let vrf_result =
-                T.eval ~constraint_constants ~private_key:producer_private_key
+                T.eval ~constraint_constants
+                  ~private_key:(producer_private_key producer)
                   { global_slot; seed; delegator }
               in
               let truncated_vrf_result = Output.truncate vrf_result in
@@ -892,11 +893,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (Some
                        ( `Vrf_eval vrf_eval
                        , `Vrf_output vrf_result
-                       , `Delegator (account.public_key, delegator) ) )
+                       , `Delegator (account.public_key, delegator)
+                       , `Producer producer ) )
                     delegators
                 in
                 match acc with
-                | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
+                | Some (`Vrf_eval prev_best_vrf_eval, _, _, _) ->
                     if String.compare prev_best_vrf_eval vrf_eval < 0 then
                       this_vrf ()
                     else go acc delegators
@@ -905,6 +907,27 @@ module Make_str (A : Wire_types.Concrete) = struct
               else go acc delegators
         in
         go None delegators
+
+      let check ~context ~should_stop
+          ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
+          ~producer_private_key ~producer_public_key ~total_stake
+          ~(get_delegators :
+                Public_key.Compressed.t
+             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+        let delegators =
+          get_delegators producer_public_key
+          |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
+          |> List.map ~f:(fun (delegator, account) -> ((), delegator, account))
+        in
+        Interruptible.map
+          (check_delegators ~context ~should_stop ~global_slot ~seed
+             ~total_stake
+             ~producer_private_key:(fun () -> producer_private_key)
+             delegators )
+          ~f:
+            (Option.map
+               ~f:(fun (vrf_eval, vrf_output, delegator, `Producer ()) ->
+                 (vrf_eval, vrf_output, delegator) ) )
     end
 
     module Optional_state_hash = struct
@@ -3762,6 +3785,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Interruptible.force
               (Vrf.check
                  ~context:(module Context)
+                 ~should_stop:(fun () -> false)
                  ~global_slot ~seed ~producer_private_key:private_key
                  ~producer_public_key:public_key_compressed ~total_stake
                  ~get_delegators:
@@ -3788,6 +3812,120 @@ module Make_str (A : Wire_types.Concrete) = struct
         let within_tolerance = Float.(diff < tolerance) in
         if not within_tolerance then
           failwithf "actual vs. expected: %d vs %f" actual expected ()
+
+      let%test_unit "Vrf.check returns the best win among the delegators \
+                     checked before should_stop" =
+        let seed = Epoch_seed.of_hash Snark_params.Tick.Field.one in
+        let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int 2 in
+        let maybe_sk, producer_account =
+          Genesis_ledger.largest_account_exn ()
+        in
+        let producer_private_key = Option.value_exn maybe_sk in
+        let producer_public_key = Account.public_key producer_account in
+        let total_stake = Amount.of_mina_int_exn 1_000 in
+        let delegators_table delegators =
+          Some (Account.Index.Table.of_alist_exn delegators)
+        in
+        let all_delegators =
+          delegators_table
+            (List.init 10 ~f:(fun delegator ->
+                 ( delegator
+                 , Account.create
+                     (Account_id.create producer_public_key Token_id.default)
+                     (Balance.of_mina_int_exn 1_000) ) ) )
+          |> Option.value_exn
+        in
+        let check ~should_stop delegators =
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Interruptible.force
+                (Vrf.check
+                   ~context:(module Context)
+                   ~should_stop ~global_slot ~seed ~producer_private_key
+                   ~producer_public_key ~total_stake
+                   ~get_delegators:(fun _ -> delegators) ) )
+          |> Result.ok_exn
+          |> Option.map
+               ~f:(fun (`Vrf_eval vrf_eval, _, `Delegator (_, index)) ->
+                 (vrf_eval, index) )
+        in
+        let checked = 4 in
+        let should_stop_calls = ref 0 in
+        let stopped =
+          check
+            ~should_stop:(fun () ->
+              incr should_stop_calls ;
+              !should_stop_calls > checked )
+            (Some all_delegators)
+        in
+        let first_checked =
+          check
+            ~should_stop:(fun () -> false)
+            (delegators_table
+               (List.take (Hashtbl.to_alist all_delegators) checked) )
+        in
+        let all = check ~should_stop:(fun () -> false) (Some all_delegators) in
+        [%test_eq: int] !should_stop_calls (checked + 1) ;
+        [%test_pred: (string * int) option] Option.is_some first_checked ;
+        [%test_eq: (string * int) option] stopped first_checked ;
+        [%test_pred: (string * int) option]
+          (Fn.non ([%equal: (string * int) option] all))
+          stopped
+
+      let%test_unit "Vrf.check_delegators returns the best win across all \
+                     producers" =
+        let seed = Epoch_seed.of_hash Snark_params.Tick.Field.one in
+        let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int 1 in
+        let total_stake = Amount.of_mina_int_exn 1_000 in
+        let producer_private_keys =
+          Lazy.force Genesis_ledger.accounts
+          |> List.filter_map ~f:fst |> Fn.flip List.take 2
+          |> List.zip_exn [ "first"; "second" ]
+        in
+        let delegators =
+          List.init 10 ~f:(fun delegator ->
+              ( (if delegator < 5 then "first" else "second")
+              , delegator
+              , Account.create
+                  (Account_id.create Public_key.Compressed.empty
+                     Token_id.default )
+                  (Balance.of_mina_int_exn 1_000) ) )
+        in
+        let check delegators =
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Interruptible.force
+                (Vrf.check_delegators
+                   ~context:(module Context)
+                   ~should_stop:(fun () -> false)
+                   ~global_slot ~seed ~total_stake
+                   ~producer_private_key:
+                     (List.Assoc.find_exn producer_private_keys
+                        ~equal:String.equal )
+                   delegators ) )
+          |> Result.ok_exn
+          |> Option.map
+               ~f:(fun
+                    ( `Vrf_eval vrf_eval
+                    , _
+                    , `Delegator (_, delegator)
+                    , `Producer producer )
+                  -> (vrf_eval, producer, delegator) )
+        in
+        let wins =
+          List.filter_map delegators ~f:(fun delegator -> check [ delegator ])
+        in
+        let best =
+          List.max_elt wins ~compare:(fun (vrf_eval1, _, _) (vrf_eval2, _, _) ->
+              String.compare vrf_eval1 vrf_eval2 )
+        in
+        [%test_pred: (string * string * int) list]
+          (List.exists ~f:(fun (_, producer, _) ->
+               String.equal producer "first" ) )
+          wins ;
+        [%test_pred: (string * string * int) option]
+          (Option.exists ~f:(fun (_, producer, _) ->
+               String.equal producer "second" ) )
+          best ;
+        [%test_eq: (string * string * int) option] (check delegators) best
 
       (* Consensus selection tests. *)
 

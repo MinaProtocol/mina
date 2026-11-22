@@ -432,6 +432,13 @@ module Ledger = struct
   *)
     val detached_signal : t -> unit Async_kernel.Deferred.t
 
+    (** The ledger's position in its stack of masks: 0 for a ledger that isn't
+        a mask, and one more than its parent's for a mask. *)
+    val level : t -> int
+
+    (** Raise if this ledger, or a mask below it, has been orphaned. *)
+    val handle_mutations : t -> unit
+
     (** Get all accounts on all masks of current ledger until reaching a 
         non-mask. Used to migrate root to an potential staged ledger for fork 
         config generation *)

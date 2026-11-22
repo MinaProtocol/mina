@@ -281,10 +281,11 @@ module Visualization = struct
   module Registered_masks = struct
     type query = string [@@deriving bin_io_unversioned]
 
-    type response = unit [@@deriving bin_io_unversioned]
+    type response = [ `Active of unit | `Bootstrapping ]
+    [@@deriving bin_io_unversioned]
 
     let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:0 ~bin_query
+      Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:1 ~bin_query
         ~bin_response
   end
 end

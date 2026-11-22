@@ -41,6 +41,9 @@ module type S = sig
 
   val visualize : filename:string -> t -> unit
 
+  (** Write a graph of the masks of the frontier's breadcrumbs. *)
+  val visualize_masks : filename:string -> t -> unit
+
   val precomputed_values : t -> Precomputed_values.t
 
   val genesis_constants : t -> Genesis_constants.t

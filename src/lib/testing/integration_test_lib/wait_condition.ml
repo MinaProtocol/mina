@@ -279,19 +279,24 @@ struct
     ; hard_timeout = Network_time_span.Slots (total_slots + 12)
     }
 
-  let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =
+  let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command
+      ~(node_included_in : [ `Any_node | `Node of Node.t ]) =
     (* TODO: don't use read_all_proofs_from_disk, instead avoid computing hashes on the level above *)
     let zkapp_command = Zkapp_command.read_all_proofs_from_disk zkapp_command in
     let txn_hash =
       Mina_transaction.Transaction_hash.hash_zkapp_command zkapp_command
     in
-    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+    let check () node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
       let zkapp_opt =
-        List.find breadcrumb_added.transaction_hashes
-          ~f:
-            (Fn.compose
-               (Mina_transaction.Transaction_hash.equal txn_hash)
-               With_status.data )
+        match node_included_in with
+        | `Node n when not (String.equal (Node.id n) (Node.id node)) ->
+            None
+        | `Any_node | `Node _ ->
+            List.find breadcrumb_added.transaction_hashes
+              ~f:
+                (Fn.compose
+                   (Mina_transaction.Transaction_hash.equal txn_hash)
+                   With_status.data )
       in
       [%log' info (Logger.create ())]
         "Looking for a zkApp transaction match for txn $txn with hash \

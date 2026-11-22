@@ -236,6 +236,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
     match%map
       Consensus.Data.Vrf.check
         ~context:(module Context)
+        ~should_stop:(fun () -> false)
         ~global_slot ~seed:epoch_seed
         ~get_delegators:(Public_key.Compressed.Table.find delegatee_table)
         ~producer_private_key:keypair.private_key

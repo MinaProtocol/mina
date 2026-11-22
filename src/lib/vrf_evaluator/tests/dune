@@ -1,0 +1,19 @@
+(test
+ (name test_vrf_evaluator)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  ;; local libraries
+  block_time
+  consensus
+  currency
+  mina_base
+  mina_numbers
+  signature_lib
+  snark_params
+  vrf_evaluator)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps mina_ppx)))
