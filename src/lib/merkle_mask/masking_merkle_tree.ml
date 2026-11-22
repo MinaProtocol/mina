@@ -70,7 +70,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; detached_next_signal : Detached_parent_signal.t
           (** Ivar for mask from which next was started being built.
              When it's fulfilled, [next] becomes [current] (because next contains superset of all masks from [baser],
-            [detached_signal] is reset to the current mask and [next] is set to contents of the current mask.
+            [detached_next_signal] is reset to the current mask and [next] is set to contents of the current mask.
           *)
     }
 
@@ -171,13 +171,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       t
 
     let assert_is_attached t = ignore (repr t : unattached)
-
-    let detached_signal t =
-      match t.desc with
-      | Ledger t ->
-          Async.Ivar.read t.detached_parent_signal
-      | Orphaned _ ->
-          Async.Deferred.unit
 
     let is_attached t =
       match repr t with

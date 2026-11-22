@@ -171,8 +171,6 @@ end = struct
 
   let depth t = t.depth
 
-  let detached_signal _ = Async_kernel.Deferred.never ()
-
   let is_attached _ = true
 
   let level _ = 0
