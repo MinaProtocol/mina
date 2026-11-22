@@ -175,7 +175,9 @@ val scan_state : t -> Scan_state.t
 (** The snarked ledgers that building [t] left below [ledger t], lowest
     first, each attached to the one before it and [ledger t] attached to the
     last. Applying a block leaves the snarked ledger that the proof of the
-    tree it completed targets, if it completed one. *)
+    tree it completed targets, if it completed one. Building [t] from a scan
+    state leaves the snarked ledger it was given, then the snarked ledger that
+    each complete tree's proof targets. *)
 val snarked_ledgers_below : t -> Mina_ledger.Immutable_ledger.t list
 
 val pending_coinbase_collection : t -> Pending_coinbase.t

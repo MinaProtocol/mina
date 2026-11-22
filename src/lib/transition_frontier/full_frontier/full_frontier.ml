@@ -195,7 +195,10 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
   ; protocol_states_for_root_scan_state
   ; persistent_root_instance
   ; time_controller
-  ; masks_below_root = []
+  ; masks_below_root =
+      List.map
+        (Staged_ledger.snarked_ledgers_below root_data.staged_ledger)
+        ~f:Mina_ledger.Immutable_ledger.unsafe_to_ledger
   }
 
 let root_data t =

@@ -377,14 +377,28 @@ module T = struct
       in
       partial_txn
     in
+    let base = Immutable_ledger.unsafe_of_ledger snarked_ledger in
+    let layer = ref (Mutable_ledger.create ~parent:base) in
+    let snarked_ledgers_below = ref [ base ] in
+    let end_layer () =
+      let snarked_ledger = Mutable_ledger.freeze ~loc:__LOC__ !layer in
+      snarked_ledgers_below := snarked_ledger :: !snarked_ledgers_below ;
+      layer := Mutable_ledger.create ~parent:snarked_ledger ;
+      Mutable_ledger.unsafe_to_ledger !layer
+    in
     let%bind (`First_pass_ledger_hash first_pass_ledger_target) =
-      Scan_state.get_staged_ledger_async
+      Scan_state.get_staged_ledger_in_layers_async
         ~async_batch_size:transaction_application_scheduler_batch_size
-        ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
+        ~ledger:(Mutable_ledger.unsafe_to_ledger !layer)
+        ~end_layer ~get_protocol_state:get_state ~apply_first_pass
         ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
         scan_state
     in
-    let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
+    let ledger =
+      Immutable_ledger.unsafe_to_ledger
+        (Mutable_ledger.freeze ~loc:__LOC__ !layer)
+    in
+    let staged_ledger_hash = Ledger.merkle_root ledger in
     let%bind () =
       Deferred.return
       @@ Result.ok_if_true
@@ -399,9 +413,11 @@ module T = struct
       Scan_state.latest_ledger_proof scan_state
       |> Option.map ~f:Ledger_proof.Cached.statement
     in
-    f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger
-      ~scan_state ~pending_coinbase_collection:pending_coinbases
-      ~first_pass_ledger_target
+    let%map t =
+      f ~constraint_constants ~last_proof_statement ~ledger ~scan_state
+        ~pending_coinbase_collection:pending_coinbases ~first_pass_ledger_target
+    in
+    { t with snarked_ledgers_below = List.rev !snarked_ledgers_below }
 
   (* Used in bootstrap (to verify data received from network)
      Consider changing types to work on stable scan state
@@ -2860,9 +2876,9 @@ let%test_module "staged ledger tests" =
                   ~pending_coinbases:!sl.pending_coinbase_collection ~get_state
                   ~signature_kind
               in
-              let _result = Or_error.ok_exn construction_result in
+              let result = Or_error.ok_exn construction_result in
               [%test_eq: Ledger_hash.t]
-                (Ledger.merkle_root sl_of_snarked_ledger)
+                (Ledger.merkle_root (Sl.ledger result))
                 (Ledger.merkle_root !sl.ledger) ;
               ignore
                 (Ledger.unregister_mask_exn sl_of_snarked_ledger ~loc:__LOC__)
