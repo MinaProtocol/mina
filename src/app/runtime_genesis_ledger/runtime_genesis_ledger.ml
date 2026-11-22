@@ -70,9 +70,9 @@ let is_dirty_proof = function
   | _ ->
       true
 
-let sanitize_proof (pf : Runtime_config.Proof_keys.t) =
-  { pf with
-    level = None
+let sanitize_proof (_ : Runtime_config.Proof_keys.t) :
+    Runtime_config.Proof_keys.t =
+  { level = None
   ; sub_windows_per_window = None
   ; ledger_depth = None
   ; work_delay = None

@@ -1056,13 +1056,12 @@ module Proof_keys = struct
     ; coinbase_amount : Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor : int option
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
     }
   [@@deriving bin_io_unversioned, yojson]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?transaction_capacity ?coinbase_amount ?supercharged_coinbase_factor
-      ?account_creation_fee ?fork () =
+      ?account_creation_fee () =
     { level
     ; sub_windows_per_window
     ; ledger_depth
@@ -1071,7 +1070,6 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork
     }
 
   let to_json_layout
@@ -1083,7 +1081,6 @@ module Proof_keys = struct
       ; coinbase_amount
       ; supercharged_coinbase_factor
       ; account_creation_fee
-      ; fork
       } =
     { Json_layout.Proof_keys.level = Option.map ~f:Level.to_json_layout level
     ; sub_windows_per_window
@@ -1095,7 +1092,7 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork
+    ; fork = None
     }
 
   let of_json_layout
@@ -1122,6 +1119,15 @@ module Proof_keys = struct
              runtime config, which moves it to \
              genesis.block_window_duration_ms"
     in
+    let%bind () =
+      match fork with
+      | None ->
+          Ok ()
+      | Some _ ->
+          Error
+            "Runtime_config.Proof_keys.of_json_layout: proof.fork must be read \
+             as part of a whole runtime config, which moves it to genesis.fork"
+    in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
       result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
@@ -1134,7 +1140,6 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork
     }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
@@ -1158,7 +1163,6 @@ module Proof_keys = struct
           t2.supercharged_coinbase_factor
     ; account_creation_fee =
         opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
-    ; fork = opt_fallthrough ~default:t1.fork t2.fork
     }
 
   let gen =
@@ -1172,12 +1176,8 @@ module Proof_keys = struct
       Currency.Amount.(gen_incl zero (of_mina_int_exn 1))
     in
     let%bind supercharged_coinbase_factor = Int.gen_incl 0 100 in
-    let%bind account_creation_fee =
+    let%map account_creation_fee =
       Currency.Fee.(gen_incl one (of_mina_int_exn 10))
-    in
-    let%map fork =
-      let open Quickcheck.Generator in
-      union [ map ~f:Option.some Fork_config.gen; return None ]
     in
     { level = Some level
     ; sub_windows_per_window = Some sub_windows_per_window
@@ -1187,7 +1187,6 @@ module Proof_keys = struct
     ; coinbase_amount = Some coinbase_amount
     ; supercharged_coinbase_factor = Some supercharged_coinbase_factor
     ; account_creation_fee = Some account_creation_fee
-    ; fork
     }
 end
 
@@ -1510,6 +1509,39 @@ let move_legacy_block_window_duration_ms (layout : Json_layout.t) :
                     { proof with block_window_duration_ms = None } )
             } )
 
+let move_legacy_fork (layout : Json_layout.t) : (Json_layout.t, string) Result.t
+    =
+  match Option.bind layout.proof ~f:(fun proof -> proof.fork) with
+  | None ->
+      Ok layout
+  | Some fork -> (
+      let genesis =
+        Option.value layout.genesis
+          ~default:
+            { k = None
+            ; delta = None
+            ; slots_per_epoch = None
+            ; slots_per_sub_window = None
+            ; grace_period_slots = None
+            ; block_window_duration_ms = None
+            ; genesis_state_timestamp = None
+            ; fork = None
+            }
+      in
+      match genesis.fork with
+      | Some _ ->
+          Error
+            "The configuration sets both proof.fork and genesis.fork. \
+             proof.fork is deprecated; remove it."
+      | None ->
+          Ok
+            { layout with
+              genesis = Some { genesis with fork = Some fork }
+            ; proof =
+                Option.map layout.proof ~f:(fun proof ->
+                    { proof with fork = None } )
+            } )
+
 let sets_legacy_block_window_duration_ms (json : Yojson.Safe.t) =
   match json with
   | `Assoc fields -> (
@@ -1524,7 +1556,9 @@ let sets_legacy_block_window_duration_ms (json : Yojson.Safe.t) =
 let of_json_layout layout =
   let open Result.Let_syntax in
   let%bind { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
-    move_legacy_block_window_duration_ms layout
+    Result.bind
+      (move_legacy_block_window_duration_ms layout)
+      ~f:move_legacy_fork
   in
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
@@ -1734,12 +1768,7 @@ let slot_tx_end, slot_chain_end =
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
-let fork t =
-  match Option.bind t.genesis ~f:(fun genesis -> genesis.fork) with
-  | Some fork ->
-      Some fork
-  | None ->
-      Option.bind t.proof ~f:(fun proof -> proof.fork)
+let fork t = Option.bind t.genesis ~f:(fun genesis -> genesis.fork)
 
 let hard_fork_genesis_slot_delta t =
   let open Option.Let_syntax in

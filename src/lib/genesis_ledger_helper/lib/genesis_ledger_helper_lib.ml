@@ -499,7 +499,6 @@ let runtime_config_of_constraint_constants
   ; supercharged_coinbase_factor =
       Some constraint_constants.supercharged_coinbase_factor
   ; account_creation_fee = Some constraint_constants.account_creation_fee
-  ; fork = None
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)

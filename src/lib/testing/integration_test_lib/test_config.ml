@@ -85,7 +85,6 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
   ; account_creation_fee = None
-  ; fork = None
   }
 
 let fork_default : Runtime_config.Fork_config.t option =

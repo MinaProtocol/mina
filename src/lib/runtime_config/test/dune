@@ -1,5 +1,5 @@
 (tests
- (names stop_slot_test block_window_duration_test)
+ (names stop_slot_test block_window_duration_test fork_test)
  (libraries
   ;; opam libraries
   alcotest
