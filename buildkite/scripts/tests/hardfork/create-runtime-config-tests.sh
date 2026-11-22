@@ -4,7 +4,8 @@
 #
 # The script patches a fork config (new genesis timestamp + ledger hashes). The
 # fork slot must be carried over verbatim from the fork config's
-# proof.fork.global_slot_since_genesis -- it must NOT be recomputed from the
+# genesis.fork.global_slot_since_genesis (proof.fork in a config from a daemon
+# that predates genesis.fork) -- it must NOT be recomputed from the
 # wall-clock genesis window with a hard-coded slot time. The legacy code divided
 # the window by 180 s/slot (Berkeley), which is wrong for a 90 s/slot Mesa
 # prefork. See https://github.com/MinaProtocol/mina/issues/18980.
@@ -68,8 +69,10 @@ EOF
 # would catch the regression.
 cat > "$WORK_DIR/prefork_config.json" <<EOF
 {
-  "genesis": { "genesis_state_timestamp": "2026-06-17T14:00:00Z" },
-  "proof": { "fork": { "global_slot_since_genesis": 455340 } }
+  "genesis": {
+    "genesis_state_timestamp": "2026-06-17T14:00:00Z",
+    "fork": { "global_slot_since_genesis": 455340 }
+  }
 }
 EOF
 
@@ -90,14 +93,14 @@ echo "--- create_runtime_config.sh output:"
 echo "$OUTPUT" | jq .
 
 # 1. The fork slot is carried over verbatim (NOT 456780 from a 180 s/slot recompute).
-actual_slot=$(echo "$OUTPUT" | jq -r '.proof.fork.global_slot_since_genesis')
+actual_slot=$(echo "$OUTPUT" | jq -r '.genesis.fork.global_slot_since_genesis')
 [[ "$actual_slot" == "$FORK_SLOT" ]] ||
   fail "fork slot should be carried over verbatim ($FORK_SLOT), got $actual_slot (a 180 s/slot recompute would give 456780)"
 
 # 2. state_hash and blockchain_length pass through from the fork config.
-[[ "$(echo "$OUTPUT" | jq -r '.proof.fork.state_hash')" == "$FORK_STATE_HASH" ]] ||
+[[ "$(echo "$OUTPUT" | jq -r '.genesis.fork.state_hash')" == "$FORK_STATE_HASH" ]] ||
   fail "state_hash not passed through"
-[[ "$(echo "$OUTPUT" | jq -r '.proof.fork.blockchain_length')" == "$FORK_BLOCKCHAIN_LENGTH" ]] ||
+[[ "$(echo "$OUTPUT" | jq -r '.genesis.fork.blockchain_length')" == "$FORK_BLOCKCHAIN_LENGTH" ]] ||
   fail "blockchain_length not passed through"
 
 # 3. The genesis timestamp is patched to the requested postfork value.
@@ -120,7 +123,7 @@ OUTPUT_2=$(
     SECONDS_PER_SLOT=90 \
     bash "$CREATE_RUNTIME_CONFIG"
 )
-slot_2=$(echo "$OUTPUT_2" | jq -r '.proof.fork.global_slot_since_genesis')
+slot_2=$(echo "$OUTPUT_2" | jq -r '.genesis.fork.global_slot_since_genesis')
 [[ "$slot_2" == "$FORK_SLOT" ]] ||
   fail "fork slot must be independent of SECONDS_PER_SLOT, got $slot_2 with SECONDS_PER_SLOT=90"
 
@@ -164,6 +167,23 @@ echo '{"daemon": {"network_id": "mainnet"}}' > "$WORK_DIR/prefork_partial.json"
 # 9. Without a prefork config (the verifier passes it empty), no daemon section.
 [[ "$(run_with_prefork "" | jq 'has("daemon")')" == "false" ]] ||
   fail "an empty FORKING_FROM_CONFIG_JSON must give no daemon section"
+
+# 10. The output has no proof section, so the new daemon does not see the
+#     deprecated proof.fork.
+[[ "$(echo "$OUTPUT" | jq 'has("proof")')" == "false" ]] ||
+  fail "the output must set the fork point in genesis.fork only"
+
+# 11. A fork config from a daemon that writes genesis.fork is read the same way.
+jq '{genesis: {fork: .proof.fork}} + del(.proof)' "$WORK_DIR/fork_config.json" \
+  > "$WORK_DIR/fork_config_genesis.json"
+OUTPUT_4=$(
+  FORK_CONFIG_JSON="$WORK_DIR/fork_config_genesis.json" \
+    LEDGER_HASHES_JSON="$WORK_DIR/hashes.json" \
+    GENESIS_TIMESTAMP="$POSTFORK_TIMESTAMP" \
+    bash "$CREATE_RUNTIME_CONFIG"
+)
+[[ "$(echo "$OUTPUT_4" | jq -cS .genesis.fork)" == "$(echo "$OUTPUT" | jq -cS .genesis.fork)" ]] ||
+  fail "a fork config with genesis.fork must give the same fork point as one with proof.fork"
 
 echo "PASSED: fork slot is carried over verbatim and is independent of the slot-time constant"
 echo "PASSED: only network_id and peer_list_url carry over from the prefork config"
