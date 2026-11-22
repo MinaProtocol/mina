@@ -87,8 +87,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Balance.to_mina_string balance.locked)
   end
 
-  let older_version = Mina_numbers.Txn_version.of_int 1
-
   let fork_config : Runtime_config.Fork_config.t =
     { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
     ; blockchain_length = 300000
@@ -178,18 +176,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~cliff_amount:2_000_000_000_000 ~vesting_period:1
                    ~vesting_increment:2_000_000_000_000 )
               ()
-          ; create ~account_name:"vk-proof" ~balance:"10000"
-              ~permissions:
-                { Permissions.user_default with
-                  set_verification_key = (Proof, older_version)
-                }
-              ~zkapp:Zkapp_account.default ()
-          ; create ~account_name:"vk-impossible" ~balance:"1000"
-              ~permissions:
-                { Permissions.user_default with
-                  set_verification_key = (Proof, older_version)
-                }
-              ~zkapp:Zkapp_account.default ()
           ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
@@ -231,12 +217,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let timed3 = Network.genesis_keypair_exn network "timed3" in
     let timed4 = Network.genesis_keypair_exn network "timed4" in
     let timed5 = Network.genesis_keypair_exn network "timed5" in
-    let vk_proof = Network.genesis_keypair_exn network "vk-proof" in
-    let vk_impossible =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "vk-impossible"
-    in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
     [%log info] "extra genesis keypairs: %s"
@@ -304,87 +284,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants
         ~signature_kind zkapp_command_spec
-    in
-    let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
-      let snapp_update =
-        { Account_update.Update.dummy with
-          verification_key =
-            Zkapp_basic.Set_or_keep.Set
-              { data = Pickles.Side_loaded.Verification_key.dummy
-              ; hash = Zkapp_account.dummy_vk_hash ()
-              }
-        }
-      in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      let amount = Currency.Amount.of_mina_int_exn 10 in
-      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
-      let (spec_proof : Transaction_snark.For_tests.Update_states_spec.t) =
-        { sender = (fish1.keypair, Account.Nonce.one)
-        ; fee
-        ; fee_payer = None
-        ; receivers = []
-        ; amount
-        ; zkapp_account_keypairs = [ vk_proof.keypair ]
-        ; memo
-        ; new_zkapp_account = false
-        ; snapp_update
-        ; current_auth = Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; actions = []
-        ; preconditions = None
-        }
-      in
-      let spec_impossible =
-        { spec_proof with
-          zkapp_account_keypairs = [ vk_impossible.keypair ]
-        ; sender = (fish1.keypair, Account.Nonce.(succ one))
-        }
-      in
-      let constraint_constants = Network.constraint_constants network in
-      let%bind vk_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
-      in
-      let%map vk_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
-      in
-      (vk_proof, vk_impossible)
-    in
-    let%bind zkapp_command_upgrade_version =
-      let constraint_constants = Network.constraint_constants network in
-      let snapp_update =
-        { Account_update.Update.dummy with
-          permissions =
-            Zkapp_basic.Set_or_keep.Set
-              (Permissions.Update.of_account Permissions.user_default)
-        }
-      in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      let amount = Currency.Amount.of_mina_int_exn 10 in
-      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
-      let (spec : Transaction_snark.For_tests.Update_states_spec.t) =
-        { sender = (vk_proof.keypair, Account.Nonce.zero)
-        ; fee
-        ; fee_payer = None
-        ; receivers = []
-        ; amount
-        ; zkapp_account_keypairs = [ vk_proof.keypair ]
-        ; memo
-        ; new_zkapp_account = false
-        ; snapp_update
-        ; current_auth = Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; actions = []
-        ; preconditions = None
-        }
-      in
-      Malleable_error.lift
-      @@ Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
     let (zkapp_command_spec
           : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
@@ -737,47 +636,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             genesis derived from hard fork config"
            (List.length blocks) ;
          return () )
-    in
-    let%bind () =
-      section_hard
-        "send a zkapp to update verification key using Signature while account \
-         permission is set to Proof with old version"
-      @@ send_zkapp ~logger
-           (Network.Node.get_ingress_uri node_a)
-           zkapp_command_update_vk_proof
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkapp to update verification key to be included in \
-         transition frontier"
-      @@ wait_for_zkapp zkapp_command_update_vk_proof
-    in
-    let%bind () =
-      section_hard
-        "send a zkapp to update verification key using Signature while account \
-         permission is set to Impossible with old version"
-      @@ send_zkapp ~logger
-           (Network.Node.get_ingress_uri node_a)
-           zkapp_command_update_vk_impossible
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkapp to update verification key to be included in \
-         transition frontier"
-      @@ wait_for_zkapp zkapp_command_update_vk_impossible
-    in
-    let%bind () =
-      section_hard
-        "send a zkapp to upgrade permission's version to current version"
-      @@ send_zkapp ~logger
-           (Network.Node.get_ingress_uri node_a)
-           zkapp_command_upgrade_version
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkapp to upgrade perimission's version to be included in \
-         transition frontier"
-      @@ wait_for_zkapp zkapp_command_upgrade_version
     in
     section_hard "running replayer"
       (* Without an explicit target the replayer only replays up to the highest

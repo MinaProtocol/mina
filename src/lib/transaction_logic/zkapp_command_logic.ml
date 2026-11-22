@@ -548,18 +548,6 @@ module type Controller_intf = sig
   include Iffable
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
-
-  val verification_key_perm_fallback_to_signature_with_older_version : t -> t
-
-  val access_perm_fallback_to_signature_with_older_version : t -> t
-end
-
-module type Txn_version_intf = sig
-  include Iffable
-
-  val equal_to_current : t -> bool
-
-  val older_than_current : t -> bool
 end
 
 module type Account_intf = sig
@@ -707,12 +695,6 @@ module type Account_intf = sig
   val permissions : t -> Permissions.t
 
   val set_permissions : Permissions.t -> t -> t
-
-  type txn_version
-
-  val txn_version : t -> txn_version
-
-  val set_txn_version_to_current : t -> t
 end
 
 module Eff = struct
@@ -788,8 +770,6 @@ module type Inputs_intf = sig
 
   module Controller : Controller_intf with type bool := Bool.t
 
-  module Txn_version : Txn_version_intf with type bool := Bool.t
-
   module Global_slot_since_genesis :
     Global_slot_since_genesis_intf with type bool := Bool.t
 
@@ -841,8 +821,7 @@ module type Inputs_intf = sig
        and type nonce := Nonce.t
        and type state_hash := State_hash.t
        and type token_id := Token_id.t
-       and type account_id := Account_id.t
-       and type txn_version = Txn_version.t)
+       and type account_id := Account_id.t)
 
   and Actions :
     (Actions_intf with type bool := Bool.t and type field := Field.t)
@@ -1550,17 +1529,10 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
-    let auth_with_fallback ~fallback_logic auth =
-      Account.txn_version a |> Txn_version.older_than_current
-      |> Controller.if_ ~then_:(fallback_logic auth) ~else_:auth
-    in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
       let has_permission =
         Account.Permissions.access a
-        |> auth_with_fallback
-             ~fallback_logic:
-               Controller.access_perm_fallback_to_signature_with_older_version
         |> Controller.check ~proof_verifies ~signature_verifies
       in
       Local_state.add_check local_state Update_not_permitted_access
@@ -1627,10 +1599,6 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let has_permission =
         Account.Permissions.set_verification_key_auth a
-        |> auth_with_fallback
-             ~fallback_logic:
-               Controller
-               .verification_key_perm_fallback_to_signature_with_older_version
         |> Controller.check ~proof_verifies ~signature_verifies
       in
       let local_state =
@@ -1642,7 +1610,6 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.verification_key a)
       in
       let a = Account.set_verification_key verification_key a in
-      let a = Account.set_txn_version_to_current a in
       (a, local_state)
     in
     (* Update action state. *)
