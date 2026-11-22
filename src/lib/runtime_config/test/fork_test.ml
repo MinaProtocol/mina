@@ -90,6 +90,13 @@ let test_proof_keys_reject_legacy_key () =
   | Error _ ->
       ()
 
+let test_detects_legacy_key () =
+  let sets_legacy s =
+    Runtime_config.sets_legacy_fork (Yojson.Safe.from_string s)
+  in
+  Alcotest.(check bool) "legacy key" true (sets_legacy legacy_layer) ;
+  Alcotest.(check bool) "new key" false (sets_legacy new_layer)
+
 let test_layering_legacy_then_new () =
   Runtime_config.combine (parse_exn legacy_layer) (parse_exn new_layer)
   |> check_fork ~expected:(Some fork_b)
@@ -139,6 +146,7 @@ let () =
         ; Alcotest.test_case "both keys, equal" `Quick test_both_keys_equal
         ; Alcotest.test_case "proof section rejects legacy key" `Quick
             test_proof_keys_reject_legacy_key
+        ; Alcotest.test_case "detects legacy key" `Quick test_detects_legacy_key
         ] )
     ; ( "layering"
       , [ Alcotest.test_case "legacy then new" `Quick

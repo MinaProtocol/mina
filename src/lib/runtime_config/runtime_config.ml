@@ -1542,16 +1542,21 @@ let move_legacy_fork (layout : Json_layout.t) : (Json_layout.t, string) Result.t
                     { proof with fork = None } )
             } )
 
-let sets_legacy_block_window_duration_ms (json : Yojson.Safe.t) =
+let sets_proof_field field (json : Yojson.Safe.t) =
   match json with
   | `Assoc fields -> (
       match List.Assoc.find fields ~equal:String.equal "proof" with
       | Some (`Assoc proof) ->
-          List.Assoc.mem proof ~equal:String.equal "block_window_duration_ms"
+          List.Assoc.mem proof ~equal:String.equal field
       | _ ->
           false )
   | _ ->
       false
+
+let sets_legacy_block_window_duration_ms =
+  sets_proof_field "block_window_duration_ms"
+
+let sets_legacy_fork = sets_proof_field "fork"
 
 let of_json_layout layout =
   let open Result.Let_syntax in

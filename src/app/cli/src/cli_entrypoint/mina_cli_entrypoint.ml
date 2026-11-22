@@ -83,6 +83,11 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
              proof.block_window_duration_ms; set \
              genesis.block_window_duration_ms instead"
             ~metadata:[ ("config_file", `String config_file) ] ;
+        if Runtime_config.sets_legacy_fork config_json then
+          [%log warn]
+            "Configuration file $config_file sets the deprecated proof.fork; \
+             set genesis.fork instead"
+            ~metadata:[ ("config_file", `String config_file) ] ;
         match Runtime_config.of_yojson config_json with
         | Ok loaded_config ->
             Runtime_config.combine config loaded_config
