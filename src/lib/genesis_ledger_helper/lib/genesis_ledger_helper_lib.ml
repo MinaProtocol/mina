@@ -583,6 +583,10 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; minimum_user_command_fee =
       Option.value ~default:default.minimum_user_command_fee
         (config.daemon >>= fun cfg -> cfg.minimum_user_command_fee)
+  ; fork =
+      Option.value_map ~default:default.fork
+        (config.proof >>= fun cfg -> cfg.fork)
+        ~f:(fun fork -> Some (fork_constants_of_fork_config fork))
   }
 
 let%test_module "Runtime config" =
