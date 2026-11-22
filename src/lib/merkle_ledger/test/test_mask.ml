@@ -270,6 +270,18 @@ module Make (Test : Test_intf) = struct
             assert (Exn.does_raise (fun () -> Mask.Attached.merkle_root sibling)) ) )
 
   let () =
+    add_test "moving a mask's ledger to a new handle orphans the old one"
+      (fun () ->
+        Test.with_chain (fun _base ~mask:m1_lazy ~mask2:_ ->
+            let m1, _ = Lazy.force m1_lazy in
+            Mask.Attached.set m1 dummy_location dummy_account ;
+            let moved = Mask.Attached.move ~loc:__LOC__ m1 in
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get moved dummy_location) ;
+            assert (
+              Exn.does_raise (fun () -> Mask.Attached.get m1 dummy_location) ) ) )
+
+  let () =
     add_test "a mask fails on its next use once a mask below it is orphaned"
       (fun () ->
         Test.with_chain (fun _base ~mask:m1_lazy ~mask2:m2_lazy ->
@@ -279,6 +291,30 @@ module Make (Test : Test_intf) = struct
             ignore (Maskable.unregister_mask_exn ~loc:__LOC__ m1 : Mask.t) ;
             assert (
               Exn.does_raise (fun () -> Mask.Attached.get m2 dummy_location) ) ) )
+
+  let () =
+    add_test "remove a parent with the same merkle root as its own parent"
+      (fun () ->
+        Test.with_chain (fun base ~mask:m1_lazy ~mask2:_ ->
+            let m1, m1_base = Lazy.force m1_lazy in
+            Mask.Attached.set m1 dummy_location dummy_account ;
+            let m2 =
+              Mask.set_parent
+                ~accumulated:(Mask.Attached.to_accumulated m1)
+                (Mask.create ~depth:Test.depth ())
+                m1_base
+            in
+            Mask.Attached.commit m1 ;
+            let root = Mask.Attached.merkle_root m2 in
+            Mask.Attached.remove_parent m2 ~parent:m1 ;
+            assert (Hash.equal root (Mask.Attached.merkle_root m2)) ;
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get m2 dummy_location) ;
+            assert (
+              Uuid.equal (Maskable.get_uuid base)
+                (Maskable.get_uuid (Mask.Attached.get_parent m2)) ) ;
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get m1 dummy_location) ) )
 
   let () =
     add_test "register and unregister mask" (fun () ->

@@ -235,6 +235,10 @@ val work_statements_for_new_diff :
 (** True if the latest tree is full and transactions would be added on to a new tree *)
 val next_on_new_tree : t -> bool
 
+(** Whether the block applied over [parent_state_hash] completed a tree with
+    its transactions. *)
+val completes_tree : t -> parent_state_hash:State_hash.t -> bool
+
 (** Per-tree counts of free space and outstanding work, oldest tree first *)
 val tree_metrics : t -> Tree_metrics.t list
 

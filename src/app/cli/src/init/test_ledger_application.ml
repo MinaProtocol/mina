@@ -165,18 +165,21 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
             Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
         ; total_supply_after_coinbase = Currency.Amount.zero
         }
-      ledger pending_coinbase zkapps' prev_state_view
+      (Mina_ledger.Mutable_ledger.unsafe_of_ledger ledger)
+      pending_coinbase zkapps' prev_state_view
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
-  | Ok (b, _, _, _, _, _) ->
-      let root = Ledger.merkle_root ledger in
+  | Ok (b, _, _, _, _, _, (first, ledger)) ->
+      Mina_ledger.Immutable_ledger.commit_into_parent ~loc:__LOC__ ledger
+        ~parent:first ;
+      let root = Mina_ledger.Immutable_ledger.merkle_root ledger in
       let elapsed = Time.diff (Time.now ()) start in
       printf
         !"Result of application %d: %B (took %s): new root %s\n%!"
         i b
         Time.(Span.to_string elapsed)
         (Ledger_hash.to_base58_check root) ;
-      elapsed
+      (elapsed, Mina_ledger.Immutable_ledger.unsafe_to_ledger ledger)
   | Error e ->
       eprintf
         !"Error applying staged ledger: %s\n%!"
@@ -285,10 +288,11 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
           () ) ;
       apply ~transfer_parties_get_actions_events:false ~action_elements:0
         ~event_elements:0 ~num_txs:num_txs_per_round ~i ledger
-      >>| save_preparation_times >>| mask_handler ledger
-      >>| Fn.flip Tuple2.create (ledger :: ledgers) )
+      >>| fun (time, ledger) ->
+      save_preparation_times time ;
+      (mask_handler ledger (), ledger :: ledgers) )
   >>| fst
   >>= apply ~transfer_parties_get_actions_events ~num_txs:num_txs_final
         ~action_elements:genesis_constants.max_action_elements
         ~event_elements:genesis_constants.max_event_elements ~i:rounds
-  >>| stop_tracing >>| save_and_dump_benchmarks
+  >>| fst >>| stop_tracing >>| save_and_dump_benchmarks
