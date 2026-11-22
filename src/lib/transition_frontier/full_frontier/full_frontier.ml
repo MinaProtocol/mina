@@ -990,9 +990,9 @@ module For_tests = struct
     Breadcrumb.For_tests.gen ~logger ~precomputed_values ~verifier
       ?trust_system:None ~accounts_with_secret_keys
 
-  let gen_breadcrumb_seq ~verifier =
-    Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
-      ?trust_system:None ~accounts_with_secret_keys
+  let gen_breadcrumb_seq ?include_snark_work ~verifier =
+    Breadcrumb.For_tests.gen_seq ~logger ?include_snark_work ~precomputed_values
+      ~verifier ?trust_system:None ~accounts_with_secret_keys
 
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)

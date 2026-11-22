@@ -97,13 +97,15 @@ module For_tests : sig
   val gen_breadcrumb :
        verifier:Verifier.t
     -> ?send_to_random_pk:bool
+    -> ?include_snark_work:bool
     -> unit
     -> (   Frontier_base.Breadcrumb.t
         -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
        Base_quickcheck.Generator.t
 
   val gen_breadcrumb_seq :
-       verifier:Verifier.t
+       ?include_snark_work:bool
+    -> verifier:Verifier.t
     -> int
     -> (   Frontier_base.Breadcrumb.t
         -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
