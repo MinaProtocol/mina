@@ -341,7 +341,7 @@ let permissions_of_account_permissions account_permissions :
   ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
   ; set_token_symbol = to_auth_required account_permissions.setTokenSymbol
   ; set_verification_key =
-      to_auth_required account_permissions.setVerificationKey.auth
+      to_auth_required account_permissions.setVerificationKey
   ; set_voting_for = to_auth_required account_permissions.setVotingFor
   ; set_timing = to_auth_required account_permissions.setTiming
   }
