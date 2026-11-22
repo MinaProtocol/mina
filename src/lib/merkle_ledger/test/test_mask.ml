@@ -317,6 +317,18 @@ module Make (Test : Test_intf) = struct
               (Mask.Attached.get m1 dummy_location) ) )
 
   let () =
+    add_test "a mask is no longer attached once a mask below it is orphaned"
+      (fun () ->
+        Test.with_chain (fun _base ~mask:m1_lazy ~mask2:m2_lazy ->
+            let m1, _ = Lazy.force m1_lazy in
+            let m2 = Lazy.force m2_lazy in
+            Mask.Attached.set m2 dummy_location dummy_account ;
+            assert (Mask.Attached.is_attached m2) ;
+            ignore (Maskable.unregister_mask_exn ~loc:__LOC__ m1 : Mask.t) ;
+            assert (not (Mask.Attached.is_attached m1)) ;
+            assert (not (Mask.Attached.is_attached m2)) ) )
+
+  let () =
     add_test "register and unregister mask" (fun () ->
         Test.with_instances (fun maskable mask ->
             let (attached_mask : Mask.Attached.t) =

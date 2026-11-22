@@ -153,7 +153,7 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
      * time *)
     let depth (T ((module Base), t)) = Base.depth t
 
-    let detached_signal (T ((module Base), t)) = Base.detached_signal t
+    let is_attached (T ((module Base), t)) = Base.is_attached t
 
     let level (T ((module Base), t)) = Base.level t
 

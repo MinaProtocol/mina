@@ -87,8 +87,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     Kvdb.close kvdb ;
     Async.Ivar.fill_if_empty detached_parent_signal ()
 
-  let detached_signal { detached_parent_signal; _ } =
-    Async.Ivar.read detached_parent_signal
+  let is_attached { detached_parent_signal; _ } =
+    not (Async.Ivar.is_full detached_parent_signal)
 
   let level _ = 0
 
