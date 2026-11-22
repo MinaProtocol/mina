@@ -458,5 +458,5 @@ module type Base_ledger_intf = sig
 
   val get_batch : t -> Location.t list -> (Location.t * Account.t option) list
 
-  val detached_signal : t -> unit Deferred.t
+  val is_attached : t -> bool
 end
