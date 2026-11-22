@@ -80,15 +80,38 @@ type EpochDataPrepatch struct {
 	Accounts any    `json:"accounts"`
 }
 
+type ForkPoint struct {
+	BlockChainLength       int    `json:"blockchain_length"`
+	GlobalSlotSinceGenesis int64  `json:"global_slot_since_genesis"`
+	StateHash              string `json:"state_hash"`
+}
+
+// ForkPointOf reads a fork config's genesis.fork, or proof.fork from a daemon
+// that predates genesis.fork.
+func ForkPointOf(configBytes []byte) (ForkPoint, error) {
+	var config struct {
+		Genesis struct {
+			Fork *ForkPoint `json:"fork"`
+		} `json:"genesis"`
+		Proof struct {
+			Fork *ForkPoint `json:"fork"`
+		} `json:"proof"`
+	}
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		return ForkPoint{}, fmt.Errorf("failed to read the fork point: %w", err)
+	}
+	if config.Genesis.Fork != nil {
+		return *config.Genesis.Fork, nil
+	}
+	if config.Proof.Fork != nil {
+		return *config.Proof.Fork, nil
+	}
+	return ForkPoint{}, fmt.Errorf("fork config sets neither genesis.fork nor proof.fork")
+}
+
 type LegacyPrepatchForkConfigView struct {
-	Genesis any `json:"genesis"`
-	Proof   struct {
-		Fork struct {
-			BlockChainLength       int    `json:"blockchain_length"`
-			GlobalSlotSinceGenesis int    `json:"global_slot_since_genesis"`
-			StateHash              string `json:"state_hash"`
-		} `json:"fork"`
-	} `json:"proof"`
+	Genesis   any `json:"genesis"`
+	Proof     any `json:"proof"`
 	EpochData struct {
 		Staking EpochDataPrepatch `json:"staking"`
 		Next    EpochDataPrepatch `json:"next"`
@@ -100,16 +123,16 @@ type LegacyPrepatchForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd client.BlockData, config LegacyPrepatchForkConfigView) error {
+func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd client.BlockData, config LegacyPrepatchForkConfigView, fork ForkPoint) error {
 
 	t.Logger.Info("Validating legacy prepatch fork config")
 
-	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
-		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
+	if fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
+		return fmt.Errorf("Expected fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, fork.BlockChainLength)
 	}
 
-	if config.Proof.Fork.StateHash != lastBlockBeforeTxEnd.StateHash {
-		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, config.Proof.Fork.StateHash)
+	if fork.StateHash != lastBlockBeforeTxEnd.StateHash {
+		return fmt.Errorf("Expected fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, fork.StateHash)
 	}
 
 	if config.EpochData.Staking.Seed != lastBlockBeforeTxEnd.CurEpochSeed {
@@ -139,19 +162,14 @@ type EpochData struct {
 }
 
 type FinalForkConfigView struct {
-	Proof struct {
-		Fork struct {
-			BlockChainLength       int    `json:"blockchain_length"`
-			GlobalSlotSinceGenesis int64  `json:"global_slot_since_genesis"`
-			StateHash              string `json:"state_hash"`
-		} `json:"fork"`
-	} `json:"proof"`
+	Proof     any `json:"proof"`
 	EpochData struct {
 		Staking EpochData `json:"staking"`
 		Next    EpochData `json:"next"`
 	} `json:"epoch_data"`
 	Genesis struct {
 		GenesisStateTimeStamp time.Time `json:"genesis_state_timestamp"`
+		Fork                  any       `json:"fork"`
 	}
 	Ledger struct {
 		Hash             string `json:"hash"`
@@ -160,22 +178,22 @@ type FinalForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateFinalForkConfig(lastBlockBeforeTxEnd client.BlockData, config FinalForkConfigView, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) ValidateFinalForkConfig(lastBlockBeforeTxEnd client.BlockData, config FinalForkConfigView, fork ForkPoint, forkGenesisTs, mainGenesisTs int64) error {
 
 	t.Logger.Info("Validating final fork config")
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
-	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
-		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
+	if fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
+		return fmt.Errorf("Expected fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, fork.BlockChainLength)
 	}
 
-	if config.Proof.Fork.GlobalSlotSinceGenesis != expectedGenesisSlot {
-		return fmt.Errorf("Expected proof.fork.global_slot_since_genesis to be %d, got %d", expectedGenesisSlot, config.Proof.Fork.GlobalSlotSinceGenesis)
+	if fork.GlobalSlotSinceGenesis != expectedGenesisSlot {
+		return fmt.Errorf("Expected fork.global_slot_since_genesis to be %d, got %d", expectedGenesisSlot, fork.GlobalSlotSinceGenesis)
 	}
 
-	if config.Proof.Fork.StateHash != lastBlockBeforeTxEnd.StateHash {
-		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, config.Proof.Fork.StateHash)
+	if fork.StateHash != lastBlockBeforeTxEnd.StateHash {
+		return fmt.Errorf("Expected fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, fork.StateHash)
 	}
 
 	if config.Genesis.GenesisStateTimeStamp.Unix() != forkGenesisTs {
