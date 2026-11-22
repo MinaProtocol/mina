@@ -409,6 +409,15 @@ module Accounts = struct
       with Stop -> accounts
 end
 
+let fork_constants_of_fork_config
+    ({ state_hash; blockchain_length; global_slot_since_genesis } :
+      Runtime_config.Fork_config.t ) : Genesis_constants.Fork_constants.t =
+  { state_hash = State_hash.of_base58_check_exn state_hash
+  ; blockchain_length = Mina_numbers.Length.of_int blockchain_length
+  ; global_slot_since_genesis =
+      Mina_numbers.Global_slot_since_genesis.of_int global_slot_since_genesis
+  }
+
 let constraint_constants_of_proof_keys
     ~(default : Genesis_constants.Constraint_constants.t)
     ~block_window_duration_ms (config : Runtime_config.Proof_keys.t) :
@@ -459,17 +468,8 @@ let constraint_constants_of_proof_keys
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee
   ; fork =
-      ( match config.fork with
-      | None ->
-          default.fork
-      | Some { state_hash; blockchain_length; global_slot_since_genesis } ->
-          Some
-            { state_hash = State_hash.of_base58_check_exn state_hash
-            ; blockchain_length = Mina_numbers.Length.of_int blockchain_length
-            ; global_slot_since_genesis =
-                Mina_numbers.Global_slot_since_genesis.of_int
-                  global_slot_since_genesis
-            } )
+      Option.value_map config.fork ~default:default.fork ~f:(fun fork ->
+          Some (fork_constants_of_fork_config fork) )
   }
 
 let make_constraint_constants
