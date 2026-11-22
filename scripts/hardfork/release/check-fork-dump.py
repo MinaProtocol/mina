@@ -52,10 +52,15 @@ def default_token_supply(accounts):
     )
 
 
+def fork_point(config):
+    """genesis.fork, or proof.fork in a config from a daemon that predates it."""
+    return config.get("genesis", {}).get("fork") or config["proof"]["fork"]
+
+
 def compare_with_block(config, block):
     body = block["data"]["protocol_state"]["body"]
     state = body["consensus_state"]
-    fork = config["proof"]["fork"]
+    fork = fork_point(config)
     epochs = config["epoch_data"]
     yield (
         "ledger hash",
@@ -95,7 +100,7 @@ def main():
     config = json.loads(dump.decode("utf-8", "surrogateescape"))
 
     prefix = args.block_prefix or f"gs://mina_network_block_data/{args.network}"
-    fork = config["proof"]["fork"]
+    fork = fork_point(config)
     url = block_url(prefix, fork["blockchain_length"], fork["state_hash"])
     print(f"fork block: {url}")
     block = json.loads(fetch(url))
