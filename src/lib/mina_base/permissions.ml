@@ -850,6 +850,192 @@ module Update = struct
     of_account dummy_value_for_set_or_keep_placeholder_only
 end
 
+(** The permissions stored in an account. Unlike {!t}, which an account
+    update sets, they hold no transaction version for [set_verification_key].
+*)
+module Account = struct
+  type permissions = t
+
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'controller t =
+          { edit_state : 'controller
+          ; access : 'controller
+          ; send : 'controller
+          ; receive : 'controller
+          ; set_delegate : 'controller
+          ; set_permissions : 'controller
+          ; set_verification_key : 'controller
+          ; set_zkapp_uri : 'controller
+          ; edit_action_state : 'controller
+          ; set_token_symbol : 'controller
+          ; increment_nonce : 'controller
+          ; set_voting_for : 'controller
+          ; set_timing : 'controller
+          }
+        [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
+      end
+    end]
+
+    let map t ~f =
+      Stable.Latest.Fields.map
+        ~edit_state:(fun x -> f (Core_kernel.Field.get x t))
+        ~access:(fun x -> f (Core_kernel.Field.get x t))
+        ~send:(fun x -> f (Core_kernel.Field.get x t))
+        ~receive:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_delegate:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_permissions:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_verification_key:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_zkapp_uri:(fun x -> f (Core_kernel.Field.get x t))
+        ~edit_action_state:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_token_symbol:(fun x -> f (Core_kernel.Field.get x t))
+        ~increment_nonce:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_voting_for:(fun x -> f (Core_kernel.Field.get x t))
+        ~set_timing:(fun x -> f (Core_kernel.Field.get x t))
+
+    let map2 t1 t2 ~f =
+      Stable.Latest.Fields.map
+        ~edit_state:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~access:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~send:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~receive:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_delegate:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_permissions:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_verification_key:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_zkapp_uri:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~edit_action_state:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_token_symbol:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~increment_nonce:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_voting_for:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+        ~set_timing:(fun x ->
+          f (Core_kernel.Field.get x t1) (Core_kernel.Field.get x t2) )
+
+    let to_input controller t =
+      let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+      Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
+        ~access:(f controller) ~send:(f controller) ~receive:(f controller)
+        ~set_delegate:(f controller) ~set_permissions:(f controller)
+        ~set_verification_key:(f controller) ~set_zkapp_uri:(f controller)
+        ~edit_action_state:(f controller) ~set_token_symbol:(f controller)
+        ~increment_nonce:(f controller) ~set_voting_for:(f controller)
+        ~set_timing:(f controller)
+      |> List.rev
+      |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Auth_required.Stable.V2.t Poly.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  (** Forgets the transaction version of [set_verification_key]. *)
+  let of_permissions
+      ({ edit_state
+       ; access
+       ; send
+       ; receive
+       ; set_delegate
+       ; set_permissions
+       ; set_verification_key
+       ; set_zkapp_uri
+       ; edit_action_state
+       ; set_token_symbol
+       ; increment_nonce
+       ; set_voting_for
+       ; set_timing
+       } :
+        permissions ) : t =
+    { edit_state
+    ; access
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key = fst set_verification_key
+    ; set_zkapp_uri
+    ; edit_action_state
+    ; set_token_symbol
+    ; increment_nonce
+    ; set_voting_for
+    ; set_timing
+    }
+
+  let of_update (update : Update.t) : t =
+    of_permissions (Update.to_account update)
+
+  let gen ~auth_tag : t Quickcheck.Generator.t =
+    Quickcheck.Generator.map (gen ~auth_tag) ~f:of_permissions
+
+  let to_input (t : t) = Poly.to_input Auth_required.to_input t
+
+  module Checked = struct
+    type t = Auth_required.Checked.t Poly.Stable.Latest.t
+
+    let to_input (t : t) = Poly.to_input Auth_required.Checked.to_input t
+
+    let if_ b ~(then_ : t) ~(else_ : t) : t Snark_params.Tick.Checked.t =
+      Snark_params.Tick.Checked.return
+        (Poly.map2 then_ else_ ~f:(fun then_ else_ ->
+             Auth_required.Checked.if_ b ~then_ ~else_ ) )
+
+    let constant (t : Stable.Latest.t) : t =
+      Poly.map t ~f:Auth_required.Checked.constant
+  end
+
+  let typ : (Checked.t, t) Typ.t =
+    let open Poly.Stable.Latest in
+    Typ.of_hlistable
+      [ Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ; Auth_required.typ
+      ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let user_default : t = of_permissions user_default
+
+  let deriver obj =
+    let open Fields_derivers_zkapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+    Poly.Stable.Latest.Fields.make_creator obj ~edit_state:!.auth_required
+      ~access:!.auth_required ~send:!.auth_required ~receive:!.auth_required
+      ~set_delegate:!.auth_required ~set_permissions:!.auth_required
+      ~set_verification_key:!.auth_required ~set_zkapp_uri:!.auth_required
+      ~edit_action_state:!.auth_required ~set_token_symbol:!.auth_required
+      ~increment_nonce:!.auth_required ~set_voting_for:!.auth_required
+      ~set_timing:!.auth_required
+    |> finish "AccountPermissions" ~t_toplevel_annots:Poly.t_toplevel_annots
+end
+
 let%test_unit "json roundtrip" =
   let open Fields_derivers_zkapps.Derivers in
   let full = o () in
@@ -892,3 +1078,33 @@ let%test_unit "Update has the same encodings as the account permissions" =
       [%test_eq: string]
         (Yojson.Safe.to_string (to_yojson t))
         (Yojson.Safe.to_string (Update.to_yojson update)) )
+
+let%test_unit "account permissions json roundtrip" =
+  let open Fields_derivers_zkapps.Derivers in
+  let full = o () in
+  let _a = Account.deriver full in
+  [%test_eq: Account.t] Account.user_default
+    (Account.user_default |> to_json full |> of_json full)
+
+let%test_unit "account permissions keep every authorization" =
+  Quickcheck.test (gen ~auth_tag:Control.Tag.Proof) ~f:(fun t ->
+      let account = Account.of_permissions t in
+      [%test_eq: t]
+        { t with
+          set_verification_key =
+            (account.set_verification_key, snd t.set_verification_key)
+        }
+        { t with
+          edit_state = account.edit_state
+        ; access = account.access
+        ; send = account.send
+        ; receive = account.receive
+        ; set_delegate = account.set_delegate
+        ; set_permissions = account.set_permissions
+        ; set_zkapp_uri = account.set_zkapp_uri
+        ; edit_action_state = account.edit_action_state
+        ; set_token_symbol = account.set_token_symbol
+        ; increment_nonce = account.increment_nonce
+        ; set_voting_for = account.set_voting_for
+        ; set_timing = account.set_timing
+        } )
