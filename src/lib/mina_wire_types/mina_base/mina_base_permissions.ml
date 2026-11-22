@@ -28,6 +28,10 @@ module V2 = struct
   type t = (Auth_required.V2.t, Mina_numbers.Txn_version.V1.t) Poly.V2.t
 end
 
+module V3 = struct
+  type t = (Auth_required.V2.t, Mina_numbers.Txn_version.V1.t) Poly.V2.t
+end
+
 module Update = struct
   module V1 = struct
     type t =
