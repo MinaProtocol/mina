@@ -1791,7 +1791,7 @@ let%test_module _ =
               | Some p ->
                   p
               | None ->
-                  Permissions.user_default )
+                  Permissions.Account.user_default )
           }
         in
         let pipe_r, pipe_w =
@@ -3185,7 +3185,7 @@ let%test_module _ =
           let%bind test =
             setup_test ~verifier:verifier_full
               ~permissions:
-                { Permissions.user_default with set_zkapp_uri = Proof }
+                { Permissions.Account.user_default with set_zkapp_uri = Proof }
               ()
           in
           let%bind zkapp_command =

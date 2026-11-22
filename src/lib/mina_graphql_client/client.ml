@@ -315,7 +315,7 @@ let get_account_data ~logger node_uri ~account_id =
           }
 
 let permissions_of_account_permissions account_permissions :
-    Mina_base.Permissions.t =
+    Mina_base.Permissions.Account.t =
   (* the polymorphic variants come from Partial_accounts.auth_required in Mina_graphql *)
   let to_auth_required = function
     | `Either ->
@@ -341,9 +341,7 @@ let permissions_of_account_permissions account_permissions :
   ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
   ; set_token_symbol = to_auth_required account_permissions.setTokenSymbol
   ; set_verification_key =
-      ( to_auth_required account_permissions.setVerificationKey.auth
-      , Mina_numbers.Txn_version.of_string
-          account_permissions.setVerificationKey.txnVersion )
+      to_auth_required account_permissions.setVerificationKey
   ; set_voting_for = to_auth_required account_permissions.setVotingFor
   ; set_timing = to_auth_required account_permissions.setTiming
   }
@@ -418,7 +416,9 @@ let get_account_update ~logger t ~account_id =
             return
             @@ Set
                  (Mina_base.Permissions.Update.of_account
-                    (permissions_of_account_permissions perms) )
+                    (Mina_base.Permissions.Account.to_permissions
+                       ~txn_version:Mina_numbers.Txn_version.current
+                       (permissions_of_account_permissions perms) ) )
         | None ->
             fail (Error.of_string "Expected permissions in account")
       in

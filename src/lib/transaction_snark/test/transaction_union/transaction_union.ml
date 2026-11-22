@@ -1315,7 +1315,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         send = Permissions.Auth_required.Signature
                       ; receive = Permissions.Auth_required.None
                       }
@@ -1337,7 +1337,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         send = Permissions.Auth_required.None
                       ; receive = Permissions.Auth_required.None
                       }
@@ -1359,7 +1359,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         send = Permissions.Auth_required.Proof
                       ; receive = Permissions.Auth_required.None
                       }
@@ -1384,7 +1384,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         send = Permissions.Auth_required.Signature
                       ; receive = Permissions.Auth_required.Signature
                       }
@@ -1409,7 +1409,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         send = Permissions.Auth_required.Signature
                       ; receive = Permissions.Auth_required.Proof
                       }
@@ -1434,7 +1434,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         access = Permissions.Auth_required.Proof
                       }
                   in
@@ -1458,7 +1458,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         increment_nonce = Permissions.Auth_required.Proof
                       }
                   in
@@ -1529,7 +1529,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         set_delegate = Permissions.Auth_required.Signature
                       }
                   in
@@ -1550,7 +1550,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         set_delegate = Permissions.Auth_required.None
                       }
                   in
@@ -1571,7 +1571,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         set_delegate = Permissions.Auth_required.Proof
                       }
                   in
@@ -1595,7 +1595,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.Proof
                       }
                   in
@@ -1660,7 +1660,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.None
                       }
                   in
@@ -1681,7 +1681,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.Proof
                       }
                   in
@@ -1705,7 +1705,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.Signature
                       }
                   in
@@ -1795,7 +1795,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.None
                       }
                   in
@@ -1816,7 +1816,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.Proof
                       }
                   in
@@ -1840,7 +1840,7 @@ let suite () =
                   let spec = List.hd_exn specs in
                   let permissions =
                     Some
-                      { Permissions.user_default with
+                      { Permissions.Account.user_default with
                         receive = Permissions.Auth_required.Signature
                       }
                   in

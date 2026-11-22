@@ -25,10 +25,6 @@ module Auth_required : sig
 
   val of_string : string -> t
 
-  val verification_key_perm_fallback_to_signature_with_older_version : t -> t
-
-  val access_perm_fallback_to_signature_with_older_version : t -> t
-
   module Checked : sig
     type t
 
@@ -44,10 +40,6 @@ module Auth_required : sig
          t
       -> signature_verifies:Boolean.var
       -> Boolean.var * [ `proof_must_verify of Boolean.var ]
-
-    val verification_key_perm_fallback_to_signature_with_older_version : t -> t
-
-    val access_perm_fallback_to_signature_with_older_version : t -> t
   end
 
   val typ : (Checked.t, t) Typ.t
@@ -204,4 +196,102 @@ module Update : sig
   val typ : (Checked.t, t) Typ.t
 
   val dummy_value_for_set_or_keep_placeholder_only : t
+end
+
+(** The permissions stored in an account. Unlike {!t}, which an account
+    update sets, they hold no transaction version for [set_verification_key].
+*)
+module Account : sig
+  type permissions := t
+
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'controller t =
+          { edit_state : 'controller
+          ; access : 'controller
+          ; send : 'controller
+          ; receive : 'controller
+          ; set_delegate : 'controller
+          ; set_permissions : 'controller
+          ; set_verification_key : 'controller
+          ; set_zkapp_uri : 'controller
+          ; edit_action_state : 'controller
+          ; set_token_symbol : 'controller
+          ; increment_nonce : 'controller
+          ; set_voting_for : 'controller
+          ; set_timing : 'controller
+          }
+        [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      end
+    end]
+  end
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Auth_required.Stable.V2.t Poly.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+    end
+  end]
+
+  (** Forgets the transaction version of [set_verification_key]. *)
+  val of_permissions : permissions -> t
+
+  val of_update : Update.t -> t
+
+  (** Adds [txn_version] to [set_verification_key]. *)
+  val to_permissions :
+    txn_version:Mina_numbers.Txn_version.t -> t -> permissions
+
+  val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
+
+  val to_input : t -> Field.t Random_oracle_input.Chunked.t
+
+  module Checked : sig
+    type t = Auth_required.Checked.t Poly.Stable.Latest.t
+
+    val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
+
+    val constant : Stable.Latest.t -> t
+
+    val of_update : Update.Checked.t -> t
+
+    val if_ : Boolean.var -> then_:t -> else_:t -> t Snark_params.Tick.Checked.t
+  end
+
+  val typ : (Checked.t, t) Typ.t
+
+  val user_default : t
+
+  val deriver :
+       (< contramap : (t -> t) ref
+        ; graphql_arg :
+            (unit -> t Fields_derivers_graphql.Schema.Arg.arg_typ) ref
+        ; graphql_arg_accumulator :
+            t Fields_derivers_zkapps.Graphql.Args.Acc.T.t ref
+        ; graphql_creator : ('a -> t) ref
+        ; graphql_fields : t Fields_derivers_zkapps.Graphql.Fields.Input.T.t ref
+        ; graphql_fields_accumulator :
+            t Fields_derivers_zkapps.Graphql.Fields.Accumulator.T.t list ref
+        ; graphql_query : string option ref
+        ; graphql_query_accumulator : (string * string option) option list ref
+        ; js_layout : Yojson.Safe.t ref
+        ; js_layout_accumulator :
+            Fields_derivers_zkapps.Js_layout.Accumulator.field option list ref
+        ; map : (t -> t) ref
+        ; nullable_graphql_arg :
+            (unit -> 'b Fields_derivers_graphql.Schema.Arg.arg_typ) ref
+        ; nullable_graphql_fields :
+            t option Fields_derivers_zkapps.Graphql.Fields.Input.T.t ref
+        ; of_json : (Yojson.Safe.t -> t) ref
+        ; of_json_creator : Yojson.Safe.t Core_kernel.String.Map.t ref
+        ; skip : bool ref
+        ; to_json : (t -> Yojson.Safe.t) ref
+        ; to_json_accumulator : (string * (t -> Yojson.Safe.t)) option list ref
+        ; .. >
+        as
+        'a )
+    -> 'a
 end

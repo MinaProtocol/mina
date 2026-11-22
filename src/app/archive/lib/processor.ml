@@ -797,6 +797,15 @@ module Zkapp_permissions = struct
       in
       select_insert.run (module Conn) value
 
+  (** Accounts store no transaction version with [set_verification_key], so
+      their rows hold the fixed version of [Permissions.user_default]. *)
+  let add_account_if_doesn't_exist (module Conn : CONNECTION)
+      (perms : Permissions.Account.t) =
+    add_if_doesn't_exist
+      (module Conn)
+      (Permissions.Account.to_permissions perms
+         ~txn_version:(snd Permissions.user_default.set_verification_key) )
+
   let load =
     let query =
       find_req Caqti_type.int typ
@@ -2985,7 +2994,7 @@ module Accounts_accessed = struct
               account_identifier_id account.timing
           in
           let%bind permissions_id =
-            Zkapp_permissions.add_if_doesn't_exist
+            Zkapp_permissions.add_account_if_doesn't_exist
               (module Conn)
               account.permissions
           in

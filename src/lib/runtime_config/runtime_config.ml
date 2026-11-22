@@ -244,15 +244,17 @@ module Json_layout = struct
             ; ("set_timing", Auth_required.to_yojson t.set_timing)
             ]
 
-        let of_permissions (perm : Mina_base.Permissions.t) =
+        let of_permissions (perm : Mina_base.Permissions.Account.t) =
           { edit_state = Auth_required.of_account_perm perm.edit_state
           ; send = Auth_required.of_account_perm perm.send
           ; receive = Auth_required.of_account_perm perm.receive
           ; set_delegate = Auth_required.of_account_perm perm.set_delegate
           ; set_permissions = Auth_required.of_account_perm perm.set_permissions
           ; set_verification_key =
-              (let auth, txn_version = perm.set_verification_key in
-               { auth = Auth_required.of_account_perm auth; txn_version } )
+              { auth = Auth_required.of_account_perm perm.set_verification_key
+              ; txn_version =
+                  snd Mina_base.Permissions.user_default.set_verification_key
+              }
           ; set_token_symbol =
               Auth_required.of_account_perm perm.set_token_symbol
           ; access = Auth_required.of_account_perm perm.access
@@ -664,7 +666,7 @@ module Accounts = struct
               }
       in
       let to_permissions (perms : Permissions.t) =
-        Mina_base.Permissions.Poly.
+        Mina_base.Permissions.Account.Poly.
           { edit_state =
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.edit_state
@@ -684,9 +686,8 @@ module Accounts = struct
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.set_permissions
           ; set_verification_key =
-              ( Json_layout.Accounts.Single.Permissions.Auth_required
-                .to_account_perm perms.set_verification_key.auth
-              , perms.set_verification_key.txn_version )
+              Json_layout.Accounts.Single.Permissions.Auth_required
+              .to_account_perm perms.set_verification_key.auth
           ; set_zkapp_uri =
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.set_zkapp_uri
@@ -714,7 +715,7 @@ module Accounts = struct
         | false, None ->
             failwithf "no permissions set for account %s" a.pk ()
         | true, _ ->
-            Mina_base.Permissions.user_default
+            Mina_base.Permissions.Account.user_default
       in
       let pad_app_state_do app_state =
         if pad_app_state then

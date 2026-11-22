@@ -745,16 +745,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Network.Node.get_ingress_uri node)
                  account_id
              in
-             if Permissions.equal ledger_permissions permissions_updated then (
+             let permissions_updated =
+               Permissions.Account.of_permissions permissions_updated
+             in
+             if Permissions.Account.equal ledger_permissions permissions_updated
+             then (
                [%log info] "Ledger, updated permissions are equal" ;
                return () )
              else (
                [%log error] "Ledger, updated permissions differ"
                  ~metadata:
                    [ ( "ledger_permissions"
-                     , Permissions.to_yojson ledger_permissions )
+                     , Permissions.Account.to_yojson ledger_permissions )
                    ; ( "updated_permissions"
-                     , Permissions.to_yojson permissions_updated )
+                     , Permissions.Account.to_yojson permissions_updated )
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string

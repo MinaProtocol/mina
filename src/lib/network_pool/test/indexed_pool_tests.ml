@@ -446,7 +446,7 @@ let init_permissionless_ledger ledger account_info =
       (* The zkApp commands built by [make_zkapp_command_payment] debit the
          sender and increment nonces without any authorization. *)
       let permissions =
-        { Permissions.user_default with
+        { Permissions.Account.user_default with
           send = Permissions.Auth_required.None
         ; increment_nonce = None
         }

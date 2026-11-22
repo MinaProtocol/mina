@@ -88,7 +88,7 @@ val gen_snapp_ledger :
 val test_snapp_update :
      ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?state_body:Transaction_protocol_state.Block_data.t
-  -> ?snapp_permissions:Permissions.t
+  -> ?snapp_permissions:Permissions.Account.t
   -> vk:
        (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
        Async.Deferred.t
@@ -107,11 +107,8 @@ val test_snapp_update :
 
 val permissions_from_update :
      auth:Permissions.Auth_required.t
-  -> ?txn_version:Mina_numbers.Txn_version.t
   -> Account_update.Update.t
-  -> ( Permissions.Auth_required.t
-     , Mina_numbers.Txn_version.t )
-     Permissions.Poly.t
+  -> Permissions.Account.t
 
 val pending_coinbase_stack_target :
      Mina_transaction.Transaction.Valid.t

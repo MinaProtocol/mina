@@ -442,13 +442,13 @@ module type Full = sig
       -> Zkapp_command.t Async.Deferred.t
 
     val trivial_zkapp_account :
-         ?permissions:Permissions.t
+         ?permissions:Permissions.Account.t
       -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
       -> Account.key
       -> Account.t
 
     val create_trivial_zkapp_account :
-         ?permissions:Permissions.t
+         ?permissions:Permissions.Account.t
       -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
       -> ledger:Mina_ledger.Ledger.t
       -> Account.key

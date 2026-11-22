@@ -105,12 +105,12 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
   let snappify_account (account : Account.t) : Account.t =
     (* TODO: use real keys *)
     let permissions =
-      { Permissions.user_default with
+      { Permissions.Account.user_default with
         edit_state = Permissions.Auth_required.Either
       ; send = Either
       ; set_delegate = Either
       ; set_permissions = Either
-      ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+      ; set_verification_key = Either
       ; set_zkapp_uri = Either
       ; edit_action_state = Either
       ; set_token_symbol = Either

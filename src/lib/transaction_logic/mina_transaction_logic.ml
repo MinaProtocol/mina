@@ -984,24 +984,6 @@ module Make (L : Ledger_intf.S) :
           else Control.Tag.None_given
         in
         Permissions.Auth_required.check perm tag
-
-      let verification_key_perm_fallback_to_signature_with_older_version =
-        Permissions.Auth_required
-        .verification_key_perm_fallback_to_signature_with_older_version
-
-      let access_perm_fallback_to_signature_with_older_version =
-        Permissions.Auth_required
-        .access_perm_fallback_to_signature_with_older_version
-    end
-
-    module Txn_version = struct
-      type t = Mina_numbers.Txn_version.t
-
-      let if_ = value_if
-
-      let equal_to_current = Mina_numbers.Txn_version.equal_to_current
-
-      let older_than_current = Mina_numbers.Txn_version.older_than_current
     end
 
     module Global_slot_since_genesis = struct
@@ -1116,7 +1098,7 @@ module Make (L : Ledger_intf.S) :
          fun a -> a.permissions.set_permissions
 
         let set_verification_key_auth : t -> Controller.t =
-         fun a -> fst a.permissions.set_verification_key
+         fun a -> a.permissions.set_verification_key
 
         let set_zkapp_uri : t -> Controller.t =
          fun a -> a.permissions.set_zkapp_uri
@@ -1135,7 +1117,7 @@ module Make (L : Ledger_intf.S) :
 
         let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
 
-        type t = Permissions.t
+        type t = Permissions.Account.t
 
         let if_ = value_if
       end
@@ -1267,22 +1249,9 @@ module Make (L : Ledger_intf.S) :
 
       let set_voting_for voting_for (a : t) = { a with voting_for }
 
-      type txn_version = Txn_version.t
-
-      let txn_version (a : t) : txn_version =
-        snd a.permissions.set_verification_key
-
       let permissions (a : t) = a.permissions
 
       let set_permissions permissions (a : t) = { a with permissions }
-
-      let set_txn_version_to_current (a : t) =
-        let set_verification_key =
-          ( fst a.permissions.set_verification_key
-          , Mina_numbers.Txn_version.current )
-        in
-        let permissions = { a.permissions with set_verification_key } in
-        { a with permissions }
     end
 
     module Amount = struct
@@ -1443,7 +1412,7 @@ module Make (L : Ledger_intf.S) :
 
         let permissions (account_update : t) =
           Set_or_keep.map account_update.body.update.permissions
-            ~f:Permissions.Update.to_account
+            ~f:Permissions.Account.of_update
       end
     end
 
@@ -2258,7 +2227,7 @@ module For_tests = struct
       , Public_key.Compressed.t option
       , State_hash.t
       , Account_timing.t
-      , Permissions.t
+      , Permissions.Account.t
       , Zkapp_account.t option )
       Account.Poly.t
     [@@deriving sexp, compare]
@@ -2291,13 +2260,13 @@ module For_tests = struct
                  Token_id.default )
             |> Or_error.ok_exn
           in
-          let permissions : Permissions.t =
+          let permissions : Permissions.Account.t =
             { edit_state = Either
             ; send = Either
             ; receive = None
             ; set_delegate = Either
             ; set_permissions = Either
-            ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+            ; set_verification_key = Either
             ; set_zkapp_uri = Either
             ; edit_action_state = Either
             ; set_token_symbol = Either

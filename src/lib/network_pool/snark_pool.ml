@@ -410,7 +410,7 @@ struct
                 ( ( "receive_permission"
                   , Mina_base.Permissions.Auth_required.to_yojson
                       (Option.value_map account_opt
-                         ~default:Mina_base.Permissions.user_default
+                         ~default:Mina_base.Permissions.Account.user_default
                          ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
                         .receive )
                 :: metadata ) ;

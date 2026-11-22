@@ -308,7 +308,9 @@ let suite () =
                Ledger.set ledger loc
                  { a with
                    permissions =
-                     { Permissions.user_default with set_permissions = Proof }
+                     { Permissions.Account.user_default with
+                       set_permissions = Proof
+                     }
                  ; zkapp =
                      Some
                        { (Option.value ~default:Zkapp_account.default a.zkapp) with

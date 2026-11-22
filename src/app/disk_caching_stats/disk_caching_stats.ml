@@ -236,7 +236,8 @@ module Values (S : Sample) = struct
           ; vesting_period = global_slot_span ()
           ; vesting_increment = amount ()
           }
-    ; permissions = permissions ()
+    ; permissions =
+        Mina_base.Permissions.Account.of_permissions (permissions ())
     ; zkapp =
         Some
           { app_state =

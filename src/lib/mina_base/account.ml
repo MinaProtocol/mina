@@ -268,7 +268,7 @@ module Binable_arg = struct
         ; delegate : Public_key.Compressed.Stable.V1.t option
         ; voting_for : State_hash.Stable.V1.t
         ; timing : Timing.Stable.V2.t
-        ; permissions : Permissions.Stable.V3.t
+        ; permissions : Permissions.Account.Stable.V1.t
         ; zkapp : Zkapp_account.Stable.V4.t option
         }
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -317,7 +317,9 @@ module Binable_arg = struct
         ; delegate
         ; voting_for
         ; timing
-        ; permissions = Permissions.Stable.V2.to_latest permissions
+        ; permissions =
+            Permissions.Account.of_permissions
+              (Permissions.Stable.V2.to_latest permissions)
         ; zkapp = Option.map zkapp ~f:Zkapp_account.Stable.V3.to_latest
         }
 
@@ -341,7 +343,7 @@ module Stable = struct
       ; delegate : Public_key.Compressed.Stable.V1.t option
       ; voting_for : State_hash.Stable.V1.t
       ; timing : Timing.Stable.V2.t
-      ; permissions : Permissions.Stable.V3.t
+      ; permissions : Permissions.Account.Stable.V1.t
       ; zkapp : Zkapp_account.Stable.V4.t option
       }
     [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
@@ -475,7 +477,7 @@ let initialize account_id : t =
   ; delegate
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
-  ; permissions = Permissions.user_default
+  ; permissions = Permissions.Account.user_default
   ; zkapp = None
   }
 
@@ -498,7 +500,7 @@ let to_input (t : t) =
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
     ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
-    ~permissions:(f Permissions.to_input)
+    ~permissions:(f Permissions.Account.to_input)
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -517,7 +519,7 @@ type var =
   , Public_key.Compressed.var
   , State_hash.var
   , Timing.var
-  , Permissions.Checked.t
+  , Permissions.Account.Checked.t
     (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
   , Field.Var.t * Zkapp_account.t option Typ.prover_value )
   Poly.t
@@ -539,7 +541,7 @@ let typ' zkapp =
           else Some delegate )
     ; State_hash.typ
     ; Timing.typ
-    ; Permissions.typ
+    ; Permissions.Account.typ
     ; zkapp
     ]
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
@@ -583,7 +585,7 @@ let var_of_t
   ; delegate = Public_key.Compressed.var_of_t (delegate_opt delegate)
   ; voting_for = State_hash.var_of_t voting_for
   ; timing = Timing.var_of_t timing
-  ; permissions = Permissions.Checked.constant permissions
+  ; permissions = Permissions.Account.Checked.constant permissions
   ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
   }
 
@@ -599,7 +601,7 @@ module Checked = struct
       , Public_key.Compressed.var
       , State_hash.var
       , Timing.var
-      , Permissions.Checked.t
+      , Permissions.Account.Checked.t
       , Zkapp_account.Checked.t )
       Poly.t
 
@@ -616,7 +618,7 @@ module Checked = struct
     List.reduce_exn ~f:append
       (Poly.Fields.fold ~init:[]
          ~zkapp:(f (fun (x, _) -> field x))
-         ~permissions:(f Permissions.Checked.to_input)
+         ~permissions:(f Permissions.Account.Checked.to_input)
          ~public_key:(f Public_key.Compressed.Checked.to_input)
          ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
@@ -745,7 +747,7 @@ let empty =
   ; delegate = None
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
-  ; permissions = Permissions.user_default
+  ; permissions = Permissions.Account.user_default
   ; zkapp = None
   }
 
@@ -770,7 +772,7 @@ let create account_id balance =
   ; delegate
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
-  ; permissions = Permissions.user_default
+  ; permissions = Permissions.Account.user_default
   ; zkapp = None
   }
 
@@ -798,7 +800,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
       ; delegate
       ; voting_for = State_hash.dummy
       ; zkapp = None
-      ; permissions = Permissions.user_default
+      ; permissions = Permissions.Account.user_default
       ; timing =
           Timing.Timed
             { initial_minimum_balance
@@ -1154,7 +1156,7 @@ let deriver obj =
        ~nonce:!.uint32 ~receipt_chain_hash:!.receipt_chain_hash
        ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
        ~voting_for:!.field ~timing:!.Timing.deriver
-       ~permissions:!.Permissions.deriver
+       ~permissions:!.Permissions.Account.deriver
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
 
@@ -1177,7 +1179,7 @@ module Hardfork = struct
     ; delegate : Public_key.Compressed.Stable.Latest.t option
     ; voting_for : State_hash.Stable.Latest.t
     ; timing : Timing.Stable.Latest.t
-    ; permissions : Permissions.Stable.Latest.t
+    ; permissions : Permissions.Account.Stable.Latest.t
     ; zkapp : Zkapp_account.Hardfork.t option
     }
   [@@deriving
@@ -1264,7 +1266,7 @@ module Hardfork = struct
       ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
       ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
       ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
-      ~permissions:(f Permissions.to_input)
+      ~permissions:(f Permissions.Account.to_input)
     |> List.reduce_exn ~f:append
 
   let digest t =
@@ -1290,7 +1292,7 @@ module Unstable = struct
     ; delegate : Public_key.Compressed.Stable.Latest.t option
     ; voting_for : State_hash.Stable.Latest.t
     ; timing : Timing.Stable.Latest.t
-    ; permissions : Permissions.Stable.Latest.t
+    ; permissions : Permissions.Account.Stable.Latest.t
     ; zkapp : Zkapp_account.Stable.Latest.t option
     ; unstable_field : Nonce.Stable.Latest.t
     }
@@ -1309,7 +1311,7 @@ module Unstable = struct
     ; delegate = None
     ; voting_for = State_hash.dummy
     ; timing = Timing.Untimed
-    ; permissions = Permissions.user_default
+    ; permissions = Permissions.Account.user_default
     ; zkapp = None
     ; unstable_field = Nonce.zero
     }
@@ -1330,7 +1332,8 @@ module Unstable = struct
       ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
       ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
       ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
-      ~permissions:(f Permissions.to_input) ~unstable_field:(f Nonce.to_input)
+      ~permissions:(f Permissions.Account.to_input)
+      ~unstable_field:(f Nonce.to_input)
     |> List.reduce_exn ~f:append
 
   let digest t =

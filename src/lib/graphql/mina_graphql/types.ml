@@ -1574,7 +1574,7 @@ module AccountObj = struct
         , Public_key.Compressed.t option
         , State_hash.t option
         , Account.Timing.t
-        , Permissions.t option
+        , Permissions.Account.t option
         , Zkapp_account.t option )
         Account.Poly.t
     ; locked : bool option
@@ -1627,89 +1627,79 @@ module AccountObj = struct
         ; enum_value "Impossible" ~value:Impossible
         ]
 
-  let set_verification_key_perm =
-    obj "VerificationKeyPermission" ~fields:(fun _ ->
-        [ field "auth" ~typ:(non_null auth_required)
-            ~doc:
-              "Authorization required to set the verification key of the zkApp \
-               associated with the account"
-            ~args:Arg.[]
-            ~resolve:(fun _ (auth, _) -> auth)
-        ; field "txnVersion" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ (_, version) ->
-              Mina_numbers.Txn_version.to_string version )
-        ] )
-
   let account_permissions =
     obj "AccountPermissions" ~fields:(fun _ ->
         [ field "editState" ~typ:(non_null auth_required)
             ~doc:"Authorization required to edit zkApp state"
             ~args:Arg.[]
-            ~resolve:(fun _ permission -> permission.Permissions.Poly.edit_state)
+            ~resolve:(fun _ permission ->
+              permission.Permissions.Account.Poly.edit_state )
         ; field "send" ~typ:(non_null auth_required)
             ~doc:"Authorization required to send tokens"
             ~args:Arg.[]
-            ~resolve:(fun _ permission -> permission.Permissions.Poly.send)
+            ~resolve:(fun _ permission ->
+              permission.Permissions.Account.Poly.send )
         ; field "receive" ~typ:(non_null auth_required)
             ~doc:"Authorization required to receive tokens"
             ~args:Arg.[]
-            ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+            ~resolve:(fun _ permission ->
+              permission.Permissions.Account.Poly.receive )
         ; field "access" ~typ:(non_null auth_required)
             ~doc:"Authorization required to access the account"
             ~args:Arg.[]
-            ~resolve:(fun _ permission -> permission.Permissions.Poly.access)
+            ~resolve:(fun _ permission ->
+              permission.Permissions.Account.Poly.access )
         ; field "setDelegate" ~typ:(non_null auth_required)
             ~doc:"Authorization required to set the delegate"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.set_delegate )
+              permission.Permissions.Account.Poly.set_delegate )
         ; field "setPermissions" ~typ:(non_null auth_required)
             ~doc:"Authorization required to change permissions"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.set_permissions )
-        ; field "setVerificationKey"
-            ~typ:(non_null set_verification_key_perm)
+              permission.Permissions.Account.Poly.set_permissions )
+        ; field "setVerificationKey" ~typ:(non_null auth_required)
             ~doc:
               "Authorization required to set the verification key of the zkApp \
                associated with the account"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.set_verification_key )
+              permission.Permissions.Account.Poly.set_verification_key )
         ; field "setZkappUri" ~typ:(non_null auth_required)
             ~doc:
               "Authorization required to change the URI of the zkApp \
                associated with the account "
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.set_zkapp_uri )
+              permission.Permissions.Account.Poly.set_zkapp_uri )
         ; field "editActionState" ~typ:(non_null auth_required)
             ~doc:"Authorization required to edit the action state"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.edit_action_state )
+              permission.Permissions.Account.Poly.edit_action_state )
         ; field "setTokenSymbol" ~typ:(non_null auth_required)
             ~doc:"Authorization required to set the token symbol"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.set_token_symbol )
+              permission.Permissions.Account.Poly.set_token_symbol )
         ; field "incrementNonce" ~typ:(non_null auth_required)
             ~doc:"Authorization required to increment the nonce"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.increment_nonce )
+              permission.Permissions.Account.Poly.increment_nonce )
         ; field "setVotingFor" ~typ:(non_null auth_required)
             ~doc:
               "Authorization required to set the state hash the account is \
                voting for"
             ~args:Arg.[]
             ~resolve:(fun _ permission ->
-              permission.Permissions.Poly.set_voting_for )
+              permission.Permissions.Account.Poly.set_voting_for )
         ; field "setTiming" ~typ:(non_null auth_required)
             ~doc:"Authorization required to set the timing of the account"
             ~args:Arg.[]
-            ~resolve:(fun _ permission -> permission.Permissions.Poly.set_timing)
+            ~resolve:(fun _ permission ->
+              permission.Permissions.Account.Poly.set_timing )
         ] )
 
   (* A token symbol or zkApp URI is any bytes on chain. The string field of the
