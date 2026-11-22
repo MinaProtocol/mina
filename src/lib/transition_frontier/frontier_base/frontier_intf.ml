@@ -33,6 +33,11 @@ module type S = sig
   val find_protocol_state :
     t -> State_hash.t -> Mina_state.Protocol_state.value option
 
+  (** The ledger with the given hash below the root's, if any: the snarked
+      ledgers that the proofs of the root's scan state will target, and the
+      ledgers of former roots between them. *)
+  val find_ledger_below_root : t -> Ledger_hash.t -> Mina_ledger.Ledger.t option
+
   val successors : t -> Breadcrumb.t -> Breadcrumb.t list
 
   val best_tip_path_length_exn : t -> int

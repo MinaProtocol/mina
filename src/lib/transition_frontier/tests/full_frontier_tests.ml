@@ -168,6 +168,14 @@ let%test_module "Full_frontier tests" =
               let proofs =
                 List.count seq ~f:(fun breadcrumb ->
                     let hashes_below_root = ledger_hashes_below_root frontier in
+                    List.iter hashes_below_root ~f:(fun hash ->
+                        assert (
+                          Option.exists
+                            (Full_frontier.find_ledger_below_root frontier hash)
+                            ~f:(fun ledger ->
+                              Ledger_hash.equal
+                                (Mina_ledger.Ledger.merkle_root ledger)
+                                hash ) ) ) ;
                     let pre_root = Full_frontier.root frontier in
                     add_breadcrumb frontier breadcrumb ;
                     let post_root = Full_frontier.root frontier in
