@@ -2428,7 +2428,7 @@ module Test_helpers = struct
           ~genesis_epoch_data:
             (Consensus.Genesis_data.Epoch.to_hashed
                Consensus.Genesis_data.Epoch.for_unit_tests )
-          ~constraint_constants ~fork:constraint_constants.fork
+          ~constraint_constants ~fork:Genesis_constants.For_unit_tests.t.fork
           ~consensus_constants ~genesis_body_reference
       in
       compile_time_genesis.data

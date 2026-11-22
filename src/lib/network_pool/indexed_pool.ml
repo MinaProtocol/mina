@@ -24,6 +24,7 @@ let replace_fee : Currency.Fee.t = Currency.Fee.of_nanomina_int_exn 1
 module Config = struct
   type t =
     { constraint_constants : Genesis_constants.Constraint_constants.t
+    ; fork : Genesis_constants.Fork_constants.t option
     ; consensus_constants : Consensus.Constants.t
     ; time_controller : Block_time.Controller.t
     ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
@@ -215,7 +216,7 @@ module For_tests = struct
           key )
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller
+let empty ~constraint_constants ~fork ~consensus_constants ~time_controller
     ~slot_tx_end : t =
   { applicable_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_sender = Account_id.Map.empty
@@ -225,6 +226,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller
   ; size = 0
   ; config =
       { constraint_constants
+      ; fork
       ; consensus_constants
       ; time_controller
       ; slot_tx_end
@@ -268,7 +270,7 @@ let global_slot_since_genesis conf =
       of_time_exn ~constants:conf.consensus_constants current_time
       |> to_global_slot)
   in
-  match conf.constraint_constants.fork with
+  match conf.fork with
   | Some { global_slot_since_genesis; _ } ->
       let slot_span =
         Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
@@ -898,6 +900,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
          M.t =
    fun ~config:
          ( { constraint_constants = _
+           ; fork = _
            ; consensus_constants
            ; time_controller
            ; slot_tx_end

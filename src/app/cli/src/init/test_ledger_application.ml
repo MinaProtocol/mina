@@ -83,15 +83,14 @@ let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
     ~constraint_constants signaturespec
 
 let generate_protocol_state_stub ~consensus_constants ~constraint_constants
-    ledger =
+    ~fork ledger =
   let open Staged_ledger_diff in
   Protocol_state.negative_one ~genesis_ledger:ledger ~genesis_epoch_data:None
-    ~constraint_constants ~fork:constraint_constants.fork ~consensus_constants
-    ~genesis_body_reference
+    ~constraint_constants ~fork ~consensus_constants ~genesis_body_reference
 
 let apply_txs ~transfer_parties_get_actions_events ~action_elements
-    ~event_elements ~constraint_constants ~first_partition_slots ~no_new_stack
-    ~has_second_partition ~num_txs ~prev_protocol_state
+    ~event_elements ~constraint_constants ~fork ~first_partition_slots
+    ~no_new_stack ~has_second_partition ~num_txs ~prev_protocol_state
     ~(keypair : Signature_lib.Keypair.t) ~i ledger =
   let init_nonce =
     let account_id = Account_id.of_public_key keypair.public_key in
@@ -111,8 +110,9 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
   in
   let fork_slot =
     Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
-      ~f:(fun f -> f.global_slot_since_genesis)
-      constraint_constants.fork
+      ~f:(fun (f : Genesis_constants.Fork_constants.t) ->
+        f.global_slot_since_genesis )
+      fork
   in
   let prev_protocol_state_body_hash =
     Protocol_state.body prev_protocol_state |> Protocol_state.Body.hash
@@ -222,14 +222,16 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     match prev_protocol_state with
     | None ->
         generate_protocol_state_stub ~consensus_constants ~constraint_constants
+          ~fork:genesis_constants.fork
           (Consensus.Genesis_data.Ledger.to_hashed
              (module Test_genesis_ledger) )
     | Some p ->
         p
   in
   let apply =
-    apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
-      ~has_second_partition ~prev_protocol_state ~keypair
+    apply_txs ~constraint_constants ~fork:genesis_constants.fork
+      ~first_partition_slots ~no_new_stack ~has_second_partition
+      ~prev_protocol_state ~keypair
   in
   let mask_handler ledger =
     if no_masks then Fn.const ledger

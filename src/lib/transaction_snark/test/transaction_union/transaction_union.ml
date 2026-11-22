@@ -643,7 +643,7 @@ let suite () =
             ~genesis_epoch_data:
               (Consensus.Genesis_data.Epoch.to_hashed
                  Consensus.Genesis_data.Epoch.for_unit_tests )
-            ~constraint_constants ~fork:constraint_constants.fork
+            ~constraint_constants ~fork:U.genesis_constants.fork
             ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
@@ -674,7 +674,7 @@ let suite () =
             ~genesis_epoch_data:
               (Consensus.Genesis_data.Epoch.to_hashed
                  Consensus.Genesis_data.Epoch.for_unit_tests )
-            ~constraint_constants ~fork:constraint_constants.fork
+            ~constraint_constants ~fork:U.genesis_constants.fork
             ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in

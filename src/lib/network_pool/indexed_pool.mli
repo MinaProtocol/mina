@@ -47,6 +47,7 @@ end
 (** Empty pool *)
 val empty :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> fork:Genesis_constants.Fork_constants.t option
   -> consensus_constants:Consensus.Constants.t
   -> time_controller:Block_time.Controller.t
   -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
