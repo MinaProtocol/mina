@@ -206,6 +206,8 @@ end)
 
   let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
 
+  let is_attached t = Primary_ledger.is_attached t.primary_ledger
+
   let level _ = 0
 
   let handle_mutations _ = ()

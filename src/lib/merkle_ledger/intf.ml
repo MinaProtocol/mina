@@ -432,6 +432,10 @@ module Ledger = struct
   *)
     val detached_signal : t -> unit Async_kernel.Deferred.t
 
+    (** Whether the ledger can still be read: [false] once it, or a mask below
+        it, has been orphaned, or once it has been closed. *)
+    val is_attached : t -> bool
+
     (** The ledger's position in its stack of masks: 0 for a ledger that isn't
         a mask, and one more than its parent's for a mask. *)
     val level : t -> int

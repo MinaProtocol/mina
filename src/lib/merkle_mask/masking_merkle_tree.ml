@@ -179,6 +179,13 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Orphaned _ ->
           Async.Deferred.unit
 
+    let is_attached t =
+      match repr t with
+      | (_ : unattached) ->
+          true
+      | exception Dangling_parent_reference _ ->
+          false
+
     let get_parent t = Result.ok_or_failwith (repr t).parent
 
     let level t = (repr t).level
