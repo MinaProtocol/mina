@@ -644,6 +644,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       t.desc <- Orphaned (mask.uuid, loc) ;
       { desc = Ledger mask }
 
+    let remove_parent t ~parent =
+      let mask = repr t in
+      assert (Uuid.equal (Base.get_uuid (get_parent t)) (get_uuid parent)) ;
+      let grandparent = get_parent parent in
+      assert (Hash.equal (merkle_root parent) (Base.merkle_root grandparent)) ;
+      assert (Map.is_empty (repr parent).maps.accounts) ;
+      (repr parent).accumulated <- None ;
+      mask.parent <- Ok grandparent
+
     (* copy tables in t; use same parent *)
     let copy t =
       let parent = get_parent t in

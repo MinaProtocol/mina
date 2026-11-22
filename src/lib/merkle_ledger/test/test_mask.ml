@@ -293,6 +293,30 @@ module Make (Test : Test_intf) = struct
               Exn.does_raise (fun () -> Mask.Attached.get m2 dummy_location) ) ) )
 
   let () =
+    add_test "remove a parent with the same merkle root as its own parent"
+      (fun () ->
+        Test.with_chain (fun base ~mask:m1_lazy ~mask2:_ ->
+            let m1, m1_base = Lazy.force m1_lazy in
+            Mask.Attached.set m1 dummy_location dummy_account ;
+            let m2 =
+              Mask.set_parent
+                ~accumulated:(Mask.Attached.to_accumulated m1)
+                (Mask.create ~depth:Test.depth ())
+                m1_base
+            in
+            Mask.Attached.commit m1 ;
+            let root = Mask.Attached.merkle_root m2 in
+            Mask.Attached.remove_parent m2 ~parent:m1 ;
+            assert (Hash.equal root (Mask.Attached.merkle_root m2)) ;
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get m2 dummy_location) ;
+            assert (
+              Uuid.equal (Maskable.get_uuid base)
+                (Maskable.get_uuid (Mask.Attached.get_parent m2)) ) ;
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get m1 dummy_location) ) )
+
+  let () =
     add_test "register and unregister mask" (fun () ->
         Test.with_instances (fun maskable mask ->
             let (attached_mask : Mask.Attached.t) =

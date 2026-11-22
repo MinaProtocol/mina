@@ -71,6 +71,12 @@ module type S = sig
         on its next use. *)
     val move : loc:string -> t -> t
 
+    (** [remove_parent t ~parent] attaches [t] to the parent of its parent
+        [parent], which must hold no accounts and have the same merkle root.
+        [parent] is left as an empty mask over its own parent, so anything
+        still reading through it reads the same ledger. *)
+    val remove_parent : t -> parent:t -> unit
+
     (** [unset_parent ~loc:__LOC__ t] detaches the parent from [t], and
         resolves [detached_signal] for [t]. The [loc] argument is shown in the
         [Dangling_parent_reference] exception, which will be raised if [t] is
