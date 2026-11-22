@@ -1141,6 +1141,44 @@ module For_tests = struct
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~persistent_root_instance
 
+  let reload_frontier t =
+    let open Async.Deferred.Let_syntax in
+    let root = root t in
+    let root_staged_ledger = Breadcrumb.staged_ledger root in
+    let get_state hash =
+      match find_protocol_state t hash with
+      | Some protocol_state ->
+          Ok protocol_state
+      | None ->
+          Or_error.errorf "Protocol state for %s not found"
+            (State_hash.to_base58_check hash)
+    in
+    let%map staged_ledger =
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+        ~constraint_constants ~logger
+        ~scan_state:(Staged_ledger.scan_state root_staged_ledger)
+        ~snarked_ledger:(Ledger.of_any_ledger t.root_ledger)
+        ~snarked_local_state:
+          ( Breadcrumb.protocol_state root
+          |> Protocol_state.blockchain_state
+          |> Blockchain_state.snarked_local_state )
+        ~expected_merkle_root:(Ledger.merkle_root (Breadcrumb.mask root))
+        ~pending_coinbases:
+          (Staged_ledger.pending_coinbase_collection root_staged_ledger)
+        ~get_state ~signature_kind:Mina_signature_kind.t_DEPRECATED
+      >>| Or_error.ok_exn
+    in
+    create
+      ~context:(module Context)
+      ~root_data:
+        { transition = Breadcrumb.validated_transition root
+        ; staged_ledger
+        ; protocol_states = Map.data t.protocol_states_for_root_scan_state
+        }
+      ~root_ledger:t.root_ledger ~consensus_local_state:t.consensus_local_state
+      ~max_length ~persistent_root_instance:t.persistent_root_instance
+      ~time_controller:t.time_controller
+
   let clean_up_persistent_root ~frontier =
     let persistent_root_instance = persistent_root_instance frontier in
     Persistent_root.Instance.destroy persistent_root_instance
