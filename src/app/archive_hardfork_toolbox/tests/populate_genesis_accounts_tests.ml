@@ -22,16 +22,23 @@ let write_fork_config ~balances =
   in
   let config =
     { Runtime_config.default with
-      proof =
+      genesis =
         Some
-          (Runtime_config.Proof_keys.make
-             ~fork:
-               { state_hash =
-                   "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
-               ; blockchain_length = 100
-               ; global_slot_since_genesis = 100
-               }
-             () )
+          { k = None
+          ; delta = None
+          ; slots_per_epoch = None
+          ; slots_per_sub_window = None
+          ; grace_period_slots = None
+          ; block_window_duration_ms = None
+          ; genesis_state_timestamp = None
+          ; fork =
+              Some
+                { state_hash =
+                    "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+                ; blockchain_length = 100
+                ; global_slot_since_genesis = 100
+                }
+          }
     ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
     }
   in

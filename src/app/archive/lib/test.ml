@@ -584,15 +584,22 @@ let%test_module "Archive node unit tests" =
       in
       let runtime_config =
         { Runtime_config.default with
-          proof =
+          genesis =
             Some
-              (Runtime_config.Proof_keys.make
-                 ~fork:
-                   { Runtime_config.Fork_config.state_hash = fork_state_hash
-                   ; blockchain_length = 100 (* genesis block height => 101 *)
-                   ; global_slot_since_genesis = 100
-                   }
-                 () )
+              { k = None
+              ; delta = None
+              ; slots_per_epoch = None
+              ; slots_per_sub_window = None
+              ; grace_period_slots = None
+              ; block_window_duration_ms = None
+              ; genesis_state_timestamp = None
+              ; fork =
+                  Some
+                    { Runtime_config.Fork_config.state_hash = fork_state_hash
+                    ; blockchain_length = 100 (* genesis block height => 101 *)
+                    ; global_slot_since_genesis = 100
+                    }
+              }
         ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
         }
       in
