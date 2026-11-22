@@ -270,6 +270,18 @@ module Make (Test : Test_intf) = struct
             assert (Exn.does_raise (fun () -> Mask.Attached.merkle_root sibling)) ) )
 
   let () =
+    add_test "moving a mask's ledger to a new handle orphans the old one"
+      (fun () ->
+        Test.with_chain (fun _base ~mask:m1_lazy ~mask2:_ ->
+            let m1, _ = Lazy.force m1_lazy in
+            Mask.Attached.set m1 dummy_location dummy_account ;
+            let moved = Mask.Attached.move ~loc:__LOC__ m1 in
+            [%test_result: Account.t option] ~expect:(Some dummy_account)
+              (Mask.Attached.get moved dummy_location) ;
+            assert (
+              Exn.does_raise (fun () -> Mask.Attached.get m1 dummy_location) ) ) )
+
+  let () =
     add_test "a mask fails on its next use once a mask below it is orphaned"
       (fun () ->
         Test.with_chain (fun _base ~mask:m1_lazy ~mask2:m2_lazy ->

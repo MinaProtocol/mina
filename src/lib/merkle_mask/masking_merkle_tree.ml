@@ -633,6 +633,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       Merkle_ledger.Mutations.append parent_mask.level ;
       detach ~loc mask
 
+    let move ~loc t =
+      let mask = repr t in
+      t.desc <- Orphaned (mask.uuid, loc) ;
+      { desc = Ledger mask }
+
     (* copy tables in t; use same parent *)
     let copy t =
       let parent = get_parent t in

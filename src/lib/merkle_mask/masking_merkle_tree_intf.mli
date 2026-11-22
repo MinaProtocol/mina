@@ -66,6 +66,11 @@ module type S = sig
         including the masks attached to it, fails on its next use. *)
     val commit_and_replace_parent : loc:string -> t -> parent:t -> unit
 
+    (** [move ~loc t] returns a new handle on [t]'s ledger and orphans [t].
+        Every other holder of [t], including the masks attached to it, fails
+        on its next use. *)
+    val move : loc:string -> t -> t
+
     (** [unset_parent ~loc:__LOC__ t] detaches the parent from [t], and
         resolves [detached_signal] for [t]. The [loc] argument is shown in the
         [Dangling_parent_reference] exception, which will be raised if [t] is
