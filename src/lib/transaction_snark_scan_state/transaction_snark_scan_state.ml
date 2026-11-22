@@ -1217,22 +1217,6 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   in
   apply_txns previous_incomplete ordered_txns ~first_pass_ledger_hash
 
-let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
-    ~get_protocol_state ~apply_first_pass ~apply_second_pass
-    ~apply_first_pass_sparse_ledger ~signature_kind =
-  let rec run = function
-    | Ok (`Continue k) ->
-        run (k ())
-    | Ok (`Complete x) ->
-        Ok x
-    | Error err ->
-        Error err
-  in
-  run
-  @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
-       ~get_protocol_state ~apply_first_pass ~apply_second_pass
-       ~apply_first_pass_sparse_ledger ~signature_kind
-
 let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
     ?(async_batch_size = 10) ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind =
@@ -1255,17 +1239,6 @@ let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
   @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
        ~get_protocol_state ~apply_first_pass ~apply_second_pass
        ~apply_first_pass_sparse_ledger ~signature_kind
-
-let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
-    ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind t =
-  match latest_ledger_proof_and_txs' t with
-  | None ->
-      Or_error.errorf "No transactions found"
-  | Some (_, txns_per_block) ->
-      apply_ordered_txns_sync ~stop_at_first_pass:true txns_per_block ~ledger
-        ~get_protocol_state ~apply_first_pass ~apply_second_pass
-        ~apply_first_pass_sparse_ledger ~signature_kind
-      |> Or_error.ignore_m
 
 let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger

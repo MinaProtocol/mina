@@ -75,37 +75,6 @@ module Scan_state : sig
       two-pass system to get snarked ledger
       - first pass includes legacy transactions and zkapp payments
       - second pass includes account updates. This ignores any account updates
-      if a blocks transactions were split among two trees.
-    *)
-  val get_snarked_ledger_sync :
-       ledger:Ledger.t
-    -> get_protocol_state:
-         (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
-    -> apply_first_pass:
-         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
-          -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-          -> Ledger.t
-          -> Transaction.t
-          -> Ledger.Transaction_partially_applied.t Or_error.t )
-    -> apply_second_pass:
-         (   Ledger.t
-          -> Ledger.Transaction_partially_applied.t
-          -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
-    -> apply_first_pass_sparse_ledger:
-         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
-          -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-          -> Mina_ledger.Sparse_ledger.t
-          -> Mina_transaction.Transaction.t
-          -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
-             Or_error.t )
-    -> signature_kind:Mina_signature_kind.t
-    -> t
-    -> unit Or_error.t
-
-  (** Apply transactions corresponding to the last emitted proof based on the
-      two-pass system to get snarked ledger
-      - first pass includes legacy transactions and zkapp payments
-      - second pass includes account updates. This ignores any account updates
         if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_async :
