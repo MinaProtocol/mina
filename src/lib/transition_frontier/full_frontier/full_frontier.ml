@@ -954,6 +954,8 @@ module For_tests = struct
              !"Protocol state with hash %s not found"
              (State_body_hash.to_yojson hash |> Yojson.Safe.to_string) )
 
+  let root_ledger_hash t = Ledger.Any_ledger.M.merkle_root t.root_ledger
+
   (* TODO: Don't force here!! *)
 
   let precomputed_values = Lazy.force Precomputed_values.for_unit_tests

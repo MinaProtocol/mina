@@ -94,6 +94,9 @@ module For_tests : sig
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
 
+  (** The merkle root of the root snarked ledger. *)
+  val root_ledger_hash : t -> Mina_base.Ledger_hash.t
+
   val gen_breadcrumb :
        verifier:Verifier.t
     -> ?send_to_random_pk:bool
