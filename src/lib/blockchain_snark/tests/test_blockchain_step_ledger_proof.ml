@@ -104,6 +104,29 @@ let baseline_transition : Mina_state.Snark_transition.Value.t =
   ; pending_coinbase_update = Mina_base.Pending_coinbase.Update.genesis
   }
 
+(* A fork point that the circuit's constraint constants know nothing about. *)
+let fork_constraint_constants =
+  { constraint_constants with
+    fork =
+      Some
+        { state_hash = Snark_params.Tick.Field.of_int 424242
+        ; blockchain_length = Mina_numbers.Length.of_int 1000
+        ; global_slot_since_genesis =
+            Mina_numbers.Global_slot_since_genesis.of_int 2000
+        }
+  }
+
+let forked_negative_one_state =
+  Mina_state.Protocol_state.negative_one ~genesis_ledger ~genesis_epoch_data
+    ~constraint_constants:fork_constraint_constants ~consensus_constants
+    ~genesis_body_reference
+
+let forked_genesis_protocol_state =
+  (Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+     ~constraint_constants:fork_constraint_constants ~consensus_constants
+     ~genesis_body_reference )
+    .data
+
 (* --- Tests --- *)
 
 let test_baseline_accepted () =
@@ -161,10 +184,37 @@ let test_variant_rejected () =
     Alcotest.fail "Hashes unexpectedly equal — test setup error"
   else ()
 
+let test_forked_genesis_accepted () =
+  let witness : Blockchain_snark.Witness.t =
+    { prev_state = forked_negative_one_state
+    ; prev_state_proof = Lazy.force Mina_base.Proof.transaction_dummy
+    ; transition =
+        { baseline_transition with
+          blockchain_state =
+            Mina_state.Protocol_state.blockchain_state
+              forked_genesis_protocol_state
+        }
+    ; txn_snark = matching_txn_snark
+    ; txn_snark_proof = Lazy.force Mina_base.Proof.transaction_dummy
+    }
+  in
+  match
+    Blockchain_snark.check witness ~handler:consensus_handler
+      ~proof_level:Genesis_constants.Proof_level.No_check ~constraint_constants
+      forked_genesis_protocol_state
+  with
+  | Ok () ->
+      ()
+  | Error e ->
+      Alcotest.fail
+        (Printf.sprintf "Forked genesis rejected: %s" (Error.to_string_hum e))
+
 let tests =
   [ ( "baseline"
     , [ Alcotest.test_case "baseline witness accepted" `Quick
           test_baseline_accepted
+      ; Alcotest.test_case "forked genesis accepted" `Quick
+          test_forked_genesis_accepted
       ] )
   ; ( "variant"
     , [ Alcotest.test_case "variant witness rejected" `Quick
