@@ -106,8 +106,10 @@ done
 echo "--- Checking that the config and the state dump describe the same fork block"
 curl -sSfL "$CONFIG_JSON_GZ_URL" -o "$WORKDIR/dump.json.gz"
 dump_field() { gunzip -c "$WORKDIR/dump.json.gz" | jq -r "$1 // empty"; }
-CONFIG_STATE_HASH=$(jq -r '.proof.fork.state_hash // empty' "$CONFIG_DIR/daemon.json")
-DUMP_STATE_HASH=$(dump_field '.proof.fork.state_hash')
+# The fork point is under genesis.fork, or proof.fork from a daemon that
+# predates genesis.fork.
+CONFIG_STATE_HASH=$(jq -r '(.genesis.fork // .proof.fork).state_hash // empty' "$CONFIG_DIR/daemon.json")
+DUMP_STATE_HASH=$(dump_field '(.genesis.fork // .proof.fork).state_hash')
 echo "config: $CONFIG_STATE_HASH"
 echo "dump:   $DUMP_STATE_HASH"
 if [[ -z "$CONFIG_STATE_HASH" || "$CONFIG_STATE_HASH" != "$DUMP_STATE_HASH" ]]; then

@@ -208,6 +208,21 @@ class FetchHardforkConfig(unittest.TestCase):
         self.write_dump(other)
         self.assert_refused(self.fetch(Archive()), "not from the same fork block")
 
+    def test_fork_point_under_genesis_is_accepted(self):
+        archive = Archive()
+        new = config("new")
+        new["genesis"] = {"fork": new.pop("proof")["fork"]}
+        archive.members["daemon.json"] = json.dumps(new).encode()
+        result = self.fetch(archive)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_other_fork_block_under_genesis_is_refused(self):
+        other = config("old")
+        other["genesis"] = {"fork": other.pop("proof")["fork"]}
+        other["genesis"]["fork"]["state_hash"] = "3Nother"
+        self.write_dump(other)
+        self.assert_refused(self.fetch(Archive()), "not from the same fork block")
+
     def test_legacy_ledger_other_than_the_dump_is_refused(self):
         self.write_dump(config("x"))
         self.assert_refused(
