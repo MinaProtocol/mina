@@ -237,7 +237,7 @@ echo "=========================================="
 echo ""
 
 # Fork the generated chain off the dump's tip, so its blocks are the newest in
-# the archive. The fixture's own proof.fork/genesis only fit the dump it was
+# the archive. The fixture's own fork point and genesis only fit the dump it was
 # made against.
 read -r FORK_STATE_HASH FORK_HEIGHT FORK_SLOT FORK_TIMESTAMP_MS < <(
     psql "$POSTGRES_URI" -At -F ' ' -v ON_ERROR_STOP=1 -c \
@@ -251,7 +251,8 @@ jq --arg state_hash "$FORK_STATE_HASH" \
    --argjson height "$FORK_HEIGHT" \
    --argjson slot "$FORK_SLOT" \
    --arg timestamp "$(date -u -d "@$((FORK_TIMESTAMP_MS / 1000))" +%Y-%m-%dT%H:%M:%SZ)" \
-   '.proof.fork = { state_hash: $state_hash, blockchain_length: $height, global_slot_since_genesis: $slot }
+   'del(.proof.fork)
+    | .genesis.fork = { state_hash: $state_hash, blockchain_length: $height, global_slot_since_genesis: $slot }
     | .genesis.genesis_state_timestamp = $timestamp' \
    "$LEDGER_DIR/runtime_config.json" > "$RUNTIME_CONFIG"
 echo "Forking at $FORK_STATE_HASH (height $FORK_HEIGHT, slot $FORK_SLOT)"
