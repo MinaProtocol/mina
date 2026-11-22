@@ -51,7 +51,8 @@ module Update = struct
     { app_state = Zkapp_state.V.to_mesa app_state ~pad:Set_or_keep.Keep
     ; delegate
     ; verification_key
-    ; permissions
+    ; permissions =
+        Set_or_keep.map permissions ~f:Mina_base.Permissions.Update.of_account
     ; zkapp_uri
     ; token_symbol
     ; timing
