@@ -442,6 +442,7 @@ module Json_layout = struct
       ; grace_period_slots : int option [@default None]
       ; block_window_duration_ms : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
+      ; fork : Fork_config.t option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -1201,6 +1202,7 @@ module Genesis = struct
     ; grace_period_slots : int option
     ; block_window_duration_ms : int option
     ; genesis_state_timestamp : string option
+    ; fork : Fork_config.t option
     }
   [@@deriving bin_io_unversioned]
 
@@ -1229,6 +1231,7 @@ module Genesis = struct
     ; genesis_state_timestamp =
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
+    ; fork = opt_fallthrough ~default:t1.fork t2.fork
     }
 
   let gen =
@@ -1244,9 +1247,13 @@ module Genesis = struct
         ]
     in
     let%bind block_window_duration_ms = Int.gen_incl 1_000 360_000 in
-    let%map genesis_state_timestamp =
+    let%bind genesis_state_timestamp =
       Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
       |> Quickcheck.Generator.map ~f:Time.to_string
+    in
+    let%map fork =
+      let open Quickcheck.Generator in
+      union [ map ~f:Option.some Fork_config.gen; return None ]
     in
     { k = Some k
     ; delta = Some delta
@@ -1255,6 +1262,7 @@ module Genesis = struct
     ; grace_period_slots
     ; block_window_duration_ms = Some block_window_duration_ms
     ; genesis_state_timestamp = Some genesis_state_timestamp
+    ; fork
     }
 end
 
@@ -1480,6 +1488,7 @@ let move_legacy_block_window_duration_ms (layout : Json_layout.t) :
             ; grace_period_slots = None
             ; block_window_duration_ms = None
             ; genesis_state_timestamp = None
+            ; fork = None
             }
       in
       match genesis.block_window_duration_ms with
@@ -1697,6 +1706,7 @@ let make_fork_config ~staged_ledger ~genesis_state_timestamp
       ; slots_per_sub_window = None
       ; grace_period_slots = None
       ; block_window_duration_ms = None
+      ; fork = None
       }
       (* add_genesis_winner must be set to false, because this
          config effectively creates a continuation of the current
@@ -1767,6 +1777,7 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
       ; slots_per_sub_window = None
       ; grace_period_slots = None
       ; block_window_duration_ms = None
+      ; fork = None
       }
   in
   let global_slot_since_genesis =

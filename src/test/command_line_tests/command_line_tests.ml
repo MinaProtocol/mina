@@ -411,6 +411,7 @@ module AutoHardforkConfigGeneration = struct
       ; grace_period_slots = None
       ; block_window_duration_ms = Some slot_duration_ms
       ; genesis_state_timestamp = Some genesis_timestamp
+      ; fork = None
       }
     in
     let runtime_config = Runtime_config.make ~ledger ~daemon ~genesis () in
