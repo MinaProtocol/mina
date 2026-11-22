@@ -856,6 +856,8 @@ end
 module Account = struct
   type permissions = t
 
+  type permissions_checked = Checked.t
+
   module Poly = struct
     [%%versioned
     module Stable = struct
@@ -982,6 +984,38 @@ module Account = struct
   let of_update (update : Update.t) : t =
     of_permissions (Update.to_account update)
 
+  (** Adds [txn_version] to [set_verification_key]. *)
+  let to_permissions ~txn_version
+      ({ edit_state
+       ; access
+       ; send
+       ; receive
+       ; set_delegate
+       ; set_permissions
+       ; set_verification_key
+       ; set_zkapp_uri
+       ; edit_action_state
+       ; set_token_symbol
+       ; increment_nonce
+       ; set_voting_for
+       ; set_timing
+       } :
+        t ) : permissions =
+    { edit_state
+    ; access
+    ; send
+    ; receive
+    ; set_delegate
+    ; set_permissions
+    ; set_verification_key = (set_verification_key, txn_version)
+    ; set_zkapp_uri
+    ; edit_action_state
+    ; set_token_symbol
+    ; increment_nonce
+    ; set_voting_for
+    ; set_timing
+    }
+
   let gen ~auth_tag : t Quickcheck.Generator.t =
     Quickcheck.Generator.map (gen ~auth_tag) ~f:of_permissions
 
@@ -999,6 +1033,40 @@ module Account = struct
 
     let constant (t : Stable.Latest.t) : t =
       Poly.map t ~f:Auth_required.Checked.constant
+
+    let of_permissions
+        ({ edit_state
+         ; access
+         ; send
+         ; receive
+         ; set_delegate
+         ; set_permissions
+         ; set_verification_key
+         ; set_zkapp_uri
+         ; edit_action_state
+         ; set_token_symbol
+         ; increment_nonce
+         ; set_voting_for
+         ; set_timing
+         } :
+          permissions_checked ) : t =
+      { edit_state
+      ; access
+      ; send
+      ; receive
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key = fst set_verification_key
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      }
+
+    let of_update (update : Update.Checked.t) : t =
+      of_permissions (Update.Checked.to_account update)
   end
 
   let typ : (Checked.t, t) Typ.t =

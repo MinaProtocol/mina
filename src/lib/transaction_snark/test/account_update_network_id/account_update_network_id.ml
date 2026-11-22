@@ -46,7 +46,9 @@ let suite () =
                   in
                   Transaction_snark.For_tests.create_trivial_zkapp_account
                     ~permissions:
-                      { Permissions.user_default with set_zkapp_uri = Proof }
+                      { Permissions.Account.user_default with
+                        set_zkapp_uri = Proof
+                      }
                     ~vk ~ledger
                     Signature_lib.Public_key.(
                       compress zkapp_account_keypair.public_key) ;

@@ -919,7 +919,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              fun a -> a.data.permissions.set_permissions
 
             let set_verification_key_auth : t -> controller =
-             fun a -> fst a.data.permissions.set_verification_key
+             fun a -> a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
@@ -939,10 +939,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_timing : t -> controller =
              fun a -> a.data.permissions.set_timing
 
-            type t = Permissions.Checked.t
+            type t = Permissions.Account.Checked.t
 
             let if_ b ~then_ ~else_ =
-              run_checked @@ Permissions.Checked.if_ b ~then_ ~else_
+              run_checked @@ Permissions.Account.Checked.if_ b ~then_ ~else_
           end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) : t =
@@ -1690,7 +1690,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
               let permissions ({ account_update; _ } : t) =
                 Set_or_keep.Checked.map account_update.data.update.permissions
-                  ~f:Permissions.Update.Checked.to_account
+                  ~f:Permissions.Account.Checked.of_update
             end
 
             module Account_precondition = struct
@@ -5336,15 +5336,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       signature_transfers ~constraint_constants
         (Multiple_transfers_spec.signature_transfers_spec_of_t spec)
 
-    let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
+    let trivial_zkapp_account ?(permissions = Permissions.Account.user_default)
+        ~vk pk =
       let id = Account_id.create pk Token_id.default in
       { (Account.create id Balance.(of_mina_int_exn 1_000_000)) with
         permissions
       ; zkapp = Some { Zkapp_account.default with verification_key = Some vk }
       }
 
-    let create_trivial_zkapp_account ?(permissions = Permissions.user_default)
-        ~vk ~ledger pk =
+    let create_trivial_zkapp_account
+        ?(permissions = Permissions.Account.user_default) ~vk ~ledger pk =
       let create ledger id account =
         match Ledger.location_of_account ledger id with
         | Some _loc ->
@@ -5386,7 +5387,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let () =
         create_trivial_zkapp_account trivial_account_pk ~ledger ~vk
-          ~permissions:{ Permissions.user_default with set_permissions = Proof }
+          ~permissions:
+            { Permissions.Account.user_default with set_permissions = Proof }
       in
       let update_empty_permissions =
         let permissions =

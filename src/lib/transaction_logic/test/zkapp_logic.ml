@@ -457,7 +457,8 @@ let%test_module "Test transaction logic." =
                  && Predicates.verify_account_updates account ~txn ~ledger
                       ~f:(fun _ -> function
                       | Some _, Some updt ->
-                          Permissions.equal updt.permissions perms
+                          Permissions.Account.equal updt.permissions
+                            (Permissions.Account.of_permissions perms)
                       | _ ->
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )

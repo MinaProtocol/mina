@@ -277,29 +277,7 @@ module Ledger = struct
       ~root_hash ~ledger_dirname:dirname ()
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
-      ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
-      =
-    let patch_accounts_version accounts_with_keys =
-      match overwrite_version with
-      | Some version ->
-          List.map accounts_with_keys ~f:(fun (key, account) ->
-              let patched_account =
-                Mina_base.Account.
-                  { account with
-                    permissions =
-                      Mina_base.Permissions.Poly.
-                        { account.permissions with
-                          set_verification_key =
-                            ( fst account.permissions.set_verification_key
-                            , version )
-                        }
-                  }
-              in
-              (key, patched_account) )
-      | None ->
-          accounts_with_keys
-    in
-
+      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -336,10 +314,7 @@ module Ledger = struct
       | Hash ->
           None
       | Accounts accounts ->
-          Some
-            ( lazy
-              (patch_accounts_version
-                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
+          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -578,11 +553,11 @@ module Ledger = struct
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ~genesis_backing_type ?(ledger_name_prefix = "genesis_ledger")
-      ?overwrite_version (config : Runtime_config.Ledger.t) =
+      (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
-            ~ledger_name_prefix ?overwrite_version config
+            ~ledger_name_prefix config
         in
         let%bind tar_file =
           find_tar ~logger ~genesis_dir ~constraint_constants
@@ -765,8 +740,7 @@ let print_config ~logger config =
     ~metadata
 
 let fill_in_ledger_data ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~(light_proof : Genesis_proof.Light.t) ?overwrite_version
-    (config : Runtime_config.t) =
+    ~(light_proof : Genesis_proof.Light.t) (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   (* If the backing type were set to Converting_db here, then the daemon would
      be forced to keep a migrated copy of the genesis ledgers around on disk the
@@ -788,7 +762,7 @@ let fill_in_ledger_data ?(genesis_dir = Cache_dir.autogen_path) ~logger
     | Some ledger ->
         Ledger.load ~proof_level:light_proof.proof_level ~genesis_dir ~logger
           ~constraint_constants:light_proof.constraint_constants
-          ~genesis_backing_type ?overwrite_version ledger
+          ~genesis_backing_type ledger
     | None ->
         [%log fatal] "No ledger was provided in the runtime configuration" ;
         Deferred.Or_error.errorf
@@ -873,7 +847,7 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
   }
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
+    ~constraint_constants ~logger ~proof_level ?genesis_dir
     (config : Runtime_config.t) : Precomputed_values.t Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   print_config ~logger config ;
@@ -882,8 +856,7 @@ let init_from_config_file ~cli_proof_level ~genesis_constants
       ~constraint_constants ~proof_level config
   in
   let%map genesis_proof =
-    fill_in_ledger_data ~light_proof ?genesis_dir ~logger ?overwrite_version
-      config
+    fill_in_ledger_data ~light_proof ?genesis_dir ~logger config
   in
   Genesis_proof.create_values_no_proof genesis_proof
 

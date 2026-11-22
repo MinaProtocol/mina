@@ -4631,7 +4631,7 @@ let%test_module "staged ledger tests" =
             (module Ledger.Ledger_inner)
             init_ledger ledger ;
           Transaction_snark.For_tests.create_trivial_zkapp_account
-            ~permissions:Permissions.user_default ~vk ~ledger zkapp_pk ;
+            ~permissions:Permissions.Account.user_default ~vk ~ledger zkapp_pk ;
           let sl = Sl.create_exn ~constraint_constants ~ledger in
           [%log info] "signed commands or zkapps"
             ~metadata:
@@ -5164,7 +5164,7 @@ let%test_module "staged ledger tests" =
                     init_ledger ledger ;
                   (* create a zkApp account *)
                   let snapp_permissions =
-                    let default = Permissions.user_default in
+                    let default = Permissions.Account.user_default in
                     { default with
                       set_delegate = Permissions.Auth_required.Proof
                     }
@@ -5327,7 +5327,9 @@ let%test_module "staged ledger tests" =
                     init_ledger ledger ;
                   Transaction_snark.For_tests.create_trivial_zkapp_account
                     ~permissions:
-                      { Permissions.user_default with set_zkapp_uri = Proof }
+                      { Permissions.Account.user_default with
+                        set_zkapp_uri = Proof
+                      }
                     ~vk ~ledger zkapp_account_pk ;
                   let invalid_zkapp_command =
                     Or_error.ok_exn

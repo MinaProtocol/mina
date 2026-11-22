@@ -72,11 +72,12 @@ module Accounts = struct
                 { Runtime_config.Accounts.Single.Permissions
                   .Verification_key_perm
                   .auth
-                ; txn_version
+                ; txn_version = _
                 } =
-              (auth_required auth, txn_version)
+              auth_required auth
             in
-            { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
+            { Mina_base.Permissions.Account.Poly.edit_state =
+                auth_required edit_state
             ; access = auth_required access
             ; send = auth_required send
             ; receive = auth_required receive
@@ -217,7 +218,7 @@ module Accounts = struct
           | Impossible ->
               Impossible
         in
-        let { Mina_base.Permissions.Poly.edit_state
+        let { Mina_base.Permissions.Account.Poly.edit_state
             ; send
             ; receive
             ; access
@@ -233,10 +234,11 @@ module Accounts = struct
             } =
           account.permissions
         in
-        let verification_key_perm (auth, txn_version) =
+        let verification_key_perm auth =
           { Runtime_config.Accounts.Single.Permissions.Verification_key_perm
             .auth = auth_required auth
-          ; txn_version
+          ; txn_version =
+              snd Mina_base.Permissions.user_default.set_verification_key
           }
         in
         Some
@@ -693,7 +695,8 @@ let%test_module "Runtime config" =
           test_account.delegate ) ;
       assert (State_hash.equal account.voting_for test_account.voting_for) ;
       assert (Account.Timing.equal account.timing test_account.timing) ;
-      assert (Permissions.equal account.permissions test_account.permissions) ;
+      assert (
+        Permissions.Account.equal account.permissions test_account.permissions ) ;
       assert (Option.equal Zkapp_account.equal account.zkapp test_account.zkapp)
 
     (* if nondefault token, no delegate created from runtime config *)

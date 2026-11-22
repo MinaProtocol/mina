@@ -14,7 +14,7 @@ module Test_account = struct
     { account_name : string
     ; balance : string
     ; timing : Mina_base.Account_timing.t
-    ; permissions : Mina_base.Permissions.t option [@default None]
+    ; permissions : Mina_base.Permissions.Account.t option [@default None]
     ; zkapp : Mina_base.Zkapp_account.t option [@default None]
     }
   [@@deriving to_yojson]

@@ -1098,7 +1098,7 @@ module Make (L : Ledger_intf.S) :
          fun a -> a.permissions.set_permissions
 
         let set_verification_key_auth : t -> Controller.t =
-         fun a -> fst a.permissions.set_verification_key
+         fun a -> a.permissions.set_verification_key
 
         let set_zkapp_uri : t -> Controller.t =
          fun a -> a.permissions.set_zkapp_uri
@@ -1117,7 +1117,7 @@ module Make (L : Ledger_intf.S) :
 
         let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
 
-        type t = Permissions.t
+        type t = Permissions.Account.t
 
         let if_ = value_if
       end
@@ -1412,7 +1412,7 @@ module Make (L : Ledger_intf.S) :
 
         let permissions (account_update : t) =
           Set_or_keep.map account_update.body.update.permissions
-            ~f:Permissions.Update.to_account
+            ~f:Permissions.Account.of_update
       end
     end
 
@@ -2227,7 +2227,7 @@ module For_tests = struct
       , Public_key.Compressed.t option
       , State_hash.t
       , Account_timing.t
-      , Permissions.t
+      , Permissions.Account.t
       , Zkapp_account.t option )
       Account.Poly.t
     [@@deriving sexp, compare]
@@ -2260,13 +2260,13 @@ module For_tests = struct
                  Token_id.default )
             |> Or_error.ok_exn
           in
-          let permissions : Permissions.t =
+          let permissions : Permissions.Account.t =
             { edit_state = Either
             ; send = Either
             ; receive = None
             ; set_delegate = Either
             ; set_permissions = Either
-            ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+            ; set_verification_key = Either
             ; set_zkapp_uri = Either
             ; edit_action_state = Either
             ; set_token_symbol = Either

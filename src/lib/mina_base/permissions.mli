@@ -249,6 +249,10 @@ module Account : sig
 
   val of_update : Update.t -> t
 
+  (** Adds [txn_version] to [set_verification_key]. *)
+  val to_permissions :
+    txn_version:Mina_numbers.Txn_version.t -> t -> permissions
+
   val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
@@ -259,6 +263,8 @@ module Account : sig
     val to_input : t -> Field.Var.t Random_oracle_input.Chunked.t
 
     val constant : Stable.Latest.t -> t
+
+    val of_update : Update.Checked.t -> t
 
     val if_ : Boolean.var -> then_:t -> else_:t -> t Snark_params.Tick.Checked.t
   end
