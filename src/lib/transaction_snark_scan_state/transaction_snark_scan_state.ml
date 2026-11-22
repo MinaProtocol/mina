@@ -1287,6 +1287,92 @@ let get_staged_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
     ~apply_first_pass_sparse_ledger ~signature_kind
 
+let get_staged_ledger_in_layers_async ?(async_batch_size = 10) ~ledger
+    ~end_layer ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger ~signature_kind t =
+  let open Deferred.Or_error.Let_syntax in
+  let trees = Parallel_scan.pending_data t.scan_state in
+  let completed_trees, current_tree =
+    if Parallel_scan.next_on_new_tree t.scan_state then (trees, [])
+    else
+      match List.drop_last trees with
+      | None ->
+          ([], [])
+      | Some completed_trees ->
+          (completed_trees, List.last_exn trees)
+  in
+  let txns_per_block
+      ( previous_incomplete
+      , `Border_block_continued_in_the_next_tree continued_in_next_tree ) tree =
+    if continued_in_next_tree then
+      Transactions_ordered.first_and_second_pass_transactions_per_tree tree
+        ~previous_incomplete
+    else
+      let txns =
+        Transactions_ordered.first_and_second_pass_transactions_per_tree tree
+          ~previous_incomplete:[]
+      in
+      if List.is_empty previous_incomplete then txns
+      else
+        { Transactions_ordered.Poly.first_pass = []
+        ; second_pass = []
+        ; previous_incomplete
+        ; current_incomplete = []
+        }
+        :: txns
+  in
+  let incomplete_in_next_tree txns_per_block =
+    match List.last txns_per_block with
+    | None ->
+        ([], `Border_block_continued_in_the_next_tree false)
+    | Some (txns_in_last_block : _ Transactions_ordered.Poly.t) ->
+        if not (List.is_empty txns_in_last_block.second_pass) then
+          ( txns_in_last_block.second_pass
+          , `Border_block_continued_in_the_next_tree false )
+        else
+          ( txns_in_last_block.current_incomplete
+          , `Border_block_continued_in_the_next_tree true )
+  in
+  let apply ?stop_at_first_pass txns_per_block ledger =
+    apply_ordered_txns_async ?stop_at_first_pass txns_per_block
+      ~async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
+      ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
+  in
+  let%bind ledger, incomplete =
+    Deferred.Or_error.List.fold
+      (List.filter completed_trees ~f:(Fn.non List.is_empty))
+      ~init:
+        ( ledger
+        , Option.value_map
+            ~default:([], `Border_block_continued_in_the_next_tree false)
+            (incomplete_txns_from_recent_proof_tree t)
+            ~f:snd )
+      ~f:(fun (ledger, incomplete) tree ->
+        let txns_per_block = txns_per_block incomplete tree in
+        let%bind (`First_pass_ledger_hash hash) =
+          apply ~stop_at_first_pass:true txns_per_block ledger
+        in
+        let expected =
+          (List.last_exn tree).Transaction_with_witness.statement.target
+            .first_pass_ledger
+        in
+        let%map () =
+          Deferred.return
+            (Result.ok_if_true
+               (Frozen_ledger_hash.equal
+                  (Frozen_ledger_hash.of_ledger_hash hash)
+                  expected )
+               ~error:
+                 (Error.create
+                    "A snarked ledger doesn't have the hash its tree's proof \
+                     targets"
+                    (hash, expected)
+                    [%sexp_of: Ledger_hash.t * Frozen_ledger_hash.t] ) )
+        in
+        (end_layer (), incomplete_in_next_tree txns_per_block) )
+  in
+  apply (txns_per_block incomplete current_tree) ledger
+
 let free_space t = Parallel_scan.free_space t.scan_state
 
 (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
