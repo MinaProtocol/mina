@@ -163,7 +163,9 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
       pending_coinbase zkapps' prev_state_view
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
-  | Ok (b, _, _, _, _, ledger) ->
+  | Ok (b, _, _, _, _, (first, ledger)) ->
+      Mina_ledger.Immutable_ledger.commit_into_parent ~loc:__LOC__ ledger
+        ~parent:first ;
       let root = Mina_ledger.Immutable_ledger.merkle_root ledger in
       let elapsed = Time.diff (Time.now ()) start in
       printf

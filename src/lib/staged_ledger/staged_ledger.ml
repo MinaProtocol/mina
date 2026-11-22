@@ -244,9 +244,12 @@ module T = struct
         Ledger.attached_mask
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection : Pending_coinbase.t
+    ; snarked_ledgers_below : Immutable_ledger.t list
     }
 
   let scan_state { scan_state; _ } = scan_state
+
+  let snarked_ledgers_below { snarked_ledgers_below; _ } = snarked_ledgers_below
 
   let all_work_pairs t
       ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
@@ -297,7 +300,12 @@ module T = struct
       ~pending_coinbase_collection ~get_state ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
     let t =
-      { ledger; scan_state; constraint_constants; pending_coinbase_collection }
+      { ledger
+      ; scan_state
+      ; constraint_constants
+      ; pending_coinbase_collection
+      ; snarked_ledgers_below = []
+      }
     in
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
@@ -345,7 +353,12 @@ module T = struct
           }
     in
     return
-      { ledger; scan_state; constraint_constants; pending_coinbase_collection }
+      { ledger
+      ; scan_state
+      ; constraint_constants
+      ; pending_coinbase_collection
+      ; snarked_ledgers_below = []
+      }
 
   let of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state:_
@@ -413,13 +426,18 @@ module T = struct
       (of_scan_state_and_ledger_unchecked ~logger)
 
   let copy
-      { scan_state; ledger; constraint_constants; pending_coinbase_collection }
-      =
+      { scan_state
+      ; ledger
+      ; constraint_constants
+      ; pending_coinbase_collection
+      ; snarked_ledgers_below
+      } =
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
     { scan_state
     ; ledger = Ledger.register_mask ledger new_mask
     ; constraint_constants
     ; pending_coinbase_collection
+    ; snarked_ledgers_below
     }
 
   let hash
@@ -427,6 +445,7 @@ module T = struct
       ; ledger
       ; constraint_constants = _
       ; pending_coinbase_collection
+      ; snarked_ledgers_below = _
       } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
@@ -443,6 +462,7 @@ module T = struct
         Pending_coinbase.create
           ~depth:constraint_constants.pending_coinbase_depth ()
         |> Or_error.ok_exn
+    ; snarked_ledgers_below = []
     }
 
   let replace_ledger_exn t ledger =
@@ -691,13 +711,11 @@ module T = struct
         (Mutable_ledger.unsafe_to_ledger ledger)
         state_and_body_hash (pre_stmts1 @ pre_stmts2)
     in
-    let ledger = Mutable_ledger.freeze ~loc:__LOC__ ledger in
-    Immutable_ledger.commit_into_parent ~loc:__LOC__ ledger ~parent:first ;
     ( txns_with_witnesses
     , updated_stack1
     , updated_stack2
     , first_pass_ledger_end
-    , ledger )
+    , (first, Mutable_ledger.freeze ~loc:__LOC__ ledger) )
 
   (** Checks if the work has already been verified before by the snark pool logic *)
   let work_already_verified_check ~get_completed_work jobs work =
@@ -952,6 +970,10 @@ module T = struct
     else (
       [%log internal] "Update_coinbase_stack_done" ;
       let first_pass_ledger_end = Mutable_ledger.merkle_root ledger in
+      let first = Mutable_ledger.freeze ~loc:__LOC__ ledger in
+      let rest =
+        Mutable_ledger.freeze ~loc:__LOC__ (Mutable_ledger.create ~parent:first)
+      in
       Deferred.return
         (Ok
            ( false
@@ -959,7 +981,7 @@ module T = struct
            , Pending_coinbase.Update.Action.Update_none
            , `Update_none
            , `First_pass_ledger_end first_pass_ledger_end
-           , Mutable_ledger.freeze ~loc:__LOC__ ledger ) ) )
+           , (first, rest) ) ) )
 
   (* Update the pending_coinbase tree with the updated/new stack and delete the
      oldest stack if a proof was emitted *)
@@ -1085,7 +1107,7 @@ module T = struct
              , stack_update_in_snark
              , stack_update
              , `First_pass_ledger_end first_pass_ledger_end
-             , new_ledger ) =
+             , (first_layer, new_ledger) ) =
       O1trace.thread "update_coinbase_stack_start_time" (fun () ->
           update_coinbase_stack_and_get_data ~logger ~constraint_constants
             ~global_slot ~signature_kind t.scan_state new_ledger
@@ -1151,6 +1173,16 @@ module T = struct
                   the scan_state $scan_state: $error" ) ;
           Deferred.return (to_staged_ledger_or_error r) )
     in
+    let snarked_ledgers_below =
+      if
+        Scan_state.completes_tree scan_state'
+          ~parent_state_hash:(fst state_and_body_hash)
+      then [ first_layer ]
+      else (
+        Immutable_ledger.commit_into_parent ~loc:__LOC__ new_ledger
+          ~parent:first_layer ;
+        [] )
+    in
     let%bind () = yield_result () in
     [%log internal] "Update_pending_coinbase_collection" ;
     let%bind updated_pending_coinbase_collection' =
@@ -1205,6 +1237,7 @@ module T = struct
       ; ledger = Immutable_ledger.unsafe_to_ledger new_ledger
       ; constraint_constants = t.constraint_constants
       ; pending_coinbase_collection = updated_pending_coinbase_collection'
+      ; snarked_ledgers_below
       }
     in
     ( `Ledger_proof res_opt
