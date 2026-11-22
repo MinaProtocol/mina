@@ -395,6 +395,16 @@ end
 
 [%%versioned
 module Stable = struct
+  module V3 = struct
+    type t =
+      ( Auth_required.Stable.V2.t
+      , Mina_numbers.Txn_version.Stable.V1.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, equal, compare, hash, yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V2 = struct
     type t =
       ( Auth_required.Stable.V2.t
