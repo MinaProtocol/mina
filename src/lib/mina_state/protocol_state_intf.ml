@@ -176,6 +176,7 @@ module type Full = sig
     -> genesis_epoch_data:
          Consensus.Genesis_data.Hashed.t Consensus.Genesis_data.Epoch.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> fork:Genesis_constants.Fork_constants.t option
     -> consensus_constants:Consensus.Constants.t
     -> genesis_body_reference:Consensus.Body_reference.t
     -> Value.t

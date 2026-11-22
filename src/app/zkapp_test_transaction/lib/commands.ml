@@ -117,7 +117,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
         ~genesis_epoch_data:
           (Consensus.Genesis_data.Epoch.to_hashed
              Consensus.Genesis_data.Epoch.for_unit_tests )
-        ~constraint_constants ~consensus_constants ~genesis_body_reference
+        ~constraint_constants ~fork:constraint_constants.fork
+        ~consensus_constants ~genesis_body_reference
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
@@ -187,7 +188,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
       ~genesis_epoch_data:
         (Consensus.Genesis_data.Epoch.to_hashed
            Consensus.Genesis_data.Epoch.for_unit_tests )
-      ~constraint_constants ~consensus_constants ~genesis_body_reference
+      ~constraint_constants ~fork:constraint_constants.fork ~consensus_constants
+      ~genesis_body_reference
   in
   let protocol_state_predicate =
     let protocol_state_predicate_view =

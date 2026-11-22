@@ -413,7 +413,8 @@ let dummy_state_view =
           (Consensus.Genesis_data.Epoch.to_hashed
              Consensus.Genesis_data.Epoch.for_unit_tests )
         ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
-        ~constraint_constants ~consensus_constants
+        ~constraint_constants ~fork:constraint_constants.fork
+        ~consensus_constants
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in

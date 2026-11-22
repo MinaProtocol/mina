@@ -58,7 +58,7 @@ let make ~(genesis_constants : Genesis_constants.t) ~constraint_constants
         (Consensus.Genesis_data.Hashed.zero_total_currency genesis_ledger)
       ~genesis_epoch_data:
         (Consensus.Genesis_data.Epoch.zero_total_currency genesis_epoch_data)
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~fork:constraint_constants.fork ~consensus_constants
       ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
   in
   of_inputs

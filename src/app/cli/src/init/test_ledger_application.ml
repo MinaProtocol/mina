@@ -86,7 +86,8 @@ let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ledger =
   let open Staged_ledger_diff in
   Protocol_state.negative_one ~genesis_ledger:ledger ~genesis_epoch_data:None
-    ~constraint_constants ~consensus_constants ~genesis_body_reference
+    ~constraint_constants ~fork:constraint_constants.fork ~consensus_constants
+    ~genesis_body_reference
 
 let apply_txs ~transfer_parties_get_actions_events ~action_elements
     ~event_elements ~constraint_constants ~first_partition_slots ~no_new_stack

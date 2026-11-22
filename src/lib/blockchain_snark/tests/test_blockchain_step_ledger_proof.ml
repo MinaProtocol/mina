@@ -30,12 +30,14 @@ let genesis_epoch_ledger = Genesis_ledger.Packed.t Genesis_ledger.for_unit_tests
 (* The state before genesis; the circuit produces genesis from it. *)
 let negative_one_state =
   Mina_state.Protocol_state.negative_one ~genesis_ledger ~genesis_epoch_data
-    ~constraint_constants ~consensus_constants ~genesis_body_reference
+    ~constraint_constants ~fork:constraint_constants.fork ~consensus_constants
+    ~genesis_body_reference
 
 (* Full genesis protocol state (= the circuit's output from negative-one). *)
 let genesis_with_hash =
   Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
-    ~constraint_constants ~consensus_constants ~genesis_body_reference
+    ~constraint_constants ~fork:constraint_constants.fork ~consensus_constants
+    ~genesis_body_reference
 
 let genesis_protocol_state = genesis_with_hash.data
 
@@ -118,12 +120,14 @@ let fork_constraint_constants =
 
 let forked_negative_one_state =
   Mina_state.Protocol_state.negative_one ~genesis_ledger ~genesis_epoch_data
-    ~constraint_constants:fork_constraint_constants ~consensus_constants
+    ~constraint_constants:fork_constraint_constants
+    ~fork:fork_constraint_constants.fork ~consensus_constants
     ~genesis_body_reference
 
 let forked_genesis_protocol_state =
   (Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
-     ~constraint_constants:fork_constraint_constants ~consensus_constants
+     ~constraint_constants:fork_constraint_constants
+     ~fork:fork_constraint_constants.fork ~consensus_constants
      ~genesis_body_reference )
     .data
 

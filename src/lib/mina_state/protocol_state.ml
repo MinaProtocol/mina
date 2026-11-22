@@ -342,7 +342,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     else state.body.genesis_state_hash
 
   let negative_one ~(genesis_ledger : Consensus.Genesis_data.Hashed.t)
-      ~genesis_epoch_data ~constraint_constants ~consensus_constants
+      ~genesis_epoch_data ~constraint_constants ~fork ~consensus_constants
       ~genesis_body_reference =
     { Poly.Stable.Latest.previous_state_hash =
         State_hash.of_hash Outside_hash_image.t
@@ -357,8 +357,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
         ; consensus_state =
             Consensus.Data.Consensus_state.negative_one ~genesis_ledger
-              ~genesis_epoch_data ~constants:consensus_constants
-              ~constraint_constants
+              ~genesis_epoch_data ~constants:consensus_constants ~fork
         ; constants =
             Consensus.Constants.to_protocol_constants consensus_constants
         }
