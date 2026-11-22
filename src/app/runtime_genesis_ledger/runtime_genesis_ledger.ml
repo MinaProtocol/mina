@@ -160,8 +160,9 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         in
         let current_genesis_global_slot =
           let open Option.Let_syntax in
-          let%bind proof = runtime_config.proof in
-          let%map { global_slot_since_genesis; _ } = proof.fork in
+          let%map { global_slot_since_genesis; _ } =
+            Runtime_config.fork runtime_config
+          in
           Mina_numbers.Global_slot_since_genesis.of_int
             global_slot_since_genesis
         in

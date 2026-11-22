@@ -1734,6 +1734,13 @@ let slot_tx_end, slot_chain_end =
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
+let fork t =
+  match Option.bind t.genesis ~f:(fun genesis -> genesis.fork) with
+  | Some fork ->
+      Some fork
+  | None ->
+      Option.bind t.proof ~f:(fun proof -> proof.fork)
+
 let hard_fork_genesis_slot_delta t =
   let open Option.Let_syntax in
   let%bind daemon = t.daemon in

@@ -72,9 +72,7 @@ module Config = struct
     |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
 
   (** [proof.fork], set once the network has hard forked. *)
-  let fork (config : Runtime_config.t) =
-    Option.bind config.proof ~f:(fun (proof : Runtime_config.Proof_keys.t) ->
-        proof.fork )
+  let fork = Runtime_config.fork
 end
 
 (** The schedule a runtime config declares, plus the daemon-derived quantities
