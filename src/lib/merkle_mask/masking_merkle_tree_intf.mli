@@ -78,6 +78,11 @@ module type S = sig
     *)
     val unset_parent : loc:string -> t -> unattached
 
+    (** [discard ~loc t] orphans [t], as [unset_parent] does, without first
+        checking that [t] and the masks below it are attached; it does nothing
+        if [t] is already orphaned. *)
+    val discard : loc:string -> t -> unit
+
     (** get mask parent *)
     val get_parent : t -> parent
 

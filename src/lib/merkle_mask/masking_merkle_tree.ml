@@ -163,12 +163,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       t.accumulated <- None ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
+    let discard ~loc attached =
+      match attached.desc with
+      | Orphaned _ ->
+          ()
+      | Ledger t ->
+          attached.desc <- Orphaned (t.uuid, loc) ;
+          Merkle_ledger.Mutations.append t.level ;
+          detach ~loc t
+
     let unset_parent ~loc attached =
       let t = repr attached in
-      attached.desc <- Orphaned (t.uuid, loc) ;
-      Merkle_ledger.Mutations.append t.level ;
-      detach ~loc t ;
-      t
+      discard ~loc attached ; t
 
     let assert_is_attached t = ignore (repr t : unattached)
 
