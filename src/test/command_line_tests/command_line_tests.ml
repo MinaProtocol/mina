@@ -282,20 +282,18 @@ module AutoHardforkConfigGeneration = struct
       |> Result.map_error ~f:Error.of_string
       |> Deferred.return
     in
-    (* Extract proof.fork.global_slot_since_genesis *)
-    let%bind proof =
-      of_option daemon_config.proof
-        ~error:"Generated config missing proof field"
-    in
+    (* Extract genesis.fork.global_slot_since_genesis *)
     let%bind fork =
-      of_option proof.fork ~error:"Generated config missing proof.fork field"
+      of_option
+        (Runtime_config.fork daemon_config)
+        ~error:"Generated config missing genesis.fork field"
     in
     let fork_slot = fork.global_slot_since_genesis in
     (* Verify fork slot *)
     let%bind () =
       if fork_slot <> expected_fork_slot then
         Deferred.Or_error.error_string
-          (sprintf "proof.fork.global_slot_since_genesis is %d, expected %d"
+          (sprintf "genesis.fork.global_slot_since_genesis is %d, expected %d"
              fork_slot expected_fork_slot )
       else Deferred.Or_error.return ()
     in

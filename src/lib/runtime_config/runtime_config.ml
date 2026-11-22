@@ -1706,7 +1706,7 @@ let make_fork_config ~staged_ledger ~genesis_state_timestamp
       ; slots_per_sub_window = None
       ; grace_period_slots = None
       ; block_window_duration_ms = None
-      ; fork = None
+      ; fork = Some fork
       }
       (* add_genesis_winner must be set to false, because this
          config effectively creates a continuation of the current
@@ -1725,7 +1725,7 @@ let make_fork_config ~staged_ledger ~genesis_state_timestamp
       ; name = None
       ; add_genesis_winner = Some false
       }
-    ~proof:(Proof_keys.make ~fork ()) ()
+    ()
 
 let slot_tx_end, slot_chain_end =
   let f get_runtime t =
@@ -1775,18 +1775,6 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
     ~global_slot_since_genesis ~state_hash ~blockchain_length
     ~staking_ledger_config ~staking_epoch_seed ~next_epoch_ledger_config
     ~next_epoch_seed =
-  let genesis =
-    Genesis.
-      { genesis_state_timestamp = Some genesis_state_timestamp
-      ; k = None
-      ; delta = None
-      ; slots_per_epoch = None
-      ; slots_per_sub_window = None
-      ; grace_period_slots = None
-      ; block_window_duration_ms = None
-      ; fork = None
-      }
-  in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
@@ -1798,6 +1786,18 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
       ; global_slot_since_genesis
       }
   in
+  let genesis =
+    Genesis.
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      ; block_window_duration_ms = None
+      ; fork = Some fork
+      }
+  in
   let epoch_data =
     let open Epoch_data in
     let open Data in
@@ -1807,5 +1807,4 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
             { ledger = config; seed = next_epoch_seed } )
     }
   in
-  make ~genesis ~epoch_data ~ledger:genesis_ledger_config
-    ~proof:(Proof_keys.make ~fork ()) ()
+  make ~genesis ~epoch_data ~ledger:genesis_ledger_config ()
