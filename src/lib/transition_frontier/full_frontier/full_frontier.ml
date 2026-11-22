@@ -195,7 +195,10 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
   ; protocol_states_for_root_scan_state
   ; persistent_root_instance
   ; time_controller
-  ; masks_below_root = []
+  ; masks_below_root =
+      List.map
+        (Staged_ledger.snarked_ledgers_below root_data.staged_ledger)
+        ~f:Mina_ledger.Immutable_ledger.unsafe_to_ledger
   }
 
 let root_data t =
@@ -405,17 +408,19 @@ let end_snarked_segment t ~old_root ~new_root =
                ~f:Mina_ledger.Immutable_ledger.unsafe_to_ledger ;
       true
 
-(** If a mask below the root holds [snarked_ledger_hash], commit it and every
-    mask below it into the root snarked ledger, lowest first, and return
-    [true]. Each mask is removed from under the mask above it once it is
-    committed. *)
+(** Commit the mask below the root that holds [snarked_ledger_hash], and every
+    mask below it, into the root snarked ledger, lowest first. Each mask is
+    removed from under the mask above it once it is committed. *)
 let commit_snarked_segments t ~root_mask snarked_ledger_hash =
   match
     List.findi t.masks_below_root ~f:(fun _ mask ->
         Ledger_hash.equal (Ledger.merkle_root mask) snarked_ledger_hash )
   with
   | None ->
-      false
+      failwithf
+        !"No mask below the root holds the snarked ledger %{sexp: \
+          Ledger_hash.t} that a proof targets"
+        snarked_ledger_hash ()
   | Some (index, _) ->
       let committed, kept = List.split_n t.masks_below_root (index + 1) in
       let masks_above =
@@ -429,8 +434,7 @@ let commit_snarked_segments t ~root_mask snarked_ledger_hash =
       [%test_result: Ledger_hash.t]
         ~message:"Root snarked ledger has the proof's hash after committing"
         ~expect:snarked_ledger_hash
-        (Ledger.Any_ledger.M.merkle_root t.root_ledger) ;
-      true
+        (Ledger.Any_ledger.M.merkle_root t.root_ledger)
 
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
@@ -475,12 +479,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    *        as `m1`)
    *     3) put `m1'` in `m1`'s place, so that the successors of `m1` are parented off
    *        of `m1'` without being moved, and orphan `m0`
-   *     4) if a segment ends at `s'`, commit it and the segments below it into `s`,
-   *        turning `s` into `s'`, and skip steps 5-7. Otherwise, create a new
-   *        temporary mask `mt` with `s` as it's parent
-   *     5) apply any transactions to `mt` that appear in the transition between `s` and `s'`
-   *     6) commit `mt` into `s`, turning `s` into `s'`
-   *     7) unattach and destroy `mt`
+   *     4) commit the segment ending at `s'` and the segments below it into `s`,
+   *        turning `s` into `s'`
    *)
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
@@ -551,70 +551,12 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~config
         t.persistent_root_instance ) ;
-    (* STEPS 4-7 *)
-    (* we need to perform steps 5-7 iff there was a proof emitted in the scan
-     * state we are transitioning to, and no segment ends at its snarked ledger *)
-    if
-      Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb
-      && not
-           (commit_snarked_segments t ~root_mask:m1
-              ( Breadcrumb.protocol_state new_root_node.breadcrumb
-              |> Protocol_state.blockchain_state
-              |> Blockchain_state.snarked_ledger_hash ) )
-    then (
-      let s = t.root_ledger in
-      (* STEP 4 *)
-      let mt =
-        Ledger.Maskable.register_mask s
-          (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
-      in
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
-      (* STEP 5 *)
-      (*Validate transactions against the protocol state associated with the transaction*)
-      let apply_first_pass =
-        Ledger.apply_transaction_first_pass ~signature_kind
-          ~constraint_constants:Context.constraint_constants
-      in
-      let apply_second_pass = Ledger.apply_transaction_second_pass in
-      let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-          sparse_ledger txn =
-        let open Or_error.Let_syntax in
-        let%map _ledger, partial_txn =
-          Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-            ~constraint_constants:Context.constraint_constants ~txn_state_view
-            ~global_slot sparse_ledger txn
-        in
-        partial_txn
-      in
-      let get_protocol_state state_hash =
-        match find_protocol_state t state_hash with
-        | Some s ->
-            Ok s
-        | None ->
-            Or_error.errorf "Failed to find protocol state for hash %s"
-              (State_hash.to_base58_check state_hash)
-      in
-      Or_error.ok_exn
-        (Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
-           ~get_protocol_state ~apply_first_pass ~apply_second_pass
-           ~apply_first_pass_sparse_ledger ~signature_kind
-           (Staged_ledger.scan_state
-              (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) ) ;
-      (*Check that the new snarked ledger is as expected*)
-      let new_snarked_ledger_hash = Ledger.merkle_root mt in
-      let expected_snarked_ledger_hash =
-        Breadcrumb.protocol_state new_root_node.breadcrumb
+    (* STEP 4 *)
+    if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then
+      commit_snarked_segments t ~root_mask:m1
+        ( Breadcrumb.protocol_state new_root_node.breadcrumb
         |> Protocol_state.blockchain_state
-        |> Blockchain_state.snarked_ledger_hash
-      in
-      assert (
-        Ledger_hash.equal new_snarked_ledger_hash expected_snarked_ledger_hash ) ;
-      (* STEP 6 *)
-      Ledger.commit mt ;
-      (* STEP 7 *)
-      ignore
-        ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt
-          : Ledger.unattached_mask ) ) ;
+        |> Blockchain_state.snarked_ledger_hash ) ;
     new_staged_ledger
   in
   (* rewrite the new root breadcrumb to contain the new root mask *)
@@ -1137,6 +1079,44 @@ module For_tests = struct
       ~consensus_local_state ~max_length
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~persistent_root_instance
+
+  let reload_frontier t =
+    let open Async.Deferred.Let_syntax in
+    let root = root t in
+    let root_staged_ledger = Breadcrumb.staged_ledger root in
+    let get_state hash =
+      match find_protocol_state t hash with
+      | Some protocol_state ->
+          Ok protocol_state
+      | None ->
+          Or_error.errorf "Protocol state for %s not found"
+            (State_hash.to_base58_check hash)
+    in
+    let%map staged_ledger =
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+        ~constraint_constants ~logger
+        ~scan_state:(Staged_ledger.scan_state root_staged_ledger)
+        ~snarked_ledger:(Ledger.of_any_ledger t.root_ledger)
+        ~snarked_local_state:
+          ( Breadcrumb.protocol_state root
+          |> Protocol_state.blockchain_state
+          |> Blockchain_state.snarked_local_state )
+        ~expected_merkle_root:(Ledger.merkle_root (Breadcrumb.mask root))
+        ~pending_coinbases:
+          (Staged_ledger.pending_coinbase_collection root_staged_ledger)
+        ~get_state ~signature_kind:Mina_signature_kind.t_DEPRECATED
+      >>| Or_error.ok_exn
+    in
+    create
+      ~context:(module Context)
+      ~root_data:
+        { transition = Breadcrumb.validated_transition root
+        ; staged_ledger
+        ; protocol_states = Map.data t.protocol_states_for_root_scan_state
+        }
+      ~root_ledger:t.root_ledger ~consensus_local_state:t.consensus_local_state
+      ~max_length ~persistent_root_instance:t.persistent_root_instance
+      ~time_controller:t.time_controller
 
   let clean_up_persistent_root ~frontier =
     let persistent_root_instance = persistent_root_instance frontier in

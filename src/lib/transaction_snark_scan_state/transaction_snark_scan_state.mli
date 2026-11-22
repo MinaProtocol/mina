@@ -115,38 +115,6 @@ val latest_ledger_proof : t -> Ledger_proof.Cached.t option
     emitted. *)
 val latest_target_registers : t -> Mina_state.Registers.Value.t option
 
-(** Apply transactions coorresponding to the last emitted proof based on the
-    two-pass system- first pass includes legacy transactions and zkapp payments
-    and the second pass includes account updates. [ignore_incomplete] is to
-    ignore the account updates that were not completed in a single scan state
-    tree corresponding to a proof. Set this to true when applying transactions
-    to get the snarked ledger corresponding to a proof.
-    *)
-val get_snarked_ledger_sync :
-     ledger:Ledger.t
-  -> get_protocol_state:
-       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
-  -> apply_first_pass:
-       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
-        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-        -> Ledger.t
-        -> Transaction.t
-        -> Ledger.Transaction_partially_applied.t Or_error.t )
-  -> apply_second_pass:
-       (   Ledger.t
-        -> Ledger.Transaction_partially_applied.t
-        -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
-  -> apply_first_pass_sparse_ledger:
-       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
-        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-        -> Mina_ledger.Sparse_ledger.t
-        -> Mina_transaction.Transaction.t
-        -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
-           Or_error.t )
-  -> signature_kind:Mina_signature_kind.t
-  -> t
-  -> unit Or_error.t
-
 val get_snarked_ledger_async :
      ?async_batch_size:int
   -> ledger:Ledger.t
@@ -238,6 +206,37 @@ val next_on_new_tree : t -> bool
 (** Whether the block applied over [parent_state_hash] completed a tree with
     its transactions. *)
 val completes_tree : t -> parent_state_hash:State_hash.t -> bool
+
+(** [get_staged_ledger_async], applying each tree of pending transactions that
+    is complete, oldest first, up to the snarked ledger its proof will target,
+    then calling [end_layer ()] for the ledger to apply the rest to. Fails if
+    such a ledger doesn't have the hash that its tree's proof targets. *)
+val get_staged_ledger_in_layers_async :
+     ?async_batch_size:int
+  -> ledger:Ledger.t
+  -> end_layer:(unit -> Ledger.t)
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Ledger.t
+        -> Transaction.t
+        -> Ledger.Transaction_partially_applied.t Or_error.t )
+  -> apply_second_pass:
+       (   Ledger.t
+        -> Ledger.Transaction_partially_applied.t
+        -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
+  -> apply_first_pass_sparse_ledger:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
+        -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
+           Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
+  -> t
+  -> [ `First_pass_ledger_hash of Ledger_hash.t ] Deferred.Or_error.t
 
 (** Per-tree counts of free space and outstanding work, oldest tree first *)
 val tree_metrics : t -> Tree_metrics.t list
