@@ -1660,6 +1660,155 @@ module Make_str (A : Wire_types.Concrete) = struct
                 State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen ) ))
     in
     test ~trials:100 coinbase_lists_gen ~f:add_remove_check
+
+  (* Drive the checked pop and add around the ring, against the unchecked
+     structure: every block fills a scan state tree, so the current stack moves
+     on each time, and once every slot holds a stack each block also pops the
+     oldest. *)
+  module Ring_test = struct
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
+    let depth = constraint_constants.pending_coinbase_depth
+
+    let ring_size =
+      Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+        constraint_constants
+
+    let index_constant i = Mina_numbers.Index.(Checked.constant (of_int i))
+
+    (* Inside the [open] below, [Checked] means something else *)
+    let pop_coinbases = Checked.pop_coinbases ~constraint_constants
+
+    let add_coinbase = Checked.add_coinbase ~constraint_constants
+
+    (* The root after a checked pop and add, or an error if the constraints
+       are not satisfied. *)
+    let checked_root t ~current ~next ~proof_emitted ~action ~coinbase
+        ~supercharged_coinbase ~state_body_hash ~global_slot =
+      let open Snark_params.Tick in
+      let comp =
+        let%bind root_after_pop, _ =
+          pop_coinbases
+            (Hash.var_of_t (merkle_root t))
+            ~current:(index_constant current)
+            ~proof_emitted:(Boolean.var_of_value proof_emitted)
+        in
+        let%map root =
+          add_coinbase root_after_pop
+            { Update.Poly.action = Update.Action.var_of_t action
+            ; coinbase_amount = Amount.var_of_t coinbase.Coinbase.amount
+            }
+            ~coinbase_receiver:
+              (Public_key.Compressed.var_of_t coinbase.receiver)
+            ~supercharge_coinbase:(Boolean.var_of_value supercharged_coinbase)
+            ~current:(index_constant current) ~next:(index_constant next)
+            (State_body_hash.var_of_t state_body_hash)
+            (Mina_numbers.Global_slot_since_genesis.Checked.constant global_slot)
+        in
+        As_prover.read Hash.typ root
+      in
+      Or_error.try_with_join (fun () ->
+          run_and_check (handle (fun () -> comp) (unstage (handler t))) )
+
+    let block_gen =
+      Quickcheck.Generator.tuple3
+        (Coinbase.Gen.gen ~constraint_constants)
+        State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen
+
+    let action_of_coinbase (coinbase : Coinbase.t) =
+      if Amount.equal coinbase.amount Amount.zero then Update.Action.Update_none
+      else Update_one
+
+    (* Apply blocks that each fill a tree, checking the checked root against
+       the unchecked one after every block. *)
+    let walk blocks =
+      List.foldi blocks ~init:(create_exn' ~depth ~ring_size ())
+        ~f:(fun
+             step
+             t
+             ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+             , state_body_hash
+             , global_slot )
+           ->
+          let current = Stack_id.to_int (current_stack_id t) in
+          let next = (current + 1) mod ring_size in
+          let proof_emitted = step >= ring_size - 1 in
+          let unchecked =
+            let t =
+              if proof_emitted then
+                remove_coinbase_stack ~ring_size t |> Or_error.ok_exn |> snd
+              else t
+            in
+            add_coinbase_with_zero_checks ~constraint_constants
+              (module T)
+              t ~coinbase ~state_body_hash ~global_slot ~supercharged_coinbase
+          in
+          let checked =
+            checked_root t ~current ~next ~proof_emitted
+              ~action:(action_of_coinbase coinbase)
+              ~coinbase ~supercharged_coinbase ~state_body_hash ~global_slot
+            |> Or_error.ok_exn
+          in
+          [%test_eq: Hash.t] (merkle_root unchecked) checked ;
+          advance ~ring_size unchecked |> Or_error.ok_exn )
+
+    let%test_unit "checked pops and adds match around the ring" =
+      Quickcheck.test ~trials:3
+        (Quickcheck.Generator.list_with_length ((3 * ring_size) + 1) block_gen)
+        ~f:(fun blocks -> ignore (walk blocks : t))
+
+    (* Check that the circuit rejects a block, which must otherwise be valid:
+       an [Update_none] block has no coinbase. *)
+    let reject ~t ~current ~next ~proof_emitted ~action =
+      let ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+          , state_body_hash
+          , global_slot ) =
+        Quickcheck.random_value ~seed:(`Deterministic "ring") block_gen
+      in
+      let coinbase =
+        match (action : Update.Action.t) with
+        | Update_none ->
+            Coinbase.create ~amount:Amount.zero ~receiver:coinbase.receiver
+              ~fee_transfer:None
+            |> Or_error.ok_exn
+        | Update_one
+        | Update_two_coinbase_in_first
+        | Update_two_coinbase_in_second ->
+            coinbase
+      in
+      assert (
+        Or_error.is_error
+          (checked_root t ~current ~next ~proof_emitted ~action ~coinbase
+             ~supercharged_coinbase ~state_body_hash ~global_slot ) )
+
+    let%test_unit "the current stack cannot skip a slot" =
+      reject
+        ~t:(create_exn' ~depth ~ring_size ())
+        ~current:0 ~next:2 ~proof_emitted:false ~action:Update_none
+
+    let%test_unit "two stacks require the current stack to move" =
+      reject
+        ~t:(create_exn' ~depth ~ring_size ())
+        ~current:0 ~next:0 ~proof_emitted:false
+        ~action:Update_two_coinbase_in_first
+
+    let%test_unit "the current stack cannot move onto a live stack" =
+      (* Fill every slot, then move on without popping the oldest. *)
+      let blocks =
+        Quickcheck.random_value ~seed:(`Deterministic "ring")
+          (Quickcheck.Generator.list_with_length (ring_size - 1) block_gen)
+      in
+      let t = walk blocks in
+      let current = Stack_id.to_int (current_stack_id t) in
+      assert (
+        not
+          (Stack.equal Stack.empty
+             (oldest_stack ~ring_size t |> Or_error.ok_exn) ) ) ;
+      reject ~t ~current
+        ~next:((current + 1) mod ring_size)
+        ~proof_emitted:false ~action:Update_none
+  end
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
