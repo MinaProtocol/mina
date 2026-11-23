@@ -39,6 +39,7 @@ let%test_module "Full_catchup_tree" =
         { nodes = State_hash.Table.create ()
         ; states = Full_catchup_tree.Node.State.Enum.Table.create ()
         ; logger
+        ; release = Full_catchup_tree.release_directly
         }
       in
       let node : Full_catchup_tree.Node.t =

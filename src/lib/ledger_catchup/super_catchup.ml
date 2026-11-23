@@ -1151,6 +1151,11 @@ let create_job_handler ~context:(module Context : CONTEXT) ~trust_system
   Transition_frontier.attach_catchup_tree frontier t ;
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
+  set_release t
+    { release =
+        (fun c _vc ->
+          Transition_handler.Block_registry.finish block_registry c `Ignored )
+    } ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
   let pre_context
       (trees :
