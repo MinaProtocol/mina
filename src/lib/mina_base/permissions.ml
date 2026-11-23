@@ -287,6 +287,15 @@ module Auth_required = struct
       (* If the transaction already failed to verify, we don't need to assert
          that the proof should verify. *)
       (result, `proof_must_verify (didn't_fail_yet &&& not signature_sufficient))
+
+    let signature = constant Signature
+
+    let is_proof ({ constant; signature_necessary; signature_sufficient } : t) =
+      let open Pickles.Impls.Step.Boolean in
+      (not constant) &&& (not signature_necessary) &&& not signature_sufficient
+
+    let accepts_signature ({ signature_sufficient; _ } : t) =
+      signature_sufficient
   end
 
   let typ =
