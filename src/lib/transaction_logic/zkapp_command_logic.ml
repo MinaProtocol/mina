@@ -550,6 +550,12 @@ module type Controller_intf = sig
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
 end
 
+module type Txn_version_intf = sig
+  include Iffable
+
+  val current : t
+end
+
 module type Account_intf = sig
   type t
 
@@ -642,11 +648,18 @@ module type Account_intf = sig
 
   val register_verification_key : t -> unit
 
+  type txn_version
+
   type verification_key
 
   val verification_key : t -> verification_key
 
-  val set_verification_key : verification_key -> t -> t
+  (** The transaction version held with the verification key; zero when there
+      is no verification key.
+  *)
+  val verification_key_txn_version : t -> txn_version
+
+  val set_verification_key : verification_key -> txn_version -> t -> t
 
   type verification_key_hash
 
@@ -770,6 +783,8 @@ module type Inputs_intf = sig
 
   module Controller : Controller_intf with type bool := Bool.t
 
+  module Txn_version : Txn_version_intf with type bool := Bool.t
+
   module Global_slot_since_genesis :
     Global_slot_since_genesis_intf with type bool := Bool.t
 
@@ -821,7 +836,8 @@ module type Inputs_intf = sig
        and type nonce := Nonce.t
        and type state_hash := State_hash.t
        and type token_id := Token_id.t
-       and type account_id := Account_id.t)
+       and type account_id := Account_id.t
+       and type txn_version = Txn_version.t)
 
   and Actions :
     (Actions_intf with type bool := Bool.t and type field := Field.t)
@@ -1605,11 +1621,17 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_verification_key
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
+      let txn_version =
+        Txn_version.if_
+          (Set_or_keep.is_set verification_key)
+          ~then_:Txn_version.current
+          ~else_:(Account.verification_key_txn_version a)
+      in
       let verification_key =
         Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
           (Account.verification_key a)
       in
-      let a = Account.set_verification_key verification_key a in
+      let a = Account.set_verification_key verification_key txn_version a in
       (a, local_state)
     in
     (* Update action state. *)

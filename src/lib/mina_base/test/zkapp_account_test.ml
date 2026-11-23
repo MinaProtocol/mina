@@ -73,8 +73,37 @@ let checked_pop_reverses_push (module E : Events_list_intf) () =
       | Error err ->
           failwithf "Error from run_and_check: %s" (Error.to_string_hum err) () )
 
+let gen_with_verification_key =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind t = Zkapp_account.gen in
+  let%bind has_vk = Bool.quickcheck_generator in
+  if has_vk then
+    let%map hash = Field.gen and txn_version = Mina_numbers.Txn_version.gen in
+    { t with
+      verification_key =
+        Some
+          (with_version ~txn_version
+             { With_hash.data = Side_loaded_verification_key.dummy; hash } )
+    }
+  else return t
+
+let digest_covers_verification_key_version () =
+  let vk =
+    { With_hash.data = Side_loaded_verification_key.dummy
+    ; hash = dummy_vk_hash ()
+    }
+  in
+  let digest_at txn_version =
+    digest
+      { default with verification_key = Some (with_version ~txn_version vk) }
+  in
+  [%test_pred: Field.t * Field.t]
+    (fun (a, b) -> not (Field.equal a b))
+    ( digest_at Mina_numbers.Txn_version.mesa
+    , digest_at Mina_numbers.Txn_version.(succ mesa) )
+
 let checked_digest_matches_unchecked () =
-  Quickcheck.test Zkapp_account.gen ~trials:10 ~f:(fun t ->
+  Quickcheck.test gen_with_verification_key ~trials:10 ~f:(fun t ->
       let f () () =
         let var = Run.exists typ ~compute:(fun () -> t) in
         let digest_var = Checked.digest var in
@@ -94,7 +123,7 @@ let upgrade_drops_only_the_zkapp_version () =
   Quickcheck.test generator ~trials:50 ~f:(fun (t, zkapp_version) ->
       let v3 : Stable.V3.t =
         { app_state = t.app_state
-        ; verification_key = t.verification_key
+        ; verification_key = Zkapp_account.verification_key_wire t
         ; zkapp_version
         ; action_state = t.action_state
         ; last_action_slot = t.last_action_slot
@@ -103,3 +132,30 @@ let upgrade_drops_only_the_zkapp_version () =
         }
       in
       [%test_eq: Zkapp_account.t] t (Stable.V3.to_latest v3) )
+
+let v3_of_latest (t : Zkapp_account.t) : Stable.V3.t =
+  { app_state = t.app_state
+  ; verification_key = verification_key_wire t
+  ; zkapp_version = Mina_numbers.Zkapp_version.zero
+  ; action_state = t.action_state
+  ; last_action_slot = t.last_action_slot
+  ; proved_state = t.proved_state
+  ; zkapp_uri = t.zkapp_uri
+  }
+
+let upgrade_gives_key_the_mesa_version () =
+  Quickcheck.test gen_with_verification_key ~trials:50 ~f:(fun t ->
+      let upgraded = Stable.V3.to_latest (v3_of_latest t) in
+      [%test_eq: Verification_key_wire.t option] (verification_key_wire t)
+        (verification_key_wire upgraded) ;
+      [%test_eq: Mina_numbers.Txn_version.t option]
+        (Option.map (verification_key_wire t) ~f:(fun _ ->
+             Mina_numbers.Txn_version.mesa ) )
+        (verification_key_txn_version upgraded) )
+
+let upgraded_account_keeps_other_fields () =
+  Quickcheck.test gen_with_verification_key ~trials:50 ~f:(fun t ->
+      let upgraded = Stable.V3.to_latest (v3_of_latest t) in
+      [%test_eq: Zkapp_account.t]
+        { t with verification_key = upgraded.verification_key }
+        upgraded )

@@ -756,6 +756,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            ; last_action_slot
            ; proved_state
            ; zkapp_uri_id
+           ; verification_key_txn_version
            }
          ->
         let%bind elements =
@@ -794,7 +795,15 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                 in
                 Zkapp_basic.F.of_string hash_str
               in
-              Some ({ data; hash } : _ With_hash.t) )
+              let txn_version =
+                Option.value_map verification_key_txn_version
+                  ~default:Mina_numbers.Txn_version.mesa ~f:(fun txn_version ->
+                    Unsigned.UInt32.of_int64 txn_version
+                    |> Mina_numbers.Txn_version.of_uint32 )
+              in
+              Some
+                (Zkapp_account.with_version ~txn_version
+                   ({ data; hash } : _ With_hash.t) ) )
         in
         let%bind elements =
           query_db ~f:(fun db ->

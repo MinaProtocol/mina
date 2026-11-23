@@ -243,7 +243,10 @@ module Values (S : Sample) = struct
           { app_state =
               Pickles_types.Vector.init Mina_base.Zkapp_state.Max_state_size.n
                 ~f:(fun _ -> field ())
-          ; verification_key = Some (verification_key ())
+          ; verification_key =
+              Some
+                (Mina_base.Zkapp_account.with_current_version
+                   (verification_key ()) )
           ; zkapp_uri = zkapp_uri ()
           ; action_state =
               Pickles_types.Vector.init Pickles_types.Nat.N5.n ~f:(fun _ ->

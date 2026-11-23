@@ -112,6 +112,7 @@ module Accounts = struct
         | Some
             { app_state
             ; verification_key
+            ; verification_key_txn_version
             ; action_state
             ; last_action_slot
             ; proved_state
@@ -138,8 +139,12 @@ module Accounts = struct
             in
 
             let verification_key =
-              Option.map verification_key
-                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
+              Option.map verification_key ~f:(fun vk ->
+                  Zkapp_account.with_version
+                    ~txn_version:
+                      (Option.value verification_key_txn_version
+                         ~default:Mina_numbers.Txn_version.mesa )
+                    (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk) )
             in
             let%map action_state =
               if
@@ -261,17 +266,19 @@ module Accounts = struct
       let zkapp =
         Option.map account.zkapp
           ~f:(fun
-               { app_state
-               ; verification_key
-               ; action_state
-               ; last_action_slot
-               ; proved_state
-               ; zkapp_uri
-               }
+               ( { app_state
+                 ; verification_key = _
+                 ; action_state
+                 ; last_action_slot
+                 ; proved_state
+                 ; zkapp_uri
+                 } as zkapp )
              ->
             let app_state = Zkapp_state.V.to_list app_state in
             let verification_key =
-              Option.map verification_key ~f:With_hash.data
+              Option.map
+                (Zkapp_account.verification_key_wire zkapp)
+                ~f:With_hash.data
             in
             let action_state = Pickles_types.Vector.to_list action_state in
             let last_action_slot =
@@ -279,6 +286,8 @@ module Accounts = struct
             in
             { Runtime_config.Accounts.Single.Zkapp_account.app_state
             ; verification_key
+            ; verification_key_txn_version =
+                Zkapp_account.verification_key_txn_version zkapp
             ; action_state
             ; last_action_slot
             ; proved_state
@@ -750,6 +759,7 @@ let%test_module "Runtime config" =
             zkapp
       in
       assert (
-        Option.equal Verification_key_wire.equal zkapp_account.verification_key
-          default.verification_key )
+        Option.equal Verification_key_wire.equal
+          (Zkapp_account.verification_key_wire zkapp_account)
+          (Zkapp_account.verification_key_wire default) )
   end )

@@ -95,10 +95,11 @@ let%test_module "Archive node unit tests" =
       let zkappify_account (account : Account.t) : Account.t =
         let verification_key =
           Some
-            With_hash.
-              { data = Side_loaded_verification_key.dummy
-              ; hash = Zkapp_account.dummy_vk_hash ()
-              }
+            (Zkapp_account.with_current_version
+               With_hash.
+                 { data = Side_loaded_verification_key.dummy
+                 ; hash = Zkapp_account.dummy_vk_hash ()
+                 } )
         in
         let zkapp = Some { Zkapp_account.default with verification_key } in
         { account with zkapp }
@@ -467,6 +468,46 @@ let%test_module "Archive node unit tests" =
         let%map row = Processor.Zkapp_account.load conn id in
         [%test_eq: int] id repeated_id ;
         [%test_eq: int64] 0L row.zkapp_version
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
+    let%test_unit "Zkapp_account: read and write a key's transaction version" =
+      let conn = Lazy.force conn_lazy in
+      let vk =
+        With_hash.
+          { data = Side_loaded_verification_key.dummy
+          ; hash = Zkapp_account.dummy_vk_hash ()
+          }
+      in
+      let txn_version = Mina_numbers.Txn_version.(succ mesa) in
+      let round_trip verification_key ~expect =
+        let open Deferred.Result.Let_syntax in
+        let%bind id =
+          Processor.Zkapp_account.add_if_doesn't_exist conn
+            { Zkapp_account.default with verification_key }
+        in
+        let%bind repeated_id =
+          Processor.Zkapp_account.add_if_doesn't_exist conn
+            { Zkapp_account.default with verification_key }
+        in
+        let%map row = Processor.Zkapp_account.load conn id in
+        [%test_eq: int] id repeated_id ;
+        [%test_eq: int64 option] expect row.verification_key_txn_version
+      in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind () = round_trip None ~expect:None in
+        round_trip
+          (Some (Zkapp_account.with_version ~txn_version vk))
+          ~expect:
+            (Some
+               ( Mina_numbers.Txn_version.to_uint32 txn_version
+               |> Unsigned.UInt32.to_int64 ) )
       with
       | Ok () ->
           ()
