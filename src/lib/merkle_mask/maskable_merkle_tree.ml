@@ -100,26 +100,16 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Graphviz = Visualization.Make_ocamlgraph (Node)
 
-  let to_graph () =
-    let masks = List.concat @@ Uuid.Table.data registered_masks in
-    let uuid_to_masks_table =
-      Uuid.Table.of_alist_exn
-        (List.map masks ~f:(fun mask -> (Mask.Attached.get_uuid mask, mask)))
-    in
+  let to_graph masks_and_children =
     let open Graphviz in
-    Uuid.Table.fold uuid_to_masks_table ~init:empty
-      ~f:(fun ~key:uuid ~data:mask graph ->
-        let graph_with_mask = add_vertex graph mask in
-        Uuid.Table.find registered_masks uuid
-        |> Option.value_map ~default:graph_with_mask ~f:(fun children_masks ->
-               List.fold ~init:graph_with_mask children_masks
-                 ~f:(fun graph_with_mask_and_child ->
-                   add_edge graph_with_mask_and_child mask ) ) )
+    List.fold masks_and_children ~init:empty ~f:(fun graph (mask, children) ->
+        List.fold children ~init:(add_vertex graph mask) ~f:(fun graph child ->
+            add_edge graph mask child ) )
 
   module Debug = struct
-    let visualize ~filename =
+    let visualize ~filename masks_and_children =
       Out_channel.with_file filename ~f:(fun output_channel ->
-          let graph = to_graph () in
+          let graph = to_graph masks_and_children in
           Graphviz.output_graph output_channel graph )
   end
 

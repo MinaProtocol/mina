@@ -309,6 +309,13 @@ let visualize ~filename (t : t) =
       let graph = Visualizor.to_graph t in
       Visualizor.output_graph output_channel graph )
 
+let visualize_masks ~filename t =
+  Ledger.Debug.visualize ~filename
+    (List.map (Hashtbl.data t.table) ~f:(fun (node : Node.t) ->
+         ( Breadcrumb.mask node.breadcrumb
+         , List.filter_map node.successor_hashes ~f:(fun hash ->
+               Option.map (find t hash) ~f:Breadcrumb.mask ) ) ) )
+
 let visualize_to_string t =
   let graph = Visualizor.to_graph t in
   let buf = Buffer.create 0 in
