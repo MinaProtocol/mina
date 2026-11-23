@@ -101,6 +101,78 @@ let suite () =
                     (Option.bind account.zkapp
                        ~f:Zkapp_account.verification_key_txn_version ) ) ) )
 
+    let mk_update_perm_check ~current_auth ~account_perm ~vk_txn_version
+        ?failure_expected () =
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, zkapp_kp) ->
+          let open Mina_transaction_logic.For_tests in
+          let spec = List.hd_exn specs in
+          let zkapp_pk = Public_key.compress zkapp_kp.public_key in
+          U.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let open Async.Deferred.Let_syntax in
+                  Init_ledger.init
+                    (module U.Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let%bind vk' = vk in
+                  Transaction_snark.For_tests.create_trivial_zkapp_account
+                    ~permissions:
+                      { Permissions.Account.user_default with
+                        set_verification_key = account_perm
+                      }
+                    ~vk_txn_version ~vk:vk' ~ledger zkapp_pk ;
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee = Fee.of_nanomina_int_exn 1_000_000
+                    ; fee_payer = None
+                    ; receivers = []
+                    ; amount = Amount.of_mina_int_exn 10
+                    ; zkapp_account_keypairs = [ zkapp_kp ]
+                    ; memo
+                    ; new_zkapp_account = false
+                    ; snapp_update
+                    ; current_auth
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; actions = []
+                    ; preconditions = None
+                    }
+                  in
+                  let%bind zkapp_command =
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
+                      ~constraint_constants:U.constraint_constants test_spec
+                  in
+                  U.check_zkapp_command_with_merges_exn
+                    ?expected_failure:failure_expected ledger [ zkapp_command ] ) ) )
+
+    let () =
+      test "Signature replaces an outdated key whose permission is Proof"
+      @@ mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
+           ~vk_txn_version:older_version
+
+    let () =
+      test "Signature replaces an outdated key whose permission is Impossible"
+      @@ mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
+           ~vk_txn_version:older_version
+
+    let () =
+      test "Signature can't replace a current key whose permission is Proof"
+      @@ mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
+           ~vk_txn_version:Mina_numbers.Txn_version.current
+           ~failure_expected:Test_input.failure_expected
+
+    let () =
+      test "Proof can't replace an outdated key whose permission is Proof"
+      @@ mk_update_perm_check ~current_auth:Proof ~account_perm:Proof
+           ~vk_txn_version:older_version
+           ~failure_expected:Test_input.failure_expected
+
+    let () =
+      test "Proof replaces an outdated key whose permission is Either"
+      @@ mk_update_perm_check ~current_auth:Proof ~account_perm:Either
+           ~vk_txn_version:older_version
+
     let () =
       test "setting the key records the current transaction version"
       @@ check_vk_txn_version_after ~update:snapp_update
