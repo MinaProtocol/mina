@@ -4036,9 +4036,18 @@ let%test_module "staged ledger tests" =
     let check_pending_coinbase ~supercharge_coinbase proof ~sl_before ~sl_after
         (_state_hash, state_body_hash) global_slot pc_update =
       let pending_coinbase_before = Sl.pending_coinbase_collection sl_before in
+      let pending_coinbase_after = Sl.pending_coinbase_collection sl_after in
       let root_before = Pending_coinbase.merkle_root pending_coinbase_before in
       let unchecked_root_after =
-        Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
+        Pending_coinbase.merkle_root pending_coinbase_after
+      in
+      let current =
+        Mina_numbers.Index.Checked.constant
+          (Pending_coinbase.current_index pending_coinbase_before)
+      in
+      let next =
+        Mina_numbers.Index.Checked.constant
+          (Pending_coinbase.current_index pending_coinbase_after)
       in
       let f_pop_and_add () =
         let open Snark_params.Tick in
@@ -4047,7 +4056,7 @@ let%test_module "staged ledger tests" =
           if Option.is_some proof then Boolean.true_ else Boolean.false_
         in
         let%bind root_after_popping, _deleted_stack =
-          Pending_coinbase.Checked.pop_coinbases ~constraint_constants
+          Pending_coinbase.Checked.pop_coinbases ~constraint_constants ~current
             ~proof_emitted
             (Hash.var_of_t root_before)
         in
@@ -4062,20 +4071,15 @@ let%test_module "staged ledger tests" =
         in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
           root_after_popping pc_update_var ~coinbase_receiver
-          ~supercharge_coinbase state_body_hash_var global_slot_var
+          ~supercharge_coinbase ~current ~next state_body_hash_var
+          global_slot_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
         let open Pending_coinbase in
         let comp =
           let%map result =
-            handle f_pop_and_add
-              (unstage
-                 (handler
-                    ~ring_size:
-                      (Genesis_constants.Constraint_constants
-                       .pending_coinbase_ring_size constraint_constants )
-                    pending_coinbase_before ) )
+            handle f_pop_and_add (unstage (handler pending_coinbase_before))
           in
           As_prover.read Hash.typ result
         in

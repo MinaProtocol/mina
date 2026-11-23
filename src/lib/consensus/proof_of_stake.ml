@@ -810,12 +810,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             unstage (Mina_ledger.Sparse_ledger.handler dummy_sparse_ledger)
           in
           let pending_coinbase_handler =
-            unstage
-              (Mina_base.Pending_coinbase.handler
-                 ~ring_size:
-                   (Genesis_constants.Constraint_constants
-                    .pending_coinbase_ring_size constraint_constants )
-                 empty_pending_coinbase )
+            unstage (Mina_base.Pending_coinbase.handler empty_pending_coinbase)
           in
           let handlers =
             Snarky_backendless.Request.Handler.(
@@ -2373,7 +2368,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; ledger
           ; producer_private_key
           ; producer_public_key
-          } ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          } ~constraint_constants:(_ : Genesis_constants.Constraint_constants.t)
           ~pending_coinbase:
             { Mina_base.Pending_coinbase_witness.pending_coinbases } :
           Snark_params.Tick.Handler.t =
@@ -2381,12 +2376,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           unstage (Mina_ledger.Sparse_ledger.handler ledger)
         in
         let pending_coinbase_handler =
-          unstage
-            (Mina_base.Pending_coinbase.handler
-               ~ring_size:
-                 (Genesis_constants.Constraint_constants
-                  .pending_coinbase_ring_size constraint_constants )
-               pending_coinbases )
+          unstage (Mina_base.Pending_coinbase.handler pending_coinbases)
         in
         let handlers =
           Snarky_backendless.Request.Handler.(

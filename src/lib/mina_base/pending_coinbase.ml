@@ -845,11 +845,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
         | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
         | Set_oldest_coinbase_stack : Address.value * Stack.t -> unit Request.t
-        | Find_index_of_newest_stacks :
-            Update.Action.t
-            -> (Address.value * Address.value) Request.t
-        | Find_index_of_oldest_stack : Address.value Request.t
-        | Get_previous_stack : State_stack.t Request.t
 
       let reraise_merkle_requests (With { request; respond }) =
         match request with
@@ -867,30 +862,70 @@ module Make_str (A : Wire_types.Concrete) = struct
           (fun () -> Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
           reraise_merkle_requests
 
+      (* The ring slot after [index], wrapping at the ring size *)
+      let next_index
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          (index : Mina_numbers.Index.Checked.t) =
+        let open Mina_numbers.Index in
+        let ring_size =
+          Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+            constraint_constants
+        in
+        let%bind is_last =
+          Checked.equal index (Checked.constant (of_int (ring_size - 1)))
+        in
+        let%bind succ = Checked.succ index in
+        Checked.if_ is_last ~then_:Checked.zero ~else_:succ
+
+      (* [create] lays out the stack for each ring slot with the slot's low bit
+         at the top of the tree, so its leaf address is the slot's bits
+         reversed. *)
+      let address_of_index ~depth (index : Mina_numbers.Index.Checked.t) =
+        let%map bits =
+          Field.Checked.unpack
+            (Mina_numbers.Index.Checked.to_field index)
+            ~length:depth
+        in
+        List.rev bits
+
+      (* [current] is the ring slot of the current stack before this block, and
+         [next] its slot after the block: either [current], or the slot after
+         it when the block fills the current scan state tree. Which of the two
+         is the prover's choice, but a wrong choice leaves stacks that no
+         ledger proof can match. *)
       let%snarkydef_ add_coinbase
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
           ({ action; coinbase_amount = amount } : Update.var) ~coinbase_receiver
-          ~supercharge_coinbase state_body_hash global_slot =
+          ~supercharge_coinbase ~current ~next state_body_hash global_slot =
         let depth = constraint_constants.pending_coinbase_depth in
-        let%bind addr1, addr2 =
-          request_witness
-            Typ.(Address.typ ~depth * Address.typ ~depth)
-            As_prover.(
-              map (read Update.Action.typ action) ~f:(fun act ->
-                  Find_index_of_newest_stacks act ))
+        let%bind after_current = next_index ~constraint_constants current in
+        let%bind addr1 = address_of_index ~depth current in
+        let%bind addr2 = address_of_index ~depth after_current in
+        let%bind advance =
+          Mina_numbers.Index.Checked.equal next after_current
+        in
+        let%bind () =
+          let%bind stays = Mina_numbers.Index.Checked.equal next current in
+          Boolean.Assert.any [ stays; advance ]
+        in
+        let%bind () =
+          (*Transactions only spill into a second stack when they fill the
+            current scan state tree*)
+          let%bind two_stacks =
+            let%bind coinbase_in_first =
+              Update.Action.Checked.update_two_stacks_coinbase_in_first action
+            and coinbase_in_second =
+              Update.Action.Checked.update_two_stacks_coinbase_in_second action
+            in
+            Boolean.(coinbase_in_first ||| coinbase_in_second)
+          in
+          Boolean.Assert.any [ Boolean.not two_stacks; advance ]
         in
         let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
         let%bind no_update = Update.Action.Checked.no_update action in
         let update_state_stack (stack : Stack.var) =
-          (*get previous stack to carry-forward the stack of state body hashes*)
-          let%bind previous_state_stack =
-            request_witness State_stack.typ
-              As_prover.(map (return ()) ~f:(fun () -> Get_previous_stack))
-          in
-          let stack_initialized = { stack with state = previous_state_stack } in
           let%bind stack_with_state_hash =
-            Stack.Checked.push_state state_body_hash global_slot
-              stack_initialized
+            Stack.Checked.push_state state_body_hash global_slot stack
           in
           (*Always update the state body hash unless there are no transactions in this block*)
           Stack.Checked.if_ no_update ~then_:stack ~else_:stack_with_state_hash
@@ -950,6 +985,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           allocated and so starts empty, gets the new state pushed, and may or
           may not have a coinbase*)
         let update_stack2 (stack0 : Stack.var) =
+          (*A newly allocated stack must not overwrite a live one*)
+          let%bind () =
+            let%bind is_empty = Stack.equal_var stack0 Stack.Checked.empty in
+            Boolean.Assert.any [ Boolean.not advance; is_empty ]
+          in
           let%bind add_coinbase =
             Update.Action.Checked.update_two_stacks_coinbase_in_second action
           in
@@ -991,11 +1031,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let%snarkydef_ pop_coinbases
           ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
-          ~proof_emitted =
+          ~current ~proof_emitted =
         let depth = constraint_constants.pending_coinbase_depth in
+        (*Every ring slot holds a stack whenever a proof is emitted, so the
+          oldest is the one after the current stack*)
         let%bind addr =
-          request_witness (Address.typ ~depth)
-            As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
+          next_index ~constraint_constants current >>= address_of_index ~depth
         in
         let%bind prev, prev_path =
           request_witness
@@ -1176,7 +1217,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let h = Digestif.SHA256.feed_string h (Stack_id.to_string current) in
       Digestif.SHA256.(get h |> to_raw_string)
 
-    let handler ~ring_size (t : t) =
+    let handler (t : t) =
       let pending_coinbase = ref t in
       let coinbase_stack_path_exn idx =
         List.map
@@ -1190,25 +1231,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (coinbase_stack_path_exn idx :> Random_oracle.Digest.t list)
               in
               respond (Provide path)
-          | Checked.Find_index_of_oldest_stack ->
-              let stack_id = oldest_stack_id ~ring_size !pending_coinbase in
-              let index =
-                find_index !pending_coinbase stack_id |> Or_error.ok_exn
-              in
-              respond (Provide index)
-          | Checked.Find_index_of_newest_stacks _action ->
-              let index1 =
-                find_index !pending_coinbase
-                  (current_stack_id !pending_coinbase)
-                |> Or_error.ok_exn
-              in
-              let index2 =
-                find_index !pending_coinbase
-                  (next_stack_id ~ring_size
-                     (current_stack_id !pending_coinbase) )
-                |> Or_error.ok_exn
-              in
-              respond @@ Provide (index1, index2)
           | Checked.Get_coinbase_stack idx ->
               let elt = get_stack !pending_coinbase idx |> Or_error.ok_exn in
               let path =
@@ -1223,9 +1245,6 @@ module Make_str (A : Wire_types.Concrete) = struct
               pending_coinbase :=
                 set_stack !pending_coinbase idx stack |> Or_error.ok_exn ;
               respond (Provide ())
-          | Checked.Get_previous_stack ->
-              let stack = current_stack !pending_coinbase |> Or_error.ok_exn in
-              respond (Provide stack.state)
           | _ ->
               unhandled )
   end
@@ -1381,6 +1400,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         assert (Stack.equal unchecked checked) )
 
+  let index_var t = Mina_numbers.Index.Checked.constant (current_index t)
+
   let%test_unit "Checked_tree = Unchecked_tree" =
     let open Quickcheck in
     let constraint_constants =
@@ -1441,8 +1462,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                     ~coinbase_receiver:coinbase_receiver_var
                     ~supercharge_coinbase:supercharge_coinbase_var
+                    ~current:(index_var pending_coinbases)
+                    ~next:(index_var pending_coinbases)
                     state_body_hash_var global_slot_var )
-                (unstage (handler ~ring_size pending_coinbases))
+                (unstage (handler pending_coinbases))
             in
             As_prover.read Hash.typ result
           in
@@ -1452,10 +1475,20 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let%test_unit "Checked_tree = Unchecked_tree after pop" =
     let open Quickcheck in
+    (* With two ring slots, the stack just filled is the oldest once the next
+       one is allocated. *)
     let constraint_constants =
-      Genesis_constants.For_unit_tests.Constraint_constants.t
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
+        transaction_capacity_log_2 = 0
+      ; work_delay = 0
+      }
     in
     let depth = constraint_constants.pending_coinbase_depth in
+    let ring_size =
+      Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+        constraint_constants
+    in
+    assert (ring_size = 2) ;
     test ~trials:20
       (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
@@ -1463,10 +1496,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
               , state_body_hash
               , global_slot ) ->
-        (* With two slots, the stack just filled is the oldest once the next
-           one is allocated. *)
         let pending_coinbases =
-          create ~depth ~ring_size:2 () |> Or_error.ok_exn
+          create ~depth ~ring_size () |> Or_error.ok_exn
         in
         let amount = coinbase.amount in
         let action =
@@ -1511,8 +1542,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                     ~coinbase_receiver:coinbase_receiver_var
                     ~supercharge_coinbase:supercharge_coinbase_var
+                    ~current:(index_var pending_coinbases)
+                    ~next:(index_var pending_coinbases)
                     state_body_hash_var global_slot_var )
-                (unstage (handler ~ring_size:2 pending_coinbases))
+                (unstage (handler pending_coinbases))
             in
             As_prover.read Hash.typ result
           in
@@ -1521,11 +1554,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
         (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
         let proof_emitted = not Update.Action.(equal action Update_none) in
-        let unchecked = advance ~ring_size:2 unchecked |> Or_error.ok_exn in
+        let unchecked = advance ~ring_size unchecked |> Or_error.ok_exn in
         let unchecked_after_pop =
           if proof_emitted then
-            remove_coinbase_stack ~ring_size:2 unchecked
-            |> Or_error.ok_exn |> snd
+            remove_coinbase_stack ~ring_size unchecked |> Or_error.ok_exn |> snd
           else unchecked
         in
         let checked_merkle_root_after_pop =
@@ -1534,9 +1566,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%map current, _previous =
               handle
                 (fun () ->
-                  f_pop_coinbase ~proof_emitted:Boolean.true_
+                  f_pop_coinbase ~current:(index_var unchecked)
+                    ~proof_emitted:Boolean.true_
                     (Hash.var_of_t checked_merkle_root) )
-                (unstage (handler ~ring_size:2 unchecked))
+                (unstage (handler unchecked))
             in
             As_prover.read Hash.typ current
           in

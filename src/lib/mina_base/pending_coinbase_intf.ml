@@ -269,7 +269,7 @@ module type S = sig
   (** Root of the merkle tree that has stacks as leaves *)
   val merkle_root : t -> Hash.t
 
-  val handler : ring_size:int -> t -> (request -> response) Staged.t
+  val handler : t -> (request -> response) Staged.t
 
   (** Replace the current stack, the one for the newest scan state tree *)
   val update_current_stack : t -> Stack.t -> t Or_error.t
@@ -315,20 +315,17 @@ module type S = sig
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
       | Set_oldest_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stacks :
-          Update.Action.t
-          -> (Address.value * Address.value) Request.t
-      | Find_index_of_oldest_stack : Address.value Request.t
-      | Get_previous_stack : State_stack.t Request.t
 
     val get : depth:int -> var -> Address.var -> Stack.var Tick.Checked.t
 
     (**
-       [update_stack t ~is_new_stack updated_stack] implements the following
-       spec:
-       - gets the address[addr] of the latest stack or a new stack
-       - finds a coinbase stack in [t] at path [addr] and pushes the
-         coinbase_data on to the stack
+       [add_coinbase t update ~current ~next] implements the following spec:
+       - [current] is the ring slot of the current stack before the block, and
+         [next] its slot after the block: [current] or the slot after it
+       - pushes the block's state, and its coinbase if any, on to the stack at
+         [current]
+       - if [next] is the slot after [current], checks that the stack there is
+         empty, and pushes on to it what [update] puts in a second stack
        - returns a root [t'] of the tree
     *)
     val add_coinbase :
@@ -337,6 +334,8 @@ module type S = sig
       -> Update.var
       -> coinbase_receiver:Public_key.Compressed.var
       -> supercharge_coinbase:Boolean.var
+      -> current:Mina_numbers.Index.Checked.t
+      -> next:Mina_numbers.Index.Checked.t
       -> State_body_hash.var
       -> Mina_numbers.Global_slot_since_genesis.Checked.t
       -> var Tick.Checked.t
@@ -344,7 +343,8 @@ module type S = sig
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:
 
-       - gets the address[addr] of the oldest stack.
+       - the address[addr] of the oldest stack is the ring slot after
+         [current], the slot of the current stack
        - finds a coinbase stack in [t] at path [addr] and replaces it with empty
          stack if a [proof_emitted] is true
        - returns a root [t'] of the tree
@@ -352,6 +352,7 @@ module type S = sig
     val pop_coinbases :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
+      -> current:Mina_numbers.Index.Checked.t
       -> proof_emitted:Boolean.var
       -> (var * Stack.var) Tick.Checked.t
   end
