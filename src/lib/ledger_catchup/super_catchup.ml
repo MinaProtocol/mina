@@ -903,15 +903,31 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     | To_initial_validate external_block ->
         let start_time = Time.now () in
         step node
-          ( initial_validate
-              ~context:(module Context)
-              ~trust_system ~batcher:initial_validation_batcher ~frontier
-              ~block_registry
-              { external_block with
-                data =
-                  { With_hash.data = external_block.data; hash = state_hash }
-              }
-          |> Deferred.map ~f:(fun x -> Ok x) )
+          ( Monitor.try_with ~here:[%here] ~extract_exn:true ~rest:`Log
+              (fun () ->
+                initial_validate
+                  ~context:(module Context)
+                  ~trust_system ~batcher:initial_validation_batcher ~frontier
+                  ~block_registry
+                  { external_block with
+                    data =
+                      { With_hash.data = external_block.data
+                      ; hash = state_hash
+                      }
+                  } )
+          |> Deferred.map ~f:(function
+               | Ok x ->
+                   Ok x
+               | Error exn ->
+                   let error = Error.tag ~tag:"exn" (Error.of_exn exn) in
+                   [%log' error t.logger]
+                     "Exception while initially validating catchup block \
+                      $state_hash"
+                     ~metadata:
+                       [ ("state_hash", State_hash.to_yojson state_hash)
+                       ; ("error", Error_json.error_to_yojson error)
+                       ] ;
+                   Ok (Error (`Error error)) ) )
           ~f:
             (on_initial_validated node ~start_time ~sender:external_block.sender)
     | To_verify tv ->
