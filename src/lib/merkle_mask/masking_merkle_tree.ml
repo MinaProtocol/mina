@@ -18,10 +18,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     type t = (Base.t, string (* Location where null was set *)) Result.t
   end
 
-  module Detached_parent_signal = struct
-    type t = unit Async.Ivar.t
-  end
-
   type maps_t = Inputs.Mask_maps.t
 
   (** Merges second maps object into the first one,
@@ -60,7 +56,6 @@ module Make (Inputs : Inputs_intf.S) = struct
   type t =
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
-    ; detached_parent_signal : Detached_parent_signal.t
     ; mutable current_location : Location.t option
     ; depth : int
     ; mutable maps : maps_t
@@ -87,7 +82,6 @@ module Make (Inputs : Inputs_intf.S) = struct
   let create ~depth () =
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
-    ; detached_parent_signal = Async.Ivar.create ()
     ; current_location = None
     ; depth
     ; accumulated = None
@@ -143,8 +137,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let detach ~loc t =
       t.parent <- Error loc ;
-      t.accumulated <- None ;
-      Async.Ivar.fill_if_empty t.detached_parent_signal ()
+      t.accumulated <- None
 
     let discard ~loc attached =
       match attached.desc with
@@ -622,7 +615,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           Ledger
             { uuid = Uuid_unix.create ()
             ; parent = Ok parent
-            ; detached_parent_signal = Async.Ivar.create ()
             ; current_location = t.current_location
             ; depth = t.depth
             ; maps = t.maps
@@ -846,8 +838,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        as sometimes this is desired behavior *)
     let close t =
       let t = repr t in
-      t.maps <- empty_maps ;
-      Async.Ivar.fill_if_empty t.detached_parent_signal ()
+      t.maps <- empty_maps
 
     let index_of_account_exn t key =
       assert_is_attached t ;
@@ -1003,7 +994,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let set_parent ?accumulated:accumulated_opt t parent =
     assert (Result.is_error t.parent) ;
-    assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
     Base.handle_mutations parent ;
     t.level <- Base.level parent + 1 ;
