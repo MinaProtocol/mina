@@ -531,6 +531,71 @@ EOF
   assert_contains "$output" "Skipping includeIf" "Should show skip messages for non-ancestor items"
 }
 
+# Write the network files that codebase_targets_unreleased_network reads.
+write_network_files() {
+  echo "$1" > "$TEST_DIR/MINA_CODEBASE_NETWORK"
+  echo "$2" > "$TEST_DIR/MINA_MAINNET_NETWORK"
+}
+
+# Test: codebase_targets_unreleased_network
+test_codebase_targets_unreleased_network() {
+  echo -e "\n${YELLOW}Testing: codebase_targets_unreleased_network${NC}"
+
+  local result
+  write_network_files starlight mesa
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" codebase_targets_unreleased_network 2>/dev/null)
+  assert_equals "true" "$result" "Targets an unreleased network when the networks differ"
+
+  write_network_files mesa mesa
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" codebase_targets_unreleased_network 2>/dev/null)
+  assert_equals "false" "$result" "Targets mainnet when the networks are the same"
+
+  rm "$TEST_DIR/MINA_CODEBASE_NETWORK"
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" codebase_targets_unreleased_network 2>/dev/null)
+  assert_equals "false" "$result" "Targets mainnet when a network file is missing"
+  rm -f "$TEST_DIR/MINA_MAINNET_NETWORK"
+}
+
+# Test: includeIf and excludeIf on the network the codebase targets
+test_check_network_conditions() {
+  echo -e "\n${YELLOW}Testing: includeIf/excludeIf on the targeted network${NC}"
+
+  local flag
+  for flag in true false; do
+    cat > "$TEST_DIR/Network_${flag}.yml" << EOF
+spec:
+  name: Network_${flag}
+  tags: [Lint]
+  scope: [PullRequest]
+  includeIf:
+    - codebaseTargetsUnreleasedNetwork: ${flag}
+      reason: "Test network condition"
+  excludeIf:
+    - codebaseTargetsUnreleasedNetwork: ${flag}
+      reason: "Test network condition"
+EOF
+  done
+
+  local result
+  write_network_files starlight mesa
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" check_include_if "$TEST_DIR/Network_true.yml" "Network_true" "$TEST_NONMATCH_ANCESTOR" 2>/dev/null)
+  assert_equals "1" "$result" "includeIf true holds on an unreleased network"
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" check_include_if "$TEST_DIR/Network_false.yml" "Network_false" "$TEST_NONMATCH_ANCESTOR" 2>/dev/null)
+  assert_equals "0" "$result" "includeIf false fails on an unreleased network"
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" check_exclude_if "$TEST_DIR/Network_true.yml" "Network_true" "$TEST_NONMATCH_ANCESTOR" 2>/dev/null)
+  assert_equals "1" "$result" "excludeIf true holds on an unreleased network"
+
+  write_network_files mesa mesa
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" check_include_if "$TEST_DIR/Network_true.yml" "Network_true" "$TEST_NONMATCH_ANCESTOR" 2>/dev/null)
+  assert_equals "0" "$result" "includeIf true fails on mainnet's network"
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" check_include_if "$TEST_DIR/Network_false.yml" "Network_false" "$TEST_NONMATCH_ANCESTOR" 2>/dev/null)
+  assert_equals "1" "$result" "includeIf false holds on mainnet's network"
+  result=$(MINA_NETWORK_FILES_DIR="$TEST_DIR" check_exclude_if "$TEST_DIR/Network_true.yml" "Network_true" "$TEST_NONMATCH_ANCESTOR" 2>/dev/null)
+  assert_equals "0" "$result" "excludeIf true fails on mainnet's network"
+
+  rm -f "$TEST_DIR/MINA_CODEBASE_NETWORK" "$TEST_DIR/MINA_MAINNET_NETWORK"
+}
+
 # Test: Integration test - full script execution
 test_integration_full_selection() {
   echo -e "\n${YELLOW}Testing: Integration - full selection${NC}"
@@ -973,6 +1038,8 @@ main() {
   test_check_include_if_multiple_none_match
   test_check_include_if_exact_case
   test_check_include_if_skip_non_ancestor
+  test_codebase_targets_unreleased_network
+  test_check_network_conditions
   test_find_closest_ancestor
 
   # Run integration tests
