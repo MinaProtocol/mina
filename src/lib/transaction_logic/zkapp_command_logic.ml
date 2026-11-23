@@ -1556,10 +1556,30 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    (* Proofs may no longer be possible against a verification key set under
+       an older transaction version. While an account holds such a key, a
+       Proof permission for access is overridden with Signature, as is a
+       Proof or Impossible permission for setting the key, so that the account
+       can still be upgraded. The overrides apply only while applying this
+       account update; the account's permissions are left as they are.
+    *)
+    let verification_key_is_outdated =
+      Bool.(
+        Account.has_verification_key a
+        &&& not
+              (Txn_version.equal_to_current
+                 (Account.verification_key_txn_version a) ))
+    in
+    let override_with_signature ~when_ perm =
+      Controller.if_
+        Bool.(verification_key_is_outdated &&& when_ perm)
+        ~then_:Controller.signature ~else_:perm
+    in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
       let has_permission =
         Account.Permissions.access a
+        |> override_with_signature ~when_:Controller.is_proof
         |> Controller.check ~proof_verifies ~signature_verifies
       in
       Local_state.add_check local_state Update_not_permitted_access
@@ -1626,6 +1646,8 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let has_permission =
         Account.Permissions.set_verification_key_auth a
+        |> override_with_signature
+             ~when_:(fun perm -> Bool.not (Controller.accepts_signature perm))
         |> Controller.check ~proof_verifies ~signature_verifies
       in
       let local_state =
