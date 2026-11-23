@@ -43,7 +43,7 @@ let%test_module "Full_catchup_tree" =
         }
       in
       let node : Full_catchup_tree.Node.t =
-        { state = To_build_breadcrumb (`Parent State_hash.dummy, cached, None)
+        { state = To_build_breadcrumb (`Parent State_hash.dummy, cached)
         ; attempts = Full_catchup_tree.Attempt_history.empty
         ; state_hash
         ; blockchain_length = Mina_numbers.Length.zero

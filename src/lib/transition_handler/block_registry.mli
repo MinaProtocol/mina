@@ -34,7 +34,9 @@ val register_exn :
      Cache_lib.Cached.t
 
 (** Finish the block that [cached] holds, or was transformed from, with
-    [outcome]. A block that has already finished is left as it is. *)
+    [outcome]. A block that has already finished is left as it is. Headers
+    registered with the block's state hash are no longer needed once the
+    block has finished, and are answered [`Ignore]. *)
 val finish : t -> (_, State_hash.t) Cache_lib.Cached.t -> outcome -> unit
 
 (** Finish the block that [cached] holds as added, and return its callback,
