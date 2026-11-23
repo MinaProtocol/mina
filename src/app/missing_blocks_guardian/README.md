@@ -132,6 +132,6 @@ Tests
 -----
 
 `MINA_PROFILE=dev dune runtest src/app/missing_blocks_guardian` runs the
-unit tests of the settings, the log reading, the download with a local HTTP
-server, and the recovery with a fake audit. The audit needs a database, so
-the patch archive test covers it.
+unit tests of the settings, the download with a local HTTP server, and the
+recovery with a fake audit. The audit needs a database, so the patch archive
+test covers it.

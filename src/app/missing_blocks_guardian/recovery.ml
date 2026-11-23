@@ -1,5 +1,5 @@
 (* recovery.ml -- restore blocks one by one: download a missing parent, write
-   it to the archive and ask the auditor for the next one. A failure is an
+   it to the archive and run the audit for the next one. A failure is an
    [Error] with the reason, for the caller to report. *)
 
 open Core
