@@ -5,6 +5,11 @@ open Cache_lib
 
 type t =
   { cache : Unprocessed_transition_cache.t
+  ; entries :
+      ( Mina_block.initial_valid_block Network_peer.Envelope.Incoming.t
+      , State_hash.t )
+      Cached.t
+      State_hash.Table.t
   ; callbacks : Mina_net2.Validation_callback.t State_hash.Table.t
   ; header_callbacks : Mina_net2.Validation_callback.t list State_hash.Table.t
   }
@@ -13,6 +18,7 @@ type outcome = [ `Added | `Rejected | `Ignored ]
 
 let create ~logger ~cache_exceptions =
   { cache = Unprocessed_transition_cache.create ~logger ~cache_exceptions
+  ; entries = State_hash.Table.create ()
   ; callbacks = State_hash.Table.create ()
   ; header_callbacks = State_hash.Table.create ()
   }
@@ -21,16 +27,23 @@ let cache t = t.cache
 
 let register_exn t block ~valid_cb =
   let cached = Unprocessed_transition_cache.register_exn t.cache block in
+  let state_hash = Cached.original cached in
+  Hashtbl.set t.entries ~key:state_hash ~data:cached ;
   Option.iter valid_cb ~f:(fun valid_cb ->
-      let state_hash = Cached.original cached in
-      Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ;
-      (* A block finalized without [finish] no longer needs its callback
-         kept, and one that failed is ignored. The block may have been
-         registered again before this runs, so leave a callback that isn't
-         this registration's. *)
-      upon
-        (Ivar.read (Cached.final_state cached))
-        (fun final_state ->
+      Hashtbl.set t.callbacks ~key:state_hash ~data:valid_cb ) ;
+  (* A block finalized without [finish] no longer needs its entry or its
+     callback kept, and one that failed is ignored. The block may have been
+     registered again before this runs, so leave an entry or a callback that
+     isn't this registration's. *)
+  upon
+    (Ivar.read (Cached.final_state cached))
+    (fun final_state ->
+      Hashtbl.change t.entries state_hash ~f:(function
+        | Some kept when phys_equal kept cached ->
+            None
+        | kept ->
+            kept ) ;
+      Option.iter valid_cb ~f:(fun valid_cb ->
           match Hashtbl.find t.callbacks state_hash with
           | Some kept when phys_equal kept valid_cb -> (
               Hashtbl.remove t.callbacks state_hash ;
@@ -81,6 +94,11 @@ let finish t cached outcome =
         ignore (Cached.invalidate_with_failure cached : _) ;
         Option.iter valid_cb ~f:(answer outcome) ;
         finish_header t state_hash `Ignored
+
+let finish_outstanding t =
+  List.iter (Hashtbl.data t.entries) ~f:(fun cached -> finish t cached `Ignored) ;
+  List.iter (Hashtbl.keys t.header_callbacks) ~f:(fun state_hash ->
+      finish_header t state_hash `Ignored )
 
 let%test_module "Block_registry" =
   ( module struct
@@ -204,6 +222,29 @@ let%test_module "Block_registry" =
              finish t (Cached.transform cached ~f:(fun _ -> ())) `Rejected ) )
         (removed `Failure, [ `Reject ])
 
+    let%test_unit "Finishing what is outstanding ignores a block in use" =
+      [%test_eq: Block_outcome_log.event list * answer list]
+        (finishing (fun t cached ->
+             let (_ : (unit, State_hash.t) Cached.t) =
+               Cached.transform cached ~f:(fun _ -> ())
+             in
+             finish_outstanding t ) )
+        (removed `Failure, [ `Ignore ])
+
+    let%test_unit "Finishing what is outstanding leaves finished blocks alone" =
+      [%test_eq: Block_outcome_log.event list * answer list]
+        (finishing (fun t cached ->
+             finish t cached `Rejected ;
+             finish_outstanding t ) )
+        (removed `Failure, [ `Reject ])
+
+    let%test_unit "Finishing what is outstanding ignores a header" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      let valid_cb, answers = callback_answers () in
+      register_header t header ~valid_cb:(Some valid_cb) ;
+      finish_outstanding t ;
+      [%test_eq: answer list] !answers [ `Ignore ]
+
     let%test_unit "A block that fails without finishing is answered Ignore" =
       let _events, answers =
         finishing (fun _t cached ->
@@ -229,6 +270,16 @@ let%test_module "Block_registry" =
           Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
       finish t second `Rejected ;
       [%test_eq: answer list] !answers [ `Reject ]
+
+    let%test_unit "A block registered again is still outstanding" =
+      let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
+      finish t (register_exn t block ~valid_cb:None) `Ignored ;
+      (* The clean-up job of the first registration has not run yet. *)
+      let second = register_exn t block ~valid_cb:None in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async_kernel_scheduler.yield_until_no_jobs_remain () ) ;
+      finish_outstanding t ;
+      assert (Ivar.is_full (Cached.final_state second))
 
     let%test_unit "An added block registered again hands over its callback" =
       let t = create ~logger:(Logger.null ()) ~cache_exceptions:false in
