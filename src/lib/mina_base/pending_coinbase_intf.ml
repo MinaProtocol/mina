@@ -257,22 +257,28 @@ module type S = sig
   val create : depth:int -> unit -> t Or_error.t
 
   (** Delete the oldest stack *)
-  val remove_coinbase_stack : depth:int -> t -> (Stack.t * t) Or_error.t
+  val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
   (** Root of the merkle tree that has stacks as leaves *)
   val merkle_root : t -> Hash.t
 
-  val handler :
-    depth:int -> t -> is_new_stack:bool -> (request -> response) Staged.t
+  val handler : t -> (request -> response) Staged.t
 
-  (** Update the current working stack or if [is_new_stack] add as the new
-      working stack *)
-  val update_coinbase_stack :
-    depth:int -> t -> Stack.t -> is_new_stack:bool -> t Or_error.t
+  (** Replace the current stack, the one for the newest scan state tree *)
+  val update_current_stack : t -> Stack.t -> t Or_error.t
 
-  (** Stack that is currently being updated. if [is_new_stack] then a new stack
-      is returned *)
-  val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
+  (** The stack for the newest scan state tree. This is [Stack.empty] until
+      transactions are added to that tree. *)
+  val current_stack : t -> Stack.t Or_error.t
+
+  (** The stack allocated before the current one, or [Stack.empty] if there is
+      none *)
+  val previous_stack : t -> Stack.t Or_error.t
+
+  (** Allocate the next stack as the current one, when the scan state allocates
+      a new tree. A fresh stack is [Stack.empty]; this fails if the slot it
+      takes is still in use. *)
+  val advance : depth:int -> t -> t Or_error.t
 
   (** The stack that corresponds to the next ledger proof that is to be
       generated *)

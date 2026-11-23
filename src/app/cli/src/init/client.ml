@@ -2483,8 +2483,6 @@ let test_ledger_application =
      and max_depth =
        flag "--max-depth" ~doc:"NN Maximum depth of masks (default: 290)"
          (optional int)
-     and no_new_stack =
-       flag "--old-stack" ~doc:"Use is_new_stack: false (scan state)" no_arg
      and has_second_partition =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
@@ -2516,10 +2514,9 @@ let test_ledger_application =
      let genesis_constants = G.genesis_constants in
      Test_ledger_application.test ~privkey_path
        ~ledger_path:(ledger_path, Stable_db) ?prev_block_path
-       ~first_partition_slots ~no_new_stack ~has_second_partition
-       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing
-       ~transfer_parties_get_actions_events num_txs ~constraint_constants
-       ~genesis_constants ~benchmark )
+       ~first_partition_slots ~has_second_partition ~num_txs_per_round ~rounds
+       ~no_masks ~max_depth ~tracing ~transfer_parties_get_actions_events
+       num_txs ~constraint_constants ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
   let compile_config =

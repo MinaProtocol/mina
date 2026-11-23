@@ -123,8 +123,7 @@
   zkapp_command_builder
   internal_tracing
   transaction_snark_scan_state
-  chain_id
-  )
+  chain_id)
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps
