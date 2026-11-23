@@ -562,6 +562,159 @@ let%test_module "Test transaction logic." =
                       ] ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
+    (* A zkApp account holding a dummy verification key set under [txn_version],
+       if any, and an account to pay the fee. *)
+    let gen_zkapp_and_fee_payer ?txn_version () =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind account = Test_account.gen in
+      let%map fee_payer =
+        Test_account.gen_constrained_balance ~min:Balance.one ()
+      in
+      let verification_key =
+        Option.map txn_version ~f:(fun txn_version ->
+            Zkapp_account.with_version ~txn_version
+              { With_hash.data = Pickles.Side_loaded.Verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              } )
+      in
+      ( { account with
+          zkapp = Some { Zkapp_account.default with verification_key }
+        }
+      , fee_payer )
+
+    let older_txn_version = Txn_version.of_int 1
+
+    let set_dummy_verification_key =
+      { Account_update.Update.noop with
+        verification_key =
+          Set
+            { With_hash.data = Pickles.Side_loaded.Verification_key.dummy
+            ; hash = Zkapp_account.dummy_vk_hash ()
+            }
+      }
+
+    (* Sets the account's permissions to [perms], then applies [updates] to
+       it, each authorised by a signature. *)
+    let run_with_permissions ?txn_version ~perms ~updates ~f () =
+      Quickcheck.test ~trials:10 (gen_zkapp_and_fee_payer ?txn_version ())
+        ~f:(fun (account, fee_payer) ->
+          let set_perms =
+            Alter_account.make ~account
+              { Account_update.Update.noop with
+                permissions = Set (Permissions.Update.of_account perms)
+              }
+          in
+          let txns =
+            (set_perms :> transaction)
+            :: List.map updates ~f:(fun update ->
+                   (Alter_account.make ~account update :> transaction) )
+          in
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(f account))
+            (run_zkapp_cmd ~fee_payer:fee_payer.pk ~fee:Fee.zero
+               ~accounts:[ account; fee_payer ] txns ) )
+
+    let applied (txn, _) = Transaction_status.equal txn.command.status Applied
+
+    let failed_with failure (txn, _) =
+      Transaction_status.equal txn.command.status
+        (Failed [ []; [ Cancelled ]; [ failure ] ])
+
+    let%test_unit "A signature can replace an outdated key that requires a \
+                   proof, and the account's permissions are unchanged." =
+      let perms =
+        { Permissions.user_default with
+          set_verification_key =
+            (Permissions.Auth_required.Proof, Txn_version.current)
+        }
+      in
+      run_with_permissions ~txn_version:older_txn_version ~perms
+        ~updates:[ set_dummy_verification_key ]
+        ~f:(fun account ((txn, ledger) as result) ->
+          applied result
+          && Predicates.verify_account_updates account ~txn ~ledger ~f:(fun _ ->
+               function
+               | _, Some updt ->
+                   Permissions.Account.equal updt.permissions
+                     (Permissions.Account.of_permissions perms)
+                   && [%equal: Txn_version.t option]
+                        (Option.bind updt.zkapp
+                           ~f:Zkapp_account.verification_key_txn_version )
+                        (Some Txn_version.current)
+               | _ ->
+                   false ) )
+        ()
+
+    let%test_unit "A signature can replace an outdated key that is impossible \
+                   to replace." =
+      run_with_permissions ~txn_version:older_txn_version
+        ~perms:
+          { Permissions.user_default with
+            set_verification_key =
+              (Permissions.Auth_required.Impossible, Txn_version.current)
+          }
+        ~updates:[ set_dummy_verification_key ]
+        ~f:(fun _ -> applied)
+        ()
+
+    let%test_unit "Updates that keep an outdated key don't end the override." =
+      run_with_permissions ~txn_version:older_txn_version
+        ~perms:
+          { Permissions.user_default with
+            set_verification_key =
+              (Permissions.Auth_required.Proof, Txn_version.current)
+          }
+        ~updates:[ Account_update.Update.noop; set_dummy_verification_key ]
+        ~f:(fun _ (txn, _) ->
+          Transaction_status.equal txn.command.status Applied )
+        ()
+
+    let%test_unit "A signature can't replace a current key that requires a \
+                   proof." =
+      run_with_permissions ~txn_version:Txn_version.current
+        ~perms:
+          { Permissions.user_default with
+            set_verification_key =
+              (Permissions.Auth_required.Proof, Txn_version.current)
+          }
+        ~updates:[ set_dummy_verification_key ]
+        ~f:(fun _ -> failed_with Update_not_permitted_verification_key)
+        ()
+
+    let%test_unit "A signature can't set a key on an account without one where \
+                   that is impossible." =
+      run_with_permissions
+        ~perms:
+          { Permissions.user_default with
+            set_verification_key =
+              (Permissions.Auth_required.Impossible, Txn_version.current)
+          }
+        ~updates:[ set_dummy_verification_key ]
+        ~f:(fun _ -> failed_with Update_not_permitted_verification_key)
+        ()
+
+    let%test_unit "A signature can access an account with an outdated key that \
+                   requires a proof for access." =
+      run_with_permissions ~txn_version:older_txn_version
+        ~perms:
+          { Permissions.user_default with
+            access = Permissions.Auth_required.Proof
+          }
+        ~updates:[ Account_update.Update.noop ]
+        ~f:(fun _ -> applied)
+        ()
+
+    let%test_unit "A signature can't access an account with a current key that \
+                   requires a proof for access." =
+      run_with_permissions ~txn_version:Txn_version.current
+        ~perms:
+          { Permissions.user_default with
+            access = Permissions.Auth_required.Proof
+          }
+        ~updates:[ Account_update.Update.noop ]
+        ~f:(fun _ -> failed_with Update_not_permitted_access)
+        ()
+
     let%test_unit "All updates must succeed or none is applied." =
       (* But the fee is still paid. *)
       Quickcheck.test ~trials

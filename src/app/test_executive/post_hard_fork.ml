@@ -93,6 +93,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; global_slot_since_genesis = 500000
     }
 
+  let outdated_txn_version =
+    Txn_version.of_int (Txn_version.to_int Txn_version.current - 1)
+
+  let dummy_verification_key =
+    { With_hash.data = Pickles.Side_loaded.Verification_key.dummy
+    ; hash = Zkapp_account.dummy_vk_hash ()
+    }
+
+  (* A zkApp account whose verification key was set under an older transaction
+     version, so that proofs may no longer be possible against it. *)
+  let zkapp_with_outdated_key =
+    { Zkapp_account.default with
+      verification_key =
+        Some
+          (Zkapp_account.with_version ~txn_version:outdated_txn_version
+             dummy_verification_key )
+    }
+
   let config ~constants =
     let open Test_config in
     let staking_accounts : Test_account.t list =
@@ -176,6 +194,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~cliff_amount:2_000_000_000_000 ~vesting_period:1
                    ~vesting_increment:2_000_000_000_000 )
               ()
+          ; create ~account_name:"vk-fee-payer" ~balance:"1000" ()
+          ; create ~account_name:"vk-kept" ~balance:"1000"
+              ~permissions:
+                { Permissions.Account.user_default with
+                  set_verification_key = Proof
+                }
+              ~zkapp:zkapp_with_outdated_key ()
+          ; create ~account_name:"vk-proof" ~balance:"1000"
+              ~permissions:
+                { Permissions.Account.user_default with
+                  set_verification_key = Proof
+                }
+              ~zkapp:zkapp_with_outdated_key ()
+          ; create ~account_name:"vk-impossible" ~balance:"1000"
+              ~permissions:
+                { Permissions.Account.user_default with
+                  set_verification_key = Impossible
+                }
+              ~zkapp:zkapp_with_outdated_key ()
+          ; create ~account_name:"access-proof" ~balance:"1000"
+              ~permissions:
+                { Permissions.Account.user_default with
+                  access = Proof
+                ; set_verification_key = Proof
+                }
+              ~zkapp:zkapp_with_outdated_key ()
           ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
@@ -217,6 +261,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let timed3 = Network.genesis_keypair_exn network "timed3" in
     let timed4 = Network.genesis_keypair_exn network "timed4" in
     let timed5 = Network.genesis_keypair_exn network "timed5" in
+    let vk_fee_payer = Network.genesis_keypair_exn network "vk-fee-payer" in
+    let vk_kept = Network.genesis_keypair_exn network "vk-kept" in
+    let vk_proof = Network.genesis_keypair_exn network "vk-proof" in
+    let vk_impossible = Network.genesis_keypair_exn network "vk-impossible" in
+    let access_proof = Network.genesis_keypair_exn network "access-proof" in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
     [%log info] "extra genesis keypairs: %s"
@@ -304,7 +353,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; preconditions = None
       }
     in
-    let wait_for_zkapp zkapp_command =
+    let wait_for_zkapp ?(has_failures = false) zkapp_command =
       let with_timeout =
         let soft_slots = 4 in
         let soft_timeout = Network_time_span.Slots soft_slots in
@@ -313,7 +362,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
              ~zkapp_command
       in
       [%log info] "ZkApp transaction included in transition frontier"
@@ -636,6 +685,85 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             genesis derived from hard fork config"
            (List.length blocks) ;
          return () )
+    in
+    let%bind () =
+      (* Each command is authorised by the zkApp account's signature, and paid
+         for by vk-fee-payer, whose nonce orders the commands. *)
+      let update_with_signature ?(has_failures = false) ~description ~nonce
+          ~update (zkapp : Network_keypair.t) =
+        section_hard description
+          (let%bind zkapp_command =
+             Malleable_error.lift
+             @@ Transaction_snark.For_tests.update_states ~constraint_constants
+                  { sender = (zkapp.keypair, Account.Nonce.zero)
+                  ; fee = Currency.Fee.of_nanomina_int_exn 1_000_000
+                  ; fee_payer =
+                      Some (vk_fee_payer.keypair, Account.Nonce.of_int nonce)
+                  ; receivers = []
+                  ; amount = Currency.Amount.zero
+                  ; zkapp_account_keypairs = [ zkapp.keypair ]
+                  ; memo = Signed_command_memo.empty
+                  ; new_zkapp_account = false
+                  ; snapp_update = update
+                  ; current_auth = Signature
+                  ; call_data = Snark_params.Tick.Field.zero
+                  ; events = []
+                  ; actions = []
+                  ; preconditions = None
+                  }
+           in
+           let%bind () =
+             send_zkapp ~logger
+               (Network.Node.get_ingress_uri node_a)
+               zkapp_command
+           in
+           wait_for_zkapp ~has_failures zkapp_command )
+      in
+      let set_key =
+        { Account_update.Update.dummy with
+          verification_key = Zkapp_basic.Set_or_keep.Set dummy_verification_key
+        }
+      in
+      let%bind () =
+        update_with_signature
+          ~description:
+            "keep the outdated verification key of an account that requires a \
+             proof to replace it"
+          ~nonce:0 ~update:Account_update.Update.dummy vk_kept
+      in
+      let%bind () =
+        update_with_signature
+          ~description:
+            "replace with a signature the outdated verification key that an \
+             earlier update kept"
+          ~nonce:1 ~update:set_key vk_kept
+      in
+      let%bind () =
+        update_with_signature
+          ~description:
+            "replace with a signature an outdated verification key that \
+             requires a proof to replace it"
+          ~nonce:2 ~update:set_key vk_proof
+      in
+      let%bind () =
+        update_with_signature ~has_failures:true
+          ~description:
+            "fail to replace with a signature the verification key that is no \
+             longer outdated"
+          ~nonce:3 ~update:set_key vk_proof
+      in
+      let%bind () =
+        update_with_signature
+          ~description:
+            "replace with a signature an outdated verification key that is \
+             impossible to replace"
+          ~nonce:4 ~update:set_key vk_impossible
+      in
+      update_with_signature
+        ~description:
+          "replace with a signature an outdated verification key of an account \
+           that requires a proof for access"
+        ~nonce:5 ~update:set_key access_proof
     in
     section_hard "running replayer"
       (* Without an explicit target the replayer only replays up to the highest

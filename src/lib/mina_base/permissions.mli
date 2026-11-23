@@ -40,6 +40,16 @@ module Auth_required : sig
          t
       -> signature_verifies:Boolean.var
       -> Boolean.var * [ `proof_must_verify of Boolean.var ]
+
+    (** [Signature], as a constant. *)
+    val signature : t
+
+    (** Whether the permission is [Proof]. *)
+    val is_proof : t -> Boolean.var
+
+    (** Whether a signature satisfies the permission, i.e. whether it is
+        [None], [Either] or [Signature]. *)
+    val accepts_signature : t -> Boolean.var
   end
 
   val typ : (Checked.t, t) Typ.t

@@ -1018,6 +1018,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let verification_key (a : t) : Verification_key.t =
             a.data.zkapp.verification_key.vk
 
+          let has_verification_key (a : t) =
+            Zkapp_basic.Flagged_option.is_some a.data.zkapp.verification_key.vk
+
           type txn_version = Mina_numbers.Txn_version.Checked.t
 
           let verification_key_txn_version (a : t) =
@@ -1486,6 +1489,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                   fun ~proof_verifies:_ ~signature_verifies perm ->
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
+
+            let signature = Permissions.Auth_required.Checked.signature
+
+            let is_proof = Permissions.Auth_required.Checked.is_proof
+
+            let accepts_signature =
+              Permissions.Auth_required.Checked.accepts_signature
           end
 
           module Txn_version = struct
@@ -1496,6 +1506,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
 
             let current = Mina_numbers.Txn_version.current_checked
+
+            let equal_to_current t =
+              run_checked @@ Mina_numbers.Txn_version.equal_to_current_checked t
           end
 
           module Ledger = struct
