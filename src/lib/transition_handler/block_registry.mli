@@ -20,9 +20,12 @@ type outcome = [ `Added | `Rejected | `Ignored ]
 
 val create : logger:Logger.t -> cache_exceptions:bool -> t
 
-(** The cache of registered blocks, for code that has yet to use the
-    registry. *)
-val cache : t -> Unprocessed_transition_cache.t
+(** How the registered block [block] finished, if it is registered and still
+    in the cache: a block is registered until it has finished. *)
+val final_state :
+     t
+  -> Mina_block.initial_valid_block Envelope.Incoming.t
+  -> State_hash.t Cache_lib.Intf.final_state option
 
 (** Register [block], to be answered through [valid_cb] when it finishes. *)
 val register_exn :
