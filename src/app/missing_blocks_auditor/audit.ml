@@ -25,29 +25,31 @@ let exit_code report =
   lor bit 2 report.chain_length_differs
   lor bit 3 report.chain_status_invalid
 
-(* Runs the checks on the database of [pool] and logs each result. A query
-   that fails, or an archive with no canonical block, is an [Error]: the
-   audit must not succeed on an empty canonical chain. *)
-let run ~logger ~pool =
+(* Runs [f] on a connection of [pool]. A failure is reported as [message]
+   with the error text. *)
+let query ~pool ~message f =
+  Deferred.map
+    (Mina_caqti.Pool.use f pool)
+    ~f:
+      (Result.map_error ~f:(fun err ->
+           { message; error = Caqti_error.show err } ) )
+
+(* Finds the blocks whose parent the archive lacks and logs each one. Returns
+   them with the height of the genesis or first fork block, which has no
+   parent but is not missing one. A query that fails is an [Error]. *)
+let find_missing_blocks ~logger ~pool =
   let open Deferred.Result.Let_syntax in
-  let query ~message f =
-    Deferred.map
-      (Mina_caqti.Pool.use f pool)
-      ~f:
-        (Result.map_error ~f:(fun err ->
-             { message; error = Caqti_error.show err } ) )
-  in
   [%log info] "Querying missing blocks" ;
   let%bind missing_blocks_raw =
-    query ~message:"Error getting missing blocks" (fun db ->
+    query ~pool ~message:"Error getting missing blocks" (fun db ->
         Sql.Unparented_blocks_detail.run db () )
   in
   (* filters out genesis or first fork block. This is needed as they are not considered missing and
      archive blocks can start from block with height > 1 in case of sandbox network forked from devnet/mainnet.
      Archive of such network won't include genesis block but fork block as a first block *)
   let%bind genesis_or_fork_block_height =
-    query ~message:"Error getting genesis or first fork block height" (fun db ->
-        Sql.GenesisOrFirstForkBlockHeight.run db () )
+    query ~pool ~message:"Error getting genesis or first fork block height"
+      (fun db -> Sql.GenesisOrFirstForkBlockHeight.run db ())
   in
   let unparented_blocks =
     List.filter missing_blocks_raw ~f:(fun (_, _, height, _) ->
@@ -56,7 +58,7 @@ let run ~logger ~pool =
   let log_gap (block_id, state_hash, height, parent_hash) =
     let parent_height = height - 1 in
     let%map gap_size =
-      query ~message:"Error getting missing blocks gap" (fun db ->
+      query ~pool ~message:"Error getting missing blocks gap" (fun db ->
           Sql.Missing_blocks_gap.run db height )
     in
     [%log info] "Block has no parent in archive db"
@@ -79,14 +81,31 @@ let run ~logger ~pool =
   in
   if List.is_empty unparented_blocks then
     [%log info] "There are no missing blocks in the archive db" ;
-  let%bind missing_blocks = log_gaps [] unparented_blocks in
+  let%map missing_blocks = log_gaps [] unparented_blocks in
+  (missing_blocks, genesis_or_fork_block_height)
+
+(* Only the first check of [run]: the blocks whose parent the archive lacks.
+   It skips the queries of the chain statuses and of the canonical chain, so
+   it is cheap to repeat and a failure of those queries does not stop it. It
+   still needs a canonical genesis or fork block, and fails without one. *)
+let missing_blocks ~logger ~pool =
+  Deferred.Result.map (find_missing_blocks ~logger ~pool) ~f:fst
+
+(* Runs the checks on the database of [pool] and logs each result. A query
+   that fails, or an archive with no canonical block, is an [Error]: the
+   audit must not succeed on an empty canonical chain. *)
+let run ~logger ~pool =
+  let open Deferred.Result.Let_syntax in
+  let%bind missing_blocks, genesis_or_fork_block_height =
+    find_missing_blocks ~logger ~pool
+  in
   [%log info] "Querying for gaps in chain statuses" ;
   let highest_canonical_message =
     "Error getting greatest height of canonical blocks"
   in
   let%bind highest_canonical =
     match%bind
-      query ~message:highest_canonical_message (fun db ->
+      query ~pool ~message:highest_canonical_message (fun db ->
           Sql.Chain_status.run_highest_canonical db () )
     with
     | Some height ->
@@ -99,7 +118,7 @@ let run ~logger ~pool =
              } )
   in
   let%bind pending_below =
-    query
+    query ~pool
       ~message:
         "Error getting number of pending blocks below highest canonical block"
       (fun db -> Sql.Chain_status.run_count_pending_below db highest_canonical)
@@ -118,7 +137,7 @@ let run ~logger ~pool =
         ]
   else [%log info] "There are no gaps in the chain statuses" ;
   let%map canonical_chain =
-    query ~message:"Error getting canonical chain" (fun db ->
+    query ~pool ~message:"Error getting canonical chain" (fun db ->
         Sql.Chain_status.run_canonical_chain db highest_canonical )
   in
   let chain_len = List.length canonical_chain |> Int64.of_int in

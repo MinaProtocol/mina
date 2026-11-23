@@ -378,21 +378,13 @@ let test_audit_exit_code () =
 (* The guardian repairs only the first missing block. *)
 let test_first_missing_parent () =
   Alcotest.(check bool)
-    "healthy" true
-    (Option.is_none (Auditor.first_missing_parent healthy)) ;
-  Alcotest.(check bool)
-    "other problems are not for the guardian" true
-    (Option.is_none
-       (Auditor.first_missing_parent
-          { healthy with chain_length_differs = true } ) ) ;
+    "no missing block" true
+    (Option.is_none (Auditor.first_missing_parent [])) ;
   match
     Auditor.first_missing_parent
-      { healthy with
-        missing_blocks =
-          [ missing ~parent_hash:"3NKfour" ~parent_height:4
-          ; missing ~parent_hash:"3NKnine" ~parent_height:9
-          ]
-      }
+      [ missing ~parent_hash:"3NKfour" ~parent_height:4
+      ; missing ~parent_hash:"3NKnine" ~parent_height:9
+      ]
   with
   | None ->
       Alcotest.fail "expected a missing parent"

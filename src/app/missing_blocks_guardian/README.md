@@ -4,10 +4,10 @@ Missing Blocks Guardian
 `mina-missing-blocks-guardian` finds the blocks that an archive database
 lacks and restores them from a bucket of block files.
 
-It audits the database to find the first block whose parent is missing. It
-downloads that parent as `<network>-<height>-<state hash>.json` from the
-bucket, writes it to the database, and repeats until the audit reports no
-missing parent.
+It runs the missing-blocks check of the audit to find the first block whose
+parent is missing. It downloads that parent as
+`<network>-<height>-<state hash>.json` from the bucket, writes it to the
+database, and repeats until the check reports no missing parent.
 
 The guardian needs a profile: `MINA_PROFILE`, or the file
 `/etc/coda/build_config/PROFILE` that packages and configured docker images
@@ -17,10 +17,11 @@ subcommand.
 Subcommands
 -----------
 
-- `audit`: run the audit and report whether blocks are missing. The other
-  checks of the audit are logged but do not change the exit code. To use
-  them in a script, run `mina-missing-blocks-auditor`, which has a bit in
-  its exit code for each check.
+- `audit`: run the missing-blocks check and report whether blocks are
+  missing. The guardian does not run the other checks of the audit (the
+  chain statuses and the length of the canonical chain). For them, run
+  `mina-missing-blocks-auditor`, which has a bit in its exit code for each
+  check.
 - `single-run`: audit, then restore the missing blocks once.
 - `daemon`: `single-run` every `--interval` seconds; after a recovery, six
   times longer.
@@ -120,8 +121,8 @@ Modules
 - `cli.ml`: the flags, the log setup, the check of the settings and the
   report of the settings in use.
 - `config.ml`: the settings, their sources and their validation.
-- `auditor.ml`: runs the audit and takes the first missing parent from its
-  report.
+- `auditor.ml`: runs the missing-blocks check of the audit and takes the
+  first missing parent.
 - `archive_blocks.ml`: writes a block file to the database with the library
   `archive_blocks_lib`.
 - `bucket.ml`: the names and the URLs of the block files in a bucket.
@@ -133,5 +134,7 @@ Tests
 
 `MINA_PROFILE=dev dune runtest src/app/missing_blocks_guardian` runs the
 unit tests of the settings, the download with a local HTTP server, and the
-recovery with a fake audit. The audit needs a database, so the patch archive
-test covers it.
+recovery with a fake audit. The audit needs a database: the group
+`missing_blocks_audit` of the archive node tests
+(`src/test/archive/archive_node_tests`) checks its results and its errors,
+and the patch archive test restores blocks with the guardian.
