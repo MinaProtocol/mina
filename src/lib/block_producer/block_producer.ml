@@ -949,6 +949,10 @@ let build_breadcrumb_for_produced_block ~logger ~time_controller
   |> Deferred.Result.map_error ~f:(function
        | `Invalid_staged_ledger_diff e ->
            `Invalid_staged_ledger_diff (e, Lazy.force staged_ledger_diff)
+       | `Invalid_body_reference ->
+           `Invalid_staged_ledger_diff
+             ( Error.of_string "invalid body reference"
+             , Lazy.force staged_ledger_diff )
        | (`Fatal_error _ | `Invalid_staged_ledger_hash _) as err ->
            err )
 

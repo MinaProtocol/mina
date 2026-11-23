@@ -343,6 +343,9 @@ module Instance = struct
                   | `Invalid_staged_ledger_hash err ->
                       "staged ledger diff application failed -- "
                       ^ Error.to_string_hum err
+                  | `Invalid_body_reference ->
+                      "staged ledger diff application failed -- invalid body \
+                       reference"
                 in
                 `Failure
                   ( "error rebuilding transition frontier from persistence: "
