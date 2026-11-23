@@ -799,17 +799,18 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let empty_pending_coinbase =
             Mina_base.Pending_coinbase.create
-              ~depth:constraint_constants.pending_coinbase_depth ()
+              ~depth:constraint_constants.pending_coinbase_depth
+              ~ring_size:
+                (Genesis_constants.Constraint_constants
+                 .pending_coinbase_ring_size constraint_constants )
+              ()
             |> Or_error.ok_exn
           in
           let ledger_handler =
             unstage (Mina_ledger.Sparse_ledger.handler dummy_sparse_ledger)
           in
           let pending_coinbase_handler =
-            unstage
-              (Mina_base.Pending_coinbase.handler
-                 ~depth:constraint_constants.pending_coinbase_depth
-                 empty_pending_coinbase ~is_new_stack:true )
+            unstage (Mina_base.Pending_coinbase.handler empty_pending_coinbase)
           in
           let handlers =
             Snarky_backendless.Request.Handler.(
@@ -2367,19 +2368,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; ledger
           ; producer_private_key
           ; producer_public_key
-          } ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          } ~constraint_constants:(_ : Genesis_constants.Constraint_constants.t)
           ~pending_coinbase:
-            { Mina_base.Pending_coinbase_witness.pending_coinbases
-            ; is_new_stack
-            } : Snark_params.Tick.Handler.t =
+            { Mina_base.Pending_coinbase_witness.pending_coinbases } :
+          Snark_params.Tick.Handler.t =
         let ledger_handler =
           unstage (Mina_ledger.Sparse_ledger.handler ledger)
         in
         let pending_coinbase_handler =
-          unstage
-            (Mina_base.Pending_coinbase.handler
-               ~depth:constraint_constants.pending_coinbase_depth
-               pending_coinbases ~is_new_stack )
+          unstage (Mina_base.Pending_coinbase.handler pending_coinbases)
         in
         let handlers =
           Snarky_backendless.Request.Handler.(
@@ -3544,7 +3541,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
         let pending_coinbases =
           Pending_coinbase.create
-            ~depth:constraint_constants.pending_coinbase_depth ()
+            ~depth:constraint_constants.pending_coinbase_depth
+            ~ring_size:
+              (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+                 constraint_constants )
+            ()
           |> Or_error.ok_exn
         in
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in
@@ -3665,10 +3666,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; producer_private_key
               ; producer_public_key
               }
-              ~pending_coinbase:
-                { Pending_coinbase_witness.pending_coinbases
-                ; is_new_stack = true
-                }
+              ~pending_coinbase:{ Pending_coinbase_witness.pending_coinbases }
           in
           let%map `Success _, var =
             Snark_params.Tick.handle (fun () -> result) handler

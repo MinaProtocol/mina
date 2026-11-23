@@ -295,6 +295,10 @@ val view_jobs_with_position :
   -> ('base -> 'c)
   -> 'c Job_view.t list list
 
+(** The most trees the scan state can hold at once. A proof is only emitted
+    when it holds exactly this many. *)
+val max_trees : ('merge, 'base) State.t -> int
+
 (** Returns true only if the next 'd that could be enqueued is
 on a new tree*)
 val next_on_new_tree : ('merge, 'base) State.t -> bool

@@ -25,6 +25,7 @@ let sample_block_sexp =
             "\147\141\184\201\248,\140\181\141?>\244\253%\0006\164\141&\167\018u=/\222Z\189\003\168\\\171\244")))
          (pending_coinbase_hash
           5047055522714573962451932445720607459327212603444463294362216371066600674316)))
+       (pending_coinbase_stack_index 0)
        (genesis_ledger_hash
         4958998934359971061501155897206360741418847934692582646141869034661458403276)
        (ledger_proof_statement
@@ -509,6 +510,7 @@ let sample_block_json =
             },
             "pending_coinbase_hash": "2mzcFr5TxgWNmHe2dBbvGZRqSGLjx8vRxAZJL3nDdM1gHEBD3YYo"
           },
+          "pending_coinbase_stack_index": "0",
           "genesis_ledger_hash": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
           "ledger_proof_statement": {
             "source": {

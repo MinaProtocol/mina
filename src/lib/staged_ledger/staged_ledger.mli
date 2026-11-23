@@ -366,7 +366,6 @@ module Test_helpers : sig
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> first_partition_slots:int
     -> no_second_partition:bool
-    -> is_new_stack:bool
     -> signature_kind:Mina_signature_kind.t
     -> init_carried:Carried_registers.t
     -> Ledger.t

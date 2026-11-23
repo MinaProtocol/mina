@@ -207,6 +207,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~genesis_ledger_hash : t =
     let pending_coinbase =
       Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
+        ~ring_size:
+          (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+             constraint_constants )
         ()
       |> Or_error.ok_exn
     in

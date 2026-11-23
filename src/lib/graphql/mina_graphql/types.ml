@@ -1272,6 +1272,15 @@ let blockchain_state :
           ~args:Arg.[]
           ~resolve:(fun _ t ->
             Staged_ledger_hash.pending_coinbase_hash (staged_ledger_hash t) )
+      ; field "pendingCoinbaseStackIndex" ~typ:(non_null uint32)
+          ~doc:
+            "Ring slot of the pending coinbase stack for the newest scan state \
+             tree"
+          ~args:Arg.[]
+          ~resolve:(fun _ (blockchain_state, _) ->
+            Mina_numbers.Index.to_uint32
+              (Mina_state.Blockchain_state.pending_coinbase_stack_index
+                 blockchain_state ) )
       ; field "stagedLedgerProofEmitted" ~typ:bool
           ~doc:
             "Block finished a staged ledger, and a proof was emitted from it \

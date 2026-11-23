@@ -182,7 +182,7 @@ module Snark_work = struct
         Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
           (Staged_ledger_hash.Aux_hash.of_bytes (String.make 32 '\000'))
           ledger_hash
-          (Pending_coinbase.create ~depth:3 () |> Or_error.ok_exn)
+          (Pending_coinbase.create ~depth:3 ~ring_size:8 () |> Or_error.ok_exn)
 
       let%test "work on the submitted block is accepted" =
         check_belongs_to_block

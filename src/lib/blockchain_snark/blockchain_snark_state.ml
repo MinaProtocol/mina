@@ -241,9 +241,17 @@ let%snarkydef_ step ~(logger : Logger.t)
       let coinbase_receiver =
         Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
       in
+      let current_stack_index =
+        previous_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.pending_coinbase_stack_index
+      in
+      let next_stack_index =
+        transition |> Snark_transition.blockchain_state
+        |> Blockchain_state.pending_coinbase_stack_index
+      in
       let%bind root_after_delete, deleted_stack =
         Pending_coinbase.Checked.pop_coinbases ~constraint_constants
-          prev_pending_coinbase_root
+          prev_pending_coinbase_root ~current:current_stack_index
           ~proof_emitted:(Boolean.not txn_stmt_ledger_hashes_didn't_change)
       in
       (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
@@ -257,8 +265,9 @@ let%snarkydef_ step ~(logger : Logger.t)
             Pending_coinbase.Checked.add_coinbase ~constraint_constants
               root_after_delete
               (Snark_transition.pending_coinbase_update transition)
-              ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash
-              global_slot )
+              ~coinbase_receiver ~supercharge_coinbase
+              ~current:current_stack_index ~next:next_stack_index
+              previous_state_body_hash global_slot )
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in

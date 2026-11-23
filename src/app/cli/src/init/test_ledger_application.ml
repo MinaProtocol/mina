@@ -89,7 +89,7 @@ let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ~constraint_constants ~consensus_constants ~genesis_body_reference
 
 let apply_txs ~transfer_parties_get_actions_events ~action_elements
-    ~event_elements ~constraint_constants ~first_partition_slots ~no_new_stack
+    ~event_elements ~constraint_constants ~first_partition_slots
     ~has_second_partition ~num_txs ~prev_protocol_state
     ~(keypair : Signature_lib.Keypair.t) ~i ledger =
   let init_nonce =
@@ -136,6 +136,9 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
   let zkapps = List.init num_txs ~f:(Fn.compose mk_tx' to_nonce) in
   let pending_coinbase =
     Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
+      ~ring_size:
+        (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+           constraint_constants )
       ()
     |> Or_error.ok_exn
   in
@@ -156,9 +159,9 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
   let start = Time.now () in
   match%map
     Staged_ledger.Test_helpers.update_coinbase_stack_and_get_data_impl
-      ~first_partition_slots ~is_new_stack:(not no_new_stack)
-      ~no_second_partition:(not has_second_partition) ~constraint_constants
-      ~logger ~global_slot ~signature_kind:Mina_signature_kind.Testnet
+      ~first_partition_slots ~no_second_partition:(not has_second_partition)
+      ~constraint_constants ~logger ~global_slot
+      ~signature_kind:Mina_signature_kind.Testnet
       ~init_carried:
         { Staged_ledger.Carried_registers.total_currency = Currency.Amount.zero
         ; ledger_after_coinbase =
@@ -184,9 +187,9 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
       exit 1
 
 let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
-    ~no_new_stack ~has_second_partition ~num_txs_per_round ~rounds ~no_masks
-    ~max_depth ~tracing ~transfer_parties_get_actions_events num_txs_final
-    ~benchmark ~(genesis_constants : Genesis_constants.t)
+    ~has_second_partition ~num_txs_per_round ~rounds ~no_masks ~max_depth
+    ~tracing ~transfer_parties_get_actions_events num_txs_final ~benchmark
+    ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   O1trace.thread "mina"
   @@ fun () ->
@@ -227,8 +230,8 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
         p
   in
   let apply =
-    apply_txs ~constraint_constants ~first_partition_slots ~no_new_stack
-      ~has_second_partition ~prev_protocol_state ~keypair
+    apply_txs ~constraint_constants ~first_partition_slots ~has_second_partition
+      ~prev_protocol_state ~keypair
   in
   let mask_handler ledger =
     if no_masks then Fn.const ledger

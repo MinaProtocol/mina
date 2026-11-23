@@ -499,7 +499,7 @@ let rec json_diff_paths ~path (expected : Yojson.Safe.t) (actual : Yojson.Safe.t
 *)
 let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
     ~parent_state_hash ~ledger_proof_statement ~staged_ledger_hash
-    ~body_reference protocol_state =
+    ~pending_coinbase_stack_index ~body_reference protocol_state =
   let parent_blockchain_state =
     Protocol_state.blockchain_state parent_protocol_state
   in
@@ -514,6 +514,7 @@ let check_protocol_state ~logger ~constraint_constants ~parent_protocol_state
   in
   let blockchain_state =
     Blockchain_state.create_value ~staged_ledger_hash
+      ~pending_coinbase_stack_index
       ~genesis_ledger_hash:
         (Blockchain_state.genesis_ledger_hash parent_blockchain_state)
       ~timestamp:
@@ -660,6 +661,9 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         ~staged_ledger_hash:
           (Option.value staged_ledger_hash_opt
              ~default:(Blockchain_state.staged_ledger_hash blockchain_state) )
+        ~pending_coinbase_stack_index:
+          ( Staged_ledger.pending_coinbase_collection transitioned_staged_ledger
+          |> Pending_coinbase.current_index )
         ~body_reference protocol_state
     in
     [%log debug]

@@ -156,6 +156,7 @@ module type Full = sig
            , _
            , _
            , _
+           , _
            , _ )
            Blockchain_state.Poly.t
          , _

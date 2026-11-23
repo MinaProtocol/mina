@@ -59,6 +59,11 @@ module Constraint_constants = struct
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
+  (** The number of pending coinbase stacks, one per scan state tree. This is
+      the scan state's [max_trees] for these constants. *)
+  let pending_coinbase_ring_size (t : t) =
+    ((t.transaction_capacity_log_2 + 1) * (t.work_delay + 1)) + 1
+
   let to_snark_keys_header (t : t) : Snark_keys_header.Constraint_constants.t =
     { sub_windows_per_window = t.sub_windows_per_window
     ; ledger_depth = t.ledger_depth

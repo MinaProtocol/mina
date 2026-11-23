@@ -375,8 +375,8 @@ let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
 
 type applied_staged_ledger_diff =
   { staged_ledger_hash : Staged_ledger_hash.t
+  ; pending_coinbase_stack_index : Mina_numbers.Index.t
   ; ledger_proof : Ledger_proof.Cached.t option
-  ; is_new_stack : bool
   ; pending_coinbase_update : Pending_coinbase.Update.t
   }
 
@@ -393,7 +393,7 @@ let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
       ( `Ledger_proof ledger_proof_opt
       , `Staged_ledger transitioned_staged_ledger
       , `Accounts_created _
-      , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) ->
+      , `Pending_coinbase_update (_advance, pending_coinbase_update) ) ->
       [%log internal] "Hash_new_staged_ledger" ;
       let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
       [%log internal] "Hash_new_staged_ledger_done" ;
@@ -401,10 +401,14 @@ let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
       ignore
       @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
            (Staged_ledger.ledger transitioned_staged_ledger) ;
+      let pending_coinbase_stack_index =
+        Staged_ledger.pending_coinbase_collection transitioned_staged_ledger
+        |> Pending_coinbase.current_index
+      in
       Some
         { staged_ledger_hash
+        ; pending_coinbase_stack_index
         ; ledger_proof = ledger_proof_opt
-        ; is_new_stack
         ; pending_coinbase_update
         }
   | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
@@ -540,8 +544,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
       | Some
           ( diff
           , { staged_ledger_hash = next_staged_ledger_hash
+            ; pending_coinbase_stack_index
             ; ledger_proof = ledger_proof_opt
-            ; is_new_stack
             ; pending_coinbase_update
             } ) ->
           let diff_unwrapped =
@@ -582,7 +586,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   *)
                   Blockchain_state.create_value ~timestamp:scheduled_time
                     ~genesis_ledger_hash
-                    ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
+                    ~staged_ledger_hash:next_staged_ledger_hash
+                    ~pending_coinbase_stack_index ~body_reference
                     ~ledger_proof_statement
                 in
                 let current_time =
@@ -606,7 +611,6 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =
                     Staged_ledger.pending_coinbase_collection staged_ledger
-                ; is_new_stack
                 }
               in
               Some (protocol_state, internal_transition, witness) ) )

@@ -93,7 +93,11 @@ let genesis_root_data ~precomputed_values =
   let pending_coinbase =
     Or_error.ok_exn
       (Pending_coinbase.create
-         ~depth:constraint_constants.pending_coinbase_depth () )
+         ~depth:constraint_constants.pending_coinbase_depth
+         ~ring_size:
+           (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+              constraint_constants )
+         () )
   in
   Root_data.Limited.create ~transition ~scan_state ~pending_coinbase
     ~protocol_states
@@ -642,8 +646,11 @@ module For_tests = struct
                    ~pending_coinbases:
                      ( Or_error.ok_exn
                      @@ Pending_coinbase.create
-                          ~depth:constraint_constants.pending_coinbase_depth ()
-                     )
+                          ~depth:constraint_constants.pending_coinbase_depth
+                          ~ring_size:
+                            (Genesis_constants.Constraint_constants
+                             .pending_coinbase_ring_size constraint_constants )
+                          () )
                    ~snarked_ledger:genesis_ledger
                    ~snarked_local_state:(Mina_state.Local_state.empty ())
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)

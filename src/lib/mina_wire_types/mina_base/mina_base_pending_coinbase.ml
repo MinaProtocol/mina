@@ -30,8 +30,7 @@ end
 
 module type Concrete = sig
   module Poly : sig
-    type ('tree, 'stack_id) t =
-      { tree : 'tree; pos_list : 'stack_id list; new_pos : 'stack_id }
+    type ('tree, 'stack_id) t = { tree : 'tree; current : 'stack_id }
   end
 
   module Stack_hash : sig
@@ -86,8 +85,7 @@ end
 
 module M = struct
   module Poly = struct
-    type ('tree, 'stack_id) t =
-      { tree : 'tree; pos_list : 'stack_id list; new_pos : 'stack_id }
+    type ('tree, 'stack_id) t = { tree : 'tree; current : 'stack_id }
   end
 
   module Stack_hash = struct
