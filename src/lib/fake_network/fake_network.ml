@@ -229,7 +229,8 @@ module Generator = struct
       ~max_frontier_length =
     let open Context in
     let epoch_ledger_location =
-      Filename.temp_dir_name ^/ "epoch_ledger"
+      Lazy.force Transition_frontier.For_tests.temp_root_dir
+      ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
     let consensus_local_state =
@@ -272,7 +273,8 @@ module Generator = struct
       ~max_frontier_length =
     let open Context in
     let epoch_ledger_location =
-      Filename.temp_dir_name ^/ "epoch_ledger"
+      Lazy.force Transition_frontier.For_tests.temp_root_dir
+      ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
     let consensus_local_state =
