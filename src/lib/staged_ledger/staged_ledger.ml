@@ -328,9 +328,14 @@ module T = struct
   (* The stack of the newest scan state tree that holds transactions. When the
      scan state has just allocated a tree, that tree's stack is still empty
      and the previous one is the newest with transactions. *)
-  let newest_pending_coinbase_stack ~scan_state pending_coinbase_collection =
+  let newest_pending_coinbase_stack ~constraint_constants ~scan_state
+      pending_coinbase_collection =
     if Scan_state.next_on_new_tree scan_state then
-      Pending_coinbase.previous_stack pending_coinbase_collection
+      Pending_coinbase.previous_stack
+        ~ring_size:
+          (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+             constraint_constants )
+        pending_coinbase_collection
     else Pending_coinbase.current_stack pending_coinbase_collection
 
   let of_scan_state_and_ledger ~logger
@@ -342,7 +347,8 @@ module T = struct
       { ledger; scan_state; constraint_constants; pending_coinbase_collection }
     in
     let%bind pending_coinbase_stack =
-      newest_pending_coinbase_stack ~scan_state pending_coinbase_collection
+      newest_pending_coinbase_stack ~constraint_constants ~scan_state
+        pending_coinbase_collection
       |> Deferred.return
     in
     let%bind () =
@@ -387,7 +393,8 @@ module T = struct
     let open Deferred.Or_error.Let_syntax in
     (* TODO consider removing the invariants check *)
     let%bind pending_coinbase_stack =
-      newest_pending_coinbase_stack ~scan_state pending_coinbase_collection
+      newest_pending_coinbase_stack ~constraint_constants ~scan_state
+        pending_coinbase_collection
       |> Deferred.return
     in
     let%bind () =
@@ -1126,7 +1133,7 @@ module T = struct
   (* Update the pending_coinbase tree with the updated current stack, delete the
      oldest stack if a proof was emitted, and allocate the next stack if the
      current scan state tree was filled *)
-  let update_pending_coinbase_collection pending_coinbase_collection
+  let update_pending_coinbase_collection ~ring_size pending_coinbase_collection
       stack_update ~advance ~ledger_proof =
     let open Result.Let_syntax in
     (* Deleting oldest stack if proof emitted *)
@@ -1134,7 +1141,8 @@ module T = struct
       match ledger_proof with
       | Some proof ->
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
-            Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
+            Pending_coinbase.remove_coinbase_stack ~ring_size
+              pending_coinbase_collection
             |> to_staged_ledger_or_error
           in
           let ledger_proof_stack =
@@ -1169,7 +1177,7 @@ module T = struct
        went into the new tree *)
     let%bind pending_coinbase_collection_updated3 =
       if advance then
-        Pending_coinbase.advance pending_coinbase_collection_updated2
+        Pending_coinbase.advance ~ring_size pending_coinbase_collection_updated2
         |> to_staged_ledger_or_error
       else Ok pending_coinbase_collection_updated2
     in
@@ -1321,8 +1329,12 @@ module T = struct
     [%log internal] "Update_pending_coinbase_collection" ;
     let%bind updated_pending_coinbase_collection' =
       O1trace.thread "update_pending_coinbase_collection" (fun () ->
-          update_pending_coinbase_collection t.pending_coinbase_collection
-            stack_update ~advance ~ledger_proof:res_opt
+          update_pending_coinbase_collection
+            ~ring_size:
+              (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+                 t.constraint_constants )
+            t.pending_coinbase_collection stack_update ~advance
+            ~ledger_proof:res_opt
           |> Deferred.return )
     in
     let%bind () = yield_result () in
@@ -1330,8 +1342,8 @@ module T = struct
       Deferred.return (coinbase_for_blockchain_snark coinbases)
     in
     let%bind latest_pending_coinbase_stack =
-      newest_pending_coinbase_stack ~scan_state:scan_state'
-        updated_pending_coinbase_collection'
+      newest_pending_coinbase_stack ~constraint_constants:t.constraint_constants
+        ~scan_state:scan_state' updated_pending_coinbase_collection'
       |> to_staged_ledger_or_error |> Deferred.return
     in
     let%bind () = yield_result () in
@@ -4057,7 +4069,13 @@ let%test_module "staged ledger tests" =
         let open Pending_coinbase in
         let comp =
           let%map result =
-            handle f_pop_and_add (unstage (handler pending_coinbase_before))
+            handle f_pop_and_add
+              (unstage
+                 (handler
+                    ~ring_size:
+                      (Genesis_constants.Constraint_constants
+                       .pending_coinbase_ring_size constraint_constants )
+                    pending_coinbase_before ) )
           in
           As_prover.read Hash.typ result
         in

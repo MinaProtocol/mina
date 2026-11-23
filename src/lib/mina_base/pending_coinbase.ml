@@ -1030,11 +1030,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     (* The stacks form a ring of [ring_size] slots, one per scan state tree,
-       held in the first [ring_size] leaves of [tree]. [current] is the slot of
-       the stack for the newest tree. *)
+       held in the first [ring_size] leaves of [tree]. [ring_size] is fixed by
+       the constraint constants and passed to the operations that need it.
+       [current] is the slot of the stack for the newest tree. *)
     module Poly = struct
       type ('tree, 'stack_id) t = ('tree, 'stack_id) A.Poly.t =
-        { tree : 'tree; current : 'stack_id; ring_size : int }
+        { tree : 'tree; current : 'stack_id }
       [@@deriving sexp, to_yojson]
     end
 
@@ -1087,7 +1088,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       { Poly.tree =
           make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
       ; current = Stack_id.zero
-      ; ring_size
       }
 
     [%%define_locally Or_error.(try_with)]
@@ -1106,8 +1106,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let find_index (t : t) key =
       try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
-    let next_stack_id (t : t) id =
-      Stack_id.of_int ((Stack_id.to_int id + 1) mod t.ring_size)
+    let next_stack_id ~ring_size id =
+      Stack_id.of_int ((Stack_id.to_int id + 1) mod ring_size)
 
     let set_stack (t : t) index stack =
       let open Or_error.Let_syntax in
@@ -1125,14 +1125,14 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let current_stack (t : t) = stack_at t t.current
 
-    let previous_stack (t : t) =
+    let previous_stack ~ring_size (t : t) =
       stack_at t
         (Stack_id.of_int
-           ((Stack_id.to_int t.current + t.ring_size - 1) mod t.ring_size) )
+           ((Stack_id.to_int t.current + ring_size - 1) mod ring_size) )
 
-    let advance (t : t) =
+    let advance ~ring_size (t : t) =
       let open Or_error.Let_syntax in
-      let next = next_stack_id t t.current in
+      let next = next_stack_id ~ring_size t.current in
       let%bind stack = stack_at t next in
       if not (Stack.equal stack Stack.empty) then
         Or_error.error_string
@@ -1142,9 +1142,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* Every slot holds a stack for one of the scan state's trees whenever a
        proof is emitted, so the oldest stack is the one after the current one,
        which is also the next to be allocated. *)
-    let oldest_stack_id (t : t) = next_stack_id t t.current
+    let oldest_stack_id ~ring_size (t : t) = next_stack_id ~ring_size t.current
 
-    let oldest_stack t = stack_at t (oldest_stack_id t)
+    let oldest_stack ~ring_size t = stack_at t (oldest_stack_id ~ring_size t)
 
     let update_current_stack' t ~(f : Stack.t -> Stack.t) =
       let open Or_error.Let_syntax in
@@ -1161,20 +1161,19 @@ module Make_str (A : Wire_types.Concrete) = struct
     let update_current_stack (t : t) stack =
       update_current_stack' t ~f:(fun _ -> stack)
 
-    let remove_coinbase_stack (t : t) =
+    let remove_coinbase_stack ~ring_size (t : t) =
       let open Or_error.Let_syntax in
-      let%bind stack_index = find_index t (oldest_stack_id t) in
+      let%bind stack_index = find_index t (oldest_stack_id ~ring_size t) in
       let%bind stack = get_stack t stack_index in
       let%map t' = set_stack t stack_index Stack.empty in
       (stack, t')
 
-    let hash_extra ({ current; ring_size; _ } : t) =
+    let hash_extra ({ current; _ } : t) =
       let h = Digestif.SHA256.init () in
       let h = Digestif.SHA256.feed_string h (Stack_id.to_string current) in
-      let h = Digestif.SHA256.feed_string h (Int.to_string ring_size) in
       Digestif.SHA256.(get h |> to_raw_string)
 
-    let handler (t : t) =
+    let handler ~ring_size (t : t) =
       let pending_coinbase = ref t in
       let coinbase_stack_path_exn idx =
         List.map
@@ -1189,7 +1188,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               respond (Provide path)
           | Checked.Find_index_of_oldest_stack ->
-              let stack_id = oldest_stack_id !pending_coinbase in
+              let stack_id = oldest_stack_id ~ring_size !pending_coinbase in
               let index =
                 find_index !pending_coinbase stack_id |> Or_error.ok_exn
               in
@@ -1202,7 +1201,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               let index2 =
                 find_index !pending_coinbase
-                  (next_stack_id !pending_coinbase
+                  (next_stack_id ~ring_size
                      (current_stack_id !pending_coinbase) )
                 |> Or_error.ok_exn
               in
@@ -1235,7 +1234,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Stable = struct
       module V2 = struct
         type ('tree, 'stack_id) t = ('tree, 'stack_id) T.Poly.t =
-          { tree : 'tree; current : 'stack_id; ring_size : int }
+          { tree : 'tree; current : 'stack_id }
         [@@deriving sexp, to_yojson]
       end
 
@@ -1278,7 +1277,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; current =
             Stack_id.of_int
               ((Stack_id.to_int new_pos + ring_size - 1) mod ring_size)
-        ; ring_size
         }
     end
   end]
@@ -1306,10 +1304,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               List.fold cbs ~init:!pending_coinbases
                 ~f:(fun acc (coinbase, _) ->
                   add_coinbase acc ~coinbase |> Or_error.ok_exn )
-              |> advance |> Or_error.ok_exn
+              |> advance ~ring_size:2 |> Or_error.ok_exn
             in
             let _, after_del =
-              remove_coinbase_stack after_adding |> Or_error.ok_exn
+              remove_coinbase_stack ~ring_size:2 after_adding |> Or_error.ok_exn
             in
             pending_coinbases := after_del ;
             assert (Hash.equal (merkle_root after_del) init) ;
@@ -1441,7 +1439,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~coinbase_receiver:coinbase_receiver_var
                     ~supercharge_coinbase:supercharge_coinbase_var
                     state_body_hash_var global_slot_var )
-                (unstage (handler pending_coinbases))
+                (unstage (handler ~ring_size pending_coinbases))
             in
             As_prover.read Hash.typ result
           in
@@ -1511,7 +1509,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~coinbase_receiver:coinbase_receiver_var
                     ~supercharge_coinbase:supercharge_coinbase_var
                     state_body_hash_var global_slot_var )
-                (unstage (handler pending_coinbases))
+                (unstage (handler ~ring_size:2 pending_coinbases))
             in
             As_prover.read Hash.typ result
           in
@@ -1520,10 +1518,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
         (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
         let proof_emitted = not Update.Action.(equal action Update_none) in
-        let unchecked = advance unchecked |> Or_error.ok_exn in
+        let unchecked = advance ~ring_size:2 unchecked |> Or_error.ok_exn in
         let unchecked_after_pop =
           if proof_emitted then
-            remove_coinbase_stack unchecked |> Or_error.ok_exn |> snd
+            remove_coinbase_stack ~ring_size:2 unchecked
+            |> Or_error.ok_exn |> snd
           else unchecked
         in
         let checked_merkle_root_after_pop =
@@ -1534,7 +1533,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (fun () ->
                   f_pop_coinbase ~proof_emitted:Boolean.true_
                     (Hash.var_of_t checked_merkle_root) )
-                (unstage (handler unchecked))
+                (unstage (handler ~ring_size:2 unchecked))
             in
             As_prover.read Hash.typ current
           in
@@ -1586,9 +1585,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           (new_stack, updated)
     in
     (* remove the oldest stack and check if that's the expected one *)
-    let remove_check t expected_stack =
+    let remove_check ~ring_size t expected_stack =
       let popped_stack, updated_pending_coinbases =
-        Pending_coinbase.remove_coinbase_stack t |> Or_error.ok_exn
+        Pending_coinbase.remove_coinbase_stack ~ring_size t |> Or_error.ok_exn
       in
       assert (Pending_coinbase.Stack.equal_data popped_stack expected_stack) ;
       updated_pending_coinbases
@@ -1609,10 +1608,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let expected, pc =
               if Fqueue.length expected = ring_size then
                 let oldest, expected = Fqueue.dequeue_exn expected in
-                (expected, remove_check pc oldest)
+                (expected, remove_check ~ring_size pc oldest)
               else (expected, pc)
             in
-            (expected, Pending_coinbase.advance pc |> Or_error.ok_exn) )
+            (expected, Pending_coinbase.advance ~ring_size pc |> Or_error.ok_exn) )
       in
       ()
     in

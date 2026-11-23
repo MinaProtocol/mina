@@ -30,8 +30,7 @@ end
 
 module type Concrete = sig
   module Poly : sig
-    type ('tree, 'stack_id) t =
-      { tree : 'tree; current : 'stack_id; ring_size : int }
+    type ('tree, 'stack_id) t = { tree : 'tree; current : 'stack_id }
   end
 
   module Stack_hash : sig
