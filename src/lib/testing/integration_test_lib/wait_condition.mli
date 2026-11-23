@@ -31,6 +31,7 @@ module Make
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
     | Persisted_frontier_loaded
+    | Node_to_bootstrap
     | Transition_frontier_loaded_from_persistence
 
   type t =

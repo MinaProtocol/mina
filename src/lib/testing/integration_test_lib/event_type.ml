@@ -307,6 +307,19 @@ module Bootstrap_required = struct
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
+module Bootstrap_started = struct
+  type t = unit [@@deriving to_yojson]
+
+  let name = "Bootstrap_started"
+
+  let structured_event_id =
+    Transition_router.starting_bootstrap_controller_structured_events_id
+
+  let parse_func = Fn.const (Or_error.return ())
+
+  let parse = From_daemon_log (structured_event_id, parse_func)
+end
+
 module Persisted_frontier_dropped = struct
   type t = unit [@@deriving to_yojson]
 
@@ -440,6 +453,7 @@ type 'a t =
   | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
   | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
   | Bootstrap_required : Bootstrap_required.t t
+  | Bootstrap_started : Bootstrap_started.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -474,6 +488,8 @@ let existential_to_string = function
       "Persisted_frontier_dropped"
   | Event_type Bootstrap_required ->
       "Bootstrap_requied"
+  | Event_type Bootstrap_started ->
+      "Bootstrap_started"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -508,6 +524,8 @@ let existential_of_string_exn = function
       Event_type Persisted_frontier_dropped
   | "Bootstrap_requied" ->
       Event_type Bootstrap_required
+  | "Bootstrap_started" ->
+      Event_type Bootstrap_started
   | _ ->
       failwith "invalid event type string"
 
@@ -554,6 +572,7 @@ let all_event_types =
   ; Event_type Persisted_frontier_fresh_boot
   ; Event_type Persisted_frontier_dropped
   ; Event_type Bootstrap_required
+  ; Event_type Bootstrap_started
   ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
@@ -588,6 +607,8 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Persisted_frontier_dropped)
   | Bootstrap_required ->
       (module Bootstrap_required)
+  | Bootstrap_started ->
+      (module Bootstrap_started)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
@@ -718,6 +739,8 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
   | Persisted_frontier_dropped, Persisted_frontier_dropped ->
       h e
   | Bootstrap_required, Bootstrap_required ->
+      h e
+  | Bootstrap_started, Bootstrap_started ->
       h e
   | _ ->
       failwithf "Mismatched event types: %s, %s" (to_string t1) (to_string t2)
