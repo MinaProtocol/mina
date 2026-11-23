@@ -452,7 +452,12 @@ let pending_coinbase
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   (* size is fixed, given a particular depth *)
   let depth = constraint_constants.pending_coinbase_depth in
-  Mina_base.Pending_coinbase.create ~depth () |> Or_error.ok_exn
+  Mina_base.Pending_coinbase.create ~depth
+    ~ring_size:
+      (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+         constraint_constants )
+    ()
+  |> Or_error.ok_exn
 
 let staged_ledger_diff =
   (* size varies, depending on number and size of commands *)

@@ -519,7 +519,11 @@ module T = struct
     ; constraint_constants
     ; pending_coinbase_collection =
         Pending_coinbase.create
-          ~depth:constraint_constants.pending_coinbase_depth ()
+          ~depth:constraint_constants.pending_coinbase_depth
+          ~ring_size:
+            (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+               constraint_constants )
+          ()
         |> Or_error.ok_exn
     }
 
@@ -1122,7 +1126,7 @@ module T = struct
   (* Update the pending_coinbase tree with the updated current stack, delete the
      oldest stack if a proof was emitted, and allocate the next stack if the
      current scan state tree was filled *)
-  let update_pending_coinbase_collection ~depth pending_coinbase_collection
+  let update_pending_coinbase_collection pending_coinbase_collection
       stack_update ~advance ~ledger_proof =
     let open Result.Let_syntax in
     (* Deleting oldest stack if proof emitted *)
@@ -1165,7 +1169,7 @@ module T = struct
        went into the new tree *)
     let%bind pending_coinbase_collection_updated3 =
       if advance then
-        Pending_coinbase.advance ~depth pending_coinbase_collection_updated2
+        Pending_coinbase.advance pending_coinbase_collection_updated2
         |> to_staged_ledger_or_error
       else Ok pending_coinbase_collection_updated2
     in
@@ -1317,10 +1321,8 @@ module T = struct
     [%log internal] "Update_pending_coinbase_collection" ;
     let%bind updated_pending_coinbase_collection' =
       O1trace.thread "update_pending_coinbase_collection" (fun () ->
-          update_pending_coinbase_collection
-            ~depth:t.constraint_constants.pending_coinbase_depth
-            t.pending_coinbase_collection stack_update ~advance
-            ~ledger_proof:res_opt
+          update_pending_coinbase_collection t.pending_coinbase_collection
+            stack_update ~advance ~ledger_proof:res_opt
           |> Deferred.return )
     in
     let%bind () = yield_result () in

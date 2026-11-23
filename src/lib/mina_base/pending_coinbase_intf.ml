@@ -32,11 +32,17 @@ module type S = sig
   type t [@@deriving sexp, to_yojson]
 
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
-    module Latest = V2
+    module V2 : sig
+      type t [@@deriving bin_io, sexp, to_yojson, version]
+
+      val to_latest : t -> V3.t
+    end
+
+    module Latest = V3
   end
 
   module Coinbase_data : sig
@@ -254,7 +260,8 @@ module type S = sig
     val var_of_t : t -> var
   end
 
-  val create : depth:int -> unit -> t Or_error.t
+  (** [ring_size] is the number of stacks, one per scan state tree. *)
+  val create : depth:int -> ring_size:int -> unit -> t Or_error.t
 
   (** Delete the oldest stack *)
   val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
@@ -278,7 +285,7 @@ module type S = sig
   (** Allocate the next stack as the current one, when the scan state allocates
       a new tree. A fresh stack is [Stack.empty]; this fails if the slot it
       takes is still in use. *)
-  val advance : depth:int -> t -> t Or_error.t
+  val advance : t -> t Or_error.t
 
   (** The stack that corresponds to the next ledger proof that is to be
       generated *)

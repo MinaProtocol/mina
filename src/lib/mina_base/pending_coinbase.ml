@@ -1029,9 +1029,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         (Hash.var_of_hash_packed new_root, prev)
     end
 
+    (* The stacks form a ring of [ring_size] slots, one per scan state tree,
+       held in the first [ring_size] leaves of [tree]. [current] is the slot of
+       the stack for the newest tree. *)
     module Poly = struct
       type ('tree, 'stack_id) t = ('tree, 'stack_id) A.Poly.t =
-        { tree : 'tree; pos_list : 'stack_id list; new_pos : 'stack_id }
+        { tree : 'tree; current : 'stack_id; ring_size : int }
       [@@deriving sexp, to_yojson]
     end
 
@@ -1059,7 +1062,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                    !cur_hash ) ) ) ;
         !cached.(i)
 
-    let create_exn' ~depth () =
+    let create_exn' ~depth ~ring_size () =
+      if ring_size < 1 || ring_size > max_coinbase_stack_count ~depth then
+        failwithf
+          "Pending coinbase ring size %d does not fit in a tree of depth %d"
+          ring_size depth () ;
       let rec create_path height path key =
         if height < 0 then path
         else
@@ -1079,13 +1086,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       let root_hash = hash_at_level depth in
       { Poly.tree =
           make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
-      ; pos_list = [ Stack_id.zero ]
-      ; new_pos = Stack_id.of_int (1 mod max_coinbase_stack_count ~depth)
+      ; current = Stack_id.zero
+      ; ring_size
       }
 
     [%%define_locally Or_error.(try_with)]
 
-    let create ~depth () = try_with (fun () -> create_exn' ~depth ())
+    let create ~depth ~ring_size () =
+      try_with (fun () -> create_exn' ~depth ~ring_size ())
 
     let merkle_root (t : t) = Merkle_tree.merkle_root t.tree
 
@@ -1098,12 +1106,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let find_index (t : t) key =
       try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
-    let next_index ~depth (t : t) =
-      if
-        Stack_id.equal t.new_pos
-          (Stack_id.of_int (max_coinbase_stack_count ~depth - 1))
-      then Ok Stack_id.zero
-      else Stack_id.incr_by_one t.new_pos
+    let next_stack_id (t : t) id =
+      Stack_id.of_int ((Stack_id.to_int id + 1) mod t.ring_size)
 
     let set_stack (t : t) index stack =
       let open Or_error.Let_syntax in
@@ -1112,48 +1116,35 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       { t with tree }
 
-    let current_stack_id (t : t) =
-      match t.pos_list with x :: _ -> x | [] -> Stack_id.zero
+    let stack_at (t : t) id =
+      let open Or_error.Let_syntax in
+      let%bind index = find_index t id in
+      get_stack t index
 
-    let current_stack (t : t) =
-      Or_error.try_with (fun () ->
-          let index = Merkle_tree.find_index_exn t.tree (current_stack_id t) in
-          Merkle_tree.get_exn t.tree index )
+    let current_stack_id (t : t) = t.current
+
+    let current_stack (t : t) = stack_at t t.current
 
     let previous_stack (t : t) =
-      match t.pos_list with
-      | _ :: previous :: _ ->
-          Or_error.try_with (fun () ->
-              let index = Merkle_tree.find_index_exn t.tree previous in
-              Merkle_tree.get_exn t.tree index )
-      | _ ->
-          Ok Stack.empty
+      stack_at t
+        (Stack_id.of_int
+           ((Stack_id.to_int t.current + t.ring_size - 1) mod t.ring_size) )
 
-    let advance ~depth (t : t) =
+    let advance (t : t) =
       let open Or_error.Let_syntax in
-      let%bind index = find_index t t.new_pos in
-      let%bind stack = get_stack t index in
+      let next = next_stack_id t t.current in
+      let%bind stack = stack_at t next in
       if not (Stack.equal stack Stack.empty) then
         Or_error.error_string
           "Cannot allocate a pending coinbase stack over a live stack"
-      else
-        let%map new_pos = next_index ~depth t in
-        { t with pos_list = t.new_pos :: t.pos_list; new_pos }
+      else Ok { t with current = next }
 
-    let oldest_stack_id (t : t) = List.last t.pos_list
+    (* Every slot holds a stack for one of the scan state's trees whenever a
+       proof is emitted, so the oldest stack is the one after the current one,
+       which is also the next to be allocated. *)
+    let oldest_stack_id (t : t) = next_stack_id t t.current
 
-    let remove_oldest_stack_id t =
-      match List.rev t with
-      | [] ->
-          Or_error.error_string "No coinbase stack-with-state-hash to pop"
-      | x :: xs ->
-          Ok (x, List.rev xs)
-
-    let oldest_stack t =
-      let open Or_error.Let_syntax in
-      let key = Option.value ~default:Stack_id.zero (oldest_stack_id t) in
-      let%bind index = find_index t key in
-      get_stack t index
+    let oldest_stack t = stack_at t (oldest_stack_id t)
 
     let update_current_stack' t ~(f : Stack.t -> Stack.t) =
       let open Or_error.Let_syntax in
@@ -1172,19 +1163,15 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let remove_coinbase_stack (t : t) =
       let open Or_error.Let_syntax in
-      let%bind oldest_stack, remaining = remove_oldest_stack_id t.pos_list in
-      let%bind stack_index = find_index t oldest_stack in
+      let%bind stack_index = find_index t (oldest_stack_id t) in
       let%bind stack = get_stack t stack_index in
       let%map t' = set_stack t stack_index Stack.empty in
-      (stack, { t' with pos_list = remaining })
+      (stack, t')
 
-    let hash_extra ({ pos_list; new_pos; _ } : t) =
+    let hash_extra ({ current; ring_size; _ } : t) =
       let h = Digestif.SHA256.init () in
-      let h =
-        Digestif.SHA256.feed_string h
-          (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Stack_id.to_string a))
-      in
-      let h = Digestif.SHA256.feed_string h (Stack_id.to_string new_pos) in
+      let h = Digestif.SHA256.feed_string h (Stack_id.to_string current) in
+      let h = Digestif.SHA256.feed_string h (Int.to_string ring_size) in
       Digestif.SHA256.(get h |> to_raw_string)
 
     let handler (t : t) =
@@ -1202,10 +1189,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               respond (Provide path)
           | Checked.Find_index_of_oldest_stack ->
-              let stack_id =
-                Option.value ~default:Stack_id.zero
-                  (oldest_stack_id !pending_coinbase)
-              in
+              let stack_id = oldest_stack_id !pending_coinbase in
               let index =
                 find_index !pending_coinbase stack_id |> Or_error.ok_exn
               in
@@ -1217,7 +1201,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 |> Or_error.ok_exn
               in
               let index2 =
-                find_index !pending_coinbase !pending_coinbase.new_pos
+                find_index !pending_coinbase
+                  (next_stack_id !pending_coinbase
+                     (current_stack_id !pending_coinbase) )
                 |> Or_error.ok_exn
               in
               respond @@ Provide (index1, index2)
@@ -1247,8 +1233,14 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Poly_versioned = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type ('tree, 'stack_id) t = ('tree, 'stack_id) T.Poly.t =
+          { tree : 'tree; current : 'stack_id; ring_size : int }
+        [@@deriving sexp, to_yojson]
+      end
+
+      module V1 = struct
+        type ('tree, 'stack_id) t =
           { tree : 'tree; pos_list : 'stack_id list; new_pos : 'stack_id }
         [@@deriving sexp, to_yojson]
       end
@@ -1259,6 +1251,18 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V3 = struct
+      type t =
+        ( Merkle_tree_versioned.Stable.V2.t
+        , Stack_id.Stable.V1.t )
+        Poly_versioned.Stable.V2.t
+      [@@deriving sexp, to_yojson]
+
+      let (_ : (t, T.t) Type_equal.t) = Type_equal.T
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Merkle_tree_versioned.Stable.V2.t
@@ -1266,9 +1270,16 @@ module Make_str (A : Wire_types.Concrete) = struct
         Poly_versioned.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let (_ : (t, T.t) Type_equal.t) = Type_equal.T
-
-      let to_latest = Fn.id
+      (* A V2 structure uses every leaf of the tree as a slot, and its newest
+         stack is the one before [new_pos]. *)
+      let to_latest ({ tree; pos_list = _; new_pos } : t) : V3.t =
+        let ring_size = Int.pow 2 tree.depth in
+        { tree
+        ; current =
+            Stack_id.of_int
+              ((Stack_id.to_int new_pos + ring_size - 1) mod ring_size)
+        ; ring_size
+        }
     end
   end]
 
@@ -1283,7 +1294,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       Quickcheck.Generator.list_non_empty
         (Coinbase.Gen.gen ~constraint_constants)
     in
-    let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
+    (* With two slots, the stack just filled is the oldest once the next one
+       is allocated. *)
+    let pending_coinbases =
+      ref (create ~depth ~ring_size:2 () |> Or_error.ok_exn)
+    in
     Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
         Run_in_thread.block_on_async_exn (fun () ->
             let init = merkle_root !pending_coinbases in
@@ -1291,7 +1306,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               List.fold cbs ~init:!pending_coinbases
                 ~f:(fun acc (coinbase, _) ->
                   add_coinbase acc ~coinbase |> Or_error.ok_exn )
-              |> advance ~depth |> Or_error.ok_exn
+              |> advance |> Or_error.ok_exn
             in
             let _, after_del =
               remove_coinbase_stack after_adding |> Or_error.ok_exn
@@ -1371,7 +1386,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
-    let pending_coinbases = create ~depth () |> Or_error.ok_exn in
+    let ring_size =
+      Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+        constraint_constants
+    in
+    let pending_coinbases = create ~depth ~ring_size () |> Or_error.ok_exn in
     test ~trials:20
       (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
@@ -1443,7 +1462,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
               , state_body_hash
               , global_slot ) ->
-        let pending_coinbases = create ~depth () |> Or_error.ok_exn in
+        (* With two slots, the stack just filled is the oldest once the next
+           one is allocated. *)
+        let pending_coinbases =
+          create ~depth ~ring_size:2 () |> Or_error.ok_exn
+        in
         let amount = coinbase.amount in
         let action =
           Currency.Amount.(
@@ -1497,6 +1520,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
         (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
         let proof_emitted = not Update.Action.(equal action Update_none) in
+        let unchecked = advance unchecked |> Or_error.ok_exn in
         let unchecked_after_pop =
           if proof_emitted then
             remove_coinbase_stack unchecked |> Or_error.ok_exn |> snd
@@ -1561,19 +1585,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           (new_stack, updated)
     in
-    (* Fill the current stack from a coinbase list, then allocate the next
-       one. *)
-    let t_of_coinbases t coinbase_list =
-      let new_stack, t = t_of_coinbases' t coinbase_list in
-      (new_stack, Pending_coinbase.advance ~depth t |> Or_error.ok_exn)
-    in
-    (* Create pending coinbase stacks from coinbase lists and add it to the pending coinbase merkle tree *)
-    let add coinbase_lists pending_coinbases =
-      List.fold ~init:([], pending_coinbases) coinbase_lists
-        ~f:(fun (stacks, pc) coinbases ->
-          let new_stack, pc = t_of_coinbases pc coinbases in
-          (new_stack :: stacks, pc) )
-    in
     (* remove the oldest stack and check if that's the expected one *)
     let remove_check t expected_stack =
       let popped_stack, updated_pending_coinbases =
@@ -1582,31 +1593,28 @@ module Make_str (A : Wire_types.Concrete) = struct
       assert (Pending_coinbase.Stack.equal_data popped_stack expected_stack) ;
       updated_pending_coinbases
     in
+    (* Each coinbase list fills the current stack. Once every slot holds a
+       stack, the oldest is popped and checked before the next stack is
+       allocated into its slot, as when the scan state emits a proof. *)
     let add_remove_check coinbase_lists =
-      (* The freshly allocated current stack takes up one slot. *)
-      let max_coinbase_stack_count =
-        Pending_coinbase.max_coinbase_stack_count ~depth - 1
+      let ring_size = Pending_coinbase.max_coinbase_stack_count ~depth in
+      let pending_coinbases =
+        Pending_coinbase.create_exn' ~depth ~ring_size ()
       in
-      let pending_coinbases = Pending_coinbase.create_exn' ~depth () in
-      let rec go coinbase_lists pc =
-        if List.is_empty coinbase_lists then ()
-        else
-          let coinbase_lists' =
-            List.take coinbase_lists max_coinbase_stack_count
-          in
-          let added_stacks, pending_coinbases_updated =
-            add coinbase_lists' pc
-          in
-          let pending_coinbases' =
-            List.fold ~init:pending_coinbases_updated (List.rev added_stacks)
-              ~f:(fun pc expected_stack -> remove_check pc expected_stack)
-          in
-          let remaining_lists =
-            List.drop coinbase_lists max_coinbase_stack_count
-          in
-          go remaining_lists pending_coinbases'
+      let (_ : Pending_coinbase.Stack.t Fqueue.t * Pending_coinbase.t) =
+        List.fold coinbase_lists ~init:(Fqueue.empty, pending_coinbases)
+          ~f:(fun (expected, pc) coinbases ->
+            let new_stack, pc = t_of_coinbases' pc coinbases in
+            let expected = Fqueue.enqueue expected new_stack in
+            let expected, pc =
+              if Fqueue.length expected = ring_size then
+                let oldest, expected = Fqueue.dequeue_exn expected in
+                (expected, remove_check pc oldest)
+              else (expected, pc)
+            in
+            (expected, Pending_coinbase.advance pc |> Or_error.ok_exn) )
       in
-      go coinbase_lists pending_coinbases
+      ()
     in
     let coinbase_lists_gen =
       Quickcheck.Generator.(

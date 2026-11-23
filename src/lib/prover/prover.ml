@@ -632,7 +632,11 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   let pending_coinbase =
     { Mina_base.Pending_coinbase_witness.pending_coinbases =
         Mina_base.Pending_coinbase.create
-          ~depth:constraint_constants.pending_coinbase_depth ()
+          ~depth:constraint_constants.pending_coinbase_depth
+          ~ring_size:
+            (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+               constraint_constants )
+          ()
         |> Or_error.ok_exn
     }
   in

@@ -66,7 +66,7 @@ module Limited : sig
       val create :
            transition:Mina_block.Validated.Stable.V4.t
         -> scan_state:Staged_ledger.Scan_state.Stable.V4.t
-        -> pending_coinbase:Pending_coinbase.Stable.V2.t
+        -> pending_coinbase:Pending_coinbase.Stable.V3.t
         -> protocol_states:
              Mina_state.Protocol_state.value
              State_hash.With_state_hashes.Stable.V1.t
@@ -134,7 +134,7 @@ module Minimal : sig
 
       val scan_state : t -> Staged_ledger.Scan_state.Stable.V4.t
 
-      val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+      val pending_coinbase : t -> Pending_coinbase.Stable.V3.t
     end
 
     module V3 : sig

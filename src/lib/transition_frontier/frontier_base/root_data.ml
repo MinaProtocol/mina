@@ -9,7 +9,7 @@ module Common = struct
     module V4 = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V4.t
-        ; pending_coinbase : Pending_coinbase.Stable.V2.t
+        ; pending_coinbase : Pending_coinbase.Stable.V3.t
         }
 
       let to_latest = Fn.id
@@ -23,7 +23,8 @@ module Common = struct
 
       let to_latest ({ scan_state; pending_coinbase } : t) : Latest.t =
         { scan_state = Staged_ledger.Scan_state.Stable.V3.to_latest scan_state
-        ; pending_coinbase
+        ; pending_coinbase =
+            Pending_coinbase.Stable.V2.to_latest pending_coinbase
         }
     end
   end]
@@ -37,7 +38,7 @@ module Common = struct
     `Assoc
       [ ("scan_state", `String "<opaque>")
       ; ( "pending_coinbase"
-        , Pending_coinbase.Stable.V2.to_yojson pending_coinbase )
+        , Pending_coinbase.Stable.V3.to_yojson pending_coinbase )
       ]
 
   let create ~scan_state ~pending_coinbase = { scan_state; pending_coinbase }
@@ -53,7 +54,7 @@ module Common = struct
 
   let bin_writer_stable : t Bin_prot.Type_class.writer =
     let scan_state = Staged_ledger.Scan_state.bin_writer_stable in
-    let pending_coinbase = Pending_coinbase.Stable.V2.bin_writer_t in
+    let pending_coinbase = Pending_coinbase.Stable.V3.bin_writer_t in
     { size =
         (fun t ->
           scan_state.size t.scan_state

@@ -136,6 +136,9 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
   let zkapps = List.init num_txs ~f:(Fn.compose mk_tx' to_nonce) in
   let pending_coinbase =
     Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
+      ~ring_size:
+        (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+           constraint_constants )
       ()
     |> Or_error.ok_exn
   in

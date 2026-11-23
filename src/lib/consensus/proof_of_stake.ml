@@ -799,7 +799,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let empty_pending_coinbase =
             Mina_base.Pending_coinbase.create
-              ~depth:constraint_constants.pending_coinbase_depth ()
+              ~depth:constraint_constants.pending_coinbase_depth
+              ~ring_size:
+                (Genesis_constants.Constraint_constants
+                 .pending_coinbase_ring_size constraint_constants )
+              ()
             |> Or_error.ok_exn
           in
           let ledger_handler =
@@ -3537,7 +3541,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
         let pending_coinbases =
           Pending_coinbase.create
-            ~depth:constraint_constants.pending_coinbase_depth ()
+            ~depth:constraint_constants.pending_coinbase_depth
+            ~ring_size:
+              (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+                 constraint_constants )
+            ()
           |> Or_error.ok_exn
         in
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in

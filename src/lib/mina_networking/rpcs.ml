@@ -257,7 +257,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type response =
         ( Staged_ledger.Scan_state.Stable.V4.t
         * Ledger_hash.Stable.V1.t
-        * Pending_coinbase.Stable.V2.t
+        * Pending_coinbase.Stable.V3.t
         * Mina_state.Protocol_state.Value.Stable.V4.t list )
         option
 

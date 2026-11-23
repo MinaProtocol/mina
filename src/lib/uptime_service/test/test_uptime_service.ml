@@ -71,7 +71,11 @@ let staged_ledger_hash_of ledger_hash =
     (Staged_ledger_hash.Aux_hash.of_bytes (String.make 32 '\000'))
     ledger_hash
     ( Pending_coinbase.create
-        ~depth:Fixture.constraint_constants.pending_coinbase_depth ()
+        ~depth:Fixture.constraint_constants.pending_coinbase_depth
+        ~ring_size:
+          (Genesis_constants.Constraint_constants.pending_coinbase_ring_size
+             Fixture.constraint_constants )
+        ()
     |> Or_error.ok_exn )
 
 let sok_message =
