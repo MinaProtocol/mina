@@ -1412,6 +1412,8 @@ let free_space t = Parallel_scan.free_space t.scan_state
 (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
 let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
+let max_trees t = Parallel_scan.max_trees t.scan_state
+
 let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
 let partition_if_overflowing t =

@@ -10,6 +10,7 @@
   core_kernel
   ;; local libraries
   disk_cache.lmdb
+  genesis_constants
   ledger_proof
   logger
   mina_base

@@ -233,6 +233,9 @@ val work_statements_for_new_diff :
   t -> Transaction_snark.Statement.t One_or_two.t list
 
 (** True if the latest tree is full and transactions would be added on to a new tree *)
+(** See [Parallel_scan.max_trees]. *)
+val max_trees : t -> int
+
 val next_on_new_tree : t -> bool
 
 (** Per-tree counts of free space and outstanding work, oldest tree first *)

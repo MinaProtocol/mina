@@ -16,9 +16,6 @@
 open Core_kernel
 open Parallel_scan
 
-let max_trees ~max_base_jobs ~delay =
-  ((Int.ceil_log2 max_base_jobs + 1) * (delay + 1)) + 1
-
 let job_done (job : (int, int) Available_job.t) : int =
   match job with Base i -> i | Merge (i, j) -> i + j
 
@@ -106,7 +103,7 @@ let candidates state ~max_base_jobs (mode, a, b) =
   @ [ (0, []) ]
 
 let run ~max_base_jobs ~delay steps =
-  let size = max_trees ~max_base_jobs ~delay in
+  let size = max_trees (empty ~max_base_jobs ~delay) in
   let ring = ring_create ~size in
   let next_data = ref 0 in
   let filled_once = ref false in
