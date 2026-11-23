@@ -543,8 +543,9 @@ let%test_module "Transition_handler.Processor tests" =
                  (Buffered (`Capacity capacity, `Overflow (Drop_head ignore))) )
       in
       let catchup_scheduler =
-        Catchup_scheduler.create ~logger ~precomputed_values ~verifier
-          ~block_registry ~trust_system ~frontier ~time_controller
+        Catchup_scheduler.create ~logger ~precomputed_values
+          ~in_flight:(Otp_lib.In_flight.create ())
+          ~verifier ~block_registry ~trust_system ~frontier ~time_controller
           ~catchup_job_writer ~catchup_breadcrumbs_writer
       in
       create_handler
@@ -938,9 +939,11 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let cache = Block_registry.cache block_registry in
                 let catchup_scheduler =
-                  Catchup_scheduler.create ~logger ~precomputed_values ~verifier
-                    ~block_registry ~trust_system ~frontier ~time_controller
-                    ~catchup_job_writer ~catchup_breadcrumbs_writer
+                  Catchup_scheduler.create ~logger ~precomputed_values
+                    ~in_flight:(Otp_lib.In_flight.create ())
+                    ~verifier ~block_registry ~trust_system ~frontier
+                    ~time_controller ~catchup_job_writer
+                    ~catchup_breadcrumbs_writer
                 in
                 let handle =
                   create_handler
