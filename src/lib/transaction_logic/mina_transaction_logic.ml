@@ -984,6 +984,17 @@ module Make (L : Ledger_intf.S) :
           else Control.Tag.None_given
         in
         Permissions.Auth_required.check perm tag
+
+      let signature = Permissions.Auth_required.Signature
+
+      let is_proof = function
+        | Permissions.Auth_required.Proof ->
+            true
+        | Impossible | None | Signature | Either ->
+            false
+
+      let accepts_signature perm =
+        Permissions.Auth_required.check perm Control.Tag.Signature
     end
 
     module Txn_version = struct
@@ -992,6 +1003,8 @@ module Make (L : Ledger_intf.S) :
       let if_ = value_if
 
       let current = Mina_numbers.Txn_version.current
+
+      let equal_to_current = Mina_numbers.Txn_version.equal_to_current
     end
 
     module Global_slot_since_genesis = struct
@@ -1205,6 +1218,9 @@ module Make (L : Ledger_intf.S) :
 
       let verification_key (a : t) =
         Zkapp_account.verification_key_wire (get_zkapp a)
+
+      let has_verification_key (a : t) =
+        Option.is_some (get_zkapp a).verification_key
 
       let verification_key_txn_version (a : t) : txn_version =
         Option.value ~default:Mina_numbers.Txn_version.zero

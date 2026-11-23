@@ -548,12 +548,21 @@ module type Controller_intf = sig
   include Iffable
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
+
+  val signature : t
+
+  val is_proof : t -> bool
+
+  (** Whether a signature satisfies the permission. *)
+  val accepts_signature : t -> bool
 end
 
 module type Txn_version_intf = sig
   include Iffable
 
   val current : t
+
+  val equal_to_current : t -> bool
 end
 
 module type Account_intf = sig
@@ -653,6 +662,8 @@ module type Account_intf = sig
   type verification_key
 
   val verification_key : t -> verification_key
+
+  val has_verification_key : t -> bool
 
   (** The transaction version held with the verification key; zero when there
       is no verification key.
