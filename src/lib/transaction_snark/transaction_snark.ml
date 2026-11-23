@@ -1018,8 +1018,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           let verification_key (a : t) : Verification_key.t =
             a.data.zkapp.verification_key
 
+          type txn_version = Mina_numbers.Txn_version.Checked.t
+
+          let verification_key_txn_version (_ : t) =
+            Mina_numbers.Txn_version.(Checked.constant mesa)
+
           let set_verification_key (verification_key : Verification_key.t)
-              ({ data = a; hash } : t) : t =
+              (_ : Mina_numbers.Txn_version.Checked.t) ({ data = a; hash } : t)
+              : t =
             { data = { a with zkapp = { a.zkapp with verification_key } }
             ; hash
             }
@@ -1477,6 +1483,16 @@ module Make_str (A : Wire_types.Concrete) = struct
                   fun ~proof_verifies:_ ~signature_verifies perm ->
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
+          end
+
+          module Txn_version = struct
+            type t = Mina_numbers.Txn_version.Checked.t
+
+            let if_ cond ~then_ ~else_ =
+              run_checked
+              @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
+
+            let current = Mina_numbers.Txn_version.current_checked
           end
 
           module Ledger = struct

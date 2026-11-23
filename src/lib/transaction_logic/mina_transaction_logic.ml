@@ -986,6 +986,14 @@ module Make (L : Ledger_intf.S) :
         Permissions.Auth_required.check perm tag
     end
 
+    module Txn_version = struct
+      type t = Mina_numbers.Txn_version.t
+
+      let if_ = value_if
+
+      let current = Mina_numbers.Txn_version.current
+    end
+
     module Global_slot_since_genesis = struct
       include Mina_numbers.Global_slot_since_genesis
 
@@ -1193,9 +1201,20 @@ module Make (L : Ledger_intf.S) :
 
       let register_verification_key (_ : t) = ()
 
-      let verification_key (a : t) = (get_zkapp a).verification_key
+      type txn_version = Txn_version.t
 
-      let set_verification_key verification_key (a : t) =
+      let verification_key (a : t) =
+        Zkapp_account.verification_key_wire (get_zkapp a)
+
+      let verification_key_txn_version (a : t) : txn_version =
+        Option.value ~default:Mina_numbers.Txn_version.zero
+          (Zkapp_account.verification_key_txn_version (get_zkapp a))
+
+      let set_verification_key verification_key txn_version (a : t) =
+        let verification_key =
+          Option.map verification_key
+            ~f:(Zkapp_account.with_version ~txn_version)
+        in
         set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
 
       let verification_key_hash (a : t) =
@@ -1203,7 +1222,9 @@ module Make (L : Ledger_intf.S) :
         | None ->
             None
         | Some zkapp ->
-            Option.map zkapp.verification_key ~f:With_hash.hash
+            Option.map
+              (Zkapp_account.verification_key_wire zkapp)
+              ~f:With_hash.hash
 
       let last_action_slot (a : t) = (get_zkapp a).last_action_slot
 
