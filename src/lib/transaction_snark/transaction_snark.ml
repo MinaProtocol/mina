@@ -1016,16 +1016,19 @@ module Make_str (A : Wire_types.Concrete) = struct
             { data = { a with zkapp = { a.zkapp with app_state } }; hash }
 
           let verification_key (a : t) : Verification_key.t =
-            a.data.zkapp.verification_key
+            a.data.zkapp.verification_key.vk
 
           type txn_version = Mina_numbers.Txn_version.Checked.t
 
-          let verification_key_txn_version (_ : t) =
-            Mina_numbers.Txn_version.(Checked.constant mesa)
+          let verification_key_txn_version (a : t) =
+            a.data.zkapp.verification_key.txn_version
 
-          let set_verification_key (verification_key : Verification_key.t)
-              (_ : Mina_numbers.Txn_version.Checked.t) ({ data = a; hash } : t)
-              : t =
+          let set_verification_key (vk : Verification_key.t)
+              (txn_version : Mina_numbers.Txn_version.Checked.t)
+              ({ data = a; hash } : t) : t =
+            let verification_key =
+              { Zkapp_account.Vk_with_version.Poly.vk; txn_version }
+            in
             { data = { a with zkapp = { a.zkapp with verification_key } }
             ; hash
             }
@@ -1451,7 +1454,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         match
                           (As_prover.read (Typ.prover_value ())
                              (Data_as_hash.prover_value
-                                a.zkapp.verification_key.data ) )
+                                a.zkapp.verification_key.vk.data ) )
                             .data
                         with
                         | Some vk ->
@@ -1460,7 +1463,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                             Side_loaded_verification_key.dummy )
                   in
                   let expected_hash =
-                    Data_as_hash.hash a.zkapp.verification_key.data
+                    Data_as_hash.hash a.zkapp.verification_key.vk.data
                   in
                   let actual_hash = Zkapp_account.Checked.digest_vk vk in
                   Field.Assert.equal expected_hash actual_hash ;

@@ -334,8 +334,9 @@ end
      size of the state has been set to eight. In the Mesa hardfork, it is
      extended to thirty-two (see {!Hardfork} and {!Zkapp_state.Hardfork}).
    - verification_key: an optional key to use when verifying transaction SNARKs
-     for zkApps using this account; when not provided, the account is a typical
-     Mina account that supports payments.
+     for zkApps using this account, together with the transaction version that
+     was current when the key was set (see {!Vk_with_version}); when not
+     provided, the account is a typical Mina account that supports payments.
    - 'action_state: an array of field elements, each representing an "action"
      contained in a zkApp. For details, see
      {{:https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md}the
@@ -364,7 +365,7 @@ module Stable = struct
   module V4 = struct
     type t =
       ( Zkapp_state.Value.Stable.V2.t
-      , Verification_key_wire.Stable.V1.t option
+      , Vk_with_version.Stable.V1.t option
       , F.Stable.V1.t
       , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       , bool
@@ -387,6 +388,8 @@ module Stable = struct
       Poly.Stable.V3.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
+    (** A key held by an account of this version was set no later than the Mesa
+        upgrade, so the upgrade gives it the Mesa transaction version. *)
     let to_latest
         ({ app_state
          ; verification_key
@@ -398,7 +401,11 @@ module Stable = struct
          } :
           t ) : Latest.t =
       { app_state
-      ; verification_key
+      ; verification_key =
+          Option.map verification_key ~f:(fun vk ->
+              { Vk_with_version.Poly.vk
+              ; txn_version = Mina_numbers.Txn_version.mesa
+              } )
       ; action_state
       ; last_action_slot
       ; proved_state
@@ -409,7 +416,7 @@ end]
 
 type t =
   ( Zkapp_state.Value.t
-  , Verification_key_wire.t option
+  , Vk_with_version.t option
   , F.t
   , Mina_numbers.Global_slot_since_genesis.t
   , bool
@@ -421,17 +428,15 @@ let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
 (** The account's verification key, without its transaction version. *)
 let verification_key_wire (t : t) : Verification_key_wire.t option =
-  t.verification_key
+  Option.map t.verification_key ~f:(fun { vk; _ } -> vk)
 
 (** The transaction version of the account's verification key. *)
 let verification_key_txn_version (t : t) : Mina_numbers.Txn_version.t option =
-  Option.map t.verification_key ~f:(fun _ -> Mina_numbers.Txn_version.mesa)
+  Option.map t.verification_key ~f:(fun { txn_version; _ } -> txn_version)
 
 (** The verification key [vk], as an account holds it having set it under
     [txn_version]. *)
-let with_version ~txn_version:(_ : Mina_numbers.Txn_version.t)
-    (vk : Verification_key_wire.t) =
-  vk
+let with_version ~txn_version vk : Vk_with_version.t = { vk; txn_version }
 
 (** The verification key [vk], as an account holds it having just set it. *)
 let with_current_version vk =
@@ -445,10 +450,7 @@ let with_current_version vk =
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
-    , ( Boolean.var
-      , (Side_loaded_verification_key.t option, Field.t) With_hash.t
-        Data_as_hash.t )
-      Flagged_option.t
+    , Vk_with_version.Checked.t
     , Pickles.Impls.Step.Field.t
     , Mina_numbers.Global_slot_since_genesis.Checked.t
     , Boolean.var
@@ -465,7 +467,7 @@ module Checked = struct
       Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
     in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
-      ~verification_key:(f field) ~action_state:(f app_state)
+      ~verification_key:(f Fn.id) ~action_state:(f app_state)
       ~last_action_slot:
         (f Mina_numbers.Global_slot_since_genesis.Checked.to_input)
       ~proved_state:
@@ -477,7 +479,7 @@ module Checked = struct
   let to_input (t : t) =
     to_input'
       { t with
-        verification_key = Data_as_hash.hash t.verification_key.data
+        verification_key = Vk_with_version.Checked.to_input t.verification_key
       ; zkapp_uri = Data_as_hash.hash t.zkapp_uri
       }
 
@@ -536,13 +538,7 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Zkapp_state.typ Field.typ
-    ; Flagged_option.lazy_option_typ
-        ~default:(lazy { With_hash.data = None; hash = dummy_vk_hash () })
-        (Data_as_hash.typ ~hash:With_hash.hash)
-      |> Typ.transport
-           ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
-           ~back:
-             (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
+    ; Vk_with_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
     ; Mina_numbers.Global_slot_since_genesis.typ
     ; Boolean.typ
@@ -561,10 +557,7 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     Random_oracle.Input.Chunked.field_elements (Pickles_types.Vector.to_array v)
   in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
-    ~verification_key:
-      (f
-         (Fn.compose field
-            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+    ~verification_key:(f Vk_with_version.to_input_opt)
     ~action_state:(f app_state)
     ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
     ~proved_state:
@@ -598,6 +591,18 @@ let action_state_deriver obj =
   let open Pickles_types.Vector.Vector_5 in
   iso ~map:of_list_exn ~contramap:to_list (list_5 (o ())) obj
 
+let vk_with_version_deriver obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:Vk_with_version.Poly.t_fields_annots in
+  let transaction_version =
+    needs_custom_js ~js_type:uint32 ~name:"TransactionVersion" uint32
+  in
+  finish "VerificationKeyWithVersion"
+    ~t_toplevel_annots:Vk_with_version.Poly.t_toplevel_annots
+  @@ Vk_with_version.Poly.Fields.make_creator
+       ~vk:!.verification_key_with_hash
+       ~txn_version:!.transaction_version obj
+
 let deriver obj =
   let open Fields_derivers_zkapps in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
@@ -605,7 +610,7 @@ let deriver obj =
   @@ Poly.Fields.make_creator
        ~app_state:!.(Zkapp_state.deriver field)
        ~verification_key:
-         !.(option ~js_type:Or_undefined (verification_key_with_hash @@ o ()))
+         !.(option ~js_type:Or_undefined (vk_with_version_deriver @@ o ()))
        ~action_state:!.action_state_deriver
        ~last_action_slot:!.global_slot_since_genesis
        ~proved_state:!.bool ~zkapp_uri:!.string obj
@@ -637,7 +642,7 @@ let gen : t Quickcheck.Generator.t =
 module Hardfork = struct
   type t =
     ( Zkapp_state.Hardfork.Value.t
-    , Verification_key_wire.Stable.Latest.t option
+    , Vk_with_version.Stable.Latest.t option
     , F.Stable.Latest.t
     , Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     , bool
@@ -653,10 +658,7 @@ module Hardfork = struct
         (Pickles_types.Vector.to_array v)
     in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
-      ~verification_key:
-        (f
-           (Fn.compose field
-              (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+      ~verification_key:(f Vk_with_version.to_input_opt)
       ~action_state:(f app_state)
       ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
       ~proved_state:

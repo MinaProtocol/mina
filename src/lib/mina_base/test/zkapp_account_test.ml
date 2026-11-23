@@ -94,7 +94,7 @@ let upgrade_drops_only_the_zkapp_version () =
   Quickcheck.test generator ~trials:50 ~f:(fun (t, zkapp_version) ->
       let v3 : Stable.V3.t =
         { app_state = t.app_state
-        ; verification_key = t.verification_key
+        ; verification_key = Zkapp_account.verification_key_wire t
         ; zkapp_version
         ; action_state = t.action_state
         ; last_action_slot = t.last_action_slot
