@@ -466,7 +466,12 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~staged_ledger_hash ~genesis_ledger_hash
+          ~staged_ledger_hash
+          ~pending_coinbase_stack_index:
+            ( Staged_ledger.pending_coinbase_collection
+                transitioned_staged_ledger
+            |> Pending_coinbase.current_index )
+          ~genesis_ledger_hash
           ~body_reference:
             ( Body.compute_reference ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
             @@ Body.read_all_proofs_from_disk body )

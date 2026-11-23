@@ -15,7 +15,8 @@ module Poly = struct
            , 'signed_amount
            , 'pending_coinbase_stack
            , 'fee_excess
-           , 'sok_digest )
+           , 'sok_digest
+           , 'pending_coinbase_stack_index )
            t =
             ( 'staged_ledger_hash
             , 'snarked_ledger_hash
@@ -25,9 +26,11 @@ module Poly = struct
             , 'signed_amount
             , 'pending_coinbase_stack
             , 'fee_excess
-            , 'sok_digest )
+            , 'sok_digest
+            , 'pending_coinbase_stack_index )
             Mina_wire_types.Mina_state.Blockchain_state.Poly.V3.t =
         { staged_ledger_hash : 'staged_ledger_hash
+        ; pending_coinbase_stack_index : 'pending_coinbase_stack_index
         ; genesis_ledger_hash : 'snarked_ledger_hash
         ; ledger_proof_statement :
             ( 'snarked_ledger_hash
@@ -85,6 +88,7 @@ end
 [%%define_locally
 Poly.
   ( staged_ledger_hash
+  , pending_coinbase_stack_index
   , genesis_ledger_hash
   , timestamp
   , body_reference
@@ -111,7 +115,8 @@ module Value = struct
         , Amount.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
-        , unit )
+        , unit
+        , Mina_numbers.Index.Stable.V1.t )
         Poly.Stable.V3.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -141,6 +146,7 @@ module Value = struct
            } :
             t ) : Latest.t =
         { staged_ledger_hash
+        ; pending_coinbase_stack_index = Mina_numbers.Index.zero
         ; genesis_ledger_hash
         ; ledger_proof_statement =
             Snarked_ledger_state.Stable.V2.to_latest ledger_proof_statement
@@ -177,12 +183,14 @@ type var =
   , Currency.Amount.var
   , Pending_coinbase.Stack.var
   , Fee_excess.var
-  , unit )
+  , unit
+  , Mina_numbers.Index.Checked.t )
   Poly.t
 
-let create_value ~staged_ledger_hash ~genesis_ledger_hash ~timestamp
-    ~body_reference ~ledger_proof_statement =
+let create_value ~staged_ledger_hash ~pending_coinbase_stack_index
+    ~genesis_ledger_hash ~timestamp ~body_reference ~ledger_proof_statement =
   { Poly.staged_ledger_hash
+  ; pending_coinbase_stack_index
   ; timestamp
   ; genesis_ledger_hash
   ; body_reference
@@ -192,6 +200,7 @@ let create_value ~staged_ledger_hash ~genesis_ledger_hash ~timestamp
 let typ : (var, Value.t) Typ.t =
   Typ.of_hlistable
     [ Staged_ledger_hash.typ
+    ; Mina_numbers.Index.typ
     ; Frozen_ledger_hash.typ
     ; Snarked_ledger_state.typ
     ; Block_time.Checked.typ
@@ -204,6 +213,7 @@ module Impl = Pickles.Impls.Step
 
 let var_to_input
     ({ staged_ledger_hash
+     ; pending_coinbase_stack_index
      ; genesis_ledger_hash
      ; timestamp
      ; body_reference
@@ -217,6 +227,7 @@ let var_to_input
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.var_to_input staged_ledger_hash
+    ; Mina_numbers.Index.Checked.to_input pending_coinbase_stack_index
     ; Frozen_ledger_hash.var_to_input genesis_ledger_hash
     ; ledger_proof_statement
     ; Block_time.Checked.to_input timestamp
@@ -225,6 +236,7 @@ let var_to_input
 
 let to_input
     ({ staged_ledger_hash
+     ; pending_coinbase_stack_index
      ; genesis_ledger_hash
      ; timestamp
      ; body_reference
@@ -234,6 +246,7 @@ let to_input
   let open Random_oracle.Input.Chunked in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
+    ; Mina_numbers.Index.to_input pending_coinbase_stack_index
     ; Frozen_ledger_hash.to_input genesis_ledger_hash
     ; Snarked_ledger_state.to_input ledger_proof_statement
     ; Block_time.to_input timestamp
@@ -248,6 +261,7 @@ let negative_one
     ~genesis_total_currency ~genesis_body_reference : Value.t =
   { staged_ledger_hash =
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
+  ; pending_coinbase_stack_index = Mina_numbers.Index.zero
   ; genesis_ledger_hash
   ; ledger_proof_statement =
       Snarked_ledger_state.genesis ~genesis_ledger_hash ~genesis_total_currency
@@ -267,12 +281,14 @@ type display =
   , string
   , string
   , string
-  , unit )
+  , unit
+  , string )
   Poly.t
 [@@deriving yojson]
 
 let display
     ({ staged_ledger_hash
+     ; pending_coinbase_stack_index
      ; genesis_ledger_hash
      ; ledger_proof_statement
      ; timestamp
@@ -282,6 +298,8 @@ let display
   { Poly.staged_ledger_hash =
       Visualization.display_prefix_of_string @@ Ledger_hash.to_base58_check
       @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
+  ; pending_coinbase_stack_index =
+      Mina_numbers.Index.to_string pending_coinbase_stack_index
   ; genesis_ledger_hash =
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash

@@ -1123,6 +1123,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let current_stack_id (t : t) = t.current
 
+    let current_index (t : t) =
+      Mina_numbers.Index.of_int (Stack_id.to_int t.current)
+
     let current_stack (t : t) = stack_at t t.current
 
     let previous_stack ~ring_size (t : t) =

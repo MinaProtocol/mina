@@ -15,6 +15,7 @@
             },
             "pending_coinbase_hash":"2n1Mm9Fs721SW54xJuMMzSNFvmjj42B1LucQdf3uxm6zaYbwpyL5"
           },
+          "pending_coinbase_stack_index":"0",
           "genesis_ledger_hash":"jy1wjiJgTkzXr7yL8r5x4ikaNJuikibsRMnkjdH6uqGCsDmR2sf",
           "ledger_proof_statement":{
             "source":{

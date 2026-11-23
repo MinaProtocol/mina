@@ -274,6 +274,9 @@ module type S = sig
   (** Replace the current stack, the one for the newest scan state tree *)
   val update_current_stack : t -> Stack.t -> t Or_error.t
 
+  (** The ring slot of the current stack *)
+  val current_index : t -> Mina_numbers.Index.t
+
   (** The stack for the newest scan state tree. This is [Stack.empty] until
       transactions are added to that tree. *)
   val current_stack : t -> Stack.t Or_error.t

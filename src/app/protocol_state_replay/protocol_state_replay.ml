@@ -60,6 +60,9 @@ let check ~(parent : block) ~(child : block) ~ledger_proof_statement
     ~staged_ledger_hash:
       (Blockchain_state.staged_ledger_hash
          (Protocol_state.blockchain_state child_state) )
+    ~pending_coinbase_stack_index:
+      (Blockchain_state.pending_coinbase_stack_index
+         (Protocol_state.blockchain_state child_state) )
     ~body_reference:child.body_reference child_state
 
 (* Leaves of a JSON value, with their paths. *)

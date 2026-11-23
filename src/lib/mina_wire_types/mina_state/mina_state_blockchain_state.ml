@@ -8,9 +8,11 @@ module Poly = struct
          , 'signed_amount
          , 'pending_coinbase_stack
          , 'fee_excess
-         , 'sok_digest )
+         , 'sok_digest
+         , 'pending_coinbase_stack_index )
          t =
       { staged_ledger_hash : 'staged_ledger_hash
+      ; pending_coinbase_stack_index : 'pending_coinbase_stack_index
       ; genesis_ledger_hash : 'snarked_ledger_hash
       ; ledger_proof_statement :
           ( 'snarked_ledger_hash
@@ -63,7 +65,8 @@ module Value = struct
       , Currency.Amount.V1.t
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V2.t
-      , unit )
+      , unit
+      , Mina_numbers.Index.V1.t )
       Poly.V3.t
   end
 end

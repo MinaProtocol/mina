@@ -375,6 +375,7 @@ let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
 
 type applied_staged_ledger_diff =
   { staged_ledger_hash : Staged_ledger_hash.t
+  ; pending_coinbase_stack_index : Mina_numbers.Index.t
   ; ledger_proof : Ledger_proof.Cached.t option
   ; pending_coinbase_update : Pending_coinbase.Update.t
   }
@@ -400,8 +401,13 @@ let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
       ignore
       @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
            (Staged_ledger.ledger transitioned_staged_ledger) ;
+      let pending_coinbase_stack_index =
+        Staged_ledger.pending_coinbase_collection transitioned_staged_ledger
+        |> Pending_coinbase.current_index
+      in
       Some
         { staged_ledger_hash
+        ; pending_coinbase_stack_index
         ; ledger_proof = ledger_proof_opt
         ; pending_coinbase_update
         }
@@ -538,6 +544,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
       | Some
           ( diff
           , { staged_ledger_hash = next_staged_ledger_hash
+            ; pending_coinbase_stack_index
             ; ledger_proof = ledger_proof_opt
             ; pending_coinbase_update
             } ) ->
@@ -579,7 +586,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   *)
                   Blockchain_state.create_value ~timestamp:scheduled_time
                     ~genesis_ledger_hash
-                    ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
+                    ~staged_ledger_hash:next_staged_ledger_hash
+                    ~pending_coinbase_stack_index ~body_reference
                     ~ledger_proof_statement
                 in
                 let current_time =

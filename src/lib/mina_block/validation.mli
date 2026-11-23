@@ -364,6 +364,7 @@ val check_protocol_state :
   -> parent_state_hash:State_hash.t
   -> ledger_proof_statement:Mina_state.Snarked_ledger_state.t option
   -> staged_ledger_hash:Staged_ledger_hash.t
+  -> pending_coinbase_stack_index:Mina_numbers.Index.t
   -> body_reference:Consensus.Body_reference.t
   -> Protocol_state.Value.t
   -> unit Or_error.t
