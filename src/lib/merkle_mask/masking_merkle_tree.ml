@@ -18,10 +18,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     type t = (Base.t, string (* Location where null was set *)) Result.t
   end
 
-  module Detached_parent_signal = struct
-    type t = unit Async.Ivar.t
-  end
-
   type maps_t = Inputs.Mask_maps.t
 
   (** Merges second maps object into the first one,
@@ -50,34 +46,16 @@ module Make (Inputs : Inputs_intf.S) = struct
     With a number of mask around 290, this trick gives a sizeable performance improvement.
 
     Accumulator is inherited from parent mask if [set_parent ~accumulated] of a child
-    is called with [to_acumulated t] of the parent mask.
-
-    Structure maintains two caches: [current] and [next], with the former
-    being always a superset of a latter and [next] always being superset of mask's contents
-    from [maps] field. These two caches are being rotated according to a certain rule
-    to ensure that no much more memory is used within accumulator as compared to the case
-    when [accumulated = None] for all masks.
-
-    Garbage-collection/rotation mechanism for [next] and [current] is based on idea to set
-    [current] to [next] and [next] to [t.maps] when the mask at which accumulation of [next] started
-    became detached. *)
+    is called with [to_acumulated t] of the parent mask. *)
   type accumulated_t =
     { mutable current : maps_t
           (** Currently used cache: contains a superset of contents of masks from base ledger to the current mask *)
-    ; mutable next : maps_t
-          (** Cache that will be used after the current cache is garbage-collected *)
     ; base : Base.t  (** Base ledger *)
-    ; detached_next_signal : Detached_parent_signal.t
-          (** Ivar for mask from which next was started being built.
-             When it's fulfilled, [next] becomes [current] (because next contains superset of all masks from [baser],
-            [detached_next_signal] is reset to the current mask and [next] is set to contents of the current mask.
-          *)
     }
 
   type t =
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
-    ; detached_parent_signal : Detached_parent_signal.t
     ; mutable current_location : Location.t option
     ; depth : int
     ; mutable maps : maps_t
@@ -104,7 +82,6 @@ module Make (Inputs : Inputs_intf.S) = struct
   let create ~depth () =
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
-    ; detached_parent_signal = Async.Ivar.create ()
     ; current_location = None
     ; depth
     ; accumulated = None
@@ -160,8 +137,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let detach ~loc t =
       t.parent <- Error loc ;
-      t.accumulated <- None ;
-      Async.Ivar.fill_if_empty t.detached_parent_signal ()
+      t.accumulated <- None
 
     let discard ~loc attached =
       match attached.desc with
@@ -191,25 +167,10 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let handle_mutations = assert_is_attached
 
-    (** Check whether mask from which we started computing the [next]
-        accumulator is detached and [current] can be garbage-collected. *)
-    let actualize_accumulated t =
-      Option.iter t.accumulated
-        ~f:(fun { detached_next_signal; next; base; current = _ } ->
-          if Async.Ivar.is_full detached_next_signal then
-            t.accumulated <-
-              Some
-                { next = t.maps
-                ; current = next
-                ; detached_next_signal = t.detached_parent_signal
-                ; base
-                } )
-
     (** When [accumulated] is not configured, returns current [t.maps] and parent.
 
                 Otherwise, returns the [current] accumulator and [base]. *)
     let maps_and_ancestor t =
-      actualize_accumulated t ;
       match t.accumulated with
       | Some { current; base; _ } ->
           (current, base)
@@ -219,16 +180,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
       let t = repr t in
-      actualize_accumulated t ;
       match (t.accumulated, t.parent) with
-      | Some { base; detached_next_signal; next; current }, _ ->
-          { base; detached_next_signal; next; current }
+      | Some { base; current }, _ ->
+          { base; current }
       | None, Ok base ->
-          { base
-          ; next = t.maps
-          ; current = t.maps
-          ; detached_next_signal = t.detached_parent_signal
-          }
+          { base; current = t.maps }
       | None, Error loc ->
           raise (Dangling_parent_reference (t.uuid, loc))
 
@@ -240,9 +196,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let update_maps ~f t =
       t.maps <- f t.maps ;
-      Option.iter t.accumulated ~f:(fun acc ->
-          acc.current <- f acc.current ;
-          acc.next <- f acc.next )
+      Option.iter t.accumulated ~f:(fun acc -> acc.current <- f acc.current)
 
     let get_maps t = (repr t).maps
 
@@ -661,7 +615,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           Ledger
             { uuid = Uuid_unix.create ()
             ; parent = Ok parent
-            ; detached_parent_signal = Async.Ivar.create ()
             ; current_location = t.current_location
             ; depth = t.depth
             ; maps = t.maps
@@ -669,11 +622,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             ; mutations = t.mutations
             ; accumulated =
                 Option.map t.accumulated ~f:(fun acc ->
-                    { base = acc.base
-                    ; detached_next_signal = acc.detached_next_signal
-                    ; next = acc.next
-                    ; current = acc.current
-                    } )
+                    { base = acc.base; current = acc.current } )
             }
       }
 
@@ -889,8 +838,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        as sometimes this is desired behavior *)
     let close t =
       let t = repr t in
-      t.maps <- empty_maps ;
-      Async.Ivar.fill_if_empty t.detached_parent_signal ()
+      t.maps <- empty_maps
 
     let index_of_account_exn t key =
       assert_is_attached t ;
@@ -1046,7 +994,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let set_parent ?accumulated:accumulated_opt t parent =
     assert (Result.is_error t.parent) ;
-    assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
     Base.handle_mutations parent ;
     t.level <- Base.level parent + 1 ;
@@ -1059,15 +1006,8 @@ module Make (Inputs : Inputs_intf.S) = struct
         have the same merkle root (and some masks in between may have been removed),
        hence no need to modify [t.accumulated]) *)
     ( match accumulated_opt with
-    | Some { current; next; base; detached_next_signal }
-      when Option.is_none t.accumulated ->
-        t.accumulated <-
-          Some
-            { current = maps_merge current t.maps
-            ; next = maps_merge next t.maps
-            ; base
-            ; detached_next_signal
-            }
+    | Some { current; base } when Option.is_none t.accumulated ->
+        t.accumulated <- Some { current = maps_merge current t.maps; base }
     | _ ->
         () ) ;
     attached
