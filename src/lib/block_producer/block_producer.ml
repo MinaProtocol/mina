@@ -376,7 +376,6 @@ let select_staged_ledger_diff ~commit_id ~logger ~constraint_constants
 type applied_staged_ledger_diff =
   { staged_ledger_hash : Staged_ledger_hash.t
   ; ledger_proof : Ledger_proof.Cached.t option
-  ; is_new_stack : bool
   ; pending_coinbase_update : Pending_coinbase.Update.t
   }
 
@@ -393,7 +392,7 @@ let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
       ( `Ledger_proof ledger_proof_opt
       , `Staged_ledger transitioned_staged_ledger
       , `Accounts_created _
-      , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) ->
+      , `Pending_coinbase_update (_advance, pending_coinbase_update) ) ->
       [%log internal] "Hash_new_staged_ledger" ;
       let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
       [%log internal] "Hash_new_staged_ledger_done" ;
@@ -404,7 +403,6 @@ let apply_staged_ledger_diff ~logger ~constraint_constants ~staged_ledger
       Some
         { staged_ledger_hash
         ; ledger_proof = ledger_proof_opt
-        ; is_new_stack
         ; pending_coinbase_update
         }
   | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
@@ -541,7 +539,6 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           ( diff
           , { staged_ledger_hash = next_staged_ledger_hash
             ; ledger_proof = ledger_proof_opt
-            ; is_new_stack
             ; pending_coinbase_update
             } ) ->
           let diff_unwrapped =
@@ -606,7 +603,6 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               let witness =
                 { Pending_coinbase_witness.pending_coinbases =
                     Staged_ledger.pending_coinbase_collection staged_ledger
-                ; is_new_stack
                 }
               in
               Some (protocol_state, internal_transition, witness) ) )

@@ -2366,9 +2366,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; producer_public_key
           } ~constraint_constants:(_ : Genesis_constants.Constraint_constants.t)
           ~pending_coinbase:
-            { Mina_base.Pending_coinbase_witness.pending_coinbases
-            ; is_new_stack = _
-            } : Snark_params.Tick.Handler.t =
+            { Mina_base.Pending_coinbase_witness.pending_coinbases } :
+          Snark_params.Tick.Handler.t =
         let ledger_handler =
           unstage (Mina_ledger.Sparse_ledger.handler ledger)
         in
@@ -3659,10 +3658,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; producer_private_key
               ; producer_public_key
               }
-              ~pending_coinbase:
-                { Pending_coinbase_witness.pending_coinbases
-                ; is_new_stack = true
-                }
+              ~pending_coinbase:{ Pending_coinbase_witness.pending_coinbases }
           in
           let%map `Success _, var =
             Snark_params.Tick.handle (fun () -> result) handler

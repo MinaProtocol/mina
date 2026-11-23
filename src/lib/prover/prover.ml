@@ -19,7 +19,7 @@ module Extend_blockchain_input = struct
         ; block : Snark_transition.Value.Stable.V3.t
         ; ledger_proof : Ledger_proof.Stable.V3.t option
         ; prover_state : Consensus.Data.Prover_state.Stable.V4.t
-        ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
+        ; pending_coinbase : Pending_coinbase_witness.Stable.V3.t
         }
 
       let to_latest = Fn.id
@@ -51,7 +51,8 @@ module Extend_blockchain_input = struct
             Option.map ledger_proof ~f:Ledger_proof.Stable.V2.to_latest
         ; prover_state =
             Consensus.Data.Prover_state.Stable.V3.to_latest prover_state
-        ; pending_coinbase
+        ; pending_coinbase =
+            Pending_coinbase_witness.Stable.V2.to_latest pending_coinbase
         }
     end
   end]
@@ -633,7 +634,6 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
         Mina_base.Pending_coinbase.create
           ~depth:constraint_constants.pending_coinbase_depth ()
         |> Or_error.ok_exn
-    ; is_new_stack = true
     }
   in
   let prover_state : Consensus_mechanism.Data.Prover_state.t =
