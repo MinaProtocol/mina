@@ -131,6 +131,8 @@ module type Transition_router_intf = sig
 
   type breadcrumb
 
+  type frontier_generation
+
   type network
 
   (** [sync_local_state] is `true` by default, may be set to `false` for tests.
@@ -162,7 +164,9 @@ module type Transition_router_intf = sig
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
-    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> producer_transition_reader:
+         (breadcrumb * [ `Built_on of frontier_generation ])
+         Strict_pipe.Reader.t
     -> get_most_recent_valid_block:(unit -> Mina_block.initial_valid_header)
     -> most_recent_valid_block_writer:
          Mina_block.initial_valid_header Broadcast_pipe.Writer.t

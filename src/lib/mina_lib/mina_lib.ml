@@ -78,6 +78,7 @@ type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
   ; producer_transition_writer :
       ( Transition_frontier.Breadcrumb.t
+        * [ `Built_on of Transition_frontier.Generation.t ]
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t

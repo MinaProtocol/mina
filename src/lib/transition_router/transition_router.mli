@@ -25,4 +25,5 @@ include
      and type transition_frontier_persistent_frontier :=
       Transition_frontier.Persistent_frontier.t
      and type breadcrumb := Transition_frontier.Breadcrumb.t
+     and type frontier_generation := Transition_frontier.Generation.t
      and type network := Mina_networking.t

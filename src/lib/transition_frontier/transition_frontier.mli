@@ -55,6 +55,13 @@ type Structured_log_events.t += Persisted_frontier_dropped
 
 val max_catchup_chunk_length : int
 
+(** Identifies one frontier among those a daemon creates, for work that must
+    be applied only to the frontier it was done against. *)
+module Generation : Core_kernel.Unique_id.Id
+
+(** This frontier's generation, distinct from every other frontier's. *)
+val generation : t -> Generation.t
+
 (** The catchup tree attached to the frontier, if any. *)
 val catchup_tree : t -> Full_catchup_tree.t option
 
