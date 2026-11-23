@@ -1019,8 +1019,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             a.data.zkapp.verification_key.vk
 
           let has_verification_key (a : t) =
-            Zkapp_basic.Flagged_option.is_some
-              a.data.zkapp.verification_key.vk
+            Zkapp_basic.Flagged_option.is_some a.data.zkapp.verification_key.vk
 
           type txn_version = Mina_numbers.Txn_version.Checked.t
 

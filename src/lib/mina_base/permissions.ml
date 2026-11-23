@@ -292,7 +292,7 @@ module Auth_required = struct
 
     let is_proof ({ constant; signature_necessary; signature_sufficient } : t) =
       let open Pickles.Impls.Step.Boolean in
-      (not constant) &&& (not signature_necessary) &&& not signature_sufficient
+      (not constant) &&& not signature_necessary &&& not signature_sufficient
 
     let accepts_signature ({ signature_sufficient; _ } : t) =
       signature_sufficient

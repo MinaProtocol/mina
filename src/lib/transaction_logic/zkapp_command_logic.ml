@@ -1646,8 +1646,8 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let has_permission =
         Account.Permissions.set_verification_key_auth a
-        |> override_with_signature
-             ~when_:(fun perm -> Bool.not (Controller.accepts_signature perm))
+        |> override_with_signature ~when_:(fun perm ->
+               Bool.not (Controller.accepts_signature perm) )
         |> Controller.check ~proof_verifies ~signature_verifies
       in
       let local_state =
