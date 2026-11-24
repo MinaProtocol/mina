@@ -198,6 +198,61 @@ let%test_module "Full_frontier tests" =
               [%test_pred: int] (( < ) 0) proofs ;
               clean_up_persistent_root ~frontier ) )
 
+    let%test_unit "A reloaded frontier builds the masks below its root for the \
+                   trees completed before it" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind make_before =
+          gen_breadcrumb_seq ~include_snark_work:true ~verifier (max_length * 4)
+        in
+        let%map make_after =
+          gen_breadcrumb_seq ~include_snark_work:true ~verifier (max_length * 4)
+        in
+        (make_before, make_after)
+      in
+      Quickcheck.test gen ~trials:2 ~f:(fun (make_before, make_after) ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
+              let%bind before = make_before (Full_frontier.root frontier) in
+              add_breadcrumbs frontier before ;
+              let%bind reloaded = reload_frontier frontier in
+              let hashes_at_reload = ledger_hashes_below_root reloaded in
+              [%test_pred: Ledger_hash.t list] (Fn.non List.is_empty)
+                hashes_at_reload ;
+              let%map after = make_after (Full_frontier.root reloaded) in
+              let proved =
+                List.filter_map after ~f:(fun breadcrumb ->
+                    let hashes_below_root = ledger_hashes_below_root reloaded in
+                    let pre_root = Full_frontier.root reloaded in
+                    add_breadcrumb reloaded breadcrumb ;
+                    let post_root = Full_frontier.root reloaded in
+                    Option.some_if
+                      ( (not (Breadcrumb.equal pre_root post_root))
+                      && Breadcrumb.just_emitted_a_proof post_root )
+                      (hashes_below_root, post_root) )
+              in
+              List.iter proved ~f:(fun (hashes_below_root, root) ->
+                  let snarked_ledger_hash =
+                    Breadcrumb.protocol_state root
+                    |> Mina_state.Protocol_state.blockchain_state
+                    |> Mina_state.Blockchain_state.snarked_ledger_hash
+                  in
+                  [%test_pred: Ledger_hash.t list]
+                    (fun hashes ->
+                      List.mem hashes snarked_ledger_hash
+                        ~equal:Ledger_hash.equal )
+                    hashes_below_root ) ;
+              [%test_pred: int] (( < ) 0)
+                (List.count proved ~f:(fun (_, root) ->
+                     List.mem hashes_at_reload
+                       ( Breadcrumb.protocol_state root
+                       |> Mina_state.Protocol_state.blockchain_state
+                       |> Mina_state.Blockchain_state.snarked_ledger_hash )
+                       ~equal:Ledger_hash.equal ) ) ;
+              clean_up_persistent_root ~frontier ) )
+
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =
       let gen =

@@ -125,6 +125,11 @@ module For_tests : sig
     -> unit
     -> t Async_kernel.Deferred.t
 
+  (** A frontier rebuilt at [t]'s root, as the daemon loads one: the root's
+      staged ledger is built again from its scan state, over the root snarked
+      ledger. *)
+  val reload_frontier : t -> t Async_kernel.Deferred.t
+
   val clean_up_persistent_root : frontier:t -> unit
 
   val verifier : unit -> Verifier.t
