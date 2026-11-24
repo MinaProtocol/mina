@@ -432,7 +432,7 @@ module Ledger = struct
     val is_attached : t -> bool
 
     (** The ledger's position in its stack of masks: 0 for a ledger that isn't
-        a mask, and one more than its parent's for a mask. *)
+        a mask, and greater than its parent's for a mask. *)
     val level : t -> int
 
     (** Raise if this ledger, or a mask below it, has been orphaned. *)

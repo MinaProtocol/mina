@@ -172,6 +172,12 @@ val ledger : t -> Ledger.t
 
 val scan_state : t -> Scan_state.t
 
+(** The snarked ledgers that building [t] left below [ledger t], lowest
+    first, each attached to the one before it and [ledger t] attached to the
+    last. Applying a block leaves the snarked ledger that the proof of the
+    tree it completed targets, if it completed one. *)
+val snarked_ledgers_below : t -> Mina_ledger.Immutable_ledger.t list
+
 val pending_coinbase_collection : t -> Pending_coinbase.t
 
 val create_exn :
@@ -344,6 +350,10 @@ module Test_helpers : sig
     -> unit
     -> Zkapp_precondition.Protocol_state.View.t
 
+  (** Apply the transactions to the ledger, which is orphaned. The result
+      ends with the ledger after the first pass of the transactions into the
+      scan state's current tree, and the ledger after all of them, attached to
+      it. *)
   val update_coinbase_stack_and_get_data_impl :
        logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -352,7 +362,7 @@ module Test_helpers : sig
     -> no_second_partition:bool
     -> is_new_stack:bool
     -> signature_kind:Mina_signature_kind.t
-    -> Ledger.t
+    -> Mina_ledger.Mutable_ledger.t
     -> Pending_coinbase.t
     -> Transaction.t With_status.t list
     -> Zkapp_precondition.Protocol_state.View.t
@@ -368,6 +378,7 @@ module Test_helpers : sig
              Pending_coinbase.Stack_versioned.t
              * Pending_coinbase.Stack_versioned.t ]
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
+         * (Mina_ledger.Immutable_ledger.t * Mina_ledger.Immutable_ledger.t)
        , Staged_ledger_error.t )
        Deferred.Result.t
 end

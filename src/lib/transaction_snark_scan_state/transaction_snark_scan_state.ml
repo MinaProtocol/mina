@@ -1294,6 +1294,17 @@ let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
 let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
+let completes_tree t ~parent_state_hash =
+  let of_block (txn : Transaction_with_witness.t) =
+    State_hash.equal (fst txn.state_hash) parent_state_hash
+  in
+  let trees = Parallel_scan.pending_data t.scan_state in
+  match List.findi trees ~f:(fun _ tree -> List.exists tree ~f:of_block) with
+  | None ->
+      false
+  | Some (index, _) ->
+      index < List.length trees - 1 || next_on_new_tree t
+
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
   let { Space_partition.first = slots, job_count; second } =

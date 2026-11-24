@@ -163,12 +163,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       t.accumulated <- None ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
+    let discard ~loc attached =
+      match attached.desc with
+      | Orphaned _ ->
+          ()
+      | Ledger t ->
+          attached.desc <- Orphaned (t.uuid, loc) ;
+          Merkle_ledger.Mutations.append t.level ;
+          detach ~loc t
+
     let unset_parent ~loc attached =
       let t = repr attached in
-      attached.desc <- Orphaned (t.uuid, loc) ;
-      Merkle_ledger.Mutations.append t.level ;
-      detach ~loc t ;
-      t
+      discard ~loc attached ; t
 
     let assert_is_attached t = ignore (repr t : unattached)
 
@@ -632,6 +638,20 @@ module Make (Inputs : Inputs_intf.S) = struct
       t.desc <- Ledger parent_mask ;
       Merkle_ledger.Mutations.append parent_mask.level ;
       detach ~loc mask
+
+    let move ~loc t =
+      let mask = repr t in
+      t.desc <- Orphaned (mask.uuid, loc) ;
+      { desc = Ledger mask }
+
+    let remove_parent t ~parent =
+      let mask = repr t in
+      assert (Uuid.equal (Base.get_uuid (get_parent t)) (get_uuid parent)) ;
+      let grandparent = get_parent parent in
+      assert (Hash.equal (merkle_root parent) (Base.merkle_root grandparent)) ;
+      assert (Map.is_empty (repr parent).maps.accounts) ;
+      (repr parent).accumulated <- None ;
+      mask.parent <- Ok grandparent
 
     (* copy tables in t; use same parent *)
     let copy t =

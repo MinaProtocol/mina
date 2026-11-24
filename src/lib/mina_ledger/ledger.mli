@@ -168,6 +168,8 @@ val commit : Mask.Attached.t -> unit
 val commit_and_replace_parent :
   loc:string -> Mask.Attached.t -> parent:Mask.Attached.t -> unit
 
+val remove_parent : Mask.Attached.t -> parent:Mask.Attached.t -> unit
+
 include
   Mina_transaction_logic.S with type ledger := t and type location := Location.t
 

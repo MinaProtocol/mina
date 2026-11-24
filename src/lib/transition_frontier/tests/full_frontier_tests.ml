@@ -143,8 +143,8 @@ let%test_module "Full_frontier tests" =
                           : Mina_state.Protocol_state.value ) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
-    let%test_unit "Each proof makes the root snarked ledger its snarked \
-                   ledger, keeping every ledger in the frontier" =
+    let%test_unit "Each proof commits the masks below the root up to its \
+                   snarked ledger, keeping every ledger in the frontier" =
       Quickcheck.test
         (gen_breadcrumb_seq ~include_snark_work:true ~verifier (max_length * 8))
         ~trials:2
@@ -167,6 +167,7 @@ let%test_module "Full_frontier tests" =
               in
               let proofs =
                 List.count seq ~f:(fun breadcrumb ->
+                    let hashes_below_root = ledger_hashes_below_root frontier in
                     let pre_root = Full_frontier.root frontier in
                     add_breadcrumb frontier breadcrumb ;
                     let post_root = Full_frontier.root frontier in
@@ -185,6 +186,11 @@ let%test_module "Full_frontier tests" =
                       |> Mina_state.Protocol_state.blockchain_state
                       |> Mina_state.Blockchain_state.snarked_ledger_hash
                     in
+                    [%test_pred: Ledger_hash.t list]
+                      (fun hashes ->
+                        List.mem hashes snarked_ledger_hash
+                          ~equal:Ledger_hash.equal )
+                      hashes_below_root ;
                     [%test_eq: Ledger_hash.t] snarked_ledger_hash
                       (root_ledger_hash frontier) ;
                     true )

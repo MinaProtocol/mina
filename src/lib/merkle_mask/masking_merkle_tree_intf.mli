@@ -66,12 +66,28 @@ module type S = sig
         including the masks attached to it, fails on its next use. *)
     val commit_and_replace_parent : loc:string -> t -> parent:t -> unit
 
+    (** [move ~loc t] returns a new handle on [t]'s ledger and orphans [t].
+        Every other holder of [t], including the masks attached to it, fails
+        on its next use. *)
+    val move : loc:string -> t -> t
+
+    (** [remove_parent t ~parent] attaches [t] to the parent of its parent
+        [parent], which must hold no accounts and have the same merkle root.
+        [parent] is left as an empty mask over its own parent, so anything
+        still reading through it reads the same ledger. *)
+    val remove_parent : t -> parent:t -> unit
+
     (** [unset_parent ~loc:__LOC__ t] detaches the parent from [t], after
         which [is_attached t] is [false]. The [loc] argument is shown in the
         [Dangling_parent_reference] exception, which will be raised if [t] is
         used while no parent is registered.
     *)
     val unset_parent : loc:string -> t -> unattached
+
+    (** [discard ~loc t] orphans [t], as [unset_parent] does, without first
+        checking that [t] and the masks below it are attached; it does nothing
+        if [t] is already orphaned. *)
+    val discard : loc:string -> t -> unit
 
     (** get mask parent *)
     val get_parent : t -> parent

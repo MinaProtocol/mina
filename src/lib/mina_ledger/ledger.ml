@@ -579,6 +579,19 @@ end
 include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
 
+let apply_transaction_second_pass ledger (t : Transaction_partially_applied.t) =
+  let t : Transaction_partially_applied.t =
+    match t with
+    | Zkapp_command c ->
+        Zkapp_command
+          { c with
+            global_state = { c.global_state with first_pass_ledger = ledger }
+          }
+    | Signed_command _ | Fee_transfer _ | Coinbase _ ->
+        t
+  in
+  apply_transaction_second_pass ledger t
+
 (** A ledger that does not maintain its merkle hashes.
 
     A block producer picks the transactions for a block by applying candidates

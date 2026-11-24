@@ -82,6 +82,10 @@ type t =
   ; context : (module CONTEXT)
   ; time_controller : Block_time.Controller.t
   ; persistent_root_instance : Persistent_root.Instance.t
+  ; mutable masks_below_root : Ledger.t list
+        (** The masks between the root snarked ledger and the root's mask,
+            lowest first. Some of them hold snarked ledgers that later proofs
+            will target. *)
   }
 
 let persistent_root_instance { persistent_root_instance; _ } =
@@ -133,9 +137,12 @@ let best_tip t = find_exn ~message:"best_tip" t t.best_tip
 let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   Mina_metrics.Transition_frontier.update_proposed_protocol_versions [] ;
-  ignore
-    ( Ledger.Maskable.unregister_mask_exn ~loc (Breadcrumb.mask (root t))
-      : Ledger.unattached_mask )
+  List.iter
+    (Breadcrumb.mask (root t) :: List.rev t.masks_below_root)
+    ~f:(fun mask ->
+      ignore
+        (Ledger.Maskable.unregister_mask_exn ~loc mask : Ledger.unattached_mask)
+      )
 
 let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
     ~consensus_local_state ~max_length ~persistent_root_instance
@@ -188,6 +195,7 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
   ; protocol_states_for_root_scan_state
   ; persistent_root_instance
   ; time_controller
+  ; masks_below_root = []
   }
 
 let root_data t =
@@ -380,6 +388,50 @@ module Util = struct
     |> State_hash.Map.of_alist_exn
 end
 
+(** If [new_root]'s block completed a tree of the scan state, end a segment at
+    the snarked ledger that the tree's proof will target, which is the parent
+    of [new_root]'s mask, and return [true]. *)
+let end_snarked_segment t ~old_root ~new_root =
+  match
+    Staged_ledger.snarked_ledgers_below (Breadcrumb.staged_ledger new_root)
+  with
+  | [] ->
+      false
+  | snarked_ledgers ->
+      t.masks_below_root <-
+        t.masks_below_root
+        @ Breadcrumb.mask old_root
+          :: List.map snarked_ledgers
+               ~f:Mina_ledger.Immutable_ledger.unsafe_to_ledger ;
+      true
+
+(** If a mask below the root holds [snarked_ledger_hash], commit it and every
+    mask below it into the root snarked ledger, lowest first, and return
+    [true]. Each mask is removed from under the mask above it once it is
+    committed. *)
+let commit_snarked_segments t ~root_mask snarked_ledger_hash =
+  match
+    List.findi t.masks_below_root ~f:(fun _ mask ->
+        Ledger_hash.equal (Ledger.merkle_root mask) snarked_ledger_hash )
+  with
+  | None ->
+      false
+  | Some (index, _) ->
+      let committed, kept = List.split_n t.masks_below_root (index + 1) in
+      let masks_above =
+        List.tl_exn committed
+        @ [ Option.value (List.hd kept) ~default:root_mask ]
+      in
+      List.iter2_exn committed masks_above ~f:(fun mask mask_above ->
+          Ledger.commit mask ;
+          Ledger.remove_parent mask_above ~parent:mask ) ;
+      t.masks_below_root <- kept ;
+      [%test_result: Ledger_hash.t]
+        ~message:"Root snarked ledger has the proof's hash after committing"
+        ~expect:snarked_ledger_hash
+        (Ledger.Any_ledger.M.merkle_root t.root_ledger) ;
+      true
+
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
   (* The transition frontier at this point in time has the following mask topology:
@@ -393,10 +445,14 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    *       m0 -> m1 -> [m...]
    *       ^
    *       |
+   *    [segments]
+   *       ^
+   *       |
    *       s
    *
    * In this diagram, the old root's mask (`m0`) is parented off of the root snarked
-   * ledger database, and the new root's mask (`m1`) is parented off of the `m0`.
+   * ledger database, through the masks of any segments that end at snarked ledgers
+   * later proofs will target, and the new root's mask (`m1`) is parented off of the `m0`.
    * There is also some garbage parented off of `m0`, and some successors that will
    * be kept in the tree after transition which are parented off of `m1`.
    *
@@ -412,10 +468,16 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    *
    *     0) notify consensus that root transitioned
    *     1) unattach and destroy all the garbage
-   *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`)
+   *     2) if the new root's block completed a tree of the scan state, end a segment
+   *        at the snarked ledger the tree's proof will target, which `m1` is
+   *        attached to, keeping `m1` as `m1'`, and skip step 3.
+   *        Otherwise, commit `m1` into `m0`, making `m0` into `m1'` (same merkle root
+   *        as `m1`)
    *     3) put `m1'` in `m1`'s place, so that the successors of `m1` are parented off
    *        of `m1'` without being moved, and orphan `m0`
-   *     4) create a new temporary mask `mt` with `s` as it's parent
+   *     4) if a segment ends at `s'`, commit it and the segments below it into `s`,
+   *        turning `s` into `s'`, and skip steps 5-7. Otherwise, create a new
+   *        temporary mask `mt` with `s` as it's parent
    *     5) apply any transactions to `mt` that appear in the transition between `s` and `s'`
    *     6) commit `mt` into `s`, turning `s` into `s'`
    *     7) unattach and destroy `mt`
@@ -457,17 +519,19 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* STEPS 2-3 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
-    O1trace.sync_thread "commit_frontier_root_snarked_ledger" (fun () ->
-        Ledger.commit_and_replace_parent ~loc:__LOC__ m1 ~parent:m0 ) ;
+    if
+      not
+        (end_snarked_segment t ~old_root:old_root_node.breadcrumb
+           ~new_root:new_root_node.breadcrumb )
+    then
+      O1trace.sync_thread "commit_frontier_root_snarked_ledger" (fun () ->
+          Ledger.commit_and_replace_parent ~loc:__LOC__ m1 ~parent:m0 ) ;
     [%test_result: Ledger_hash.t]
       ~message:
-        "Merkle root of new root's staged ledger mask is the same after \
-         committing"
+        "Merkle root of new root's staged ledger mask is the same after moving \
+         the root"
       ~expect:m1_hash_pre_commit (Ledger.merkle_root m1) ;
     let new_staged_ledger = Breadcrumb.staged_ledger new_root_node.breadcrumb in
-    (* STEPS 4-7 *)
-    (* we need to perform steps 4-7 iff there was a proof emitted in the scan
-     * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
       let config =
         Persistent_root.Config.make_potential_snarked_ledger
@@ -486,7 +550,18 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           ]
         "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~config
-        t.persistent_root_instance ;
+        t.persistent_root_instance ) ;
+    (* STEPS 4-7 *)
+    (* we need to perform steps 5-7 iff there was a proof emitted in the scan
+     * state we are transitioning to, and no segment ends at its snarked ledger *)
+    if
+      Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb
+      && not
+           (commit_snarked_segments t ~root_mask:m1
+              ( Breadcrumb.protocol_state new_root_node.breadcrumb
+              |> Protocol_state.blockchain_state
+              |> Blockchain_state.snarked_ledger_hash ) )
+    then (
       let s = t.root_ledger in
       (* STEP 4 *)
       let mt =
@@ -955,6 +1030,9 @@ module For_tests = struct
              (State_body_hash.to_yojson hash |> Yojson.Safe.to_string) )
 
   let root_ledger_hash t = Ledger.Any_ledger.M.merkle_root t.root_ledger
+
+  let ledger_hashes_below_root t =
+    List.map t.masks_below_root ~f:Ledger.merkle_root
 
   (* TODO: Don't force here!! *)
 
