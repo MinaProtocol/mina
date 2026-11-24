@@ -213,25 +213,6 @@ module Make (Test : Test_intf) = struct
               compare_maskable_mask_hashes maskable attached_mask dummy_address ) ) )
 
   let () =
-    add_test "mask prune after parent notification" (fun () ->
-        Test.with_instances (fun maskable mask ->
-            let attached_mask = Maskable.register_mask maskable mask in
-            (* set to mask *)
-            Mask.Attached.set attached_mask dummy_location dummy_account ;
-            (* verify account is in mask *)
-            if
-              Mask.Attached.For_testing.location_in_mask attached_mask
-                dummy_location
-            then (
-              Maskable.set maskable dummy_location dummy_account ;
-              (* verify account pruned from mask *)
-              assert (
-                not
-                  (Mask.Attached.For_testing.location_in_mask attached_mask
-                     dummy_location ) ) )
-            else assert false ) )
-
-  let () =
     add_test "commit puts mask contents in parent, flushes mask" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
@@ -309,10 +290,6 @@ module Make (Test : Test_intf) = struct
     add_test "mask and parent agree on Merkle root after set" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
-            (* the order of sets matters here; if we set in the mask first,
-                   the set in the maskable notifies the mask, which then removes
-                   the account, changing the Merkle root to what it was before the set
-            *)
             Maskable.set maskable dummy_location dummy_account ;
             Mask.Attached.set attached_mask dummy_location dummy_account ;
             let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
@@ -627,25 +604,6 @@ module Make (Test : Test_intf) = struct
                       ~expect:(Some a) (Mask.Attached.get m2 loc) )
             | _ ->
                 failwith "unexpected" ) )
-
-  let () =
-    add_test
-      "setting account in parent doesn't remove masked copy if mask is still \
-       dirty for said account" (fun () ->
-        Test.with_instances (fun maskable mask ->
-            let attached_mask = Maskable.register_mask maskable mask in
-            let k = Account_id.gen_accounts 1 |> List.hd_exn in
-            let T = Account_id.eq in
-            let acct1 = Account.create k (Balance.of_nanomina_int_exn 10) in
-            let loc =
-              Mask.Attached.get_or_create_account attached_mask k acct1
-              |> Or_error.ok_exn |> snd
-            in
-            let acct2 = Account.create k (Balance.of_nanomina_int_exn 5) in
-            Maskable.set maskable loc acct2 ;
-            [%test_result: Account.t]
-              ~message:"account in mask should be unchanged" ~expect:acct1
-              (Mask.Attached.get attached_mask loc |> Option.value_exn) ) )
 
   let () =
     add_test "all_accounts_on_masks works on a chain" (fun () ->

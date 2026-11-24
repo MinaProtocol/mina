@@ -85,7 +85,6 @@ module Make (Inputs : Inputs_intf.S) = struct
              and for a few ancestors.
              This is used as a lookup cache. *)
     ; mutable accumulated : accumulated_t option
-    ; mutable is_committing : bool
     }
 
   type unattached = t
@@ -107,7 +106,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; depth
     ; accumulated = None
     ; maps = empty_maps
-    ; is_committing = false
     }
 
   let get_uuid { uuid; _ } = uuid
@@ -498,41 +496,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root ancestor
 
-    let remove_account_and_update_hashes t location =
-      (* remove account and key from tables *)
-      let account = Option.value_exn (Map.find t.maps.accounts location) in
-      let account_id = Account.identifier account in
-      t.maps <-
-        { t.maps with
-          (* remove account and key from tables *)
-          accounts =
-            Map.remove t.maps.accounts location (* update token info. *)
-        ; token_owners =
-            Token_id.Map.remove t.maps.token_owners
-              (Account_id.derive_token_id ~owner:account_id)
-            (* TODO : use stack database to save unused location, which can be used
-               when allocating a location *)
-        ; locations = Map.remove t.maps.locations account_id
-        } ;
-      (* reuse location if possible *)
-      Option.iter t.current_location ~f:(fun curr_loc ->
-          if Location.equal location curr_loc then
-            match Location.prev location with
-            | Some prev_loc ->
-                t.current_location <- Some prev_loc
-            | None ->
-                t.current_location <- None ) ;
-      (* update hashes *)
-      let account_address = Location.to_path_exn location in
-      let account_hash = Hash.empty_account in
-      let merkle_path = merkle_path t location in
-      let addresses_and_hashes =
-        addresses_and_hashes_from_merkle_path_exn merkle_path account_address
-          account_hash
-      in
-      List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          self_set_hash t addr hash )
-
     let set_account_unsafe t location account =
       assert_is_attached t ;
       self_set_account t location account ;
@@ -558,24 +521,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
-
-    (* if the mask's parent sets an account, we can prune an entry in the mask
-       if the account in the parent is the same in the mask
-
-        returns true is the mask is in the state of being comitted *)
-    let parent_set_notify t account =
-      assert_is_attached t ;
-      Option.value ~default:()
-      @@ let%bind.Option location =
-           Map.find t.maps.locations (Account.identifier account)
-         in
-         let%bind.Option existing_account = Map.find t.maps.accounts location in
-         let%map.Option () =
-           Option.some_if (Account.equal account existing_account) ()
-         in
-         remove_account_and_update_hashes t location
-
-    let is_committing t = t.is_committing
 
     (* as for accounts, we see if we have it in the mask, else delegate to
        parent *)
@@ -620,8 +565,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
-      assert (not t.is_committing) ;
-      t.is_committing <- true ;
       assert_is_attached t ;
       let parent = get_parent t in
       let old_root_hash = merkle_root t in
@@ -636,8 +579,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               old one in the mask" ) ;
       assert (
         Hash.equal (merkle_root t) (Base.merkle_root parent)
-        || failwith "Merkle root of the mask should delegate to the parent now" ) ;
-      t.is_committing <- false
+        || failwith "Merkle root of the mask should delegate to the parent now" )
 
     (* copy tables in t; use same parent *)
     let copy t =
@@ -654,7 +596,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; next = acc.next
               ; current = acc.current
               } )
-      ; is_committing = false
       }
 
     let last_filled t =
@@ -681,8 +622,6 @@ module Make (Inputs : Inputs_intf.S) = struct
                   failwith
                     "last_filled: expected account locations for the parent \
                      and mask" ) )
-
-    let drop_accumulated t = t.accumulated <- None
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
