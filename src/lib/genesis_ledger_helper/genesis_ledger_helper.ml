@@ -706,6 +706,7 @@ module Genesis_proof = struct
         ~genesis_epoch_data:
           (Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data)
         ~constraint_constants:light_proof.constraint_constants
+        ~fork:light_proof.genesis_constants.fork
         ~consensus_constants:light_proof.consensus_constants
         ~genesis_body_reference:light_proof.genesis_body_reference
     in

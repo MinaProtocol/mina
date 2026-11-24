@@ -409,6 +409,15 @@ module Accounts = struct
       with Stop -> accounts
 end
 
+let fork_constants_of_fork_config
+    ({ state_hash; blockchain_length; global_slot_since_genesis } :
+      Runtime_config.Fork_config.t ) : Genesis_constants.Fork_constants.t =
+  { state_hash = State_hash.of_base58_check_exn state_hash
+  ; blockchain_length = Mina_numbers.Length.of_int blockchain_length
+  ; global_slot_since_genesis =
+      Mina_numbers.Global_slot_since_genesis.of_int global_slot_since_genesis
+  }
+
 let constraint_constants_of_proof_keys
     ~(default : Genesis_constants.Constraint_constants.t)
     ~block_window_duration_ms (config : Runtime_config.Proof_keys.t) :
@@ -458,18 +467,6 @@ let constraint_constants_of_proof_keys
   ; account_creation_fee =
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee
-  ; fork =
-      ( match config.fork with
-      | None ->
-          default.fork
-      | Some { state_hash; blockchain_length; global_slot_since_genesis } ->
-          Some
-            { state_hash = State_hash.of_base58_check_exn state_hash
-            ; blockchain_length = Mina_numbers.Length.of_int blockchain_length
-            ; global_slot_since_genesis =
-                Mina_numbers.Global_slot_since_genesis.of_int
-                  global_slot_since_genesis
-            } )
   }
 
 let make_constraint_constants
@@ -502,16 +499,7 @@ let runtime_config_of_constraint_constants
   ; supercharged_coinbase_factor =
       Some constraint_constants.supercharged_coinbase_factor
   ; account_creation_fee = Some constraint_constants.account_creation_fee
-  ; fork =
-      Option.map constraint_constants.fork
-        ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis } ->
-          { Runtime_config.Fork_config.state_hash =
-              State_hash.to_base58_check state_hash
-          ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
-          ; global_slot_since_genesis =
-              Mina_numbers.Global_slot_since_genesis.to_int
-                global_slot_since_genesis
-          } )
+  ; fork = None
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
@@ -583,6 +571,10 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; minimum_user_command_fee =
       Option.value ~default:default.minimum_user_command_fee
         (config.daemon >>= fun cfg -> cfg.minimum_user_command_fee)
+  ; fork =
+      Option.value_map ~default:default.fork
+        (config.proof >>= fun cfg -> cfg.fork)
+        ~f:(fun fork -> Some (fork_constants_of_fork_config fork))
   }
 
 let%test_module "Runtime config" =

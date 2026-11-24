@@ -486,7 +486,7 @@ let state_body ~logger ~(genesis_constants : Genesis_constants.t)
          (Consensus.Genesis_data.Ledger.to_hashed (module Test_genesis_ledger))
        ~genesis_epoch_data:
          (Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data)
-       ~constraint_constants ~consensus_constants
+       ~constraint_constants ~fork:genesis_constants.fork ~consensus_constants
        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
      |> With_hash.data |> Mina_state.Protocol_state.body )
 

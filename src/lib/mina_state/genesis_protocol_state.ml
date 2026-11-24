@@ -1,6 +1,6 @@
 open Core_kernel
 
-let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
+let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants ~fork
     ~consensus_constants ~genesis_body_reference =
   let protocol_constants =
     Consensus.Constants.to_protocol_constants consensus_constants
@@ -9,20 +9,19 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     Protocol_state.(
       hashes
         (negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
-           ~consensus_constants ~genesis_body_reference ))
+           ~fork ~consensus_constants ~genesis_body_reference ))
       .state_hash
   in
   let genesis_consensus_state =
     Consensus.Data.Consensus_state.create_genesis
       ~negative_one_protocol_state_hash ~genesis_ledger ~genesis_epoch_data
-      ~constraint_constants ~constants:consensus_constants
+      ~constraint_constants ~fork ~constants:consensus_constants
   in
   let state =
     Protocol_state.create_value
       ~genesis_state_hash:negative_one_protocol_state_hash
       ~previous_state_hash:
-        (Option.value_map constraint_constants.fork
-           ~default:negative_one_protocol_state_hash
+        (Option.value_map fork ~default:negative_one_protocol_state_hash
            ~f:(fun { state_hash; _ } -> state_hash) )
       ~blockchain_state:
         (Blockchain_state.genesis ~constraint_constants ~consensus_constants

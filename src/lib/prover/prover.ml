@@ -610,7 +610,8 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
       ~genesis_epoch_data:
         (Consensus.Genesis_data.Epoch.to_hashed
            genesis_inputs.genesis_epoch_data )
-      ~constraint_constants ~consensus_constants ~genesis_body_reference
+      ~constraint_constants ~fork:genesis_inputs.genesis_constants.fork
+      ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =
     match genesis_inputs.genesis_epoch_data with

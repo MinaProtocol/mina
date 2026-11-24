@@ -221,13 +221,17 @@ let%snarkydef_ step ~(logger : Logger.t)
       |> Consensus.Data.Consensus_state.is_genesis_state_var
     in
     let%bind previous_state_hash =
-      match constraint_constants.fork with
-      | Some { state_hash = fork_prev; _ } ->
-          State_hash.if_ is_base_case
-            ~then_:(State_hash.var_of_t fork_prev)
-            ~else_:t.previous_state_hash
-      | None ->
-          Checked.return t.previous_state_hash
+      let%bind base_case_previous_state_hash =
+        exists State_hash.typ
+          ~compute:
+            As_prover.(
+              map
+                (read (Typ.prover_value ())
+                   (Data_as_hash.prover_value new_state) )
+                ~f:Protocol_state.previous_state_hash)
+      in
+      State_hash.if_ is_base_case ~then_:base_case_previous_state_hash
+        ~else_:t.previous_state_hash
     in
     let t = { t with previous_state_hash } in
     let%map () =

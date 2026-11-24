@@ -1972,11 +1972,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let negative_one ~(genesis_ledger : Genesis_data.Hashed.t)
           ~(genesis_epoch_data : Genesis_data.Hashed.t Genesis_data.Epoch.t)
           ~(constants : Constants.t)
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+          ~(fork : Genesis_constants.Fork_constants.t option) =
         let max_sub_window_density = constants.slots_per_sub_window in
         let max_window_density = constants.slots_per_window in
         let blockchain_length, global_slot_since_genesis =
-          match constraint_constants.fork with
+          match fork with
           | None ->
               (Length.zero, Mina_numbers.Global_slot_since_genesis.zero)
           | Some { blockchain_length; global_slot_since_genesis; _ } ->
@@ -2027,7 +2027,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let create_genesis_from_transition ~negative_one_protocol_state_hash
           ~consensus_transition ~(genesis_ledger : Genesis_data.Hashed.t)
           ~(genesis_epoch_data : Genesis_data.Hashed.t Genesis_data.Epoch.t)
-          ~constraint_constants ~constants : Value.t =
+          ~constraint_constants ~fork ~constants : Value.t =
         let staking_seed =
           Option.value_map genesis_epoch_data ~default:Epoch_seed.initial
             ~f:(fun data -> data.staking.seed)
@@ -2049,7 +2049,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (update ~constants ~producer_vrf_result
              ~previous_consensus_state:
                (negative_one ~genesis_ledger ~genesis_epoch_data ~constants
-                  ~constraint_constants )
+                  ~fork )
              ~previous_protocol_state_hash:negative_one_protocol_state_hash
              ~consensus_transition ~total_currency:genesis_ledger.total_currency
              ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
@@ -2058,10 +2058,10 @@ module Make_str (A : Wire_types.Concrete) = struct
              ~coinbase_receiver:genesis_winner_pk ~supercharge_coinbase:true )
 
       let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
-          ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
+          ~genesis_epoch_data ~constraint_constants ~fork ~constants : Value.t =
         create_genesis_from_transition ~negative_one_protocol_state_hash
           ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
-          ~genesis_epoch_data ~constraint_constants ~constants
+          ~genesis_epoch_data ~constraint_constants ~fork ~constants
 
       (* ??? do these mean, genesis-of-all-time, or genesis-at-hard-fork? *)
       (* Check that both epoch and slot are zero. *)
@@ -3116,9 +3116,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let negative_one =
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
-          ~constants
-          ~constraint_constants:
-            Genesis_constants.For_unit_tests.Constraint_constants.t
+          ~constants ~fork:None
       in
       let curr_epoch, curr_slot =
         Consensus_state.curr_epoch_and_slot negative_one
@@ -3143,9 +3141,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let negative_one =
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
-          ~constants
-          ~constraint_constants:
-            Genesis_constants.For_unit_tests.Constraint_constants.t
+          ~constants ~fork:None
       in
       let start_time = Epoch.start_time ~constants epoch in
       let ((curr_epoch, curr_slot) as curr) =
@@ -3494,7 +3490,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let consensus_constants = constants
       end
 
-      let test_update constraint_constants =
+      let test_update ~fork =
         (* build pieces needed to apply "update" *)
         let snarked_ledger_hash =
           Frozen_ledger_hash.of_ledger_hash
@@ -3507,10 +3503,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger ~genesis_epoch_data ~constraint_constants ~constants
+            ~genesis_ledger ~genesis_epoch_data ~constraint_constants ~fork
+            ~constants
         in
         (*If this is a fork then check blockchain length and global_slot_since_genesis have been set correctly*)
-        ( match constraint_constants.fork with
+        ( match fork with
         | None ->
             ()
         | Some fork ->
@@ -3588,7 +3585,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           |> Or_error.ok_exn
         in
         (*If this is a fork then check blockchain length and global_slot_since_genesis have increased correctly*)
-        ( match constraint_constants.fork with
+        ( match fork with
         | None ->
             ()
         | Some fork ->
@@ -3694,27 +3691,23 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let%test_unit "update, update_var agree starting from same genesis state"
           =
-        test_update constraint_constants
+        test_update ~fork:None
 
       let%test_unit "update, update_var agree starting from same genesis state \
                      after fork" =
-        let constraint_constants_with_fork =
-          let fork_constants =
-            Some
-              { Genesis_constants.Fork_constants.state_hash =
-                  Result.ok_or_failwith
-                    (State_hash.of_yojson
-                       (`String
-                         "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"
-                         ) )
-              ; blockchain_length = Mina_numbers.Length.of_int 100
-              ; global_slot_since_genesis =
-                  Mina_numbers.Global_slot_since_genesis.of_int 200
-              }
-          in
-          { constraint_constants with fork = fork_constants }
+        let fork =
+          Some
+            { Genesis_constants.Fork_constants.state_hash =
+                Result.ok_or_failwith
+                  (State_hash.of_yojson
+                     (`String
+                       "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY" ) )
+            ; blockchain_length = Mina_numbers.Length.of_int 100
+            ; global_slot_since_genesis =
+                Mina_numbers.Global_slot_since_genesis.of_int 200
+            }
         in
-        test_update constraint_constants_with_fork
+        test_update ~fork
 
       let%test_unit "vrf win rate" =
         let constants = Lazy.force Constants.for_unit_tests in
@@ -3730,7 +3723,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger ~genesis_epoch_data ~constraint_constants ~constants
+            ~genesis_ledger ~genesis_epoch_data ~constraint_constants ~fork:None
+            ~constants
         in
         let seed = previous_consensus_state.staking_epoch_data.seed in
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in

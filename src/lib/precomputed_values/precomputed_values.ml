@@ -30,6 +30,7 @@ let for_unit_tests =
              Consensus.Genesis_data.Epoch.for_unit_tests )
         ~constraint_constants:
           Genesis_constants.For_unit_tests.Constraint_constants.t
+        ~fork:Genesis_constants.For_unit_tests.t.fork
         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)
         ~genesis_body_reference
     in

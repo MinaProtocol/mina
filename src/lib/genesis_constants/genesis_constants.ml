@@ -54,7 +54,6 @@ module Constraint_constants = struct
     ; coinbase_amount : Currency.Amount.Stable.Latest.t
     ; supercharged_coinbase_factor : int
     ; account_creation_fee : Currency.Fee.Stable.Latest.t
-    ; fork : Fork_constants.t option
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
@@ -68,19 +67,7 @@ module Constraint_constants = struct
     ; coinbase_amount = Currency.Amount.to_uint64 t.coinbase_amount
     ; supercharged_coinbase_factor = t.supercharged_coinbase_factor
     ; account_creation_fee = Currency.Fee.to_uint64 t.account_creation_fee
-    ; fork =
-        ( match t.fork with
-        | Some { blockchain_length; state_hash; global_slot_since_genesis } ->
-            Some
-              { blockchain_length = Unsigned.UInt32.to_int blockchain_length
-              ; state_hash = Pickles.Backend.Tick.Field.to_string state_hash
-              ; global_slot_since_genesis =
-                  Unsigned.UInt32.to_int
-                    (Mina_numbers.Global_slot_since_genesis.to_uint32
-                       global_slot_since_genesis )
-              }
-        | None ->
-            None )
+    ; fork = None
     }
 end
 
@@ -274,6 +261,7 @@ module T = struct
     ; max_action_elements : int
     ; zkapp_cmd_limit_hardcap : int
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
+    ; fork : Fork_constants.t option
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
@@ -405,7 +393,6 @@ module Make (Node_config : Node_config_intf.S) : S = struct
           ; account_creation_fee =
               Currency.Fee.of_mina_string_exn
                 Node_config.account_creation_fee_int
-          ; fork = None
           }
       end :
         sig
@@ -452,6 +439,7 @@ module Make (Node_config : Node_config_intf.S) : S = struct
     ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
     ; minimum_user_command_fee =
         Currency.Fee.of_mina_string_exn Node_config.minimum_user_command_fee
+    ; fork = None
     }
 end
 

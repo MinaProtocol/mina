@@ -567,7 +567,7 @@ module type S = sig
            genesis_ledger:Genesis_data.Hashed.t
         -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constants:Constants.t
-        -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> fork:Genesis_constants.Fork_constants.t option
         -> Value.t
 
       val create_genesis_from_transition :
@@ -576,6 +576,7 @@ module type S = sig
         -> genesis_ledger:Genesis_data.Hashed.t
         -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> fork:Genesis_constants.Fork_constants.t option
         -> constants:Constants.t
         -> Value.t
 
@@ -584,6 +585,7 @@ module type S = sig
         -> genesis_ledger:Genesis_data.Hashed.t
         -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> fork:Genesis_constants.Fork_constants.t option
         -> constants:Constants.t
         -> Value.t
 

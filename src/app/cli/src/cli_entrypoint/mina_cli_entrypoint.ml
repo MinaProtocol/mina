@@ -13,13 +13,13 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
-    =
+let make_ledger_backing ~(fork : Genesis_constants.Fork_constants.t option)
+    ~runtime_config ~hardfork_handling =
   let current_genesis_global_slot =
     let%map.Option { global_slot_since_genesis = current_genesis_global_slot
                    ; _
                    } =
-      constraint_constants.Genesis_constants.Constraint_constants.fork
+      fork
     in
     current_genesis_global_slot
   in
@@ -155,8 +155,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
             (to_string chain_id) ()
   in
   let ledger_backing =
-    make_ledger_backing
-      ~constraint_constants:precomputed_values.constraint_constants
+    make_ledger_backing ~fork:precomputed_values.genesis_constants.fork
       ~runtime_config:config ~hardfork_handling
   in
   ( precomputed_values

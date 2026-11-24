@@ -22,8 +22,8 @@ let logger = Logger.null ()
 let time_controller = Block_time.Controller.basic ~logger
 
 let empty =
-  empty ~constraint_constants ~consensus_constants ~time_controller
-    ~slot_tx_end:None
+  empty ~constraint_constants ~fork:precomputed_values.genesis_constants.fork
+    ~consensus_constants ~time_controller ~slot_tx_end:None
 
 let empty_invariants () = assert_pool_consistency empty
 
@@ -413,7 +413,8 @@ let dummy_state_view =
           (Consensus.Genesis_data.Epoch.to_hashed
              Consensus.Genesis_data.Epoch.for_unit_tests )
         ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
-        ~constraint_constants ~consensus_constants
+        ~constraint_constants ~fork:precomputed_values.genesis_constants.fork
+        ~consensus_constants
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in

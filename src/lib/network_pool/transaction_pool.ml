@@ -832,7 +832,8 @@ struct
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool =
-            Indexed_pool.empty ~constraint_constants ~consensus_constants
+            Indexed_pool.empty ~constraint_constants
+              ~fork:config.Config.genesis_constants.fork ~consensus_constants
               ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted = Locally_generated.create ()
         ; locally_generated_committed = Locally_generated.create ()
@@ -1753,7 +1754,8 @@ let%test_module _ =
             ~genesis_epoch_data:
               (Consensus.Genesis_data.Epoch.to_hashed
                  Consensus.Genesis_data.Epoch.for_unit_tests )
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~fork:genesis_constants.fork
+            ~consensus_constants
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         in
         compile_time_genesis.data |> Mina_state.Protocol_state.body
