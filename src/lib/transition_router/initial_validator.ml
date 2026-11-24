@@ -441,20 +441,32 @@ let%test_module "Initial validation of block bodies" =
                  ~logger ~trust_system ~verifier ~initialization_finish_signal
                  ~precomputed_values )
           in
-          let valid_transition_reader, valid_transition_writer =
-            Pipe_lib.Strict_pipe.create (Buffered (`Capacity 2, `Overflow Crash))
+          let passed_on = ref [] in
+          let on_valid (b_or_h, `Valid_cb _) =
+            let state_hash =
+              match b_or_h with
+              | `Block cached ->
+                  Cache_lib.Cached.invalidate_with_failure cached
+                  |> Envelope.Incoming.data
+                  |> Mina_block.Validation.block_with_hash
+                  |> State_hash.With_state_hashes.state_hash
+              | `Header h ->
+                  State_hash.With_state_hashes.state_hash
+                    (fst (Envelope.Incoming.data h))
+            in
+            passed_on := state_hash :: !passed_on
           in
           let handle =
             Transition_handler.Validator.create_handler
               ~context:(module Context)
               ~trust_system
               ~time_controller:(Block_time.Controller.basic ~logger)
-              ~frontier ~valid_transition_writer
+              ~frontier ~on_valid
               ~unprocessed_transition_cache:
                 (Transition_handler.Unprocessed_transition_cache.create ~logger
                    ~cache_exceptions:false )
           in
-          let%bind answers =
+          let%map answers =
             Deferred.List.map blocks ~how:`Sequential ~f:(fun block ->
                 let valid_cb =
                   Mina_net2.Validation_callback.create_without_expiration ()
@@ -486,25 +498,6 @@ let%test_module "Initial validation of block bodies" =
                 in
                 let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
                 !answer )
-          in
-          Pipe_lib.Strict_pipe.Writer.close valid_transition_writer ;
-          let passed_on = ref [] in
-          let%map () =
-            Pipe_lib.Strict_pipe.Reader.iter valid_transition_reader
-              ~f:(fun (b_or_h, `Valid_cb _) ->
-                let state_hash =
-                  match b_or_h with
-                  | `Block cached ->
-                      Cache_lib.Cached.invalidate_with_failure cached
-                      |> Envelope.Incoming.data
-                      |> Mina_block.Validation.block_with_hash
-                      |> State_hash.With_state_hashes.state_hash
-                  | `Header h ->
-                      State_hash.With_state_hashes.state_hash
-                        (fst (Envelope.Incoming.data h))
-                in
-                passed_on := state_hash :: !passed_on ;
-                Deferred.unit )
           in
           let penalised =
             match Pipe.read_now' actions with

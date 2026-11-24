@@ -94,16 +94,25 @@ module For_tests : sig
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
 
+  (** The merkle root of the root snarked ledger. *)
+  val root_ledger_hash : t -> Mina_base.Ledger_hash.t
+
+  (** The merkle roots of the masks between the root snarked ledger and the
+      root's mask, lowest first. *)
+  val ledger_hashes_below_root : t -> Mina_base.Ledger_hash.t list
+
   val gen_breadcrumb :
        verifier:Verifier.t
     -> ?send_to_random_pk:bool
+    -> ?include_snark_work:bool
     -> unit
     -> (   Frontier_base.Breadcrumb.t
         -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
        Base_quickcheck.Generator.t
 
   val gen_breadcrumb_seq :
-       verifier:Verifier.t
+       ?include_snark_work:bool
+    -> verifier:Verifier.t
     -> int
     -> (   Frontier_base.Breadcrumb.t
         -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )

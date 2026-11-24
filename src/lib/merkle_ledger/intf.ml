@@ -427,10 +427,16 @@ module Ledger = struct
 
     val get_hash_batch_exn : t -> Location.t list -> hash list
 
-    (** Triggers when the ledger has been detached and should no longer be
-      accessed.
-  *)
-    val detached_signal : t -> unit Async_kernel.Deferred.t
+    (** Whether the ledger can still be read: [false] once it, or a mask below
+        it, has been orphaned, or once it has been closed. *)
+    val is_attached : t -> bool
+
+    (** The ledger's position in its stack of masks: 0 for a ledger that isn't
+        a mask, and greater than its parent's for a mask. *)
+    val level : t -> int
+
+    (** Raise if this ledger, or a mask below it, has been orphaned. *)
+    val handle_mutations : t -> unit
 
     (** Get all accounts on all masks of current ledger until reaching a 
         non-mask. Used to migrate root to an potential staged ledger for fork 

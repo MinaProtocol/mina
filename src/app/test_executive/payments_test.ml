@@ -499,11 +499,37 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri untimed_node_b)
              ~account_id:(get_account_id snark_node_key1.keypair.public_key)
          in
-         let%bind { total_balance = key_2_balance_actual; _ } =
-           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
-             (Network.Node.get_ingress_uri untimed_node_a)
-             ~account_id:(get_account_id snark_node_key2.keypair.public_key)
+         (* The proofs waited for above may all have been bought from
+            snark-node-key1, so wait (for up to 10 slots) for a block that pays
+            snark-node-key2 for its work. *)
+         let deadline =
+           Time.add (Time.now ())
+             (Time.Span.scale
+                (Time.Span.of_ms
+                   (Float.of_int
+                      (Network.constraint_constants network)
+                        .block_window_duration_ms ) )
+                10.0 )
          in
+         let rec get_key_2_balance () =
+           let%bind { total_balance; _ } =
+             Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+               (Network.Node.get_ingress_uri untimed_node_a)
+               ~account_id:(get_account_id snark_node_key2.keypair.public_key)
+           in
+           if
+             Currency.Amount.( >= )
+               (Currency.Balance.to_amount total_balance)
+               new_snark_work_fee
+             || Time.(now () > deadline)
+           then Malleable_error.return total_balance
+           else
+             let%bind () =
+               Malleable_error.lift (after (Time.Span.of_sec 5.0))
+             in
+             get_key_2_balance ()
+         in
+         let%bind key_2_balance_actual = get_key_2_balance () in
          if
            Currency.Amount.( >= )
              (Currency.Balance.to_amount key_2_balance_actual)
@@ -552,8 +578,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (* Without an explicit target the replayer only replays up to the highest
          canonical block, which in a short-lived test network is genesis, so it
-         emits too few logs. Target a recent proof block instead: it is deep in
-         the chain and therefore already persisted in the archive. *)
+         emits too few logs. Target a recent proof block instead, once a later
+         block has been produced: the archive has received the proof block by
+         then. *)
       (let proof_state_hash =
          let ns = network_state t in
          match ns.proof_block_state_hashes with
@@ -564,6 +591,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        in
        [%log info] "Replaying archive up to proof block $state_hash"
          ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
+       let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
        let%bind logs =
          Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))

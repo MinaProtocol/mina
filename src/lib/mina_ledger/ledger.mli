@@ -135,12 +135,6 @@ include
      and type accumulated_t = Mask.accumulated_t
      and type maps_t := Mask_maps.t
 
-(* We override the type of unregister_mask_exn that comes from
-   Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
-   doing reparenting and shouldn't be able to turn off the check parameter.
-*)
-val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
-
 val unsafe_preload_accounts_from_parent :
   Mask.Attached.t -> Account_id.t list -> unit
 
@@ -170,6 +164,11 @@ val copy : t -> t
 val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
+
+val commit_and_replace_parent :
+  loc:string -> Mask.Attached.t -> parent:Mask.Attached.t -> unit
+
+val remove_parent : Mask.Attached.t -> parent:Mask.Attached.t -> unit
 
 include
   Mina_transaction_logic.S with type ledger := t and type location := Location.t

@@ -70,7 +70,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; detached_next_signal : Detached_parent_signal.t
           (** Ivar for mask from which next was started being built.
              When it's fulfilled, [next] becomes [current] (because next contains superset of all masks from [baser],
-            [detached_signal] is reset to the current mask and [next] is set to contents of the current mask.
+            [detached_next_signal] is reset to the current mask and [next] is set to contents of the current mask.
           *)
     }
 
@@ -85,7 +85,9 @@ module Make (Inputs : Inputs_intf.S) = struct
              and for a few ancestors.
              This is used as a lookup cache. *)
     ; mutable accumulated : accumulated_t option
-    ; mutable is_committing : bool
+    ; mutable level : int
+    ; mutable mutations : Merkle_ledger.Mutations.t
+          (** This mask's place in the log of orphaned masks *)
     }
 
   type unattached = t
@@ -107,13 +109,19 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; depth
     ; accumulated = None
     ; maps = empty_maps
-    ; is_committing = false
+    ; level = 0
+    ; mutations = Merkle_ledger.Mutations.current ()
     }
 
   let get_uuid { uuid; _ } = uuid
 
   module Attached = struct
-    type t = unattached
+    type desc = Ledger of unattached | Orphaned of Uuid.t * string
+
+    (** The handle that every holder of an attached mask shares. Orphaning it
+        makes every holder's next use raise, including the masks attached to
+        it. *)
+    type t = { mutable desc : desc }
 
     module Path = Base.Path
     module Addr = Location.Addr
@@ -127,25 +135,61 @@ module Make (Inputs : Inputs_intf.S) = struct
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
 
-    let unset_parent ?(trigger_signal = true) ~loc t =
-      assert (Result.is_ok t.parent) ;
-      t.parent <- Error loc ;
-      if trigger_signal then (
-        t.accumulated <- None ;
-        Async.Ivar.fill_if_empty t.detached_parent_signal () ) ;
-      t
-
-    let assert_is_attached t =
-      match t.parent with
-      | Error loc ->
-          raise (Dangling_parent_reference (t.uuid, loc))
-      | Ok _ ->
+    (** Catch [t] up on the masks orphaned since it last did, raising if one
+        of them is below it. The entries after [t]'s place in the log are first
+        merged, in the log itself, into one at their lowest level, so that
+        [t]'s parent is caught up at most once. *)
+    let rec catch_up t =
+      match t.mutations with
+      | { tail = Some (level1, { tail = Some (level2, mutations) }) } as head ->
+          head.tail <- Some (Int.min level1 level2, mutations) ;
+          catch_up t
+      | { tail = Some (level, ({ tail = None } as last)) } ->
+          if level < t.level then
+            Base.handle_mutations (Result.ok_or_failwith t.parent) ;
+          t.mutations <- last
+      | { tail = None } ->
           ()
 
-    let detached_signal t = Async.Ivar.read t.detached_parent_signal
+    let repr t =
+      match t.desc with
+      | Ledger t ->
+          catch_up t ; t
+      | Orphaned (uuid, loc) ->
+          raise (Dangling_parent_reference (uuid, loc))
 
-    let get_parent ({ parent = opt; _ } as t) =
-      assert_is_attached t ; Result.ok_or_failwith opt
+    let detach ~loc t =
+      t.parent <- Error loc ;
+      t.accumulated <- None ;
+      Async.Ivar.fill_if_empty t.detached_parent_signal ()
+
+    let discard ~loc attached =
+      match attached.desc with
+      | Orphaned _ ->
+          ()
+      | Ledger t ->
+          attached.desc <- Orphaned (t.uuid, loc) ;
+          Merkle_ledger.Mutations.append t.level ;
+          detach ~loc t
+
+    let unset_parent ~loc attached =
+      let t = repr attached in
+      discard ~loc attached ; t
+
+    let assert_is_attached t = ignore (repr t : unattached)
+
+    let is_attached t =
+      match repr t with
+      | (_ : unattached) ->
+          true
+      | exception Dangling_parent_reference _ ->
+          false
+
+    let get_parent t = Result.ok_or_failwith (repr t).parent
+
+    let level t = (repr t).level
+
+    let handle_mutations = assert_is_attached
 
     (** Check whether mask from which we started computing the [next]
         accumulator is detached and [current] can be garbage-collected. *)
@@ -170,10 +214,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Some { current; base; _ } ->
           (current, base)
       | None ->
-          (t.maps, get_parent t)
+          (t.maps, Result.ok_or_failwith t.parent)
 
     (** Either copies accumulated or initializes it with the parent being used as the [base]. *)
     let to_accumulated t =
+      let t = repr t in
       actualize_accumulated t ;
       match (t.accumulated, t.parent) with
       | Some { base; detached_next_signal; next; current }, _ ->
@@ -187,13 +232,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None, Error loc ->
           raise (Dangling_parent_reference (t.uuid, loc))
 
-    let get_uuid t = assert_is_attached t ; t.uuid
+    let get_uuid t = (repr t).uuid
 
-    let get_directory t =
-      assert_is_attached t ;
-      Base.get_directory (Result.ok_or_failwith t.parent)
+    let get_directory t = Base.get_directory (get_parent t)
 
-    let depth t = assert_is_attached t ; t.depth
+    let depth t = (repr t).depth
 
     let update_maps ~f t =
       t.maps <- f t.maps ;
@@ -201,11 +244,9 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
-    let get_maps t = assert_is_attached t ; t.maps
+    let get_maps t = (repr t).maps
 
-    let append_maps t maps =
-      assert_is_attached t ;
-      update_maps t ~f:(Fn.flip maps_merge maps)
+    let append_maps t maps = update_maps (repr t) ~f:(Fn.flip maps_merge maps)
 
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
@@ -245,7 +286,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
     let get t location =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.accounts location with
       | Some account ->
@@ -263,7 +304,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           if is_empty then None else Base.get ancestor location
 
     let self_find_or_batch_lookup self_find lookup_parent t ids =
-      assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
       let self_found_or_none = List.map ids ~f:(self_find ~maps) in
       let not_found =
@@ -289,6 +329,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         |> snd
 
     let get_batch t =
+      let t = repr t in
       let is_empty loc =
         Option.value_map ~default:true t.current_location ~f:(fun cur_loc ->
             let cur_addr = Location.to_path_exn cur_loc in
@@ -406,7 +447,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        mask *)
 
     let merkle_path_at_addr_exn t address =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       match
         self_merkle_path ~depth:t.depth ~hashes:maps.hashes
@@ -421,13 +462,13 @@ module Make (Inputs : Inputs_intf.S) = struct
           fixup_merkle_path ~hashes:maps.hashes parent_merkle_path ~address
 
     let merkle_path_at_index_exn t index =
-      merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
+      merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:(depth t) index)
 
     let merkle_path t location =
       merkle_path_at_addr_exn t (Location.to_path_exn location)
 
     let path_batch_impl ~fixup_path ~self_lookup ~base_lookup t locations =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       let self_paths =
         List.map locations ~f:(fun location ->
@@ -490,7 +531,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.hashes (Addr.root ()) with
       | Some hash ->
@@ -498,43 +539,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root ancestor
 
-    let remove_account_and_update_hashes t location =
-      (* remove account and key from tables *)
-      let account = Option.value_exn (Map.find t.maps.accounts location) in
-      let account_id = Account.identifier account in
-      t.maps <-
-        { t.maps with
-          (* remove account and key from tables *)
-          accounts =
-            Map.remove t.maps.accounts location (* update token info. *)
-        ; token_owners =
-            Token_id.Map.remove t.maps.token_owners
-              (Account_id.derive_token_id ~owner:account_id)
-            (* TODO : use stack database to save unused location, which can be used
-               when allocating a location *)
-        ; locations = Map.remove t.maps.locations account_id
-        } ;
-      (* reuse location if possible *)
-      Option.iter t.current_location ~f:(fun curr_loc ->
-          if Location.equal location curr_loc then
-            match Location.prev location with
-            | Some prev_loc ->
-                t.current_location <- Some prev_loc
-            | None ->
-                t.current_location <- None ) ;
-      (* update hashes *)
-      let account_address = Location.to_path_exn location in
-      let account_hash = Hash.empty_account in
-      let merkle_path = merkle_path t location in
-      let addresses_and_hashes =
-        addresses_and_hashes_from_merkle_path_exn merkle_path account_address
-          account_hash
-      in
-      List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          self_set_hash t addr hash )
-
     let set_account_unsafe t location account =
-      assert_is_attached t ;
+      let t = repr t in
       self_set_account t location account ;
       (* Update token info. *)
       let account_id = Account.identifier account in
@@ -556,31 +562,14 @@ module Make (Inputs : Inputs_intf.S) = struct
         addresses_and_hashes_from_merkle_path_exn merkle_path account_address
           account_hash
       in
+      let t = repr t in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
-
-    (* if the mask's parent sets an account, we can prune an entry in the mask
-       if the account in the parent is the same in the mask
-
-        returns true is the mask is in the state of being comitted *)
-    let parent_set_notify t account =
-      assert_is_attached t ;
-      Option.value ~default:()
-      @@ let%bind.Option location =
-           Map.find t.maps.locations (Account.identifier account)
-         in
-         let%bind.Option existing_account = Map.find t.maps.accounts location in
-         let%map.Option () =
-           Option.some_if (Account.equal account existing_account) ()
-         in
-         remove_account_and_update_hashes t location
-
-    let is_committing t = t.is_committing
 
     (* as for accounts, we see if we have it in the mask, else delegate to
        parent *)
     let get_hash t addr =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.hashes addr with
       | Some hash ->
@@ -592,7 +581,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           with _ -> None )
 
     let get_hash_batch_exn t locations =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       let self_hashes_rev =
         List.rev_map locations ~f:(fun location ->
@@ -620,14 +609,13 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
-      assert (not t.is_committing) ;
-      t.is_committing <- true ;
       assert_is_attached t ;
       let parent = get_parent t in
       let old_root_hash = merkle_root t in
-      let account_data = Map.to_alist t.maps.accounts in
-      let hash_cache = t.maps.hashes in
-      t.maps <- empty_maps ;
+      let mask = repr t in
+      let account_data = Map.to_alist mask.maps.accounts in
+      let hash_cache = mask.maps.hashes in
+      mask.maps <- empty_maps ;
       Base.set_batch ~hash_cache parent account_data ;
       assert (
         Hash.equal old_root_hash (Base.merkle_root parent)
@@ -636,32 +624,63 @@ module Make (Inputs : Inputs_intf.S) = struct
               old one in the mask" ) ;
       assert (
         Hash.equal (merkle_root t) (Base.merkle_root parent)
-        || failwith "Merkle root of the mask should delegate to the parent now" ) ;
-      t.is_committing <- false
+        || failwith "Merkle root of the mask should delegate to the parent now" )
+
+    let commit_and_replace_parent ~loc t ~parent =
+      assert (Uuid.equal (Base.get_uuid (get_parent t)) (get_uuid parent)) ;
+      let mask = repr t in
+      (* A mask attached to [t] would read past [t] and [parent] through
+         [parent]'s cell if [t] didn't have an accumulated cache. *)
+      assert (Option.is_some mask.accumulated) ;
+      commit t ;
+      let parent_mask = repr parent in
+      parent.desc <- Orphaned (parent_mask.uuid, loc) ;
+      t.desc <- Ledger parent_mask ;
+      Merkle_ledger.Mutations.append parent_mask.level ;
+      detach ~loc mask
+
+    let move ~loc t =
+      let mask = repr t in
+      t.desc <- Orphaned (mask.uuid, loc) ;
+      { desc = Ledger mask }
+
+    let remove_parent t ~parent =
+      let mask = repr t in
+      assert (Uuid.equal (Base.get_uuid (get_parent t)) (get_uuid parent)) ;
+      let grandparent = get_parent parent in
+      assert (Hash.equal (merkle_root parent) (Base.merkle_root grandparent)) ;
+      assert (Map.is_empty (repr parent).maps.accounts) ;
+      (repr parent).accumulated <- None ;
+      mask.parent <- Ok grandparent
 
     (* copy tables in t; use same parent *)
     let copy t =
-      { uuid = Uuid_unix.create ()
-      ; parent = Ok (get_parent t)
-      ; detached_parent_signal = Async.Ivar.create ()
-      ; current_location = t.current_location
-      ; depth = t.depth
-      ; maps = t.maps
-      ; accumulated =
-          Option.map t.accumulated ~f:(fun acc ->
-              { base = acc.base
-              ; detached_next_signal = acc.detached_next_signal
-              ; next = acc.next
-              ; current = acc.current
-              } )
-      ; is_committing = false
+      let parent = get_parent t in
+      let t = repr t in
+      { desc =
+          Ledger
+            { uuid = Uuid_unix.create ()
+            ; parent = Ok parent
+            ; detached_parent_signal = Async.Ivar.create ()
+            ; current_location = t.current_location
+            ; depth = t.depth
+            ; maps = t.maps
+            ; level = t.level
+            ; mutations = t.mutations
+            ; accumulated =
+                Option.map t.accumulated ~f:(fun acc ->
+                    { base = acc.base
+                    ; detached_next_signal = acc.detached_next_signal
+                    ; next = acc.next
+                    ; current = acc.current
+                    } )
+            }
       }
 
     let last_filled t =
-      assert_is_attached t ;
-      Option.value_map
-        (Base.last_filled (get_parent t))
-        ~default:t.current_location
+      let parent = get_parent t in
+      let t = repr t in
+      Option.value_map (Base.last_filled parent) ~default:t.current_location
         ~f:(fun parent_loc ->
           match t.current_location with
           | None ->
@@ -681,8 +700,6 @@ module Make (Inputs : Inputs_intf.S) = struct
                   failwith
                     "last_filled: expected account locations for the parent \
                      and mask" ) )
-
-    let drop_accumulated t = t.accumulated <- None
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
@@ -712,17 +729,18 @@ module Make (Inputs : Inputs_intf.S) = struct
         Option.value_exn (get_hash t (Location.to_path_exn location))
 
       let set_raw_hash_batch t locations_and_hashes =
-        assert_is_attached t ;
+        let t = repr t in
         List.iter locations_and_hashes ~f:(fun (location, hash) ->
             self_set_hash t (Location.to_path_exn location) hash )
 
       let set_location_batch ~last_location t account_to_location_list =
+        let t = repr t in
         t.current_location <- Some last_location ;
         Mina_stdlib.Nonempty_list.iter account_to_location_list
           ~f:(fun (key, data) -> self_set_location t key data)
 
       let set_raw_account_batch t locations_and_accounts =
-        assert_is_attached t ;
+        let t = repr t in
         List.iter locations_and_accounts ~f:(fun (location, account) ->
             let account_id = Account.identifier account in
             self_set_token_owner t
@@ -736,7 +754,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       set_batch_accounts t addresses_and_accounts
 
     let token_owner t tid =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.token_owners tid with
       | Some id ->
@@ -745,7 +763,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           Base.token_owner ancestor tid
 
     let token_owners (t : t) : Account_id.Set.t =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       let mask_owners =
         Map.fold maps.token_owners ~init:Account_id.Set.empty
@@ -754,7 +772,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       Set.union mask_owners (Base.token_owners ancestor)
 
     let tokens t pk =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       let mask_tokens =
         Map.keys maps.locations
@@ -767,7 +785,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       Set.union mask_tokens (Base.tokens ancestor pk)
 
     let num_accounts t =
-      assert_is_attached t ;
+      let t = repr t in
       match t.current_location with
       | None ->
           0
@@ -784,7 +802,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       else Option.map ~f:Option.some @@ Map.find maps.locations account_id
 
     let location_of_account t account_id =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       match self_lookup_account ~maps account_id with
       | Some r ->
@@ -792,10 +810,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.location_of_account ancestor account_id
 
-    let location_of_account_batch =
+    let location_of_account_batch t =
       self_find_or_batch_lookup
         (fun ~maps id -> (id, self_lookup_account ~maps id))
-        Base.location_of_account_batch
+        Base.location_of_account_batch (repr t)
 
     (* Adds specified accounts to the mask by laoding them from parent ledger.
 
@@ -814,7 +832,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           | key, None ->
               Second key )
       in
-      update_maps t ~f:(fun maps ->
+      update_maps (repr t) ~f:(fun maps ->
           { maps with
             non_existent_accounts =
               Set.union maps.non_existent_accounts
@@ -856,7 +874,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       (* Batch import merkle paths and self hashes. *)
       List.iter2_exn all_hash_locations all_hashes ~f:(fun location hash ->
           let address = Location.to_path_exn location in
-          self_set_hash t address hash ) ;
+          self_set_hash (repr t) address hash ) ;
       (* Batch import accounts. *)
       List.iter accounts ~f:(fun (location, account) ->
           Option.iter account ~f:(set_account_unsafe t location) )
@@ -864,13 +882,13 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let get_inner_hash_at_addr_exn t address =
       assert_is_attached t ;
-      assert (Addr.depth address <= t.depth) ;
+      assert (Addr.depth address <= depth t) ;
       get_hash t address |> Option.value_exn
 
     (* Destroy intentionally does not commit before destroying
        as sometimes this is desired behavior *)
     let close t =
-      assert_is_attached t ;
+      let t = repr t in
       t.maps <- empty_maps ;
       Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
@@ -881,8 +899,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       Addr.to_int addr
 
     let get_at_index t index =
-      assert_is_attached t ;
-      let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
+      let addr = Addr.of_int_exn ~ledger_depth:(depth t) index in
       get t (Location.Account addr)
 
     let get_at_index_exn t index =
@@ -891,8 +908,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
     let set_at_index_exn t index account =
-      assert_is_attached t ;
-      let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
+      let addr = Addr.of_int_exn ~ledger_depth:(depth t) index in
       set t (Location.Account addr) account
 
     let to_list t =
@@ -925,7 +941,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                account_opt ) )
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
-      assert_is_attached t ;
+      let t = repr t in
       let maps, ancestor = maps_and_ancestor t in
       let locations_and_accounts = Map.to_alist maps.accounts in
       (* parent should ignore accounts in this mask *)
@@ -970,14 +986,12 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     module For_testing = struct
       let location_in_mask t location =
-        assert_is_attached t ;
-        Option.is_some (Map.find t.maps.accounts location)
+        Option.is_some (Map.find (repr t).maps.accounts location)
 
       let address_in_mask t addr =
-        assert_is_attached t ;
-        Option.is_some (Map.find t.maps.hashes addr)
+        Option.is_some (Map.find (repr t).maps.hashes addr)
 
-      let current_location t = t.current_location
+      let current_location t = (repr t).current_location
     end
 
     (* leftmost location *)
@@ -990,14 +1004,14 @@ module Make (Inputs : Inputs_intf.S) = struct
     let get_or_create_account t account_id account =
       assert_is_attached t ;
       let ({ locations; non_existent_accounts; _ } : maps_t), ancestor =
-        maps_and_ancestor t
+        maps_and_ancestor (repr t)
       in
       let add_location () =
         (* not in parent, create new location *)
         let maybe_location =
-          match t.current_location with
+          match (repr t).current_location with
           | None ->
-              Some (first_location ~ledger_depth:t.depth)
+              Some (first_location ~ledger_depth:(depth t))
           | Some loc ->
               Location.next loc
         in
@@ -1027,15 +1041,19 @@ module Make (Inputs : Inputs_intf.S) = struct
     let all_accounts_on_masks t =
       let base = get_parent t |> Base.all_accounts_on_masks in
       let combine ~key:_ _ v = v in
-      Map.merge_skewed ~combine base t.maps.accounts
+      Map.merge_skewed ~combine base (repr t).maps.accounts
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =
     assert (Result.is_error t.parent) ;
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
+    Base.handle_mutations parent ;
+    t.level <- Base.level parent + 1 ;
+    t.mutations <- Merkle_ledger.Mutations.current () ;
     t.parent <- Ok parent ;
-    t.current_location <- Attached.last_filled t ;
+    let attached = { Attached.desc = Ledger t } in
+    t.current_location <- Attached.last_filled attached ;
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),
@@ -1052,5 +1070,5 @@ module Make (Inputs : Inputs_intf.S) = struct
             }
     | _ ->
         () ) ;
-    t
+    attached
 end

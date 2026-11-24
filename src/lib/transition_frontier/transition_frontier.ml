@@ -569,6 +569,8 @@ include struct
 
   let visualize ~filename = proxy1 (visualize ~filename)
 
+  let visualize_masks ~filename = proxy1 (visualize_masks ~filename)
+
   let visualize_to_string = proxy1 visualize_to_string
 
   let successors = proxy1 successors

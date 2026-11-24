@@ -204,7 +204,11 @@ end)
   let get_hash_batch_exn t locations =
     Primary_ledger.get_hash_batch_exn t.primary_ledger locations
 
-  let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
+  let is_attached t = Primary_ledger.is_attached t.primary_ledger
+
+  let level _ = 0
+
+  let handle_mutations _ = ()
 
   let all_accounts_on_masks _ = Location.Map.empty
 end

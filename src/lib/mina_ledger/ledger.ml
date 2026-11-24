@@ -435,14 +435,12 @@ module Ledger_inner = struct
     try
       let result = f masked_ledger in
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn ~loc:__LOC__ ~grandchildren:`Recursive
-          masked_ledger
+        Maskable.unregister_mask_exn ~loc:__LOC__ masked_ledger
       in
       result
     with exn ->
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn ~loc:__LOC__ ~grandchildren:`Recursive
-          masked_ledger
+        Maskable.unregister_mask_exn ~loc:__LOC__ masked_ledger
       in
       raise exn
 
@@ -460,9 +458,6 @@ module Ledger_inner = struct
     Maskable.unsafe_preload_accounts_from_parent
 
   let unregister_mask_exn ~loc mask = Maskable.unregister_mask_exn ~loc mask
-
-  let remove_and_reparent_exn t t_as_mask =
-    Maskable.remove_and_reparent_exn (packed t) t_as_mask
 
   type unattached_mask = Mask.t
 
@@ -583,6 +578,19 @@ end
 
 include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
+
+let apply_transaction_second_pass ledger (t : Transaction_partially_applied.t) =
+  let t : Transaction_partially_applied.t =
+    match t with
+    | Zkapp_command c ->
+        Zkapp_command
+          { c with
+            global_state = { c.global_state with first_pass_ledger = ledger }
+          }
+    | Signed_command _ | Fee_transfer _ | Coinbase _ ->
+        t
+  in
+  apply_transaction_second_pass ledger t
 
 (** A ledger that does not maintain its merkle hashes.
 

@@ -643,6 +643,15 @@ let visualize_frontier ~filename =
   in
   Transition_frontier.visualize ~filename frontier
 
+let visualize_masks ~filename =
+  compose_of_option
+  @@ fun t ->
+  let open Option.Let_syntax in
+  let%map frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  Transition_frontier.visualize_masks ~filename frontier
+
 let best_staged_ledger = compose_of_option best_staged_ledger_opt
 
 let best_protocol_state = compose_of_option best_protocol_state_opt

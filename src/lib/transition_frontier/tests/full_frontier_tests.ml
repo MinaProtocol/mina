@@ -143,6 +143,61 @@ let%test_module "Full_frontier tests" =
                           : Mina_state.Protocol_state.value ) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
+    let%test_unit "Each proof commits the masks below the root up to its \
+                   snarked ledger, keeping every ledger in the frontier" =
+      Quickcheck.test
+        (gen_breadcrumb_seq ~include_snark_work:true ~verifier (max_length * 8))
+        ~trials:2
+        ~f:(fun make_seq ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
+              let root = Full_frontier.root frontier in
+              let%map seq = make_seq root in
+              let accounts breadcrumb =
+                Mina_ledger.Ledger.to_list_sequential
+                  (Breadcrumb.mask breadcrumb)
+              in
+              let accounts_when_built =
+                State_hash.Table.of_alist_exn
+                  (List.map seq ~f:(fun breadcrumb ->
+                       (Breadcrumb.state_hash breadcrumb, accounts breadcrumb) )
+                  )
+              in
+              let proofs =
+                List.count seq ~f:(fun breadcrumb ->
+                    let hashes_below_root = ledger_hashes_below_root frontier in
+                    let pre_root = Full_frontier.root frontier in
+                    add_breadcrumb frontier breadcrumb ;
+                    let post_root = Full_frontier.root frontier in
+                    List.iter (Full_frontier.all_breadcrumbs frontier)
+                      ~f:(fun breadcrumb ->
+                        Hashtbl.find accounts_when_built
+                          (Breadcrumb.state_hash breadcrumb)
+                        |> Option.iter ~f:(fun expected ->
+                               [%test_eq: Account.t list] expected
+                                 (accounts breadcrumb) ) ) ;
+                    (not (Breadcrumb.equal pre_root post_root))
+                    && Breadcrumb.just_emitted_a_proof post_root
+                    &&
+                    let snarked_ledger_hash =
+                      Breadcrumb.protocol_state post_root
+                      |> Mina_state.Protocol_state.blockchain_state
+                      |> Mina_state.Blockchain_state.snarked_ledger_hash
+                    in
+                    [%test_pred: Ledger_hash.t list]
+                      (fun hashes ->
+                        List.mem hashes snarked_ledger_hash
+                          ~equal:Ledger_hash.equal )
+                      hashes_below_root ;
+                    [%test_eq: Ledger_hash.t] snarked_ledger_hash
+                      (root_ledger_hash frontier) ;
+                    true )
+              in
+              [%test_pred: int] (( < ) 0) proofs ;
+              clean_up_persistent_root ~frontier ) )
+
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =
       let gen =
