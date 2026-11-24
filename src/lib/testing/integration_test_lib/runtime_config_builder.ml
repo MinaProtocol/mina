@@ -34,6 +34,7 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
         ; slots_per_epoch = Some test_config.slots_per_epoch
         ; slots_per_sub_window = Some test_config.slots_per_sub_window
         ; grace_period_slots = Some test_config.grace_period_slots
+        ; block_window_duration_ms = Some test_config.block_window_duration_ms
         ; genesis_state_timestamp =
             Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
         }

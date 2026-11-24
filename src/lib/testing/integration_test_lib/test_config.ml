@@ -81,7 +81,6 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; sub_windows_per_window = None
   ; ledger_depth = None
   ; work_delay = None
-  ; block_window_duration_ms = Some 120000
   ; transaction_capacity = None
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
@@ -167,7 +166,7 @@ let default ~(constants : constants) =
   ; slot_chain_end = None
   ; hard_fork_genesis_slot_delta = None
   ; network_id = None
-  ; block_window_duration_ms = constraint_constants.block_window_duration_ms
+  ; block_window_duration_ms = 120000
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
   ; signature_kind = Testnet
   }
@@ -180,15 +179,11 @@ let transaction_capacity_log_2 (config : t) =
       i
   | Some (Txns_per_second_x10 tps_goal_x10) ->
       let max_coinbases = 2 in
-      let block_window_duration_ms =
-        Option.value ~default:config.block_window_duration_ms
-          config.proof_config.block_window_duration_ms
-      in
       let max_user_commands_per_block =
         (* block_window_duration is in milliseconds, so divide by 1000 divide
            by 10 again because we have tps * 10
         *)
-        tps_goal_x10 * block_window_duration_ms / (1000 * 10)
+        tps_goal_x10 * config.block_window_duration_ms / (1000 * 10)
       in
       (* Log of the capacity of transactions per transition.
           - 1 will only work if we don't have prover fees.

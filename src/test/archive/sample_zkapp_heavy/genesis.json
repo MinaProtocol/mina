@@ -3,15 +3,15 @@
         "slots_per_epoch": 48,
         "k": 10,
         "grace_period_slots": 3,
-        "genesis_state_timestamp": "2026-10-06 11:58:28+00:00"
+        "genesis_state_timestamp": "2026-10-06 11:58:28+00:00",
+        "block_window_duration_ms": 30000
     },
     "proof": {
         "work_delay": 1,
         "level": "none",
         "transaction_capacity": {
             "2_to_the": 2
-        },
-        "block_window_duration_ms": 30000
+        }
     },
     "ledger": {
         "name": "release",

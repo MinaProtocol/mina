@@ -10,7 +10,7 @@ open Frontier_base
 type t
 
 val create :
-     constraint_constants:Genesis_constants.Constraint_constants.t
+     protocol_constants:Genesis_constants.Protocol.t
   -> logger:Logger.t
   -> time_controller:Block_time.Controller.t
   -> db:Database.t

@@ -77,6 +77,12 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let config =
     List.fold ~init:Runtime_config.default config_jsons
       ~f:(fun config (config_file, config_json) ->
+        if Runtime_config.sets_legacy_block_window_duration_ms config_json then
+          [%log warn]
+            "Configuration file $config_file sets the deprecated \
+             proof.block_window_duration_ms; set \
+             genesis.block_window_duration_ms instead"
+            ~metadata:[ ("config_file", `String config_file) ] ;
         match Runtime_config.of_yojson config_json with
         | Ok loaded_config ->
             Runtime_config.combine config loaded_config
@@ -851,7 +857,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~proof_level:G.proof_level config_files ~genesis_constants
               ~constraint_constants ~cli_proof_level ~hardfork_handling
           in
-          constraint_constants.block_window_duration_ms |> Float.of_int
+          genesis_constants.protocol.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
           let rev_daemon_configs =

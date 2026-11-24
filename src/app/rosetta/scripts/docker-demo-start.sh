@@ -76,8 +76,7 @@ cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PROD
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF >"$MINA_CONFIG_FILE"
 {
-  "genesis": { "genesis_state_timestamp": "$CURRENT_TIME" },
-  "proof": { "block_window_duration_ms": 20000 },
+  "genesis": { "genesis_state_timestamp": "$CURRENT_TIME", "block_window_duration_ms": 20000 },
   "ledger": {
     "name": "${MINA_NETWORK}",
     "accounts": [

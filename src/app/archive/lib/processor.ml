@@ -5299,8 +5299,8 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       |> don't_wait_for ;
       (*Update archive metrics*)
       serve_metrics_server ~logger ~metric_server ~missing_blocks_width
-        ~block_window_duration_ms:constraint_constants.block_window_duration_ms
-        pool
+        ~block_window_duration_ms:
+          genesis_constants.protocol.block_window_duration_ms pool
       |> don't_wait_for ;
       (* NOTE: this is depended on by archive fixture, so whenever updating this message, consider updating the fixture as well *)
       [%log info] "Archive process ready. Clients can now connect" ;

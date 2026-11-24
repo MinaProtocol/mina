@@ -208,11 +208,11 @@ let create' (type length global_slot_since_hard_fork time timespan)
        and type timespan = timespan )
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants :
-       (length, length, time) Genesis_constants.Protocol.Poly.t ) :
+       (length, length, time, timespan) Genesis_constants.Protocol.Poly.t ) :
     (length, global_slot_since_hard_fork, time, timespan) Poly.t =
   let open M in
   let block_window_duration_ms =
-    constant constraint_constants.block_window_duration_ms
+    of_timespan protocol_constants.block_window_duration_ms
   in
   let k = of_length protocol_constants.k in
   let delta = of_length protocol_constants.delta in
@@ -316,6 +316,7 @@ let to_protocol_constants
      ; slots_per_sub_window
      ; slots_per_epoch
      ; grace_period_slots
+     ; block_window_duration_ms
      ; _
      } :
       _ Poly.t ) =
@@ -325,6 +326,7 @@ let to_protocol_constants
   ; slots_per_sub_window
   ; slots_per_epoch
   ; grace_period_slots
+  ; block_window_duration_ms
   }
 
 let typ =
@@ -467,6 +469,12 @@ let%test_unit "checked = unchecked" =
           ~protocol_constants:
             (Protocol_constants_checked.t_of_value protocol_constants) )
   in
-  Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
+  let block_window_duration_ms =
+    Block_time.Span.of_ms (Int64.of_int for_unit_tests.block_window_duration_ms)
+  in
+  Quickcheck.test ~trials:100
+    (Quickcheck.Generator.map Protocol_constants_checked.Value.gen
+       ~f:(fun protocol_constants ->
+         { protocol_constants with block_window_duration_ms } ) )
     ~examples:[ Protocol_constants_checked.value_of_t for_unit_tests ]
     ~f:test

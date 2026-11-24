@@ -7,7 +7,9 @@ let to_span t ~(constants : Test_config.constants) =
   let slots n =
     Time.Span.of_ms
       (to_float
-         (n * of_int constants.constraint_constants.block_window_duration_ms) )
+         ( n
+         * of_int constants.genesis_constants.protocol.block_window_duration_ms
+         ) )
   in
   match t with
   | Epochs n ->

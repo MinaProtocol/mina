@@ -409,15 +409,11 @@ module Accounts = struct
       with Stop -> accounts
 end
 
-let make_constraint_constants
+let constraint_constants_of_proof_keys
     ~(default : Genesis_constants.Constraint_constants.t)
-    (config : Runtime_config.Proof_keys.t) :
+    ~block_window_duration_ms (config : Runtime_config.Proof_keys.t) :
     Genesis_constants.Constraint_constants.t =
   let work_delay = Option.value ~default:default.work_delay config.work_delay in
-  let block_window_duration_ms =
-    Option.value ~default:default.block_window_duration_ms
-      config.block_window_duration_ms
-  in
   let transaction_capacity_log_2 =
     match config.transaction_capacity with
     | Some (Log_2 i) ->
@@ -452,7 +448,6 @@ let make_constraint_constants
   ; ledger_depth =
       Option.value ~default:default.ledger_depth config.ledger_depth
   ; work_delay
-  ; block_window_duration_ms
   ; transaction_capacity_log_2
   ; pending_coinbase_depth
   ; coinbase_amount =
@@ -477,6 +472,15 @@ let make_constraint_constants
             } )
   }
 
+let make_constraint_constants
+    ~(default : Genesis_constants.Constraint_constants.t)
+    ~(protocol_constants : Genesis_constants.Protocol.t)
+    (config : Runtime_config.t) : Genesis_constants.Constraint_constants.t =
+  Option.value_map config.proof ~default
+    ~f:
+      (constraint_constants_of_proof_keys ~default
+         ~block_window_duration_ms:protocol_constants.block_window_duration_ms )
+
 let runtime_config_of_constraint_constants
     ~(proof_level : Genesis_constants.Proof_level.t)
     (constraint_constants : Genesis_constants.Constraint_constants.t) :
@@ -492,8 +496,6 @@ let runtime_config_of_constraint_constants
   ; sub_windows_per_window = Some constraint_constants.sub_windows_per_window
   ; ledger_depth = Some constraint_constants.ledger_depth
   ; work_delay = Some constraint_constants.work_delay
-  ; block_window_duration_ms =
-      Some constraint_constants.block_window_duration_ms
   ; transaction_capacity =
       Some (Log_2 constraint_constants.transaction_capacity_log_2)
   ; coinbase_amount = Some constraint_constants.coinbase_amount
@@ -555,6 +557,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       ; genesis_state_timestamp =
           Option.value ~default:default.protocol.genesis_state_timestamp
             genesis_state_timestamp
+      ; block_window_duration_ms =
+          Option.value ~default:default.protocol.block_window_duration_ms
+            (config.genesis >>= fun cfg -> cfg.block_window_duration_ms)
       }
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size

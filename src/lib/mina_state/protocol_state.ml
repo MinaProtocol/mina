@@ -75,7 +75,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V3.t
             , Consensus.Data.Consensus_state.Value.Stable.V3.t
-            , Protocol_constants_checked.Value.Stable.V1.t )
+            , Protocol_constants_checked.Value.Stable.V2.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
 
@@ -95,6 +95,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             { t with
               blockchain_state =
                 Blockchain_state.Value.Stable.V2.to_latest t.blockchain_state
+            ; constants =
+                Protocol_constants_checked.Value.Stable.V1.to_latest t.constants
             }
 
           let hash
@@ -109,7 +111,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (Blockchain_state.Value.Stable.V2.to_input blockchain_state)
                 (Consensus.Data.Consensus_state.to_input consensus_state)
               |> append (field (genesis_state_hash :> Field.t))
-              |> append (Protocol_constants_checked.to_input constants))
+              |> append
+                   (Protocol_constants_checked.Value.Stable.V1.to_input
+                      constants ))
             |> Random_oracle.pack_input
             |> Random_oracle.hash ~init:Hash_prefix.protocol_state_body
             |> State_body_hash.of_hash

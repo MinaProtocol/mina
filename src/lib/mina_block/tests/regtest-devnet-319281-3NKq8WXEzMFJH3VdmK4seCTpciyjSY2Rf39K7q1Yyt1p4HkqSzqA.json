@@ -170,7 +170,8 @@
           "slots_per_sub_window":"7",
           "grace_period_slots":"2160",
           "delta":"0",
-          "genesis_state_timestamp":"1712696400000"
+          "genesis_state_timestamp":"1712696400000",
+          "block_window_duration_ms":"180000"
         }
       }
     },

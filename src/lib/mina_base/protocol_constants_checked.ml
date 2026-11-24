@@ -16,12 +16,45 @@ module Poly = Genesis_constants.Protocol.Poly
 module Value = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        ( T.Stable.V1.t
+        , T.Stable.V1.t
+        , Block_time.Stable.V1.t
+        , Block_time.Span.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving equal, ord, hash, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         (T.Stable.V1.t, T.Stable.V1.t, Block_time.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving equal, ord, hash, sexp, yojson]
 
-      let to_latest = Fn.id
+      let to_latest (_ : t) : Latest.t =
+        failwith
+          "Protocol_constants_checked.Value.Stable.V1.to_latest: no \
+           block_window_duration_ms"
+
+      let to_input
+          ({ k
+           ; delta
+           ; slots_per_epoch
+           ; slots_per_sub_window
+           ; grace_period_slots
+           ; genesis_state_timestamp
+           } :
+            t ) =
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+          [| T.to_input k
+           ; T.to_input delta
+           ; T.to_input slots_per_epoch
+           ; T.to_input slots_per_sub_window
+           ; T.to_input grace_period_slots
+           ; Block_time.to_input genesis_state_timestamp
+          |]
     end
   end]
 
@@ -36,15 +69,18 @@ module Value = struct
       Eg: 34702788243129 <--> 34702788243128, 8094 <--> 8093*)
     let%bind ms = Int64.(gen_log_uniform_incl 0L 9999999999999L) in
     let end_time = Block_time.of_int64 999999999999999L in
-    let%map genesis_state_timestamp =
+    let%bind genesis_state_timestamp =
       Block_time.(gen_incl (of_int64 ms) end_time)
     in
+    let%map block_window_duration_ms = Int.gen_incl 1_000 360_000 in
     { Poly.k = T.of_int k
     ; delta = T.of_int delta
     ; slots_per_epoch = T.of_int slots_per_epoch
     ; slots_per_sub_window = T.of_int slots_per_sub_window
     ; grace_period_slots = T.of_int grace_period_slots
     ; genesis_state_timestamp
+    ; block_window_duration_ms =
+        Block_time.Span.of_ms (Int64.of_int block_window_duration_ms)
     }
 end
 
@@ -57,6 +93,7 @@ let value_of_t
      ; slots_per_sub_window
      ; grace_period_slots
      ; genesis_state_timestamp
+     ; block_window_duration_ms
      } :
       Genesis_constants.Protocol.t ) : value =
   { k = T.of_int k
@@ -65,6 +102,8 @@ let value_of_t
   ; slots_per_sub_window = T.of_int slots_per_sub_window
   ; grace_period_slots = T.of_int grace_period_slots
   ; genesis_state_timestamp = Block_time.of_int64 genesis_state_timestamp
+  ; block_window_duration_ms =
+      Block_time.Span.of_ms (Int64.of_int block_window_duration_ms)
   }
 
 let t_of_value
@@ -74,6 +113,7 @@ let t_of_value
      ; slots_per_sub_window
      ; grace_period_slots
      ; genesis_state_timestamp
+     ; block_window_duration_ms
      } :
       value ) : Genesis_constants.Protocol.t =
   { k = T.to_int k
@@ -82,6 +122,8 @@ let t_of_value
   ; slots_per_sub_window = T.to_int slots_per_sub_window
   ; grace_period_slots = T.to_int grace_period_slots
   ; genesis_state_timestamp = Block_time.to_int64 genesis_state_timestamp
+  ; block_window_duration_ms =
+      Block_time.Span.to_ms block_window_duration_ms |> Int64.to_int_exn
   }
 
 let to_input
@@ -91,6 +133,7 @@ let to_input
      ; slots_per_sub_window
      ; grace_period_slots
      ; genesis_state_timestamp
+     ; block_window_duration_ms
      } :
       value ) =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
@@ -100,9 +143,15 @@ let to_input
      ; T.to_input slots_per_sub_window
      ; T.to_input grace_period_slots
      ; Block_time.to_input genesis_state_timestamp
+     ; Block_time.Span.to_input block_window_duration_ms
     |]
 
-type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
+type var =
+  ( T.Checked.t
+  , T.Checked.t
+  , Block_time.Checked.t
+  , Block_time.Span.Checked.t )
+  Poly.t
 
 let typ =
   Typ.of_hlistable
@@ -112,6 +161,7 @@ let typ =
     ; T.Checked.typ
     ; T.Checked.typ
     ; Block_time.Checked.typ
+    ; Block_time.Span.Checked.typ
     ]
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
@@ -123,6 +173,7 @@ let var_to_input
      ; slots_per_sub_window
      ; grace_period_slots
      ; genesis_state_timestamp
+     ; block_window_duration_ms
      } :
       var ) =
   let k = T.Checked.to_input k
@@ -133,6 +184,9 @@ let var_to_input
   let genesis_state_timestamp =
     Block_time.Checked.to_input genesis_state_timestamp
   in
+  let block_window_duration_ms =
+    Block_time.Span.Checked.to_input block_window_duration_ms
+  in
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| k
      ; delta
@@ -140,6 +194,7 @@ let var_to_input
      ; slots_per_sub_window
      ; grace_period_slots
      ; genesis_state_timestamp
+     ; block_window_duration_ms
     |]
 
 let%test_unit "value = var" =

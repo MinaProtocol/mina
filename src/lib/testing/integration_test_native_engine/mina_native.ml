@@ -105,7 +105,8 @@ module Network_config = struct
     in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:constants.constraint_constants test_config.proof_config
+        ~default:constants.constraint_constants
+        ~protocol_constants:genesis_constants.protocol runtime_config
     in
     let constants : Test_config.constants =
       { constants with genesis_constants; constraint_constants }
@@ -236,7 +237,7 @@ module Network_manager = struct
       [ ("k", G.genesis_constants.protocol.k)
       ; ("slots_per_epoch", G.genesis_constants.protocol.slots_per_epoch)
       ; ( "block_window_duration_ms"
-        , G.constraint_constants.block_window_duration_ms )
+        , G.genesis_constants.protocol.block_window_duration_ms )
       ]
     in
     let%bind output =

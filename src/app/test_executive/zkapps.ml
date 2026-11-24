@@ -792,7 +792,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
         in
         let block_duration_ms =
-          constants.constraint_constants.block_window_duration_ms
+          constants.genesis_constants.protocol.block_window_duration_ms
           |> Int.to_float
         in
         let current_slot_span_ms =

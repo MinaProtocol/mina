@@ -1133,7 +1133,7 @@ let perform_compaction compaction_interval t =
   | Some compaction_interval_compiled ->
       let slot_duration_ms =
         let leeway = 1000 in
-        t.config.precomputed_values.constraint_constants
+        t.config.precomputed_values.genesis_constants.protocol
           .block_window_duration_ms + leeway
       in
       let expected_time_for_compaction =
@@ -1257,19 +1257,19 @@ let stop_long_running_daemon t =
   in
   go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
 
-let offline_time
-    { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
+let offline_time ({ block_window_duration_ms; _ } : Genesis_constants.Protocol.t)
+    =
   (* This is a bit of a hack, see #3232. *)
   let inactivity_ms = block_window_duration_ms * 8 in
   Block_time.Span.of_ms @@ Int64.of_int inactivity_ms
 
-let setup_timer ~constraint_constants time_controller sync_state_broadcaster =
-  Block_time.Timeout.create time_controller (offline_time constraint_constants)
+let setup_timer ~protocol_constants time_controller sync_state_broadcaster =
+  Block_time.Timeout.create time_controller (offline_time protocol_constants)
     ~f:(fun _ ->
       Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
       |> don't_wait_for )
 
-let online_broadcaster ~constraint_constants time_controller =
+let online_broadcaster ~protocol_constants time_controller =
   let online_reader, online_writer = Broadcast_pipe.create `Offline in
   let init =
     Block_time.Timeout.create time_controller
@@ -1281,7 +1281,7 @@ let online_broadcaster ~constraint_constants time_controller =
     let%map () = Broadcast_pipe.Writer.write online_writer `Online in
     Block_time.Timeout.cancel time_controller !current_timer () ;
     current_timer :=
-      setup_timer ~constraint_constants time_controller online_writer
+      setup_timer ~protocol_constants time_controller online_writer
   in
   (online_reader, notify_online)
 
@@ -2088,7 +2088,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
             online_broadcaster
-              ~constraint_constants:Context.constraint_constants
+              ~protocol_constants:
+                Context.precomputed_values.genesis_constants.protocol
               config.time_controller
           in
           let on_first_received_message ~f =

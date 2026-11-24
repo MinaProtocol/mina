@@ -18,7 +18,8 @@ let%test_module "Persisting the frontier" =
       Time.Span.of_ms
         ( 5.
         *. Float.of_int
-             precomputed_values.constraint_constants.block_window_duration_ms )
+             precomputed_values.genesis_constants.protocol
+               .block_window_duration_ms )
 
     let persisted_best_tip frontier =
       let persistent_frontier =
