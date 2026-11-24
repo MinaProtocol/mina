@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
-
-	// importing this automatically registers the pprof api to our metrics server
-	_ "net/http/pprof"
 
 	"codanet"
 	ipc "libp2p_ipc"
@@ -23,14 +21,31 @@ import (
 
 const validationTimeout = 5 * time.Minute
 
-func startMetricsServer(port uint16) *codaMetricsServer {
+// newMetricsMux serves the Prometheus metrics on /metrics. It serves the pprof
+// profiles on /debug/pprof/ only when enablePprof is set: pprof has no
+// authentication, and some profiles (goroutine dumps, CPU profiles, traces)
+// pause or slow down the helper while they are collected.
+func newMetricsMux(enablePprof bool) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	if enablePprof {
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
+	return mux
+}
+
+func startMetricsServer(port uint16, enablePprof bool) *codaMetricsServer {
 	log := logging.Logger("metrics server")
 	done := &sync.WaitGroup{}
 	done.Add(1)
-	server := &http.Server{Addr: ":" + strconv.Itoa(int(port))}
-
-	// does this need re-registered every time?
-	// http.Handle("/metrics", promhttp.Handler())
+	server := &http.Server{
+		Addr:    ":" + strconv.Itoa(int(port)),
+		Handler: newMetricsMux(enablePprof),
+	}
 
 	go func() {
 		defer done.Done()
@@ -79,7 +94,6 @@ func init() {
 	prometheus.MustRegister(connectionCountMetric)
 	prometheus.MustRegister(validationTimeoutMetric)
 	prometheus.MustRegister(validationTimeMetric)
-	http.Handle("/metrics", promhttp.Handler())
 }
 
 func main() {
@@ -151,6 +165,13 @@ func main() {
 		helperLog.Info("mDNS discovery disabled (default) - use LIBP2P_ENABLE_MDNS=true to enable for local development")
 	} else {
 		helperLog.Info("mDNS discovery enabled via LIBP2P_ENABLE_MDNS")
+	}
+
+	// pprof on the metrics port is DISABLED by default. Set
+	// LIBP2P_ENABLE_PPROF=true to serve /debug/pprof/ next to /metrics.
+	app.EnablePprof = os.Getenv("LIBP2P_ENABLE_PPROF") == "true"
+	if app.EnablePprof {
+		helperLog.Info("pprof enabled on the metrics port via LIBP2P_ENABLE_PPROF")
 	}
 
 	go func() {

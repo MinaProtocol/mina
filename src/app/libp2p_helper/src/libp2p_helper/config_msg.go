@@ -519,7 +519,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 		metricsServer.Shutdown()
 	}
 	if m.MetricsPort() > 0 {
-		app.metricsServer = startMetricsServer(m.MetricsPort())
+		app.metricsServer = startMetricsServer(m.MetricsPort(), app.EnablePprof)
 		if !app.metricsCollectionStarted {
 			go app.checkBandwidth()
 			go app.checkPeerCount()
