@@ -137,12 +137,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Orphaned (uuid, loc) ->
           raise (Dangling_parent_reference (uuid, loc))
 
+    let detach ~loc t =
+      t.parent <- Error loc ;
+      t.accumulated <- None ;
+      Async.Ivar.fill_if_empty t.detached_parent_signal ()
+
     let unset_parent ~loc attached =
       let t = repr attached in
       attached.desc <- Orphaned (t.uuid, loc) ;
-      t.parent <- Error loc ;
-      t.accumulated <- None ;
-      Async.Ivar.fill_if_empty t.detached_parent_signal () ;
+      detach ~loc t ;
       t
 
     let assert_is_attached t = ignore (repr t : unattached)
@@ -591,6 +594,18 @@ module Make (Inputs : Inputs_intf.S) = struct
         Hash.equal (merkle_root t) (Base.merkle_root parent)
         || failwith "Merkle root of the mask should delegate to the parent now" )
 
+    let commit_and_replace_parent ~loc t ~parent =
+      assert (Uuid.equal (Base.get_uuid (get_parent t)) (get_uuid parent)) ;
+      let mask = repr t in
+      (* A mask attached to [t] would read past [t] and [parent] through
+         [parent]'s cell if [t] didn't have an accumulated cache. *)
+      assert (Option.is_some mask.accumulated) ;
+      commit t ;
+      let parent_mask = repr parent in
+      parent.desc <- Orphaned (parent_mask.uuid, loc) ;
+      t.desc <- Ledger parent_mask ;
+      detach ~loc mask
+
     (* copy tables in t; use same parent *)
     let copy t =
       let parent = get_parent t in
@@ -978,12 +993,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       let base = get_parent t |> Base.all_accounts_on_masks in
       let combine ~key:_ _ v = v in
       Map.merge_skewed ~combine base (repr t).maps.accounts
-
-    let reparent attached parent =
-      let t = repr attached in
-      assert (Int.equal t.depth (Base.depth parent)) ;
-      t.parent <- Ok parent ;
-      t.current_location <- last_filled attached
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =
