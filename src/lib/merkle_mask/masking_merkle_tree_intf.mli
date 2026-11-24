@@ -66,8 +66,8 @@ module type S = sig
         including the masks attached to it, fails on its next use. *)
     val commit_and_replace_parent : loc:string -> t -> parent:t -> unit
 
-    (** [unset_parent ~loc:__LOC__ t] detaches the parent from [t], and
-        resolves [detached_signal] for [t]. The [loc] argument is shown in the
+    (** [unset_parent ~loc:__LOC__ t] detaches the parent from [t], after
+        which [is_attached t] is [false]. The [loc] argument is shown in the
         [Dangling_parent_reference] exception, which will be raised if [t] is
         used while no parent is registered.
     *)

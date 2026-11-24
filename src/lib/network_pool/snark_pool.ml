@@ -372,8 +372,7 @@ struct
             let open Mina_base in
             let open Option.Let_syntax in
             let%bind ledger = best_tip_ledger t in
-            if Deferred.is_determined (Base_ledger.detached_signal ledger) then
-              None
+            if not (Base_ledger.is_attached ledger) then None
             else
               let%bind loc =
                 Account_id.create prover Token_id.default
