@@ -1054,8 +1054,8 @@ module For_tests = struct
     let persistent_root =
       Persistent_root.create ~logger ~backing_type:Stable_db
         ~directory:
-          (Filename.temp_dir ~in_dir:(Lazy.force temp_root_dir)
-             "snarked_ledger" "" )
+          (Filename.temp_dir ~in_dir:(Lazy.force temp_root_dir) "snarked_ledger"
+             "" )
         ~ledger_depth
     in
     let%map () =
