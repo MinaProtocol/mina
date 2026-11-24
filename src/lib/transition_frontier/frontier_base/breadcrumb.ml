@@ -372,9 +372,10 @@ module For_tests = struct
         Signed_command.sign ~signature_kind:Testnet sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
-      ~(precomputed_values : Precomputed_values.t) ~verifier
-      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
-      (t -> t Deferred.t) Quickcheck.Generator.t =
+      ?(include_snark_work = false) ~(precomputed_values : Precomputed_values.t)
+      ~verifier ?(trust_system = Trust_system.null ())
+      ~accounts_with_secret_keys () : (t -> t Deferred.t) Quickcheck.Generator.t
+      =
     let open Quickcheck.Let_syntax in
     let%bind slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
@@ -398,8 +399,14 @@ module For_tests = struct
       in
       let largest_account_public_key = Account.public_key largest_account in
       let get_completed_work stmts =
-        let { Keypair.public_key; _ } = Keypair.create () in
-        let prover = Public_key.compress public_key in
+        let prover =
+          if include_snark_work then largest_account_public_key
+          else
+            (* The fee can't create this key's account, so the work is never
+               included. *)
+            let { Keypair.public_key; _ } = Keypair.create () in
+            Public_key.compress public_key
+        in
         Some
           (Transaction_snark_work.Checked.create_unsafe
              { fee = Fee.of_nanomina_int_exn 1
@@ -571,13 +578,13 @@ module For_tests = struct
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~precomputed_values ~verifier ?trust_system
-      ~accounts_with_secret_keys n =
+  let gen_seq ?logger ?include_snark_work ~precomputed_values ~verifier
+      ?trust_system ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~precomputed_values ~verifier ?trust_system
-           ~accounts_with_secret_keys () )
+        (gen ?logger ?include_snark_work ~precomputed_values ~verifier
+           ?trust_system ~accounts_with_secret_keys () )
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->

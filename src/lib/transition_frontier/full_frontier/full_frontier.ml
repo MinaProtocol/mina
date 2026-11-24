@@ -954,6 +954,8 @@ module For_tests = struct
              !"Protocol state with hash %s not found"
              (State_body_hash.to_yojson hash |> Yojson.Safe.to_string) )
 
+  let root_ledger_hash t = Ledger.Any_ledger.M.merkle_root t.root_ledger
+
   (* TODO: Don't force here!! *)
 
   let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
@@ -990,9 +992,9 @@ module For_tests = struct
     Breadcrumb.For_tests.gen ~logger ~precomputed_values ~verifier
       ?trust_system:None ~accounts_with_secret_keys
 
-  let gen_breadcrumb_seq ~verifier =
-    Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
-      ?trust_system:None ~accounts_with_secret_keys
+  let gen_breadcrumb_seq ?include_snark_work ~verifier =
+    Breadcrumb.For_tests.gen_seq ~logger ?include_snark_work ~precomputed_values
+      ~verifier ?trust_system:None ~accounts_with_secret_keys
 
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
@@ -1034,7 +1036,10 @@ module For_tests = struct
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
     let staged_ledger =
-      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      Staged_ledger.create_exn ~constraint_constants
+        ~ledger:
+          (Mina_ledger.Ledger.register_mask root_ledger
+             (Mina_ledger.Ledger.Mask.create ~depth:ledger_depth ()) )
     in
     let root_data =
       let open Root_data in

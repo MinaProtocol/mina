@@ -97,6 +97,7 @@ module For_tests : sig
   val gen :
        ?logger:Logger.t
     -> ?send_to_random_pk:bool
+    -> ?include_snark_work:bool
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
@@ -115,6 +116,7 @@ module For_tests : sig
 
   val gen_seq :
        ?logger:Logger.t
+    -> ?include_snark_work:bool
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
