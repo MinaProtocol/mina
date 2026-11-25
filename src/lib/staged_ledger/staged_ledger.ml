@@ -4902,7 +4902,9 @@ let%test_module "staged ledger tests" =
                     [ mk_basic_node ~account:a ~authorization:Signature
                         ~update:
                           { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_a
+                            verification_key =
+                              Zkapp_basic.Set_or_keep.Set
+                                (Verification_key_wire.of_hashed vk_a)
                           }
                         ()
                     ]
@@ -4920,7 +4922,9 @@ let%test_module "staged ledger tests" =
                     [ mk_basic_node ~account:b ~authorization:Signature
                         ~update:
                           { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_b
+                            verification_key =
+                              Zkapp_basic.Set_or_keep.Set
+                                (Verification_key_wire.of_hashed vk_b)
                           }
                         ()
                     ]
@@ -4972,7 +4976,9 @@ let%test_module "staged ledger tests" =
                     [ mk_basic_node ~account:a ~authorization:Signature
                         ~update:
                           { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_a
+                            verification_key =
+                              Zkapp_basic.Set_or_keep.Set
+                                (Verification_key_wire.of_hashed vk_a)
                           }
                         ()
                     ]
@@ -4997,7 +5003,9 @@ let%test_module "staged ledger tests" =
                           }
                         ~update:
                           { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_b
+                            verification_key =
+                              Zkapp_basic.Set_or_keep.Set
+                                (Verification_key_wire.of_hashed vk_b)
                           }
                         ()
                     ]
@@ -5155,7 +5163,8 @@ let%test_module "staged ledger tests" =
                       zkapp =
                         Some
                           { (Option.value_exn account.zkapp) with
-                            verification_key = Some vk
+                            verification_key =
+                              Some (Verification_key_wire.of_hashed vk)
                           }
                     } ;
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in

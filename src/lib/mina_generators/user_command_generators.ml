@@ -119,7 +119,9 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
       ; set_timing = Either
       }
     in
-    let verification_key = Some verification_key in
+    let verification_key =
+      Some (Verification_key_wire.of_hashed verification_key)
+    in
     let zkapp = Some { Zkapp_account.default with verification_key } in
     { account with permissions; zkapp }
   in
