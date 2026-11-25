@@ -21,6 +21,7 @@ Mina supports custom fungible tokens in addition to the native MINA token. Custo
   - [4.1 May-use-token Permission](#41-may-use-token-permission)
   - [4.2 Caller-is-Manager Security](#42-caller-is-manager-security)
   - [4.3 Token Owner Not Caller Check](#43-token-owner-not-caller-check)
+  - [4.4 Access Permission of the Token Owner](#44-access-permission-of-the-token-owner)
 - [5. zkApp Transaction Structure for Tokens](#5-zkapp-transaction-structure-for-tokens)
   - [5.1 Call Forest and Caller Identity](#51-call-forest-and-caller-identity)
   - [5.2 Caller ID Computation](#52-caller-id-computation)
@@ -52,9 +53,9 @@ Token IDs are encoded as Base58Check strings when serialized (e.g., in GraphQL o
 Every custom token is associated with a **token owner** — a specific account (identified by its `Account_id`, which is a `(public_key, token_id)` pair) whose zkApp smart contract is responsible for authorizing all operations on that token.
 
 The token owner account:
-- Holds the zkApp verification key that governs token operations.
 - Is the entity whose `Account_id` was used to derive the custom token ID.
 - Must appear as an ancestor in the account-update call tree whenever a non-default token account is accessed.
+- Usually holds a zkApp verification key that governs token operations. The protocol does not require one: the call-tree check in [Section 4.3](#43-token-owner-not-caller-check) only looks at the owner's `Account_id`. Whether the owner's circuit must run at all is decided by the owner account's `access` permission (see [Section 4.4](#44-access-permission-of-the-token-owner)).
 
 ### 1.3 Token Accounts
 
@@ -152,12 +153,16 @@ This field is stored in `Account_update.Body.may_use_token`.
 
 The Mina custom token system enforces a **caller-is-manager** security model: every account update that accesses a non-default token account must have the token owner as an ancestor in the account-update call tree.
 
-This ensures that:
-1. The token owner's zkApp proof is always executed before any child account update can access custom token accounts.
-2. The token owner controls what operations are permissible on the token (minting, transferring, burning) through its zkApp circuit logic.
-3. No account update can access a custom token account without the explicit approval of the token owner.
-
 The protocol enforces this by computing a **caller ID** for each account update and checking it against the account's token ID (see [Section 4.3](#43-token-owner-not-caller-check)).
+
+This check is purely structural. It guarantees that:
+1. An account update for the token owner is present as the parent (or an inherited ancestor) of every account update that touches a custom token account.
+2. The token owner's zkApp circuit, *when it runs*, can constrain what operations are permissible on the token (minting, transferring, burning) by constraining its child account updates.
+
+It does **not** by itself guarantee that the token owner's circuit runs, or that the token owner approved the transaction. The owner account update is an ordinary account update: it can carry a proof, a signature, or no authorization at all (`None_given`). Which of these the ledger accepts is decided by a separate check, the owner account's `access` permission, described in [Section 4.4](#44-access-permission-of-the-token-owner). A token owner is only secure when both checks hold:
+
+- the caller-is-manager check places the owner above every custom-token account update, **and**
+- the owner's `access` permission forces that owner account update to be authorized by the owner (proof or signature).
 
 ### 4.3 Token Owner Not Caller Check
 
@@ -173,7 +178,26 @@ Where `caller_id` is computed according to the algorithm in [Section 5.2](#52-ca
 
 If this check fails, the transaction fails with the `Token_owner_not_caller` error.
 
-This guarantees that any account update affecting a non-default token account must have been explicitly authorized by the token owner (the parent in the call tree).
+This guarantees that any account update affecting a non-default token account has an account update for the token owner as its caller (the parent in the call tree). It does not check how that owner account update was authorized; see [Section 4.4](#44-access-permission-of-the-token-owner).
+
+### 4.4 Access Permission of the Token Owner
+
+Every account has an `access` permission (`Permissions.access`, of type `Auth_required`). The ledger checks it for every account update against the authorization that the account update carries, and fails the transaction with `Update_not_permitted_access` when the authorization is not sufficient. This check is implemented in `src/lib/transaction_logic/zkapp_command_logic.ml` next to the other permission checks, and it is independent of the caller-is-manager check above.
+
+| `access` value | Authorization the owner account update must carry |
+|---|---|
+| `None` | Any, including `None_given`. **This is the default** (`Permissions.user_default`). |
+| `Either` | A valid proof or a valid signature from the owner key. |
+| `Proof` | A valid proof against the owner's verification key. |
+| `Signature` | A valid signature from the owner key. |
+| `Impossible` | Nothing; the account can never be accessed by a zkApp command. |
+
+Consequences for token owners:
+
+- With `access = None`, **anyone** can build a zkApp command that contains an unauthorized (`None_given`) account update for the owner's `Account_id`, with child account updates that use `may_use_token: Parents_own_token`. The caller-is-manager check passes, because the owner is the caller. The owner's circuit does not run. The children can then mint, transfer, or burn the custom token subject only to the children's own account permissions. The token policy is not enforced.
+- A token owner **must** therefore set `access` to `Proof` (or `Either`, when signature-based administration is wanted) when the zkApp is deployed, before any custom token accounts are funded. The reference test in `src/app/zkapps_examples/test/tokens/tokens.ml` deploys the owner with `access = Either` and contains a negative test that expects `Update_not_permitted_access` for exactly the unauthorized-owner shape described above.
+- The `set_permissions` permission of the owner must also be strong enough that a third party cannot lower `access` again.
+- Accounts whose stored transaction version is older than the current protocol version have `access = Proof` interpreted as `Signature` (`Controller.access_perm_fallback_to_signature_with_older_version`). A signature from the owner key is still required, so this does not open the owner to third parties, but the owner's circuit does not run for such an account update.
 
 ---
 
@@ -208,6 +232,8 @@ Where:
 
 The top-level account updates in a transaction have `caller = default_token_id` and `caller_caller = default_token_id`.
 
+Note that `parent.caller` is derived only from the parent's `Account_id`. The parent's authorization (proof, signature, or none) plays no role in the caller ID computation.
+
 This is implemented in `src/lib/transaction_logic/zkapp_command_logic.ml` in the `get_next_account_update` function.
 
 ---
@@ -221,9 +247,10 @@ All token operations are implemented as zkApp transactions. The token owner's zk
 To create a custom token:
 
 1. **Deploy** a zkApp to an owner account, typically `(owner_pk, MINA_token_id)`, with a verification key that implements the desired token policy. More generally, the owner can be any account `(owner_pk, owner_token_id)`.
-2. **Initialize** the token owner's app state (e.g., setting supply, configuration flags, etc.).
-3. The custom token ID is automatically derived from the owner `Account_id` as `derive_token_id(owner_pk, owner_token_id)`.
-4. Optionally set the `token_symbol` on the owner account to provide a human-readable label.
+2. **Set the owner's permissions** in the same deployment: `access` must be `Proof` (or `Either`), and `set_permissions` and `set_verification_key` must require the owner's authorization. Without this step the token policy is not enforced; see [Section 4.4](#44-access-permission-of-the-token-owner).
+3. **Initialize** the token owner's app state (e.g., setting supply, configuration flags, etc.).
+4. The custom token ID is automatically derived from the owner `Account_id` as `derive_token_id(owner_pk, owner_token_id)`.
+5. Optionally set the `token_symbol` on the owner account to provide a human-readable label.
 
 If the owner account is on the default token, it may itself hold MINA, while the *custom token accounts* are separate accounts with the derived `token_id`. This derivation model also works when the owner account is itself on a non-default token.
 
@@ -236,7 +263,7 @@ Minting creates new custom token supply by increasing the balance of a custom to
 3. The child account update increases the balance of the target custom token account.
 4. The token owner's zkApp circuit validates the mint (e.g., enforcing supply caps, authorization checks, recording the mint in the action state).
 
-The token owner's zkApp proof guarantees that minting is only performed when its circuit allows it. Without the token owner's proof executing as a parent, the `Token_owner_not_caller` check would fail and the transaction would be rejected.
+The token owner's zkApp proof guarantees that minting is only performed when its circuit allows it. Two checks together make this hold: without an account update for the token owner as the parent, the `Token_owner_not_caller` check rejects the transaction; and with the owner's `access` permission set to `Proof`, an owner account update that does not carry a valid proof is rejected by `Update_not_permitted_access`. If `access` is left at its default `None`, the second rejection does not happen and anyone can mint (see [Section 4.4](#44-access-permission-of-the-token-owner)).
 
 ### 6.3 Transferring Tokens
 
@@ -259,6 +286,7 @@ Burning reduces custom token supply by decreasing the balance of a custom token 
 | Failure | Description |
 |---|---|
 | `Token_owner_not_caller` | An account update attempts to access a non-default token account, but the token owner is not the caller (parent) in the call tree. The `may_use_token` field did not correctly establish the caller context. |
+| `Update_not_permitted_access` | An account update (for example, one for the token owner) does not carry an authorization that satisfies the account's `access` permission. This is the failure that protects a correctly configured token owner from unauthorized use; see [Section 4.4](#44-access-permission-of-the-token-owner). |
 | `Update_not_permitted_token_symbol` | An account update attempts to update the `token_symbol` field of an account, but the account's permissions do not allow it. |
 
 ---
