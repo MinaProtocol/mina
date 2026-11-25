@@ -104,6 +104,10 @@ let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
   | Ok `Already_loaded ->
       [%log info] "The genesis ledger at height $height is already written"
         ~metadata
+  | Ok (`Mismatch mismatch) ->
+      failwith
+        (Archive_lib.Processor.Genesis_accounts.mismatch_message ~genesis_height
+           mismatch )
   | Ok (`Added (count, resumed_after)) ->
       [%log info]
         "Wrote $count genesis ledger accounts at height $height, after \

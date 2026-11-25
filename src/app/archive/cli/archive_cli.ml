@@ -45,6 +45,14 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
+     and legacy_genesis_accounts =
+       flag "--legacy-genesis-accounts"
+         ~aliases:[ "-legacy-genesis-accounts" ]
+         no_arg
+         ~doc:
+           " Write the genesis ledger of --config-file to accounts_accessed, \
+            one row per account on the genesis block, as archives before 5.0.0 \
+            did, instead of to genesis_accounts"
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
@@ -67,7 +75,8 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED
+         ~legacy_genesis_accounts )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

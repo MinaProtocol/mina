@@ -11,15 +11,6 @@ let table_exists (module Conn : CONNECTION) =
        "SELECT to_regclass('genesis_accounts') IS NOT NULL" )
     ()
 
-(** The number of rows of the genesis ledger at [genesis_height]. *)
-let written (module Conn : CONNECTION) ~genesis_height =
-  Conn.find
-    (find_req Caqti_type.int64 Caqti_type.int
-       {sql| SELECT count(*)::int FROM genesis_accounts
-             WHERE genesis_height = ?
-       |sql} )
-    genesis_height
-
 (* One statement per chunk: the rows travel as one array per column. *)
 let insert_chunk_req =
   exec_req
@@ -64,6 +55,18 @@ let row_typ =
       (t4 string string string int64)
       (t5 (option string) (option int64) (option string) (option int64)
          (option string) ))
+
+(** Every row of the genesis ledger at [genesis_height]. *)
+let rows_at (module Conn : CONNECTION) ~genesis_height =
+  Conn.collect_list
+    (collect_req Caqti_type.int64 row_typ
+       {sql| SELECT public_key, token, balance, nonce,
+                    initial_minimum_balance, cliff_time, cliff_amount,
+                    vesting_period, vesting_increment
+             FROM genesis_accounts
+             WHERE genesis_height = ?
+       |sql} )
+    genesis_height
 
 let latest_req =
   find_opt_req

@@ -130,46 +130,101 @@ let insert_chunk (module Conn : Mina_caqti.CONNECTION) ~genesis_height rows =
 
 let default_chunk_size = 5_000
 
+(** A row's account: its public key and token. *)
+module Account_key = struct
+  type t = string * string [@@deriving compare, hash, sexp]
+end
+
+let key row = (row.public_key, row.token)
+
+(** Rows at a height that are not [accounts]: [differing] rows hold another
+    state for an account of the ledger, [not_in_ledger] rows are accounts the
+    ledger does not have. Such a height was written from another ledger (an
+    older config, another network), or by hand. *)
+type mismatch = { differing : int; not_in_ledger : int }
+[@@deriving equal, sexp, yojson]
+
 (** Write [accounts] as the genesis ledger that takes effect at
     [genesis_height].
 
+    The rows the height already has are compared with [accounts] first. When
+    each is a row of [accounts], the missing ones are written: an interrupted
+    import continues, whatever order it stopped in. When any differs, or is not
+    an account of [accounts], nothing is written and the result is
+    [`Mismatch]: the height holds another ledger, which is not overwritten.
+
     Each chunk of [chunk_size] accounts is one statement and one transaction,
-    so an interrupted import keeps what it wrote. The accounts are written in
-    a fixed order (public key, then token), so the rows a height already has
-    are the first ones in that order, and a later call continues after them.
-    The ledger is written when the height has as many rows as the ledger has
-    accounts; a repeated row is ignored. *)
+    so an interrupted import keeps what it wrote. *)
 let add ?(chunk_size = default_chunk_size) (module Conn : Mina_caqti.CONNECTION)
     ~genesis_height accounts =
   let open Deferred.Result.Let_syntax in
   match%bind Sql.table_exists (module Conn) with
   | false ->
       return `No_table
-  | true ->
+  | true -> (
       let rows =
         List.map accounts ~f:row_of_account
-        |> List.sort ~compare:(fun a b ->
-               [%compare: string * string] (a.public_key, a.token)
-                 (b.public_key, b.token) )
+        |> List.sort ~compare:(fun a b -> Account_key.compare (key a) (key b))
       in
-      let total = List.length rows in
-      let%bind already = Sql.written (module Conn) ~genesis_height in
-      if already >= total then return `Already_loaded
+      (* one lookup per written row, in a table of the ledger's rows: the
+         ledger is in memory already, so this costs little next to loading
+         it *)
+      let ledger =
+        Hashtbl.of_alist_exn
+          (module Account_key)
+          (List.map rows ~f:(fun row -> (key row, row)))
+      in
+      let%bind written =
+        Sql.rows_at (module Conn) ~genesis_height >>| List.map ~f:row_of_tuple
+      in
+      let mismatch =
+        List.fold written ~init:{ differing = 0; not_in_ledger = 0 }
+          ~f:(fun acc row ->
+            match Hashtbl.find ledger (key row) with
+            | None ->
+                { acc with not_in_ledger = acc.not_in_ledger + 1 }
+            | Some expected when equal_row expected row ->
+                acc
+            | Some _ ->
+                { acc with differing = acc.differing + 1 } )
+      in
+      if mismatch.differing > 0 || mismatch.not_in_ledger > 0 then
+        return (`Mismatch mismatch)
       else
-        let%map () =
-          List.drop rows already
-          |> List.chunks_of ~length:chunk_size
-          |> Mina_caqti.deferred_result_list_fold ~init:() ~f:(fun () chunk ->
-                 let%bind () = Conn.start () in
-                 match%bind.Deferred
-                   insert_chunk (module Conn) ~genesis_height chunk
-                 with
-                 | Ok () ->
-                     Conn.commit ()
-                 | Error e ->
-                     let%bind.Deferred (_ : (unit, _) Result.t) =
-                       Conn.rollback ()
-                     in
-                     Deferred.Result.fail e )
+        let present =
+          Hash_set.of_list (module Account_key) (List.map written ~f:key)
         in
-        `Added (total - already, already)
+        let missing =
+          List.filter rows ~f:(fun row -> not (Hash_set.mem present (key row)))
+        in
+        match missing with
+        | [] ->
+            return `Already_loaded
+        | _ ->
+            let%map () =
+              List.chunks_of missing ~length:chunk_size
+              |> Mina_caqti.deferred_result_list_fold ~init:()
+                   ~f:(fun () chunk ->
+                     let%bind () = Conn.start () in
+                     match%bind.Deferred
+                       insert_chunk (module Conn) ~genesis_height chunk
+                     with
+                     | Ok () ->
+                         Conn.commit ()
+                     | Error e ->
+                         let%bind.Deferred (_ : (unit, _) Result.t) =
+                           Conn.rollback ()
+                         in
+                         Deferred.Result.fail e )
+            in
+            `Added (List.length missing, List.length written) )
+
+(** What to tell an operator about a [`Mismatch] at [genesis_height]. *)
+let mismatch_message ~genesis_height { differing; not_in_ledger } =
+  sprintf
+    "genesis_accounts at height %Ld holds another genesis ledger than the \
+     config's (%d rows differ, %d accounts are not in the config's ledger): it \
+     was written from another config or network. It is not overwritten; to \
+     replace it, run DELETE FROM genesis_accounts WHERE genesis_height = %Ld \
+     and write the ledger again"
+    genesis_height differing not_in_ledger genesis_height

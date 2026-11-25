@@ -70,6 +70,8 @@ let write_once ?chunk_size ~server_uri accounts =
       failwith "the database has no genesis_accounts table"
   | Ok `Already_loaded ->
       failwith "the fresh database already had the ledger"
+  | Ok (`Mismatch _) ->
+      failwith "the fresh database already had another ledger"
   | Error e ->
       failwith (Caqti_error.show e)
 

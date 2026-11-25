@@ -606,7 +606,7 @@ let write_genesis_accounts w genesis_accounts =
              ()
          | `No_table ->
              failwith "the archive has no genesis_accounts table"
-         | `Already_loaded ->
+         | `Already_loaded | `Mismatch _ ->
              failwithf "a genesis ledger at %d was already written" height () )
 
 (* --- the whole scenario ------------------------------------------------------ *)
