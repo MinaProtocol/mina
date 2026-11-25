@@ -595,24 +595,25 @@ let update_permissions =
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
+       let permissions : Permissions.Update.t Zkapp_basic.Set_or_keep.t =
          Zkapp_basic.Set_or_keep.Set
-           { Permissions.Poly.edit_state = Util.auth_of_string edit_state
-           ; send = Util.auth_of_string send
-           ; receive = Util.auth_of_string receive
-           ; access = Util.auth_of_string access
-           ; set_permissions = Util.auth_of_string set_permissions
-           ; set_delegate = Util.auth_of_string set_delegate
-           ; set_verification_key =
-               ( Util.auth_of_string set_verification_key
-               , Mina_numbers.Txn_version.current )
-           ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
-           ; edit_action_state = Util.auth_of_string edit_action_state
-           ; set_token_symbol = Util.auth_of_string set_token_symbol
-           ; increment_nonce = Util.auth_of_string increment_nonce
-           ; set_voting_for = Util.auth_of_string set_voting_for
-           ; set_timing = Util.auth_of_string set_timing
-           }
+           (Permissions.Update.of_account
+              { Permissions.Poly.edit_state = Util.auth_of_string edit_state
+              ; send = Util.auth_of_string send
+              ; receive = Util.auth_of_string receive
+              ; access = Util.auth_of_string access
+              ; set_permissions = Util.auth_of_string set_permissions
+              ; set_delegate = Util.auth_of_string set_delegate
+              ; set_verification_key =
+                  ( Util.auth_of_string set_verification_key
+                  , Mina_numbers.Txn_version.current )
+              ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
+              ; edit_action_state = Util.auth_of_string edit_action_state
+              ; set_token_symbol = Util.auth_of_string set_token_symbol
+              ; increment_nonce = Util.auth_of_string increment_nonce
+              ; set_voting_for = Util.auth_of_string set_voting_for
+              ; set_timing = Util.auth_of_string set_timing
+              } )
        in
        let snapp_update = { Account_update.Update.dummy with permissions } in
 
