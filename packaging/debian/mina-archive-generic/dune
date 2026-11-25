@@ -1,0 +1,65 @@
+; Defined only in the contexts of dune-workspace.packaging, so the default
+; build never makes packages.
+
+(rule
+ (enabled_if
+  (or
+   (= %{context_name} deb)
+   (= %{context_name} deb-instrumented)))
+ (alias debs)
+ (targets
+  mina-archive-generic%{env:DEB_SUFFIX=}_%{env:MINA_DEB_VERSION=0.0.0-experimental}_%{architecture}.deb)
+ (deps
+  (:mkdeb ../mkdeb.sh)
+  (:archive %{workspace_root}/src/app/archive/archive.exe)
+  (:archive_blocks
+   %{workspace_root}/src/app/archive_blocks/archive_blocks.exe)
+  (:extract_blocks
+   %{workspace_root}/src/app/extract_blocks/extract_blocks.exe)
+  (:archive_hardfork_toolbox
+   %{workspace_root}/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe)
+  (:missing_blocks_guardian
+   %{workspace_root}/src/app/missing_blocks_guardian/missing_blocks_guardian.exe)
+  (:missing_blocks_auditor
+   %{workspace_root}/src/app/missing_blocks_auditor/missing_blocks_auditor.exe)
+  (:replayer %{workspace_root}/src/app/replayer/replayer.exe)
+  (:dump_slot_ledger
+   %{workspace_root}/src/app/dump_slot_ledger/dump_slot_ledger.exe)
+  (:mina_archive_healthcheck
+   %{workspace_root}/src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe)
+  (:sql
+   (glob_files %{workspace_root}/src/app/archive/*.sql))
+  /etc/os-release
+  (env_var MINA_COMMIT_SHA1)
+  (env_var BUILDKITE_BUILD_URL))
+ (action
+  (run
+   %{mkdeb}
+   --output
+   %{targets}
+   --package
+   mina-archive-generic%{env:DEB_SUFFIX=}
+   --version
+   %{env:MINA_DEB_VERSION=0.0.0-experimental}
+   --architecture
+   %{architecture}
+   --description
+   "Mina Archive Node for generic usage"
+   --depends
+   curl
+   --githash
+   %{env:MINA_COMMIT_SHA1=}
+   --buildurl
+   %{env:BUILDKITE_BUILD_URL=}
+   %{archive}:/usr/local/bin/mina-archive
+   %{archive_blocks}:/usr/local/bin/mina-archive-blocks
+   %{extract_blocks}:/usr/local/bin/mina-extract-blocks
+   %{archive_hardfork_toolbox}:/usr/local/bin/mina-archive-hardfork-toolbox
+   %{missing_blocks_guardian}:/usr/local/bin/mina-missing-blocks-guardian
+   %{missing_blocks_auditor}:/usr/local/bin/mina-missing-blocks-auditor
+   %{replayer}:/usr/local/bin/mina-replayer
+   %{dump_slot_ledger}:/usr/local/bin/mina-dump-slot-ledger
+   %{mina_archive_healthcheck}:/usr/local/bin/mina-archive-healthcheck
+   --into
+   /etc/mina/archive
+   %{sql})))

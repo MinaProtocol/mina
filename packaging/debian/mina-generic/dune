@@ -1,0 +1,74 @@
+; Defined only in the contexts of dune-workspace.packaging, so the default
+; build never makes packages.
+;
+; libp2p_helper is a Go binary that dune does not build: `make libp2p_helper`
+; puts it in src/app/libp2p_helper/result/bin before the packages are built.
+
+(rule
+ (enabled_if
+  (or
+   (= %{context_name} deb)
+   (= %{context_name} deb-instrumented)))
+ (alias debs)
+ (targets
+  mina-generic%{env:DEB_SUFFIX=}_%{env:MINA_DEB_VERSION=0.0.0-experimental}_%{architecture}.deb)
+ (deps
+  (:mkdeb ../mkdeb.sh)
+  (:mina %{workspace_root}/src/app/cli/src/mina.exe)
+  (:runtime_genesis_ledger
+   %{workspace_root}/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)
+  (:generate_keypair
+   %{workspace_root}/src/app/generate_keypair/generate_keypair.exe)
+  (:validate_keypair
+   %{workspace_root}/src/app/validate_keypair/validate_keypair.exe)
+  (:run_snark_worker
+   %{workspace_root}/src/lib/snark_worker/standalone/run_snark_worker.exe)
+  (:rocksdb_scanner
+   %{workspace_root}/src/app/rocksdb-scanner/rocksdb_scanner.exe)
+  (:mina_healthcheck
+   %{workspace_root}/src/app/mina_healthcheck/mina_healthcheck.exe)
+  (:mina_graphql_client
+   %{workspace_root}/src/app/mina_graphql_client/mina_graphql_client_app.exe)
+  (:libp2p_helper
+   %{workspace_root}/src/app/libp2p_helper/result/bin/libp2p_helper)
+  (:create_runtime_config
+   %{workspace_root}/scripts/hardfork/create_runtime_config.sh)
+  (:verify_packaged_fork_config
+   %{workspace_root}/scripts/hardfork/mina-verify-packaged-fork-config)
+  /etc/os-release
+  (env_var MINA_COMMIT_SHA1)
+  (env_var BUILDKITE_BUILD_URL))
+ (action
+  (run
+   %{mkdeb}
+   --output
+   %{targets}
+   --package
+   mina-generic%{env:DEB_SUFFIX=}
+   --base-name
+   mina-generic
+   --version
+   %{env:MINA_DEB_VERSION=0.0.0-experimental}
+   --architecture
+   %{architecture}
+   --description
+   "Mina Protocol Client and Daemon for the Generic usage"
+   --depends
+   "tzdata, mina-logproc, curl"
+   --suggests
+   "jq, wget"
+   --githash
+   %{env:MINA_COMMIT_SHA1=}
+   --buildurl
+   %{env:BUILDKITE_BUILD_URL=}
+   %{mina}:/usr/local/bin/mina
+   %{runtime_genesis_ledger}:/usr/local/bin/mina-create-genesis
+   %{generate_keypair}:/usr/local/bin/mina-generate-keypair
+   %{validate_keypair}:/usr/local/bin/mina-validate-keypair
+   %{run_snark_worker}:/usr/local/bin/mina-standalone-snark-worker
+   %{rocksdb_scanner}:/usr/local/bin/mina-rocksdb-scanner
+   %{mina_healthcheck}:/usr/local/bin/mina-healthcheck
+   %{mina_graphql_client}:/usr/local/bin/mina-graphql-client
+   %{libp2p_helper}:/usr/local/bin/coda-libp2p_helper
+   %{create_runtime_config}:/usr/local/bin/mina-hf-create-runtime-config
+   %{verify_packaged_fork_config}:/usr/local/bin/mina-verify-packaged-fork-config)))
