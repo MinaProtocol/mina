@@ -30,8 +30,6 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val list_peers : unit -> Peer.t list Deferred.t
-
   val get_transition_frontier : unit -> Transition_frontier.t option
 
   val get_snark_pool : unit -> Network_pool.Snark_pool.t option
@@ -120,87 +118,6 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
           (action, msg) )
   in
   List.is_empty version_errors
-
-[%%versioned_rpc
-module Get_some_initial_peers = struct
-  type nonrec ctx = ctx
-
-  module Master = struct
-    let name = "get_some_initial_peers"
-
-    module T = struct
-      type query = unit [@@deriving sexp, yojson]
-
-      type response = Peer.t list [@@deriving sexp, yojson]
-    end
-
-    module Caller = T
-    module Callee = T
-  end
-
-  include Master.T
-
-  let sent_counter = Mina_metrics.Network.get_some_initial_peers_rpcs_sent
-
-  let received_counter =
-    Mina_metrics.Network.get_some_initial_peers_rpcs_received
-
-  let failed_request_counter =
-    Mina_metrics.Network.get_some_initial_peers_rpc_requests_failed
-
-  let failed_response_counter =
-    Mina_metrics.Network.get_some_initial_peers_rpc_responses_failed
-
-  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-  include M
-
-  include Perf_histograms.Rpc.Plain.Extend (struct
-    include M
-    include Master
-  end)
-
-  module V1 = struct
-    module T = struct
-      type query = unit
-
-      type response = Network_peer.Peer.Stable.V1.t list
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      let response_of_callee_model = Fn.id
-
-      let caller_model_of_response = Fn.id
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  let receipt_trust_action_message _ = ("Get_some_initial_peers query", [])
-
-  let log_request_received ~logger ~sender () =
-    [%log trace] "Sending some initial peers to $peer"
-      ~metadata:[ ("peer", Peer.to_yojson sender) ]
-
-  let response_is_successful peer_list = not (List.is_empty peer_list)
-
-  let handle_request (module Context : CONTEXT) ~version:_ _request =
-    Context.list_peers ()
-
-  let rate_limit_budget = (1, `Per Time.Span.minute)
-
-  let rate_limit_cost = Fn.const 1
-end]
 
 [%%versioned_rpc
 module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
@@ -1176,8 +1093,6 @@ module Get_best_tip = struct
 end]
 
 type ('query, 'response) rpc =
-  | Get_some_initial_peers
-      : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
   | Get_staged_ledger_aux_and_pending_coinbases_at_hash
       : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
         , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
@@ -1201,8 +1116,7 @@ type ('query, 'response) rpc =
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
 let all_rpcs =
-  [ Rpc Get_some_initial_peers
-  ; Rpc Get_staged_ledger_aux_and_pending_coinbases_at_hash
+  [ Rpc Get_staged_ledger_aux_and_pending_coinbases_at_hash
   ; Rpc Answer_sync_ledger_query
   ; Rpc Get_best_tip
   ; Rpc Get_ancestry
@@ -1215,8 +1129,6 @@ let all_rpcs =
 
 let implementation :
     type q r. (q, r) rpc -> (ctx, q, r) Gossip_net.rpc_implementation = function
-  | Get_some_initial_peers ->
-      (module Get_some_initial_peers)
   | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
       (module Get_staged_ledger_aux_and_pending_coinbases_at_hash)
   | Answer_sync_ledger_query ->
