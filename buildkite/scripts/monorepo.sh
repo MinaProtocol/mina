@@ -261,6 +261,29 @@ for file in "${!SELECTED_FILES[@]}"; do
   done < <(resolve_transitive_deps "$file")
 done
 
+# A retry of this step (e.g. after its agent was lost part-way through the
+# uploads) must not upload again what an earlier attempt already uploaded:
+# Buildkite rejects the duplicate step keys, so every retry would fail. Each
+# upload is recorded in build meta-data under this step's id, which retries
+# share, and a retry skips the recorded jobs. The record is written only after
+# the upload succeeds, so a lost record costs a loud duplicate-key failure,
+# never a silently missing job.
+upload_marker() {
+  echo "monorepo-uploaded:${BUILDKITE_STEP_ID}:$1"
+}
+
+already_uploaded() {
+  [[ -n "${BUILDKITE_STEP_ID:-}" && "${BUILDKITE_RETRY_COUNT:-0}" -gt 0 ]] \
+    && buildkite-agent meta-data exists "$(upload_marker "$1")"
+}
+
+record_upload() {
+  if [[ -n "${BUILDKITE_STEP_ID:-}" ]]; then
+    buildkite-agent meta-data set "$(upload_marker "$1")" uploaded \
+      || echo "⚠️  Could not record the upload of $1; a retry of this step will upload it again" >&2
+  fi
+}
+
 # Phase 3: upload every job in the run set exactly once.
 for file in "${!TO_UPLOAD[@]}"; do
   job_name=$(yq -r .spec.name "$file")
@@ -270,7 +293,13 @@ for file in "${!TO_UPLOAD[@]}"; do
     continue
   fi
 
+  if already_uploaded "$job_name"; then
+    printf " -> ↩️  Already uploaded by an earlier attempt of this step: %s\n" "$job_name"
+    continue
+  fi
+
   job_path=$(yq -r .spec.path "$file")
   ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
+  record_upload "$job_name"
   printf " -> ✅ Uploaded job: %s\n" "$job_name"
 done
