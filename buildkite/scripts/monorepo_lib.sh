@@ -70,6 +70,26 @@ scope_matches() {
   echo $(( match_count == 1 ? 1 : 0 ))
 }
 
+# codebase_targets_unreleased_network - Whether the codebase is developing a
+# network that is not yet live on mainnet, i.e. whether MINA_CODEBASE_NETWORK
+# differs from MINA_MAINNET_NETWORK. The files are read from
+# MINA_NETWORK_FILES_DIR, by default the top of the repository. Where either
+# is missing, the codebase is taken to target mainnet.
+# Returns: true or false
+codebase_targets_unreleased_network() {
+  local dir="${MINA_NETWORK_FILES_DIR:-$(git rev-parse --show-toplevel)}"
+  if [[ ! -f "$dir/MINA_CODEBASE_NETWORK" || ! -f "$dir/MINA_MAINNET_NETWORK" ]]; then
+    echo "⚠️  MINA_CODEBASE_NETWORK or MINA_MAINNET_NETWORK not found in $dir: taking the codebase to target mainnet" >&2
+    echo false
+    return
+  fi
+  if [[ "$(cat "$dir/MINA_CODEBASE_NETWORK")" != "$(cat "$dir/MINA_MAINNET_NETWORK")" ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 # check_exclude_if - Check if a job should be excluded based on excludeIf conditions
 # Args:
 #   $1: file - path to job YAML file
@@ -96,6 +116,20 @@ check_exclude_if() {
     local ancestor reason
     ancestor=$(yq -r ".spec.excludeIf[$i].ancestor // \"\"" "$file")
     reason=$(yq -r ".spec.excludeIf[$i].reason // \"\"" "$file")
+
+    # A condition on the network the codebase targets. Read without '//',
+    # which would treat false as missing.
+    local targets_unreleased
+    targets_unreleased=$(yq -r ".spec.excludeIf[$i].codebaseTargetsUnreleasedNetwork" "$file")
+    if [[ "$targets_unreleased" == "true" || "$targets_unreleased" == "false" ]]; then
+      echo "Evaluating excludeIf[$i]: codebaseTargetsUnreleasedNetwork=$targets_unreleased, reason=$reason" >&2
+      if [[ "$targets_unreleased" == "$(codebase_targets_unreleased_network)" ]]; then
+        echo "❌🚫 $job_name excluded based on excludeIf condition: $reason" >&2
+        echo 1
+        return
+      fi
+      continue
+    fi
 
     # Skip this item if it doesn't have ancestor field (not an ancestor-based exclusion)
     if [[ -z "$ancestor" || "$ancestor" == "null" ]]; then
@@ -148,6 +182,20 @@ check_include_if() {
     local ancestor reason
     ancestor=$(yq -r ".spec.includeIf[$i].ancestor // \"\"" "$file")
     reason=$(yq -r ".spec.includeIf[$i].reason // \"\"" "$file")
+
+    # A condition on the network the codebase targets. Read without '//',
+    # which would treat false as missing.
+    local targets_unreleased
+    targets_unreleased=$(yq -r ".spec.includeIf[$i].codebaseTargetsUnreleasedNetwork" "$file")
+    if [[ "$targets_unreleased" == "true" || "$targets_unreleased" == "false" ]]; then
+      echo "Evaluating includeIf[$i]: codebaseTargetsUnreleasedNetwork=$targets_unreleased, reason=$reason" >&2
+      if [[ "$targets_unreleased" == "$(codebase_targets_unreleased_network)" ]]; then
+        echo "✅ $job_name included based on includeIf condition: $reason" >&2
+        echo 1
+        return
+      fi
+      continue
+    fi
 
     # Skip this item if it doesn't have ancestor field (not an ancestor-based inclusion)
     if [[ -z "$ancestor" || "$ancestor" == "null" ]]; then

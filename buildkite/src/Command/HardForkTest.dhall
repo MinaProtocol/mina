@@ -14,8 +14,6 @@ let Expr = ../Pipeline/Expr.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
 
-let MainlineBranch = ../Pipeline/MainlineBranch.dhall
-
 let Pipeline = ../Pipeline/Dsl.dhall
 
 let PipelineScope = ../Pipeline/Scope.dhall
@@ -55,10 +53,10 @@ in  { pipeline =
                   , PipelineTag.Type.Hardfork
                   ]
                 , includeIf =
-                  [ Expr.Type.DescendantOf
-                      { ancestor = MainlineBranch.Type.Develop
+                  [ Expr.Type.CodebaseTargetsUnreleasedNetwork
+                      { codebaseTargetsUnreleasedNetwork = True
                       , reason =
-                          "build-and-test.sh builds the postfork daemon from the commit under test, and only develop carries the next protocol_version_transaction; elsewhere this is a same-version fork, which the advanced and auto fork methods cannot complete"
+                          "build-and-test.sh forks from compatible to a postfork daemon built from the commit under test, which is a fork to a new network only when the codebase targets one not yet live on mainnet"
                       }
                   ]
                 }
