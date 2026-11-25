@@ -105,8 +105,23 @@ function load_cached_image_id() {
   docker image inspect --format '{{.Id}}' "$image_id" 2>/dev/null
 }
 
+# Drop the images one check pulled and loaded before the next check: a run
+# covers one image per codename at ~10 GB each, on a docker graph shared with
+# the other jobs of the agent. The tag first, then the IDs without --force, so
+# an image another tag still holds stays and a running container refuses.
+function drop_check_images() {
+  local id
+  docker image rm "$remote_ref" >/dev/null 2>&1 || true
+  for id in "$remote_id" "$cached_id"; do
+    [[ -n "$id" ]] || continue
+    docker image rm "$id" >/dev/null 2>&1 || true
+  done
+}
+
 for check in "${checks[@]}"; do
   IFS='|' read -r remote_ref cached_file tag <<< "$check"
+  remote_id=""
+  cached_id=""
 
   echo "==> Verifying ${remote_ref} against ${cached_file}"
 
@@ -114,6 +129,11 @@ for check in "${checks[@]}"; do
     echo "WARNING: failed to pull ${remote_ref} from docker.io — skipping"
     missing_remote+=("$tag")
     continue
+  fi
+  # Crash cover: the pre-exit hook (.buildkite/hooks/pre-command) removes a
+  # pull this loop did not get to drop.
+  if [[ -n "${OWNED_REFS_FILE:-}" ]]; then
+    echo "$remote_ref" >> "$OWNED_REFS_FILE"
   fi
   remote_id="$(docker image inspect --format '{{.Id}}' "$remote_ref")"
 
@@ -127,6 +147,7 @@ for check in "${checks[@]}"; do
 
   if [[ -n "$remote_id" && "$cached_id" == "$remote_id" ]]; then
     echo "OK ${tag}"
+    drop_check_images
     continue
   fi
 
@@ -147,6 +168,7 @@ for check in "${checks[@]}"; do
     echo "ERROR: failed to save and replace ${cached_file}"
     exit 1
   fi
+  drop_check_images
 done
 
 echo
