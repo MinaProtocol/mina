@@ -50,7 +50,6 @@ end
 let setup (type n) ~context:(module Context : CONTEXT)
     ?(time_controller = Block_time.Controller.basic ~logger:Context.logger)
     (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
-  let open Context in
   let _, peers =
     Vect.fold_map states
       ~init:(Constants.init_ip, Constants.init_discovery_port)
@@ -88,9 +87,6 @@ let setup (type n) ~context:(module Context : CONTEXT)
   let config rpc_mocks peer =
     let open Mina_networking.Config in
     { is_seed = Vect.is_empty peers
-    ; genesis_ledger_hash =
-        Mina_ledger.Ledger.merkle_root
-          (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
