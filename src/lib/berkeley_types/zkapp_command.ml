@@ -41,7 +41,7 @@ let hash ({ fee_payer; account_updates; memo } : Stable.V1.t) :
   |> Mina_transaction.Transaction_hash.digest_string
 
 let to_mesa ({ fee_payer; account_updates; memo } : Stable.V1.t) :
-    Mina_base.Zkapp_command.Stable.Latest.t =
+    Mina_base.Zkapp_command.Stable.V2.t =
   { fee_payer
   ; account_updates = Call_forest.map account_updates ~f:Account_update.to_mesa
   ; memo

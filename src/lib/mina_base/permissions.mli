@@ -82,6 +82,14 @@ end
 
 [%%versioned:
 module Stable : sig
+  module V3 : sig
+    type t =
+      ( Auth_required.Stable.V2.t
+      , Mina_numbers.Txn_version.Stable.V1.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, equal, compare, hash, yojson]
+  end
+
   module V2 : sig
     type t =
       ( Auth_required.Stable.V2.t

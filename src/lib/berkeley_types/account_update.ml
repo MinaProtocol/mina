@@ -47,7 +47,7 @@ module Update = struct
        ; timing
        ; voting_for
        } :
-        Stable.V1.t ) : Mina_base.Account_update.Update.Stable.Latest.t =
+        Stable.V1.t ) : Mina_base.Account_update.Update.Stable.V2.t =
     { app_state = Zkapp_state.V.to_mesa app_state ~pad:Set_or_keep.Keep
     ; delegate
     ; verification_key
@@ -216,7 +216,7 @@ module Body = struct
        ; may_use_token
        ; authorization_kind
        } :
-        Stable.V1.t ) : Mina_base.Account_update.Body.Stable.Latest.t =
+        Stable.V1.t ) : Mina_base.Account_update.Body.Stable.V2.t =
     { public_key
     ; token_id
     ; update = Update.to_mesa update
@@ -249,5 +249,5 @@ end]
 let to_mesa
     ({ body; authorization; aux = () } :
       (_, _, unit) Mina_base.Account_update.Poly.t ) :
-    Mina_base.Account_update.Stable.Latest.t =
+    Mina_base.Account_update.Stable.V2.t =
   { body = Body.to_mesa body; authorization; aux = () }
