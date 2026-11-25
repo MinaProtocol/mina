@@ -1,0 +1,23 @@
+(test
+ (name test_rosetta_vesting_balance)
+ (deps
+  %{project_root}/app/archive/create_schema.sql
+  %{project_root}/app/archive/upgrade.sql
+  (env_var MINA_TEST_POSTGRES))
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  integers
+  ;; local libraries
+  lib
+  mina_automation.synthetic_archive
+  mina_base
+  mina_caqti
+  rosetta_lib)
+ (preprocess
+  (pps ppx_version ppx_jane)))
