@@ -89,7 +89,10 @@ module Make (Inputs : Inputs_intf) :
           None
       | Ledger_root ledger ->
           Some (Root_ledger.as_unmasked ledger)
-    else None
+    else
+      Option.map
+        (Transition_frontier.find_ledger_below_root frontier ledger_hash)
+        ~f:(Ledger.Any_ledger.cast (module Ledger))
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
