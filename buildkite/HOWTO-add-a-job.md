@@ -75,7 +75,7 @@ in  Pipeline.build
 
 ### `JobSpec` fields
 
-Defined at [`buildkite/src/Pipeline/JobSpec.dhall:9-25`](./src/Pipeline/JobSpec.dhall).
+Defined at [`buildkite/src/Pipeline/JobSpec.dhall:7-19`](./src/Pipeline/JobSpec.dhall).
 
 | Field        | Type                       | Default          | What it controls |
 |---|---|---|---|
@@ -84,8 +84,6 @@ Defined at [`buildkite/src/Pipeline/JobSpec.dhall:9-25`](./src/Pipeline/JobSpec.
 | `scope`      | `List Scope.Type`          | `Scope.Full`     | Which top-level run scopes (PullRequest / Nightly / MainlineNightly / Release) include this job. |
 | `tags`       | `List PipelineTag.Type`    | `[Fast]`         | Filter labels. `BUILDKITE_PIPELINE_FILTER` selects by tag. |
 | `dirtyWhen`  | `List SelectFiles.Type`    | *(required)*     | Egrep patterns. In `PullRequest` mode the job runs only if at least one pattern matches `git diff`. |
-| `excludeIf`  | `List Expr.Type`           | `[]`             | Branch-ancestor predicates that exclude this job from a run. |
-| `includeIf`  | `List Expr.Type`           | `[]`             | Branch-ancestor predicates that *force-include* this job. |
 
 Use `JobSpec::{ name = "…", … }` syntax — the Dhall record-update form
 fills in defaults for fields you omit.

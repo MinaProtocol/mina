@@ -12,10 +12,6 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let RosettaBlockRaceTest = ../../Command/RosettaBlockRaceTest.dhall
 
-let Expr = ../../Pipeline/Expr.dhall
-
-let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
 let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
@@ -33,17 +29,6 @@ in  Pipeline.build
         , name = "RosettaBlockRaceTest"
         , scope =
           [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
-        , excludeIf =
-          [ Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Mesa
-              , reason = "Mesa does not support devnet network yet"
-              }
-          , Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Develop
-              , reason =
-                  "Develop branch is incompatible with current devnet network"
-              }
-          ]
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

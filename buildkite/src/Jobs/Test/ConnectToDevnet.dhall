@@ -14,10 +14,6 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Expr = ../../Pipeline/Expr.dhall
-
-let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
 let network = Network.Type.Devnet
 
 let dependsOn =
@@ -38,17 +34,6 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
-          ]
-        , excludeIf =
-          [ Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Mesa
-              , reason = "Mesa does not have devnet network yet"
-              }
-          , Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Develop
-              , reason =
-                  "Develop branch is incompatible with current devnet network"
-              }
           ]
         }
       , steps =

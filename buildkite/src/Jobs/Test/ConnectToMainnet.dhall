@@ -16,10 +16,6 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Expr = ../../Pipeline/Expr.dhall
-
-let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
 let network = Network.Type.Mainnet
 
 let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
@@ -42,17 +38,6 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           , PipelineTag.Type.Rosetta
-          ]
-        , excludeIf =
-          [ Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Mesa
-              , reason = "Mesa does not have mainnet network yet"
-              }
-          , Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Develop
-              , reason =
-                  "Develop branch is incompatible with current mainnet network"
-              }
           ]
         }
       , steps =
