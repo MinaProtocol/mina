@@ -12,4 +12,8 @@
   mina_stdlib_unix
   lmdb_storage)
  (preprocess
-  (pps mina_ppx)))
+  (pps mina_ppx))
+ ;; In CI this test occasionally dies part-way through a case and leaves no
+ ;; trace in the log; run_test.sh reports how it ended and what it printed.
+ (action
+  (run bash %{dep:run_test.sh} %{dep:test_lmdb_storage.exe})))
