@@ -8,6 +8,11 @@
 # it changes for each PR.
 # 3. Build the commit under test as the postfork build, and hardfork_test;
 # 4. Execute hardfork_test on them.
+#
+# When HARDFORK_TEST_PG_URI is set (CI starts a PostgreSQL server and sets it),
+# both networks also run an archive node in that database, and the test checks
+# the archive upgrade, the hard-fork data repair and rosetta-cli across the
+# fork.
 
 # Step 0. Prepare environment if needed
 set -eux -o pipefail
@@ -144,12 +149,28 @@ if [ -n "${BUILDKITE:-}" ]; then
   fi
 
   git fetch origin
+
+  # PostgreSQL for the archive across the fork. initdb refuses to run as root,
+  # so the server runs as a nix build user of this image.
+  nix-env -iA unstable.{postgresql_16,util-linux}
+  PG_DATA=$(mktemp -d --tmpdir hardfork-pgdata.XXXXXXX)
+  PG_SOCKET_DIR=$(mktemp -d --tmpdir hardfork-pgsocket.XXXXXXX)
+  chown nixbld1 "$PG_DATA" "$PG_SOCKET_DIR"
+  as_pg_user() { setpriv --reuid=nixbld1 --regid=nixbld --init-groups "$@"; }
+  as_pg_user initdb -D "$PG_DATA" -U postgres --auth=trust >/dev/null
+  as_pg_user pg_ctl -D "$PG_DATA" -l "$PG_DATA/postgres.log" -w start \
+    -o "-c listen_addresses=127.0.0.1 -c port=5432 -c max_connections=200 -k $PG_SOCKET_DIR"
+  export HARDFORK_TEST_PG_URI="postgres://postgres:postgres@127.0.0.1:5432/archive"
 fi
+
+# create_schema.sql of the prefork version, copied while it is checked out.
+ARCHIVE_SQL_DIR=$(mktemp -d --tmpdir hardfork-archive-sql.XXXXXXX)
 
 # 1. Build PREFORK as a prefork build;
 git checkout $PREFORK
 git submodule update --init --recursive --depth 1
-nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet^out,archive" --out-link "prefork-devnet"
+cp src/app/archive/create_schema.sql "$ARCHIVE_SQL_DIR/prefork_create_schema.sql"
 
 # 2. Push what was built to the storage box cache.
 push_cache
@@ -161,9 +182,10 @@ push_cache
 # nightly on a given branch tests some other branch's daemon.
 git checkout "$TEST_COMMIT"
 git submodule update --init --recursive --depth 1
-nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet^out,archive" --out-link "postfork-devnet"
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#mina-graphql-client" --out-link "mina-graphql-client"
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#rosetta-cli" --out-link "rosetta-cli"
 
 # 3. Execute hardfork_test on them.
 
@@ -172,6 +194,22 @@ SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
 SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
 
 NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
+
+ARCHIVE_ARGS=()
+if [[ -n "${HARDFORK_TEST_PG_URI:-}" ]]; then
+  ARCHIVE_ARGS=(
+    --pg-uri "$HARDFORK_TEST_PG_URI"
+    --main-archive-exe "$PWD/prefork-devnet-archive/bin/mina-archive"
+    --main-archive-schema "$ARCHIVE_SQL_DIR/prefork_create_schema.sql"
+    --fork-archive-exe "$PWD/postfork-devnet-archive/bin/mina-archive"
+    --fork-archive-upgrade-script "$PWD/src/app/archive/upgrade.sql"
+    --fork-archive-toolbox-exe "$PWD/postfork-devnet-archive/bin/mina-archive-hardfork-toolbox"
+    --fork-rosetta-exe "$PWD/postfork-devnet/bin/rosetta"
+    --fork-signer-exe "$PWD/postfork-devnet/bin/mina-ocaml-signer"
+    --rosetta-cli-exe "$PWD/rosetta-cli/bin/rosetta-cli"
+    --rosetta-cli-config-dir "$PWD/src/app/rosetta/rosetta-cli-config"
+  )
+fi
 
 hardfork_test/bin/hardfork_test \
   --main-mina-exe prefork-devnet/bin/mina \
@@ -183,6 +221,7 @@ hardfork_test/bin/hardfork_test \
   --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \
   --root "$NETWORK_ROOT" \
+  "${ARCHIVE_ARGS[@]}" \
   "${EXTRA_ARGS[@]}"
 
 popd

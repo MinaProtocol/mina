@@ -20,6 +20,16 @@ The hardfork test simulates a complete protocol upgrade by running two sequentia
 7. **Fork Network Start**: Launches a new network using the post-fork executable with the generated hardfork ledgers
 8. **Continuity Verification**: Validates that the new network can continue from the forked state by producing blocks and processing transactions
 
+**Archive and Rosetta across the fork** (only when `--pg-uri` is set)
+
+Both networks write to one archive database, as in a real hard fork:
+1. The main network runs an archive node (pre-fork binary, pre-fork `create_schema.sql`).
+2. Between the networks, the fork version's `upgrade.sql` upgrades the database; `archive_hardfork_toolbox verify-upgrade` checks the recorded migration.
+3. The fork network runs an archive node (fork binary, fork runtime config) in the same database, and a Rosetta server.
+4. The toolbox repairs the data: `convert-chain-to-canonical` settles the pending pre-fork blocks, and `populate-genesis-accounts` writes the fork genesis ledger to `genesis_accounts`.
+5. The test checks the data: `validate-fork`; no pending pre-fork block; one canonical block per pre-fork height; a `genesis_accounts` row at the fork genesis height for each account of the main genesis ledger.
+6. `rosetta-cli` runs `configuration:validate`, `check:spec`, `check:construction` and `check:data` against the fork Rosetta server, with `src/app/rosetta/rosetta-cli-config/{config.json,mina.ros}`. The construction check pays from the last offline whale account (the background payments use `offline_whale_account_0`).
+
 ### What This Tests
 
 This validates the critical hardfork mechanism:
@@ -74,6 +84,20 @@ This validates the critical hardfork mechanism:
 - `--user-command-check-max-iterations`: Max iterations to check for user commands in blocks (default: 10)
 - `--fork-earliest-block-max-retries`: Maximum number of retries to wait for earliest block in fork network (default: 10)
 - `--graphql-max-retries`: Maximum number of retries for GraphQL requests (default: 5)
+
+#### Archive and Rosetta Configuration
+All optional. `--pg-uri` turns the archive and Rosetta checks on; then all paths below are required and `psql` must be on `PATH`.
+- `--pg-uri`: PostgreSQL URI of the archive database (`postgres://user:password@host:port/db`). The test drops and recreates this database.
+- `--main-archive-exe`, `--main-archive-schema`: archive executable and `create_schema.sql` of the main (pre-fork) version
+- `--fork-archive-exe`, `--fork-archive-upgrade-script`: archive executable and `upgrade.sql` of the fork version
+- `--fork-archive-toolbox-exe`: `mina-archive-hardfork-toolbox` of the fork version
+- `--fork-rosetta-exe`, `--fork-signer-exe`: Rosetta server and `mina-ocaml-signer` of the fork version
+- `--rosetta-cli-exe`, `--rosetta-cli-config-dir`: `rosetta-cli` and the directory with its `config.json` and `mina.ros`
+- `--archive-port` (default: 3086), `--rosetta-port` (default: 3087)
+- `--archive-wait`: minutes to wait for the fork genesis block in the archive (default: 15)
+- `--rosetta-check-timeout`: timeout in minutes of each rosetta-cli check (default: 60)
+
+`scripts/hardfork/build-and-test.sh` sets all of them when `HARDFORK_TEST_PG_URI` is set; in CI it starts a PostgreSQL server and sets it.
 
 ## Example
 

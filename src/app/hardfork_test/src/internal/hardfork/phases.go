@@ -153,6 +153,18 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 		return err
 	}
 
+	if t.Config.ArchiveEnabled() {
+		t.Logger.Info("Phase 5: Repairing and validating the archive across the fork...")
+		if err := t.RepairAndValidateArchive(*commonGenesisBlock, latestPreForkHeight); err != nil {
+			return err
+		}
+
+		t.Logger.Info("Phase 6: Running rosetta-cli against the fork network...")
+		if err := t.RunRosettaChecks(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -428,6 +440,10 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		chainStateDir := filepath.Join(nodeDir, chainId)
 		if err = os.Mkdir(chainStateDir, 0755); err != nil {
 			return err
+		}
+		if t.forkGenesisDir == "" {
+			// All nodes have the same fork ledgers; the archive uses the first.
+			t.forkGenesisDir = filepath.Join(chainStateDir, "genesis")
 		}
 		filesToMove := []MoveFileSpec{
 			{from: forkConfigFile, to: filepath.Join(nodeDir, "daemon.json")},
