@@ -485,7 +485,10 @@ let glue_sync_ledger :
                           (List.filter_map ps ~f:(fun (q, r) ->
                                match r with
                                | Ok r ->
-                                   Some (q, r)
+                                   Some
+                                     ( q
+                                     , Sync_ledger.Answer.With_raw_accounts
+                                       .to_answer r )
                                | Error _ ->
                                    None ) ) ) ) )
           ()
