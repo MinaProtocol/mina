@@ -185,6 +185,21 @@ module Best_chain =
   }
 |}]
 
+module Scan_state =
+[%graphql
+{|
+  query ($state_hash: String) @encoders(module: "Encoders") {
+    scanState(stateHash: $state_hash) {
+      stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+      trees {
+        availableSpace
+        baseJobsTodo
+        mergeJobsTodo
+      }
+    }
+  }
+|}]
+
 module Query_metrics =
 [%graphql
 {|
