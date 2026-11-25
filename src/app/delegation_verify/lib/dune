@@ -5,6 +5,8 @@
   core
   yojson
   ;;local libraries
+  base58_check
+  blake2
   currency
   ledger_proof
   mina_base

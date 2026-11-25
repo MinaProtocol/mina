@@ -31,11 +31,19 @@ module Deferred_block = struct
     verify_blockchain_snarks
       [ (protocol_state header, protocol_state_proof header) ]
 
-  let create ?(validate = true) ~verify_blockchain_snarks contents =
+  (* The block is checked against [block_hash] before its proof is verified:
+     every submission naming [block_hash] is answered with this block. *)
+  let create ?(validate = true) ~verify_blockchain_snarks ~block_hash contents =
     let open Deferred.Or_error.Monad_infix in
     let block = contents >>= block_of_string in
     let valid =
-      if validate then block >>= verify_block ~verify_blockchain_snarks
+      if validate then
+        contents
+        >>= (fun block_data ->
+              Deferred.return
+              @@ Delegation_verify_lib.Block_hash.check ~block_hash ~block_data
+              )
+        >>= fun () -> block >>= verify_block ~verify_blockchain_snarks
       else Deferred.Or_error.return ()
     in
     { block; valid }
@@ -46,7 +54,8 @@ let known_blocks : (Block_hash.t, Deferred_block.t) Hashtbl.t =
 
 let add ?validate ~verify_blockchain_snarks ~block_hash block_contents =
   let block =
-    Deferred_block.create ?validate ~verify_blockchain_snarks block_contents
+    Deferred_block.create ?validate ~verify_blockchain_snarks ~block_hash
+      block_contents
   in
   Hashtbl.add_exn known_blocks ~key:block_hash ~data:block
 
