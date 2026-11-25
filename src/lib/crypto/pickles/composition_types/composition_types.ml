@@ -5,6 +5,7 @@ module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
 module Opt = Opt
+module Wire = Wire
 open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
@@ -30,40 +31,23 @@ module Wrap = struct
         performing them directly, it exposes the values needed for those computations as a part of
         its own public-input, so that the next circuit can do them (since it will use the other curve on the cycle,
         and hence can efficiently perform computations in that scalar field). *)
+    include Wire.Wrap.Proof_state
+
     module Deferred_values = struct
+      (** All the deferred values needed, comprising values from the PLONK IOP
+          verification, values from the inner-product argument, and
+          [which_branch] which is needed to know the proper domain to use. *)
+      include Wire.Wrap.Proof_state.Deferred_values
+
       module Plonk = struct
         module Minimal = struct
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
-                  all that's needed to derive all the values in the [In_circuit] version below.
+          (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
+              all that's needed to derive all the values in the [In_circuit] version below.
 
-                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
-                  from the [Minimal] value.
-              *)
-              type ('challenge, 'scalar_challenge, 'bool) t =
-                    ( 'challenge
-                    , 'scalar_challenge
-                    , 'bool )
-                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                    .Deferred_values
-                    .Plonk
-                    .Minimal
-                    .V1
-                    .t =
-                { alpha : 'scalar_challenge
-                ; beta : 'challenge
-                ; gamma : 'challenge
-                ; zeta : 'scalar_challenge
-                ; joint_combiner : 'scalar_challenge option
-                ; feature_flags : 'bool Plonk_types.Features.Stable.V1.t
-                }
-              [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-              let to_latest = Fn.id
-            end
-          end]
+              See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
+              from the [Minimal] value.
+          *)
+          include Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
 
           let map_challenges t ~f ~scalar =
             { t with
@@ -180,108 +164,8 @@ module Wrap = struct
           }
       end
 
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
-
-        module V1 = struct
-          (** All the deferred values needed, comprising values from the PLONK IOP verification,
-    values from the inner-product argument, and [which_branch] which is needed to know
-    the proper domain to use. *)
-          type ( 'plonk
-               , 'scalar_challenge
-               , 'fp
-               , 'bulletproof_challenges
-               , 'branch_data )
-               t =
-                ( 'plonk
-                , 'scalar_challenge
-                , 'fp
-                , 'bulletproof_challenges
-                , 'branch_data )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Deferred_values
-                .V1
-                .t =
-            { plonk : 'plonk
-            ; combined_inner_product : 'fp
-                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-            ; b : 'fp
-                  (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
-                where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
-            *)
-            ; xi : 'scalar_challenge
-                  (** The challenge used for combining polynomials *)
-            ; bulletproof_challenges : 'bulletproof_challenges
-                  (** The challenges from the inner-product argument that was partially verified. *)
-            ; branch_data : 'branch_data
-                  (** Data specific to which step branch of the proof-system was verified *)
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-          let to_latest = Fn.id
-        end
-      end]
-
-      type ( 'plonk
-           , 'scalar_challenge
-           , 'fp
-           , 'bulletproof_challenges
-           , 'branch_data )
-           t =
-            ( 'plonk
-            , 'scalar_challenge
-            , 'fp
-            , 'bulletproof_challenges
-            , 'branch_data )
-            Stable.Latest.t =
-        { plonk : 'plonk
-        ; combined_inner_product : 'fp
-        ; b : 'fp
-        ; xi : 'scalar_challenge
-        ; bulletproof_challenges : 'bulletproof_challenges
-        ; branch_data : 'branch_data
-        }
-      [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
       module Minimal = struct
-        [@@@warning "-27"]
-
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            (* 'fp is unused in Minimal but kept for type compatibility with
-               In_circuit. We suppress the warning instead of using a phantom
-               type to preserve the serialization format. *)
-            type ( 'challenge
-                 , 'scalar_challenge
-                 , 'fp
-                 , 'bool
-                 , 'bulletproof_challenges
-                 , 'branch_data )
-                 t =
-                  ( 'challenge
-                  , 'scalar_challenge
-                  , 'fp
-                  , 'bool
-                  , 'bulletproof_challenges
-                  , 'branch_data )
-                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                  .Deferred_values
-                  .Minimal
-                  .V1
-                  .t =
-              { plonk :
-                  ( 'challenge
-                  , 'scalar_challenge
-                  , 'bool )
-                  Plonk.Minimal.Stable.V1.t
-              ; bulletproof_challenges : 'bulletproof_challenges
-              ; branch_data : 'branch_data
-              }
-            [@@deriving sexp, compare, yojson, hash, equal]
-          end
-        end]
+        include Wire.Wrap.Proof_state.Deferred_values.Minimal
 
         let map_challenges { plonk; bulletproof_challenges; branch_data } ~f
             ~scalar =
@@ -368,22 +252,7 @@ module Wrap = struct
     (** The component of the proof accumulation state that is only computed on by the
         "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
     module Messages_for_next_wrap_proof = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('g1, 'bulletproof_challenges) t =
-                ( 'g1
-                , 'bulletproof_challenges )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Messages_for_next_wrap_proof
-                .V1
-                .t =
-            { challenge_polynomial_commitment : 'g1
-            ; old_bulletproof_challenges : 'bulletproof_challenges
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
 
       let to_field_elements (type g f)
           { challenge_polynomial_commitment; old_bulletproof_challenges }
@@ -401,82 +270,8 @@ module Wrap = struct
           ~value_of_hlist:of_hlist
     end
 
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'plonk
-             , 'scalar_challenge
-             , 'fp
-             , 'messages_for_next_wrap_proof
-             , 'digest
-             , 'bp_chals
-             , 'index )
-             t =
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'bp_chals
-              , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
-          { deferred_values :
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'bp_chals
-              , 'index )
-              Deferred_values.Stable.V1.t
-          ; sponge_digest_before_evaluations : 'digest
-          ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
-                (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
-              circuit which is then "unhashed". *)
-          }
-        [@@deriving sexp, compare, yojson, hlist, hash, equal]
-      end
-    end]
-
     module Minimal = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'bool
-               , 'messages_for_next_wrap_proof
-               , 'digest
-               , 'bp_chals
-               , 'index )
-               t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'bp_chals
-                , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Minimal
-                .V1
-                .t =
-            { deferred_values :
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'bp_chals
-                , 'index )
-                Deferred_values.Minimal.Stable.V1.t
-            ; sponge_digest_before_evaluations : 'digest
-            ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
-                  (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
-              circuit which is then "unhashed". *)
-            }
-          [@@deriving sexp, compare, yojson, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Proof_state.Minimal
     end
 
     module In_circuit = struct
@@ -632,83 +427,10 @@ module Wrap = struct
         to parts of incompletely verified proofs.
   *)
   module Statement = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'plonk
-             , 'scalar_challenge
-             , 'fp
-             , 'messages_for_next_wrap_proof
-             , 'digest
-             , 'messages_for_next_step_proof
-             , 'bp_chals
-             , 'index )
-             t =
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'messages_for_next_step_proof
-              , 'bp_chals
-              , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.t =
-          { proof_state :
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'bp_chals
-              , 'index )
-              Proof_state.Stable.V1.t
-          ; messages_for_next_step_proof : 'messages_for_next_step_proof
-          }
-        [@@deriving compare, yojson, sexp, hash, equal]
-      end
-    end]
+    include Wire.Wrap.Statement
 
     module Minimal = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'bool
-               , 'messages_for_next_wrap_proof
-               , 'digest
-               , 'messages_for_next_step_proof
-               , 'bp_chals
-               , 'index )
-               t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'messages_for_next_step_proof
-                , 'bp_chals
-                , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
-                .V1
-                .t =
-            { proof_state :
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'bp_chals
-                , 'index )
-                Proof_state.Minimal.Stable.V1.t
-            ; messages_for_next_step_proof : 'messages_for_next_step_proof
-            }
-          [@@deriving compare, yojson, sexp, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Statement.Minimal
     end
 
     module In_circuit = struct
@@ -932,24 +654,14 @@ module Step = struct
     module Deferred_values = struct
       module Plonk = struct
         module Minimal = struct
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
-                  all that's needed to derive all the values in the [In_circuit] version below.
+          (** Challenges from the PLONK IOP. These, plus the evaluations that
+              are already in the proof, are all that's needed to derive all
+              the values in the [In_circuit] version below.
 
-                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
-                  from the [Minimal] value.
-              *)
-              type ('challenge, 'scalar_challenge) t =
-                { alpha : 'scalar_challenge
-                ; beta : 'challenge
-                ; gamma : 'challenge
-                ; zeta : 'scalar_challenge
-                }
-              [@@deriving sexp, compare, yojson, hlist, hash, equal]
-            end
-          end]
+              See src/lib/pickles/plonk_checks/plonk_checks.ml for the
+              computation of the [In_circuit] value from the [Minimal] value.
+          *)
+          include Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
 
           let to_wrap ~feature_flags { alpha; beta; gamma; zeta } :
               _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
