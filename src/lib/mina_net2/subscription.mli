@@ -11,16 +11,22 @@ val id : 'a t -> Id.t
 
 val topic : 'a t -> string
 
-val subscribe :
-     helper:Libp2p_helper.t
-  -> topic:string
+(** [create] makes a subscription with a fresh id, without telling the libp2p
+    helper about it. *)
+val create :
+     topic:string
   -> encode:('a -> string)
   -> decode:(string -> 'a Or_error.t)
   -> on_decode_failure:
        [ `Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit ]
   -> validator:
        ('a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t)
-  -> 'a t Deferred.Or_error.t
+  -> 'a t
+
+(** [subscribe ~helper sub] asks the libp2p helper to deliver gossip on [sub]'s
+    topic. The helper may deliver gossip for [sub] before this returns, so
+    [sub] must already be registered to receive it. *)
+val subscribe : helper:Libp2p_helper.t -> 'a t -> unit Deferred.Or_error.t
 
 val unsubscribe : helper:Libp2p_helper.t -> 'a t -> unit Deferred.Or_error.t
 
