@@ -70,9 +70,9 @@ let is_dirty_proof = function
   | _ ->
       true
 
-let sanitize_proof (pf : Runtime_config.Proof_keys.t) =
-  { pf with
-    level = None
+let sanitize_proof (_ : Runtime_config.Proof_keys.t) :
+    Runtime_config.Proof_keys.t =
+  { level = None
   ; sub_windows_per_window = None
   ; ledger_depth = None
   ; work_delay = None
@@ -160,8 +160,9 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         in
         let current_genesis_global_slot =
           let open Option.Let_syntax in
-          let%bind proof = runtime_config.proof in
-          let%map { global_slot_since_genesis; _ } = proof.fork in
+          let%map { global_slot_since_genesis; _ } =
+            Runtime_config.fork runtime_config
+          in
           Mina_numbers.Global_slot_since_genesis.of_int
             global_slot_since_genesis
         in

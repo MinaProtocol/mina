@@ -442,6 +442,7 @@ module Json_layout = struct
       ; grace_period_slots : int option [@default None]
       ; block_window_duration_ms : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
+      ; fork : Fork_config.t option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -1055,13 +1056,12 @@ module Proof_keys = struct
     ; coinbase_amount : Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor : int option
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
-    ; fork : Fork_config.t option
     }
   [@@deriving bin_io_unversioned, yojson]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?transaction_capacity ?coinbase_amount ?supercharged_coinbase_factor
-      ?account_creation_fee ?fork () =
+      ?account_creation_fee () =
     { level
     ; sub_windows_per_window
     ; ledger_depth
@@ -1070,7 +1070,6 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork
     }
 
   let to_json_layout
@@ -1082,7 +1081,6 @@ module Proof_keys = struct
       ; coinbase_amount
       ; supercharged_coinbase_factor
       ; account_creation_fee
-      ; fork
       } =
     { Json_layout.Proof_keys.level = Option.map ~f:Level.to_json_layout level
     ; sub_windows_per_window
@@ -1094,7 +1092,7 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork
+    ; fork = None
     }
 
   let of_json_layout
@@ -1121,6 +1119,15 @@ module Proof_keys = struct
              runtime config, which moves it to \
              genesis.block_window_duration_ms"
     in
+    let%bind () =
+      match fork with
+      | None ->
+          Ok ()
+      | Some _ ->
+          Error
+            "Runtime_config.Proof_keys.of_json_layout: proof.fork must be read \
+             as part of a whole runtime config, which moves it to genesis.fork"
+    in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
       result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
@@ -1133,7 +1140,6 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork
     }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
@@ -1157,7 +1163,6 @@ module Proof_keys = struct
           t2.supercharged_coinbase_factor
     ; account_creation_fee =
         opt_fallthrough ~default:t1.account_creation_fee t2.account_creation_fee
-    ; fork = opt_fallthrough ~default:t1.fork t2.fork
     }
 
   let gen =
@@ -1171,12 +1176,8 @@ module Proof_keys = struct
       Currency.Amount.(gen_incl zero (of_mina_int_exn 1))
     in
     let%bind supercharged_coinbase_factor = Int.gen_incl 0 100 in
-    let%bind account_creation_fee =
+    let%map account_creation_fee =
       Currency.Fee.(gen_incl one (of_mina_int_exn 10))
-    in
-    let%map fork =
-      let open Quickcheck.Generator in
-      union [ map ~f:Option.some Fork_config.gen; return None ]
     in
     { level = Some level
     ; sub_windows_per_window = Some sub_windows_per_window
@@ -1186,7 +1187,6 @@ module Proof_keys = struct
     ; coinbase_amount = Some coinbase_amount
     ; supercharged_coinbase_factor = Some supercharged_coinbase_factor
     ; account_creation_fee = Some account_creation_fee
-    ; fork
     }
 end
 
@@ -1201,6 +1201,7 @@ module Genesis = struct
     ; grace_period_slots : int option
     ; block_window_duration_ms : int option
     ; genesis_state_timestamp : string option
+    ; fork : Fork_config.t option
     }
   [@@deriving bin_io_unversioned]
 
@@ -1229,6 +1230,7 @@ module Genesis = struct
     ; genesis_state_timestamp =
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp
+    ; fork = opt_fallthrough ~default:t1.fork t2.fork
     }
 
   let gen =
@@ -1244,9 +1246,13 @@ module Genesis = struct
         ]
     in
     let%bind block_window_duration_ms = Int.gen_incl 1_000 360_000 in
-    let%map genesis_state_timestamp =
+    let%bind genesis_state_timestamp =
       Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
       |> Quickcheck.Generator.map ~f:Time.to_string
+    in
+    let%map fork =
+      let open Quickcheck.Generator in
+      union [ map ~f:Option.some Fork_config.gen; return None ]
     in
     { k = Some k
     ; delta = Some delta
@@ -1255,6 +1261,7 @@ module Genesis = struct
     ; grace_period_slots
     ; block_window_duration_ms = Some block_window_duration_ms
     ; genesis_state_timestamp = Some genesis_state_timestamp
+    ; fork
     }
 end
 
@@ -1480,6 +1487,7 @@ let move_legacy_block_window_duration_ms (layout : Json_layout.t) :
             ; grace_period_slots = None
             ; block_window_duration_ms = None
             ; genesis_state_timestamp = None
+            ; fork = None
             }
       in
       match genesis.block_window_duration_ms with
@@ -1501,21 +1509,61 @@ let move_legacy_block_window_duration_ms (layout : Json_layout.t) :
                     { proof with block_window_duration_ms = None } )
             } )
 
-let sets_legacy_block_window_duration_ms (json : Yojson.Safe.t) =
+let move_legacy_fork (layout : Json_layout.t) : (Json_layout.t, string) Result.t
+    =
+  match Option.bind layout.proof ~f:(fun proof -> proof.fork) with
+  | None ->
+      Ok layout
+  | Some fork -> (
+      let genesis =
+        Option.value layout.genesis
+          ~default:
+            { k = None
+            ; delta = None
+            ; slots_per_epoch = None
+            ; slots_per_sub_window = None
+            ; grace_period_slots = None
+            ; block_window_duration_ms = None
+            ; genesis_state_timestamp = None
+            ; fork = None
+            }
+      in
+      match genesis.fork with
+      | Some _ ->
+          Error
+            "The configuration sets both proof.fork and genesis.fork. \
+             proof.fork is deprecated; remove it."
+      | None ->
+          Ok
+            { layout with
+              genesis = Some { genesis with fork = Some fork }
+            ; proof =
+                Option.map layout.proof ~f:(fun proof ->
+                    { proof with fork = None } )
+            } )
+
+let sets_proof_field field (json : Yojson.Safe.t) =
   match json with
   | `Assoc fields -> (
       match List.Assoc.find fields ~equal:String.equal "proof" with
       | Some (`Assoc proof) ->
-          List.Assoc.mem proof ~equal:String.equal "block_window_duration_ms"
+          List.Assoc.mem proof ~equal:String.equal field
       | _ ->
           false )
   | _ ->
       false
 
+let sets_legacy_block_window_duration_ms =
+  sets_proof_field "block_window_duration_ms"
+
+let sets_legacy_fork = sets_proof_field "fork"
+
 let of_json_layout layout =
   let open Result.Let_syntax in
   let%bind { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
-    move_legacy_block_window_duration_ms layout
+    Result.bind
+      (move_legacy_block_window_duration_ms layout)
+      ~f:move_legacy_fork
   in
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
@@ -1697,6 +1745,7 @@ let make_fork_config ~staged_ledger ~genesis_state_timestamp
       ; slots_per_sub_window = None
       ; grace_period_slots = None
       ; block_window_duration_ms = None
+      ; fork = Some fork
       }
       (* add_genesis_winner must be set to false, because this
          config effectively creates a continuation of the current
@@ -1715,7 +1764,7 @@ let make_fork_config ~staged_ledger ~genesis_state_timestamp
       ; name = None
       ; add_genesis_winner = Some false
       }
-    ~proof:(Proof_keys.make ~fork ()) ()
+    ()
 
 let slot_tx_end, slot_chain_end =
   let f get_runtime t =
@@ -1723,6 +1772,8 @@ let slot_tx_end, slot_chain_end =
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
+
+let fork t = Option.bind t.genesis ~f:(fun genesis -> genesis.fork)
 
 let hard_fork_genesis_slot_delta t =
   let open Option.Let_syntax in
@@ -1758,17 +1809,6 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
     ~global_slot_since_genesis ~state_hash ~blockchain_length
     ~staking_ledger_config ~staking_epoch_seed ~next_epoch_ledger_config
     ~next_epoch_seed =
-  let genesis =
-    Genesis.
-      { genesis_state_timestamp = Some genesis_state_timestamp
-      ; k = None
-      ; delta = None
-      ; slots_per_epoch = None
-      ; slots_per_sub_window = None
-      ; grace_period_slots = None
-      ; block_window_duration_ms = None
-      }
-  in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
@@ -1780,6 +1820,18 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
       ; global_slot_since_genesis
       }
   in
+  let genesis =
+    Genesis.
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      ; block_window_duration_ms = None
+      ; fork = Some fork
+      }
+  in
   let epoch_data =
     let open Epoch_data in
     let open Data in
@@ -1789,5 +1841,4 @@ let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
             { ledger = config; seed = next_epoch_seed } )
     }
   in
-  make ~genesis ~epoch_data ~ledger:genesis_ledger_config
-    ~proof:(Proof_keys.make ~fork ()) ()
+  make ~genesis ~epoch_data ~ledger:genesis_ledger_config ()

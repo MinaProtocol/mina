@@ -834,8 +834,9 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
       let slot_chain_end = Runtime_config.slot_chain_end hf_runtime_config in
       let current_genesis_global_slot =
         let open Option.Let_syntax in
-        let%bind proof = hf_runtime_config.proof in
-        let%map { global_slot_since_genesis; _ } = proof.fork in
+        let%map { global_slot_since_genesis; _ } =
+          Runtime_config.fork hf_runtime_config
+        in
         Mina_numbers.Global_slot_since_genesis.of_int global_slot_since_genesis
       in
       match Option.both genesis_slot slot_chain_end with

@@ -499,7 +499,6 @@ let runtime_config_of_constraint_constants
   ; supercharged_coinbase_factor =
       Some constraint_constants.supercharged_coinbase_factor
   ; account_creation_fee = Some constraint_constants.account_creation_fee
-  ; fork = None
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
@@ -572,8 +571,7 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       Option.value ~default:default.minimum_user_command_fee
         (config.daemon >>= fun cfg -> cfg.minimum_user_command_fee)
   ; fork =
-      Option.value_map ~default:default.fork
-        (config.proof >>= fun cfg -> cfg.fork)
+      Option.value_map ~default:default.fork (Runtime_config.fork config)
         ~f:(fun fork -> Some (fork_constants_of_fork_config fork))
   }
 

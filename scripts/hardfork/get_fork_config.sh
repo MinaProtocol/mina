@@ -175,8 +175,8 @@ if step "Validate & rename"; then
   gunzip -k -f fork_config.json.gz
   jq empty fork_config.json || fail "Invalid JSON in fork_config.json"
 
-  BLOCK_LENGTH=$(jq -r '.proof.fork.blockchain_length' fork_config.json)
-  STATE_HASH=$(jq -r '.proof.fork.state_hash' fork_config.json)
+  BLOCK_LENGTH=$(jq -r '(.genesis.fork // .proof.fork).blockchain_length' fork_config.json)
+  STATE_HASH=$(jq -r '(.genesis.fork // .proof.fork).state_hash' fork_config.json)
 
   [[ -n "$BLOCK_LENGTH" && "$BLOCK_LENGTH" != "null" ]] || fail "Missing blockchain_length"
   [[ -n "$STATE_HASH"   && "$STATE_HASH"   != "null" ]] || fail "Missing state_hash"

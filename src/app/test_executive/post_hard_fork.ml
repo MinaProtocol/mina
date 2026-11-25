@@ -208,8 +208,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
-        ; fork = Some fork_config
         }
+    ; fork = Some fork_config
     }
 
   let run ~config:({ Test_config.signature_kind; _ } as config) network t =

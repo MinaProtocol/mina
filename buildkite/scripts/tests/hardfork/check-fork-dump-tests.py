@@ -126,6 +126,18 @@ class CheckForkDump(unittest.TestCase):
         result = self.run_check({})
         self.assertNotEqual(result.returncode, 0, result.stdout)
 
+    def test_fork_point_under_genesis_passes(self):
+        config = fork_config()
+        config["genesis"] = {"fork": config.pop("proof")["fork"]}
+        result = self.run_check(config)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_wrong_fork_slot_under_genesis_fails(self):
+        config = fork_config()
+        config["genesis"] = {"fork": config.pop("proof")["fork"]}
+        config["genesis"]["fork"]["global_slot_since_genesis"] = 8
+        self.assert_fails(self.run_check(config), "global slot since genesis")
+
     def test_wrong_fork_slot_fails(self):
         config = fork_config()
         config["proof"]["fork"]["global_slot_since_genesis"] = 8

@@ -29,7 +29,7 @@ ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/$DUMP_SQL.ta
 #     -p 1 -k 1 --pad-app-state --mina-binary ... --runtime-genesis-ledger-binary ...
 # Keys are renamed to bp1/plain1 and the ledger tars go under ledgers/.
 #
-# Its runtime_config.json `proof.fork` and genesis timestamp are overwritten at run time
+# Its runtime_config.json fork point and genesis timestamp are overwritten at run time
 # from the dump's tip block (see test-block-race.sh).
 LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger-mesa.tar"
 

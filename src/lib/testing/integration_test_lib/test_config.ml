@@ -85,15 +85,16 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; coinbase_amount = None
   ; supercharged_coinbase_factor = None
   ; account_creation_fee = None
-  ; fork =
-      Some
-        { blockchain_length = 0
-        ; global_slot_since_genesis = 0
-        ; state_hash =
-            "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
-            (*any state hash would do*)
-        }
   }
+
+let fork_default : Runtime_config.Fork_config.t option =
+  Some
+    { blockchain_length = 0
+    ; global_slot_since_genesis = 0
+    ; state_hash =
+        "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
+        (*any state hash would do*)
+    }
 
 type t =
   { requires_graphql : bool
@@ -123,6 +124,7 @@ type t =
   ; hard_fork_genesis_slot_delta : int option [@default None]
   ; network_id : string option [@default None]
   ; block_window_duration_ms : int [@default 0]
+  ; fork : Runtime_config.Fork_config.t option [@default fork_default]
   ; transaction_capacity_log_2 : int [@default 3]
   ; signature_kind : Mina_signature_kind.t [@default Testnet]
   }
@@ -167,6 +169,7 @@ let default ~(constants : constants) =
   ; hard_fork_genesis_slot_delta = None
   ; network_id = None
   ; block_window_duration_ms = 120000
+  ; fork = fork_default
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
   ; signature_kind = Testnet
   }

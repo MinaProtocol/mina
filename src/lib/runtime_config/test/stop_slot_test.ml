@@ -33,7 +33,7 @@
 
     Counters: [slot_tx_end] and [slot_chain_end] are
     [Global_slot_since_hard_fork], counted from the network's last hard fork
-    genesis. A fork config's [proof.fork.global_slot_since_genesis] is a
+    genesis. A fork config's [genesis.fork.global_slot_since_genesis] is a
     different counter; the two must never be compared directly. They meet only
     at the fork itself: the new fork config's [global_slot_since_genesis] is
     the previous one's plus the hard fork genesis slot. For devnet that is
@@ -71,10 +71,8 @@ module Config = struct
     Genesis_constants.to_time genesis_constants.protocol.genesis_state_timestamp
     |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
 
-  (** [proof.fork], set once the network has hard forked. *)
-  let fork (config : Runtime_config.t) =
-    Option.bind config.proof ~f:(fun (proof : Runtime_config.Proof_keys.t) ->
-        proof.fork )
+  (** [genesis.fork], set once the network has hard forked. *)
+  let fork = Runtime_config.fork
 end
 
 (** The schedule a runtime config declares, plus the daemon-derived quantities
@@ -204,14 +202,14 @@ module Expected = struct
   type forked =
     { genesis_time : string  (** [genesis.genesis_state_timestamp]. *)
     ; previous_fork_slot_since_genesis : int
-          (** [proof.fork.global_slot_since_genesis] of the config this one
+          (** [genesis.fork.global_slot_since_genesis] of the config this one
               replaced, i.e. the base of the [Global_slot_since_hard_fork]
               counter the schedule was expressed in. *)
     ; hard_fork_genesis_slot : int
           (** The genesis slot the schedule aimed at, since that base. *)
     ; fork_slot_since_genesis : int
-          (** [proof.fork.global_slot_since_genesis] of this config. *)
-    ; fork_blockchain_length : int  (** [proof.fork.blockchain_length]. *)
+          (** [genesis.fork.global_slot_since_genesis] of this config. *)
+    ; fork_blockchain_length : int  (** [genesis.fork.blockchain_length]. *)
     }
 
   (* Both networks are [Forked] right now, so nothing builds a [Scheduled]
@@ -299,7 +297,7 @@ let scheduled_suite ~network ~(expected : Expected.schedule) ~config_path =
 let forked_suite ~network ~(expected : Expected.forked) ~config_path =
   let open Expected in
   let config () = Config.of_file config_path in
-  let fork () = Schedule.require "proof.fork" (Config.fork (config ())) in
+  let fork () = Schedule.require "genesis.fork" (Config.fork (config ())) in
   [ case "no hard fork is armed any more" (fun () ->
         Alcotest.(check bool)
           "daemon declares no stop slot schedule" true
@@ -311,10 +309,10 @@ let forked_suite ~network ~(expected : Expected.forked) ~config_path =
           ( expected.previous_fork_slot_since_genesis
           + expected.hard_fork_genesis_slot ) ;
         Alcotest.(check int)
-          "proof.fork.global_slot_since_genesis"
+          "genesis.fork.global_slot_since_genesis"
           expected.fork_slot_since_genesis (fork ()).global_slot_since_genesis ;
         Alcotest.(check int)
-          "proof.fork.blockchain_length" expected.fork_blockchain_length
+          "genesis.fork.blockchain_length" expected.fork_blockchain_length
           (fork ()).blockchain_length )
   ; case "hard fork genesis is at the agreed time" (fun () ->
         Alcotest.(check string)

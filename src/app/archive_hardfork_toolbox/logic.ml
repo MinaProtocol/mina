@@ -52,7 +52,7 @@ let connect postgres_uri =
 
 (* Write the genesis ledger of the runtime config to genesis_accounts, at the
    height of the config's genesis block (the fork genesis when the config has
-   [proof.fork]). Balance queries read an account no block touched from there.
+   [genesis.fork]). Balance queries read an account no block touched from there.
    Continues an interrupted write; a written ledger is left as it is. *)
 let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     () =

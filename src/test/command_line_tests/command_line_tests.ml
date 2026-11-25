@@ -282,20 +282,18 @@ module AutoHardforkConfigGeneration = struct
       |> Result.map_error ~f:Error.of_string
       |> Deferred.return
     in
-    (* Extract proof.fork.global_slot_since_genesis *)
-    let%bind proof =
-      of_option daemon_config.proof
-        ~error:"Generated config missing proof field"
-    in
+    (* Extract genesis.fork.global_slot_since_genesis *)
     let%bind fork =
-      of_option proof.fork ~error:"Generated config missing proof.fork field"
+      of_option
+        (Runtime_config.fork daemon_config)
+        ~error:"Generated config missing genesis.fork field"
     in
     let fork_slot = fork.global_slot_since_genesis in
     (* Verify fork slot *)
     let%bind () =
       if fork_slot <> expected_fork_slot then
         Deferred.Or_error.error_string
-          (sprintf "proof.fork.global_slot_since_genesis is %d, expected %d"
+          (sprintf "genesis.fork.global_slot_since_genesis is %d, expected %d"
              fork_slot expected_fork_slot )
       else Deferred.Or_error.return ()
     in
@@ -411,6 +409,7 @@ module AutoHardforkConfigGeneration = struct
       ; grace_period_slots = None
       ; block_window_duration_ms = Some slot_duration_ms
       ; genesis_state_timestamp = Some genesis_timestamp
+      ; fork = None
       }
     in
     let runtime_config = Runtime_config.make ~ledger ~daemon ~genesis () in
@@ -649,15 +648,26 @@ module ConfigFileOverride = struct
       ; sync_ledger_default_subtree_depth = None
       }
     in
+    let genesis_with_fork fork : Runtime_config.Genesis.t =
+      { k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      ; block_window_duration_ms = None
+      ; genesis_state_timestamp = None
+      ; fork = Some fork
+      }
+    in
     let fork_a : Runtime_config.Fork_config.t =
       { state_hash = "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
       ; blockchain_length = 100
       ; global_slot_since_genesis = 200
       }
     in
-    let proof_a = Runtime_config.Proof_keys.make ~fork:fork_a () in
     let base_config =
-      Runtime_config.make ~ledger ~daemon:daemon_cfg ~proof:proof_a ()
+      Runtime_config.make ~ledger ~daemon:daemon_cfg
+        ~genesis:(genesis_with_fork fork_a) ()
     in
     (* Write base config as daemon.json *)
     let base_file = test.config.dirs.conf ^/ "daemon.json" in
@@ -669,8 +679,9 @@ module ConfigFileOverride = struct
       ; global_slot_since_genesis = 1000
       }
     in
-    let proof_b = Runtime_config.Proof_keys.make ~fork:fork_b () in
-    let override_config = Runtime_config.make ~proof:proof_b () in
+    let override_config =
+      Runtime_config.make ~genesis:(genesis_with_fork fork_b) ()
+    in
     (* Write override config *)
     let override_file = test.config.dirs.conf ^/ "override.json" in
     Runtime_config.to_yojson override_config
@@ -708,18 +719,17 @@ module ConfigFileOverride = struct
         |> Deferred.return
       in
       (* Verify fork B won (override) *)
-      let%bind proof =
-        of_option merged_config.proof ~error:"Merged config missing proof field"
-      in
       let%bind fork =
-        of_option proof.fork ~error:"Merged config missing proof.fork field"
+        of_option
+          (Runtime_config.fork merged_config)
+          ~error:"Merged config missing genesis.fork field"
       in
       let%bind () =
         if Runtime_config.Fork_config.equal fork fork_b then
           Deferred.Or_error.return ()
         else
           Deferred.Or_error.error_string
-            "Merged proof.fork does not match expected fork B"
+            "Merged genesis.fork does not match expected fork B"
       in
       (* Verify daemon.network_id preserved from base *)
       let%bind daemon_merged =

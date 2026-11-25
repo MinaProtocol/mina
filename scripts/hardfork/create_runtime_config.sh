@@ -28,8 +28,9 @@ if [[ -n "$PREFORK_CONFIG" ]]; then
 fi
 
 # The fork slot is taken verbatim from the fork config's
-# proof.fork.global_slot_since_genesis (the same authoritative source we already
-# read state_hash and blockchain_length from). We deliberately do NOT recompute
+# genesis.fork.global_slot_since_genesis, or proof.fork in a config from a daemon
+# that predates genesis.fork (the same authoritative source we already read
+# state_hash and blockchain_length from). We deliberately do NOT recompute
 # it from the wall-clock genesis window: that conversion needs a slot-time
 # constant, and the legacy "180 s/slot" value is the Berkeley slot time -- Mesa
 # runs at 90 s/slot, so a Mesa prefork came out off by 2x. See
@@ -43,15 +44,14 @@ jq -M \
   --slurpfile hashes "$POSTFORK_GENESIS_LEDGER_HASHES" \
   --argjson daemon "$POSTFORK_DAEMON" \
   '
+  (.genesis.fork // .proof.fork) as $fork |
   {
     genesis: {
-      genesis_state_timestamp: $genesis_timestamp
-    },
-    proof: {
+      genesis_state_timestamp: $genesis_timestamp,
       fork: {
-        state_hash: .proof.fork.state_hash,
-        blockchain_length: .proof.fork.blockchain_length,
-        global_slot_since_genesis: .proof.fork.global_slot_since_genesis
+        state_hash: $fork.state_hash,
+        blockchain_length: $fork.blockchain_length,
+        global_slot_since_genesis: $fork.global_slot_since_genesis
       }
     },
     ledger: {

@@ -215,7 +215,9 @@ export MINA_LIBP2P_PASS=''
 mkdir -p "$WORKDIR"/{ledgers{,-backup},keys}
 chmod 700 "$WORKDIR/keys"
 
-fork_point=$(jq -r '.proof.fork | [.state_hash, .blockchain_length, .global_slot_since_genesis] | @tsv' "$FORK_CONFIG")
+# The fork point is under genesis.fork, or proof.fork from a daemon that
+# predates genesis.fork.
+fork_point=$(jq -r '(.genesis.fork // .proof.fork) | [.state_hash, .blockchain_length, .global_slot_since_genesis] | @tsv' "$FORK_CONFIG")
 read -r fork_block_state_hash fork_block_length fork_global_slot <<< "$fork_point"
 
 # Fetch the precomputed fork block from local file or gcloud
@@ -395,9 +397,10 @@ if checks_contains block; then
     --arg state_hash "$fork_block_state_hash" --argjson migration "$LEDGER_MIGRATION" '
     $block[0].data.protocol_state.body as $body |
     $body.consensus_state as $c |
-    (   [ ["fork state hash", .proof.fork.state_hash, $state_hash]
-        , ["blockchain length", .proof.fork.blockchain_length, $c.blockchain_length]
-        , ["global slot since genesis", .proof.fork.global_slot_since_genesis, $c.global_slot_since_genesis]
+    (.genesis.fork // .proof.fork) as $fork |
+    (   [ ["fork state hash", $fork.state_hash, $state_hash]
+        , ["blockchain length", $fork.blockchain_length, $c.blockchain_length]
+        , ["global slot since genesis", $fork.global_slot_since_genesis, $c.global_slot_since_genesis]
         , ["staking seed", .epoch_data.staking.seed, $c.staking_epoch_data.seed]
         , ["next seed", .epoch_data.next.seed, $c.next_epoch_data.seed]
         ]

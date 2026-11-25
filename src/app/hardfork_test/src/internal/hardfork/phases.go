@@ -184,8 +184,13 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w, here's the config: '%s'", err, string(forkConfigBytes))
 	}
 
+	prepatchFork, err := ForkPointOf(forkConfigBytes)
+	if err != nil {
+		return err
+	}
+
 	// Validate fork config data
-	if err := t.ValidateLegacyPrepatchForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, prepatchConfig); err != nil {
+	if err := t.ValidateLegacyPrepatchForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, prepatchConfig, prepatchFork); err != nil {
 		return err
 	}
 	// Write fork config to file
@@ -221,7 +226,12 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 		return fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
-	err = t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, patchedConfig, forkGenesisTs, mainGenesisTs)
+	patchedFork, err := ForkPointOf(patchedConfigBytes)
+	if err != nil {
+		return err
+	}
+
+	err = t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, patchedConfig, patchedFork, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return err
 	}
@@ -248,7 +258,12 @@ func (t *HardforkTest) validateAutoForkData(daemon config.DaemonInfo, forkDataPa
 		return fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
-	if err := t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs); err != nil {
+	fork, err := ForkPointOf(forkConfigBytes)
+	if err != nil {
+		return err
+	}
+
+	if err := t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, config, fork, forkGenesisTs, mainGenesisTs); err != nil {
 		return err
 	}
 

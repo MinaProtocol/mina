@@ -1,8 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2026-08-19T18:00:00.00Z"
-  },
-  "proof": {
+    "genesis_state_timestamp": "2026-08-19T18:00:00.00Z",
     "fork": {
       "state_hash": "3NLYmfj4U9Fbbvruz3QJj2j8WJyjhGtq4LgYvo7oW1WZm16uEKib",
       "blockchain_length": 545433,
