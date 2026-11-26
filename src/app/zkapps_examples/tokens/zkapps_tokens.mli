@@ -2,6 +2,10 @@ open Signature_lib
 open Mina_base
 open Pickles_types
 
+module Transfer_recursive : sig
+  val vk : Pickles.Side_loaded.Verification_key.t Async.Deferred.t Lazy.t
+end
+
 val compile : unit -> unit
 
 val tag :
