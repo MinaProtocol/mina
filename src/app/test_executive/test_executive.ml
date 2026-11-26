@@ -399,13 +399,55 @@ let main inputs =
                 failwith "Aborted because of required offline node" ) ;
               Async_kernel.Deferred.return `Continue )
         in
+        (* A daemon only initialises once its chain has started, so readiness
+           before genesis means answering on GraphQL with [min_peers] peers. *)
+        let wait_until_ready ~min_peers (node : Engine.Network.Node.t) =
+          let deadline = Time.add (Time.now ()) (Time.Span.of_min 15.) in
+          let rec poll () =
+            match%bind.Deferred
+              Graphql_requests.get_daemon_status ~num_tries:1
+                ~logger:(Logger.null ())
+                (Engine.Network.Node.get_ingress_uri node)
+            with
+            | Ok { peer_count; _ } when peer_count >= min_peers ->
+                Malleable_error.return ()
+            | _ when Time.(now () > deadline) ->
+                Malleable_error.hard_error_format "%s did not become ready"
+                  (Engine.Network.Node.infra_id node)
+            | _ ->
+                let%bind.Deferred () = after (Time.Span.of_sec 1.) in
+                poll ()
+          in
+          poll ()
+        in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
-          Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
+          Malleable_error.List.iter seed_nodes
+            ~f:(wait_until_ready ~min_peers:0)
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
+        let%bind () =
+          Malleable_error.List.iter
+            (Engine.Network.all_mina_nodes network |> Core.String.Map.data)
+            ~f:(wait_until_ready ~min_peers:1)
+        in
+        let genesis_timestamp =
+          Block_time.to_time_exn
+          @@ Block_time.of_int64
+               (Engine.Network.genesis_constants network).protocol
+                 .genesis_state_timestamp
+        in
+        let%bind () =
+          Malleable_error.ok_if_true
+            Time.(now () < genesis_timestamp)
+            ~error:
+              (Error.createf "network was ready at %s, after genesis (%s)"
+                 (Time.to_string (Time.now ()))
+                 (Time.to_string genesis_timestamp) )
+        in
+        [%log info] "Network is ready before genesis" ;
         let archive_nodes =
           Engine.Network.archive_nodes network |> Core.String.Map.data
         in
