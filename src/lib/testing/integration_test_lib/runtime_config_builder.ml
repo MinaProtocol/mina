@@ -9,7 +9,8 @@ let ledger_is_prefix ledger1 ledger2 =
              ({ account_name = name2; _ } : Test_config.Test_account.t)
            -> String.equal name1 name2 )
 
-let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
+let create ?(genesis_delay = Time.Span.zero) ~(test_config : Test_config.t)
+    ~(genesis_ledger : Genesis_ledger.t) () =
   { Runtime_config.daemon =
       Some
         { txpool_max_size = Some test_config.txpool_max_size
@@ -35,7 +36,9 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
         ; slots_per_sub_window = Some test_config.slots_per_sub_window
         ; grace_period_slots = Some test_config.grace_period_slots
         ; genesis_state_timestamp =
-            Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
+            Some
+              Core.Time.(
+                to_string_abs ~zone:Zone.utc (add (now ()) genesis_delay))
         }
   ; proof =
       Some test_config.proof_config (* TODO: prebake ledger and only set hash *)
