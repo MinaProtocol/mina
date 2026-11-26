@@ -55,6 +55,14 @@ let () =
                         .Make_FixtureWithoutBootstrap
                           (Load_genesis_ledger) ) )
         ] )
+    ; ( "missing_blocks_audit"
+      , [ test_case
+            "Audit of missing blocks on real databases, and its failures" `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Missing_blocks_audit) ) )
+        ] )
     ; ( "upgrade_archive"
       , [ test_case
             "Recreate database from precomputed blocks after upgrade script is \

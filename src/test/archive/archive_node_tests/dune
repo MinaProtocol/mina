@@ -11,7 +11,13 @@
    stdio
    alcotest
    cmdliner
+   caqti
+   uri
    ;; mina libraries
+   logger
+   mina_caqti
+   missing_blocks_auditor_lib
+   missing_blocks_guardian_lib
    mina_automation
    mina_automation.fixture
    mina_automation.runner)
