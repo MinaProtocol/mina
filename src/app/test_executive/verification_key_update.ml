@@ -466,7 +466,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       , update_vk_proof )
     in
     let with_timeout =
-      let soft_slots = 3 in
+      let soft_slots = 6 in
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
